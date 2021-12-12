@@ -1,0 +1,25 @@
+[
+    {
+        "inputs": [
+            {
+                "name": "balance",
+                "type": "felt"
+            }
+        ],
+        "name": "update_balance",
+        "outputs": [],
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "get_balance",
+        "outputs": [
+            {
+                "name": "balance",
+                "type": "felt"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    }
+]
