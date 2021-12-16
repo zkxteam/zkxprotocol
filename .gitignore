@@ -1,4 +1,6 @@
-abi/account_abi.json
-abi/admin_auth_abi.json
+
+env
+
+.pytest_cache
 
 .DS_Store
