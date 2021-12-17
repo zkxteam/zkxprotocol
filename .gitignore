@@ -1,14 +1,5 @@
-abi/account_abi.json
-abi/admin_auth_abi.json
+env
 
-node_modules
+.pytest_cache
 
-node_modules
-.env
-coverage
-coverage.json
-typechain
-
-#Hardhat files
-cache
-artifacts
+.DS_Store

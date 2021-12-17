@@ -23,6 +23,10 @@
             {
                 "name": "action",
                 "type": "felt"
+            },
+            {
+                "name": "value",
+                "type": "felt"
             }
         ],
         "name": "update_admin_mapping",
