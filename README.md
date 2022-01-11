@@ -19,3 +19,8 @@ nile compile
 ```
 pytest
 ```
+
+4. Script to deploy contracts
+```
+python3 scripts/deploy_all.py 
+```
