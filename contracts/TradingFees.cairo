@@ -83,8 +83,8 @@ func constructor{
 
     # Set the trade access for each criteria
     trade_access.write(tier_level = 1, value = trade_access1)
-    trade_access.write(tier_level = 1, value = trade_access2)
-    trade_access.write(tier_level = 1, value = trade_access3)
+    trade_access.write(tier_level = 2, value = trade_access2)
+    trade_access.write(tier_level = 3, value = trade_access3)
 
     auth_address.write(value = _authAddress)
     return ()
