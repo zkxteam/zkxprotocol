@@ -22,7 +22,7 @@ def deploy_all():
     # deploy Account Contracts
     admin1 = deploy_command("Account", [str(signer1.public_key)], network, "Account1")
     admin2 = deploy_command("Account", [str(signer2.public_key)], network, "Account2")
-    user1 = deploy_command("Account", [str(signer2.public_key)], network, "Account3")
+    user1 = deploy_command("Account", [str(signer3.public_key)], network, "Account3")
 
     # deploy Admin Auth Contracts
     admin_auth = deploy_command("AdminAuth", [admin1, admin2], network, "AdminAuth")
