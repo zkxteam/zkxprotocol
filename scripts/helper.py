@@ -4,8 +4,8 @@ import re
 import subprocess
 import json
 
-CONTRACTS_DIRECTORY = "../contracts"
-BUILD_DIRECTORY = "../artifacts"
+CONTRACTS_DIRECTORY = "./contracts"
+BUILD_DIRECTORY = "./artifacts"
 ABIS_DIRECTORY = f"{BUILD_DIRECTORY}/abis"
 NODE_FILENAME = "node.json"
 
