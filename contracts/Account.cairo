@@ -35,6 +35,14 @@ end
 func public_key() -> (res: felt):
 end
 
+@storage_var
+func trading_volume() -> (res: felt):
+end
+
+@storage_var
+func balance() -> (res: felt):
+end
+
 #
 # Guards
 #
@@ -72,6 +80,26 @@ func get_nonce{
         range_check_ptr
     }() -> (res: felt):
     let (res) = current_nonce.read()
+    return (res=res)
+end
+
+@view
+func get_trading_volume{
+        syscall_ptr : felt*, 
+        pedersen_ptr : HashBuiltin*,
+        range_check_ptr
+    }() -> (res: felt):
+    let (res) = trading_volume.read()
+    return (res=res)
+end
+
+@view
+func get_balance{
+        syscall_ptr : felt*, 
+        pedersen_ptr : HashBuiltin*,
+        range_check_ptr
+    }() -> (res: felt):
+    let (res) = balance.read()
     return (res=res)
 end
 
