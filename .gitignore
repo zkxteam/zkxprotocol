@@ -1,6 +1,5 @@
-5 lines (3 sloc)  29 Bytes
-   
 env
+artifacts/
 
 .pytest_cache
 
