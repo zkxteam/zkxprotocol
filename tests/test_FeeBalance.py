@@ -64,6 +64,13 @@ async def feeBalance_factory():
     return feeBalance, callFeeBalance, admin1, admin2
 
 @pytest.mark.asyncio
+async def test_update_fee_mapping_invalid(feeBalance_factory):
+    feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
+
+    assert_revert(lambda: signer1.send_transaction(admin1, feeBalance.contract_address, 'update_fee_mapping', [pytest.user1.contract_address, 10]))
+
+
+@pytest.mark.asyncio
 async def test_update_fee_mapping(feeBalance_factory):
     feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
 
