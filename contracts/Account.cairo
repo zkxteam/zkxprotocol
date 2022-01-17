@@ -23,6 +23,19 @@ struct Message:
     member nonce: felt
 end
 
+# @notice structure to store Order Details
+struct OrderDetails:
+    member ticker: felt
+    member orderType: felt
+    member openingTimestamp: felt
+    member openingPrice: felt
+    member assetQuantity: felt
+    member closingTimestamp: felt
+    member closingPrice: felt
+    member orderStatus: felt
+end
+
+
 #
 # Storage
 #
@@ -41,6 +54,16 @@ end
 
 @storage_var
 func balance() -> (res: felt):
+end
+
+# @notice Mapping between orderID and Account Portfolio
+@storage_var
+func order_details(orderId: felt) -> (order : OrderDetails):
+end
+
+# @notice Mapping between asset and assetquantity
+@storage_var
+func asset_details(asset: felt) -> (assetQuantity : felt):
 end
 
 #
@@ -164,6 +187,35 @@ func is_valid_signature{
     return ()
 end
 
+# @notice Getter function for order details
+# @param orderID is the ID of the position
+# @returns the position details associated with the order ID
+@view
+func getOrder{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr
+}(orderId: felt) -> (order: OrderDetails) :
+
+    let (orderDetails) = order_details.read(orderId = orderId)
+    return (orderDetails)
+end
+
+
+# @notice Getter function for asset details
+# @param asset 
+# @returns the asset details
+@view
+func getAssetDetails{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr
+}(asset: felt) -> (assetQuantity: felt) :
+
+    let (assetQuantity) = asset_details.read(asset = asset)
+    return (assetQuantity)
+end
+
 @external
 func execute{
         syscall_ptr : felt*, 
@@ -251,4 +303,37 @@ func hash_calldata{pedersen_ptr: HashBuiltin*}(
         let pedersen_ptr = hash_ptr
         return (res=res)
     end
+end
+
+
+# @notice Add order function
+# @param orderId - ID of the order
+# @param order details - struct variable with the required order details
+@external
+func addOrder{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr
+}(orderId: felt, orderDetails: OrderDetails) :
+    order_details.write(orderId = orderId, value = orderDetails)
+    let asset = orderDetails.ticker
+    let assetQuantity = orderDetails.assetQuantity
+    let quantity: felt = asset_details.read(asset = asset)
+    let totalQuantity = assetQuantity + quantity
+    asset_details.write(asset = asset, value = totalQuantity)
+    return ()
+end
+
+
+# @notice modify order function
+# @param orderId - ID of the order
+# @param modified order details - struct variable with the modified order details
+@external
+func modifyOrder{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr
+}(orderId: felt, modifiedOrderDetails: OrderDetails) :
+    order_details.write(orderId = orderId, value = modifiedOrderDetails)
+    return ()
 end
