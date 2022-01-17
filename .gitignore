@@ -7,4 +7,4 @@ artifacts/
 
 .DS_Store
 
-test/__pycache__/
+tests/__pycache__/
