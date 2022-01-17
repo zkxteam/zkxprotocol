@@ -42,6 +42,10 @@ end
 func balance() -> (res : felt):
 end
 
+@storage_var
+func authorized_registry() -> (res : felt):
+end
+
 #
 # Guards
 #
@@ -103,8 +107,9 @@ end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        _public_key : felt):
+        _public_key : felt, _registry : felt):
     public_key.write(_public_key)
+    authorized_registry.write(_registry)
     return ()
 end
 
@@ -196,5 +201,12 @@ func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size 
         let (res) = hash_finalize(hash_state_ptr)
         let pedersen_ptr = hash_ptr
         return (res=res)
+    end
+end
+
+# @notice AuthorizedRegistry interface
+@contract_interface
+namespace IAuthorizedRegistry:
+    func get_registry_value(address : felt, action : felt) -> (allowed : felt):
     end
 end
