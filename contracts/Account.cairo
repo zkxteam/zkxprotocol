@@ -34,7 +34,6 @@ struct OrderDetails:
     member orderStatus: felt
 end
 
-
 #
 # Storage
 #
