@@ -81,3 +81,14 @@ def hash_message(sender, to, selector, calldata, nonce):
         nonce
     ]
     return compute_hash_on_elements(message)
+
+
+def hash_order(order_id, ticker, price, position, direction):
+    order = [ 
+        order_id,
+        ticker,
+        price,
+        position,
+        direction
+    ]
+    return compute_hash_on_elements(order)

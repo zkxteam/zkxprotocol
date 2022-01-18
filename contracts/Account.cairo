@@ -8,6 +8,8 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_signature
 from starkware.cairo.common.hash_state import (
     hash_init, hash_finalize, hash_update, hash_update_single)
+from starkware.cairo.common.math_cmp import is_le
+from starkware.cairo.common.math import assert_le
 
 #
 # Structs
@@ -22,6 +24,32 @@ struct Message:
     member nonce : felt
 end
 
+struct OrderRequest:
+    member orderID: felt
+    member ticker: felt
+    member price: felt
+    member positionSize: felt
+    member direction: felt
+    member closeOrder: felt
+end
+
+struct Signature:
+    member r_value: felt
+    member s_value: felt
+end
+
+# status 0: partial
+# status 1: executed
+# status 2: close partial
+# status 3: close
+struct OrderDetails:
+    member ticker: felt
+    member price: felt
+    member positionSize: felt
+    member direction: felt
+    member portionExecuted: felt
+    member status: felt
+end
 #
 # Storage
 #
@@ -45,6 +73,10 @@ end
 @storage_var
 func authorized_registry() -> (res : felt):
 end
+
+@storage_var
+func order_mapping(orderID: felt) -> (res : OrderDetails):
+end 
 
 #
 # Guards
@@ -86,6 +118,16 @@ end
 func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
         res : felt):
     let (res) = balance.read()
+    return (res=res)
+end
+
+@view
+func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    order_ID : felt
+) -> (
+    res : OrderDetails
+):
+    let (res) = order_mapping.read(orderID=order_ID)
     return (res=res)
 end
 
@@ -202,6 +244,121 @@ func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size 
         let pedersen_ptr = hash_ptr
         return (res=res)
     end
+end
+
+@external
+func place_order{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr, 
+    ecdsa_ptr: SignatureBuiltin*
+}(
+    request : OrderRequest,
+    signature : Signature,
+    size : felt
+) -> (res : felt):
+    alloc_locals
+    let (__fp__, _) = get_fp_and_pc()
+
+    # hash the parameters
+    let (hash) = hash_order(&request)
+    # check the validity of the signature
+    is_valid_signature_order(hash, signature)
+    
+    # check if it's a partial order (Initial check)
+    let (isPartial) = is_le(size, request.positionSize)
+    
+    # closeOrder == 0 -> Open a new position
+    # closeOrder == 1 -> Close a position
+    if request.closeOrder == 0:
+        # Get the order details if already exists
+        let (orderDetails) = order_mapping.read(orderID = request.orderID)
+        # init var to store the order status
+        if (isPartial) == 1:
+            let status_ = 0
+        else:
+            let status_ = 1
+        end
+        
+        # If it's a new order
+        if orderDetails.ticker == 0:
+            let new_order = OrderDetails(
+                ticker = request.ticker,
+                price = request.price,
+                positionSize = request.positionSize,
+                direction = request.direction,
+                portionExecuted = size,
+                status = status_
+            )
+            # Write to the mapping
+            order_mapping.write(orderID = request.orderID, value = new_order)
+        # If it's an existing order
+        else:
+            # Return if the position size after the executing the current order is more than the order's positionSize
+            assert_le(request.positionSize, size + orderDetails.portionExecuted)
+            # Check if the order is fully filled by executing the current one
+            let (isPartialCurrent) = is_le(size + orderDetails.portionExecuted, request.positionSize)
+
+            if (isPartialCurrent) == 0:
+                status_ = 1
+            end
+
+            let updated_order = OrderDetails(
+                ticker = orderDetails.ticker,
+                price = orderDetails.price,
+                positionSize = orderDetails.positionSize,
+                direction = orderDetails.direction,
+                portionExecuted = orderDetails.portionExecuted + size,
+                status = status_
+            )
+            # Write to the mapping
+            order_mapping.write(orderID = request.orderID, value = updated_order)
+        end
+    end
+
+    return (1)
+end
+
+func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (res: felt):
+    alloc_locals
+
+    let hash_ptr = pedersen_ptr
+    with hash_ptr:
+        let (hash_state_ptr) = hash_init()
+        # first three iterations are 'sender', 'to', and 'selector'
+        let (hash_state_ptr) = hash_update(
+            hash_state_ptr, 
+            orderRequest, 
+            6
+        )
+        let (res) = hash_finalize(hash_state_ptr)
+        let pedersen_ptr = hash_ptr
+        return (res=res)
+    end
+end
+
+@view
+func is_valid_signature_order{
+        syscall_ptr : felt*, 
+        pedersen_ptr : HashBuiltin*,
+        range_check_ptr, 
+        ecdsa_ptr: SignatureBuiltin*
+    }(
+        hash: felt,
+        signature: Signature,
+    ) -> ():
+
+    let sig_r = signature.r_value
+    let sig_s = signature.s_value
+    let (pub_key) = public_key.read()
+    verify_ecdsa_signature(
+        message=hash,
+        public_key= pub_key,
+        signature_r=sig_r,
+        signature_s=sig_s
+    )
+
+    return ()
 end
 
 # @notice AuthorizedRegistry interface
