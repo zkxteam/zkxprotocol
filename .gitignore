@@ -1,6 +1,9 @@
 env
+
 artifacts/
 
 .pytest_cache
 
 .DS_Store
+
+tests/__pycache__/
