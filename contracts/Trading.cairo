@@ -12,6 +12,9 @@ from starkware.cairo.common.hash_state import (
     hash_init, hash_finalize, hash_update
 )
 
+@storage_var
+func balance() -> (res : felt):
+end
 
 struct OrderRequest:
     member orderID: felt
@@ -39,7 +42,8 @@ func execute_order{
     signature_1 : Signature,
     request2 : OrderRequest,
     signer_2_pub_key : felt,
-    signature_2 : Signature
+    signature_2 : Signature,
+    size : felt
 ) -> (res : felt):
     assert (request1.direction * request2.direction) = 0
     assert (request1.direction + request2.direction) = 1
@@ -48,22 +52,12 @@ func execute_order{
     assert_nn(request1.positionSize)
     assert_nn(request2.positionSize)
 
+    let (res1) = IAccount.place_order(contract_address=signer_1_pub_key, request = request1, signature = signature_1, size = size)
+    let (res2) = IAccount.place_order(contract_address=signer_2_pub_key, request = request2, signature = signature_2, size = size)
 
-    let size_ = request2.positionSize
-    let (res_) =  is_le(request1.positionSize, request2.positionSize)
-    if (res_) == 1 :
-        size_ = request1.positionSize
-    end
-
-    let (res1) = IAccount.place_order(contract_address=signer_1_pub_key, request = request1, signature = signature_1, size = size_)
-    let (res2) = IAccount.place_order(contract_address=signer_2_pub_key, request = request2, signature = signature_2, size = size_)
-
-    # transfer of funds
-    #
-    #
-    #
     return (1)
 end
+
 
 
 @contract_interface

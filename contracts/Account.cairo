@@ -9,7 +9,7 @@ from starkware.starknet.common.syscalls import call_contract, get_caller_address
 from starkware.cairo.common.hash_state import (
     hash_init, hash_finalize, hash_update, hash_update_single)
 from starkware.cairo.common.math_cmp import is_le
-from starkware.cairo.common.math import assert_le
+from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn
 
 #
 # Structs
@@ -246,12 +246,26 @@ func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size 
     end
 end
 
+func modify_balance{
+        syscall_ptr : felt*, 
+        pedersen_ptr : HashBuiltin*, 
+        range_check_ptr,
+}(
+    amount: felt
+):
+    let (curr_balance) = get_balance()
+    assert_nn(curr_balance - amount)
+    balance.write(curr_balance - amount)
+
+    return ()
+end
+
 @external
 func place_order{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*,
+    ecdsa_ptr : SignatureBuiltin*,
     range_check_ptr, 
-    ecdsa_ptr: SignatureBuiltin*
 }(
     request : OrderRequest,
     signature : Signature,
@@ -267,21 +281,24 @@ func place_order{
     
     # check if it's a partial order (Initial check)
     let (isPartial) = is_le(size, request.positionSize)
+
+    local status_
+    local pnl
     
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
         # Get the order details if already exists
         let (orderDetails) = order_mapping.read(orderID = request.orderID)
-        # init var to store the order status
-        if (isPartial) == 1:
-            let status_ = 0
-        else:
-            let status_ = 1
-        end
-        
         # If it's a new order
-        if orderDetails.ticker == 0:
+        if orderDetails.positionSize == 0:
+
+            if request.positionSize == size:
+                status_ = 1
+            else :
+                status_ = 0
+            end
+
             let new_order = OrderDetails(
                 ticker = request.ticker,
                 price = request.price,
@@ -292,15 +309,19 @@ func place_order{
             )
             # Write to the mapping
             order_mapping.write(orderID = request.orderID, value = new_order)
+            tempvar syscall_ptr :felt* = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
+            tempvar range_check_ptr = range_check_ptr
         # If it's an existing order
         else:
             # Return if the position size after the executing the current order is more than the order's positionSize
-            assert_le(request.positionSize, size + orderDetails.portionExecuted)
+            assert_le(size + orderDetails.portionExecuted, request.positionSize)
             # Check if the order is fully filled by executing the current one
-            let (isPartialCurrent) = is_le(size + orderDetails.portionExecuted, request.positionSize)
 
-            if (isPartialCurrent) == 0:
+            if request.positionSize == size + orderDetails.portionExecuted:
                 status_ = 1
+            else :
+                status_ = 0
             end
 
             let updated_order = OrderDetails(
@@ -313,10 +334,64 @@ func place_order{
             )
             # Write to the mapping
             order_mapping.write(orderID = request.orderID, value = updated_order)
+            tempvar syscall_ptr :felt* = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
+            tempvar range_check_ptr = range_check_ptr
+
+        # let order_amount = size * request.price
+        # modify_balance(order_amount*-1)
+        # pnl = order_amount
+
+        tempvar syscall_ptr :felt* = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
+        tempvar range_check_ptr = range_check_ptr
         end
+    else :
+        # Get the order details 
+        let (orderDetails) = order_mapping.read(orderID = request.orderID)
+
+        # Assert that it's the reverse direction of the current position
+        assert_not_equal(request.direction, orderDetails.direction)
+
+        # Assert that the order exists
+        assert_not_zero(orderDetails.positionSize)
+        assert_nn(orderDetails.portionExecuted - size)
+
+        if orderDetails.portionExecuted - size == 0:
+            status_ = 4
+        else :
+            status_ = 3
+        end
+
+        let updated_order = OrderDetails(
+            ticker = orderDetails.ticker,
+            price = orderDetails.price,
+            positionSize = orderDetails.positionSize,
+            direction = orderDetails.direction,
+            portionExecuted = orderDetails.portionExecuted - size,
+            status = status_
+        )
+        # Write to the mapping
+        order_mapping.write(orderID = request.orderID, value = updated_order)
+
+        # local price_diff
+        # if orderDetails.direction == 0:
+        #     price_diff = request.price - orderDetails.price 
+        # else :
+        #     price_diff = orderDetails.price - request.price 
+        # end
+
+        # let amount = price_diff * size
+
+        # modify_balance(amount)
+        # pnl = amount * (-1)
+
+        tempvar syscall_ptr :felt* = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
+        tempvar range_check_ptr = range_check_ptr
     end
 
-    return (1)
+    return (pnl)
 end
 
 func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (res: felt):
@@ -347,13 +422,13 @@ func is_valid_signature_order{
         hash: felt,
         signature: Signature,
     ) -> ():
-
+    let (_public_key) = public_key.read()
     let sig_r = signature.r_value
     let sig_s = signature.s_value
-    let (pub_key) = public_key.read()
+
     verify_ecdsa_signature(
         message=hash,
-        public_key= pub_key,
+        public_key=_public_key,
         signature_r=sig_r,
         signature_s=sig_s
     )

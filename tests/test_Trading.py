@@ -76,19 +76,19 @@ async def test_signing_of_data(adminAuth_factory):
     price1 = 100000
     position1 = 10
     direction1 = 1
-    closeOrder = 0
+    closeOrder1 = 0
 
     order_id_2 = str_to_felt("f45g")
     ticker2 = str_to_felt('BTC')
-    price2 = 10000
+    price2 = 100000
     position2 = 1
     direction2 = 0
-    closeOrder = 0
+    closeOrder2 = 0
 
-    hash_computed1 = hash_order(order_id_1, ticker1, price1, position1, direction1)
+    hash_computed1 = hash_order(order_id_1, ticker1, price1, position1, direction1, closeOrder1)
     print(hash_computed1)
 
-    hash_computed2 = hash_order(order_id_2, ticker2, price2, position2, direction2)
+    hash_computed2 = hash_order(order_id_2, ticker2, price2, position2, direction2, closeOrder2)
     print(hash_computed2)
     
     signed_message1 = signer1.sign(hash_computed1)
@@ -97,10 +97,23 @@ async def test_signing_of_data(adminAuth_factory):
     signed_message2 = signer2.sign(hash_computed2)
     print(signed_message2)
     
-    await signer1.send_transaction(admin1, trading.contract_address, "execute_order", [order_id_1, ticker1, price1, position1, direction1, admin1.contract_address, signed_message1[0], signed_message1[1], order_id_2, ticker2, price2, position2, direction2, admin2.contract_address, signed_message2[0], signed_message2[1]])
+    await signer1.send_transaction(admin1, trading.contract_address, "execute_order", [
+        order_id_1, ticker1, price1, position1, direction1, closeOrder1, 
+        admin1.contract_address, 
+        signed_message1[0], signed_message1[1], 
 
-    # execution_info1 = await trading.get_order_data(str_to_felt("sdaf")).call()
-    # print(execution_info1)
+        order_id_2, ticker2, price2, position2, direction2, closeOrder2, 
+        admin2.contract_address, 
+        signed_message2[0], signed_message2[1],
+        
+        1
+    ])
+    # await signer1.send_transaction(admin1, admin1.contract_address, "place_order", [order_id_1, ticker1, price1, position1, direction1, closeOrder1, signed_message1[0], signed_message1[1], 12])
+    execution_info1 = await admin1.get_order_data(str_to_felt("sdaf")).call()
+    print(execution_info1.result.res)
+
+    execution_info2 = await admin2.get_order_data(str_to_felt("f45g")).call()
+    print(execution_info2.result.res)
 
     # signed_message2 = signer2.sign(hash_computed)
     # assert_revert(lambda: signer1.send_transaction(admin1, trading.contract_address, "execute_order", [ticker, price, position, direction, signer1.public_key, signed_message2[0], signed_message[1]]))
