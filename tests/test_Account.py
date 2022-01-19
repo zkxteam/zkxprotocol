@@ -38,7 +38,7 @@ async def test_adding_order(adminAuth_factory):
     fetched_order = execution_info.result.order
 
     assert fetched_order.ticker == str_to_felt("ETH")
-    assert fetched_order.orderType == str_to_felt("long")
+    assert fetched_order.direction == str_to_felt("long")
     assert fetched_order.openingTimestamp == str_to_felt("01-01-2022")
     assert fetched_order.openingPrice == 100
     assert fetched_order.assetQuantity == 1
@@ -63,7 +63,7 @@ async def test_modifying_order(adminAuth_factory):
     fetched_order = execution_info.result.order
 
     assert fetched_order.ticker == str_to_felt("ETH")
-    assert fetched_order.orderType == str_to_felt("long")
+    assert fetched_order.direction == str_to_felt("long")
     assert fetched_order.openingTimestamp == str_to_felt("01-01-2022")
     assert fetched_order.openingPrice == 100
     assert fetched_order.assetQuantity == 1
@@ -77,7 +77,7 @@ async def test_modifying_order(adminAuth_factory):
     fetched_order1 = execution_info1.result.order
 
     assert fetched_order1.ticker == str_to_felt("ETH")
-    assert fetched_order1.orderType == str_to_felt("long")
+    assert fetched_order1.direction == str_to_felt("long")
     assert fetched_order1.openingTimestamp == str_to_felt("01-01-2022")
     assert fetched_order1.openingPrice == 100
     assert fetched_order1.assetQuantity == 1

@@ -23,9 +23,14 @@ struct Message:
 end
 
 # @notice structure to store Order Details
+# orderStatus 0: partial
+# orderStatus 1: executed
+# orderStatus 2: close partial
+# orderStatus 3: close
+# direction : short/long
 struct OrderDetails:
     member ticker: felt
-    member orderType: felt
+    member direction: felt
     member openingTimestamp: felt
     member openingPrice: felt
     member assetQuantity: felt
