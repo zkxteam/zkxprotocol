@@ -60,26 +60,39 @@ async def adminAuth_factory():
         ]
     )
 
-    trading = await starknet.deploy(
-        "contracts/Trading.cairo",
-        constructor_calldata=[]
+    asset = await starknet.deploy(
+        "contracts/Asset.cairo",
+        constructor_calldata=[
+            adminAuth.contract_address
+        ]
     )
 
-    return adminAuth, fees, admin1, admin2, user1, trading
+    trading = await starknet.deploy(
+        "contracts/Trading.cairo",
+        constructor_calldata=[
+            asset.contract_address,
+            fees.contract_address
+        ]
+    )
+
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
+    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("BTC"), str_to_felt("Bitcoin"), 1])
+
+    return adminAuth, fees, admin1, admin2, user1, asset, trading
 
 @pytest.mark.asyncio
 async def test_signing_of_data(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, user1, trading = adminAuth_factory
+    adminAuth, fees, admin1, admin2, user1, asset, trading = adminAuth_factory
 
     order_id_1 = str_to_felt("sdaf")
-    ticker1 = str_to_felt('BTC')
+    ticker1 = str_to_felt("32f0406jz7qj8")
     price1 = 100000
     position1 = 10
     direction1 = 1
     closeOrder1 = 0
 
     order_id_2 = str_to_felt("f45g")
-    ticker2 = str_to_felt('BTC')
+    ticker2 = str_to_felt("32f0406jz7qj8")
     price2 = 100000
     position2 = 1
     direction2 = 0
@@ -96,8 +109,11 @@ async def test_signing_of_data(adminAuth_factory):
 
     signed_message2 = signer2.sign(hash_computed2)
     print(signed_message2)
-    
-    await signer1.send_transaction(admin1, trading.contract_address, "execute_order", [
+
+    execution_info1 = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
+    print(execution_info1.result.currAsset)
+
+    await signer1.send_transaction(admin1, trading.contract_address, "check_execution", [
         order_id_1, ticker1, price1, position1, direction1, closeOrder1, 
         admin1.contract_address, 
         signed_message1[0], signed_message1[1], 
@@ -108,12 +124,18 @@ async def test_signing_of_data(adminAuth_factory):
         
         1
     ])
-    # await signer1.send_transaction(admin1, admin1.contract_address, "place_order", [order_id_1, ticker1, price1, position1, direction1, closeOrder1, signed_message1[0], signed_message1[1], 12])
-    execution_info1 = await admin1.get_order_data(str_to_felt("sdaf")).call()
-    print(execution_info1.result.res)
 
-    execution_info2 = await admin2.get_order_data(str_to_felt("f45g")).call()
-    print(execution_info2.result.res)
+    lockedFunds1 = await admin1.get_locked_balance().call()
+    print(lockedFunds1)
+
+    lockedFunds2 = await admin2.get_locked_balance().call()
+    print(lockedFunds2)
+    # await signer1.send_transaction(admin1, admin1.contract_address, "place_order", [order_id_1, ticker1, price1, position1, direction1, closeOrder1, signed_message1[0], signed_message1[1], 12])
+    # execution_info1 = await admin1.get_order_data(str_to_felt("sdaf")).call()
+    # print(execution_info1.result.res)
+
+    # execution_info2 = await admin2.get_order_data(str_to_felt("f45g")).call()
+    # print(execution_info2.result.res)
 
     # signed_message2 = signer2.sign(hash_computed)
     # assert_revert(lambda: signer1.send_transaction(admin1, trading.contract_address, "execute_order", [ticker, price, position, direction, signer1.public_key, signed_message2[0], signed_message[1]]))

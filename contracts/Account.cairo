@@ -74,6 +74,12 @@ end
 func authorized_registry() -> (res : felt):
 end
 
+
+@storage_var
+func locked_balance() -> (res : felt):
+end
+
+
 @storage_var
 func order_mapping(orderID: felt) -> (res : OrderDetails):
 end 
@@ -118,6 +124,13 @@ end
 func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
         res : felt):
     let (res) = balance.read()
+    return (res=res)
+end
+
+@view
+func get_locked_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+        res : felt):
+    let (res) = locked_balance.read()
     return (res=res)
 end
 
@@ -393,6 +406,35 @@ func place_order{
 
     return (pnl)
 end
+
+
+@external
+func initialize_order{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*,
+    ecdsa_ptr : SignatureBuiltin*,
+    range_check_ptr, 
+}(
+    request : OrderRequest,
+    signature : Signature,
+    size : felt,
+    amount : felt
+) -> (res : felt):
+    alloc_locals
+    let (__fp__, _) = get_fp_and_pc()
+
+    # hash the parameters
+    let (hash) = hash_order(&request)
+    # check the validity of the signature
+    is_valid_signature_order(hash, signature)
+    
+    let (locked_amount) = locked_balance.read()
+    locked_balance.write(locked_amount + amount) 
+
+    return (1)
+end
+
+
 
 func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (res: felt):
     alloc_locals
