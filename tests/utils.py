@@ -93,3 +93,6 @@ def hash_order(order_id, ticker, price, position, direction, closeOrder):
         closeOrder
     ]
     return compute_hash_on_elements(order)
+
+def parse_number(num):
+    return int(num**6)

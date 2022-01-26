@@ -47,7 +47,7 @@ end
 
 # @notice Constructor for the smart-contract
 # @param long_fees - Base fees for the long positions
-# @param short_fes - Base fees for the short positions
+# @param short_fees - Base fees for the short positions
 # @param _authAddress - Address of the AdminAuth Contract
 # @param tier_details1 - Struct object to init tier level 1
 # @param tier_details2 - Struct object to init tier level 2

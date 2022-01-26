@@ -172,6 +172,33 @@ end
 # Business logic
 #
 
+# @external
+# func transfer_from{
+#     syscall_ptr : felt*, 
+#     pedersen_ptr : HashBuiltin*, 
+#     range_check_ptr,
+# }(
+#     amount : felt
+# ) -> ():
+
+#     let (caller) = get_caller_address()
+
+#     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
+#     tempvar range_check_ptr = range_check_ptr
+
+#     let (authorized_registry_) = authorized_registry.read()
+#     let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3)
+#     assert is_trading_contract = 1
+
+#     # tempvar syscall_ptr :felt* = syscall_ptr
+    
+#     let (curr_balance) = balance.read()
+#     assert_nn(curr_balance - amount)
+#     balance.write(curr_balance - amount)
+#     return (0)
+# end
+
+
 @view
 func is_valid_signature{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
@@ -259,7 +286,9 @@ func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size 
     end
 end
 
-func modify_balance{
+# TODO: Remove; Only for testing purposes
+@external
+func set_balance{
         syscall_ptr : felt*, 
         pedersen_ptr : HashBuiltin*, 
         range_check_ptr,
@@ -267,11 +296,11 @@ func modify_balance{
     amount: felt
 ):
     let (curr_balance) = get_balance()
-    assert_nn(curr_balance - amount)
-    balance.write(curr_balance - amount)
-
+    balance.write(curr_balance + amount)
     return ()
 end
+
+
 
 @external
 func place_order{
@@ -387,18 +416,6 @@ func place_order{
         # Write to the mapping
         order_mapping.write(orderID = request.orderID, value = updated_order)
 
-        # local price_diff
-        # if orderDetails.direction == 0:
-        #     price_diff = request.price - orderDetails.price 
-        # else :
-        #     price_diff = orderDetails.price - request.price 
-        # end
-
-        # let amount = price_diff * size
-
-        # modify_balance(amount)
-        # pnl = amount * (-1)
-
         tempvar syscall_ptr :felt* = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         tempvar range_check_ptr = range_check_ptr
@@ -422,6 +439,11 @@ func initialize_order{
 ) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
+
+    let (caller) = get_caller_address()
+    let (authorized_registry_) = authorized_registry.read()
+    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3)
+    assert is_trading_contract = 1
 
     # hash the parameters
     let (hash) = hash_order(&request)
@@ -484,3 +506,4 @@ namespace IAuthorizedRegistry:
     func get_registry_value(address : felt, action : felt) -> (allowed : felt):
     end
 end
+
