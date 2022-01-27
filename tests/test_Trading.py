@@ -1,3 +1,4 @@
+from ast import parse
 from turtle import position
 import pytest
 import asyncio
@@ -124,7 +125,52 @@ async def adminAuth_factory():
     return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave
 
 @pytest.mark.asyncio
-async def test_signing_of_data(adminAuth_factory):
+async def test_set_balance_for_testing(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
+
+    alice_balance = parse_number(100000)
+    bob_balance = parse_number(100000)
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [alice_balance]) 
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [bob_balance]) 
+
+    alice_curr_balance = await alice.get_balance().call()
+    bob_curr_balance = await bob.get_balance().call()
+
+ 
+    assert alice_curr_balance.result.res == alice_balance
+    assert bob_curr_balance.result.res == bob_balance
+
+async def test_set_allowance_for_testing(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
+
+    alice_balance = parse_number(100000)
+    bob_balance = parse_number(100000)
+
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [alice_balance]) 
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [bob_balance]) 
+
+    alice_approved = parse_number(10000)
+    bob_approved = parse_number(10000)
+
+    await alice_signer.send_transaction(alice, alice.contract_address, 'approve', [trading.contract_address, alice_approved]) 
+    await bob_signer.send_transaction(bob, bob.contract_address, 'approve', [trading.contract_address, bob_approved])
+
+    alice_curr_approved = await alice.get_allowance(trading.contract_address).call()
+    bob_curr_approved = await alice.get_allowance(trading.contract_address).call()
+
+    assert alice_curr_approved.result.res == alice_approved
+    assert bob_curr_approved.result.res == bob_approved
+
+   
+   
+
+
+
+
+
+
+@pytest.mark.asyncio
+async def test_execution_of_data(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
 
     size = 2
@@ -132,6 +178,7 @@ async def test_signing_of_data(adminAuth_factory):
     order_id_1 = str_to_felt("sdaf")
     ticker1 = str_to_felt("32f0406jz7qj8")
     price1 = parse_number(10000)
+    orderType1 = 0
     position1 = 4
     direction1 = 0
     closeOrder1 = 0
@@ -139,14 +186,17 @@ async def test_signing_of_data(adminAuth_factory):
     order_id_2 = str_to_felt("f45g")
     ticker2 = str_to_felt("32f0406jz7qj8")
     price2 = parse_number(10000)
+    orderType2 = 0
     position2 = 3
     direction2 = 1
     closeOrder2 = 0
 
-    hash_computed1 = hash_order(order_id_1, ticker1, price1, position1, direction1, closeOrder1)
+    execution_price = 10000
+
+    hash_computed1 = hash_order(order_id_1, ticker1, price1, orderType1, position1, direction1, closeOrder1)
     print(hash_computed1)
 
-    hash_computed2 = hash_order(order_id_2, ticker2, price2, position2, direction2, closeOrder2)
+    hash_computed2 = hash_order(order_id_2, ticker2, price2, orderType2, position2, direction2, closeOrder2)
     print(hash_computed2)
     
     signed_message1 = alice_signer.sign(hash_computed1)
@@ -158,13 +208,14 @@ async def test_signing_of_data(adminAuth_factory):
     execution_info1 = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
     print(execution_info1.result.currAsset)
 
-    # res = await dave_signer.send_transaction( dave, trading.contract_address, "check_execution", [
-    #     size,
-    #     2,
-    #     alice.contract_address, signed_message1[0], signed_message1[1], order_id_1, ticker1, price1, position1, direction1, closeOrder1, 
-    #     bob.contract_address, signed_message2[0], signed_message2[1], order_id_2, ticker2, price2, position2, direction2, closeOrder2, 
-    # ])
-    # print(res.result)
+    res = await dave_signer.send_transaction( dave, trading.contract_address, "check_execution", [
+        size,
+        10000,
+        2,
+        alice.contract_address, signed_message1[0], signed_message1[1], order_id_1, ticker1, price1, orderType1, position1, direction1, closeOrder1, 
+        bob.contract_address, signed_message2[0], signed_message2[1], order_id_2, ticker2, price2, orderType2, position2, direction2, closeOrder2, 
+    ])
+    print(res.result)
 
     res = await fees.get_fees().call()
     print(res.result)
@@ -180,7 +231,31 @@ async def test_signing_of_data(adminAuth_factory):
 
     lockedFunds2 = await bob.get_locked_balance().call()
     print(lockedFunds2.result)
-    # await signer1.send_transaction(admin1, admin1.contract_address, "place_order", [order_id_1, ticker1, price1, position1, direction1, closeOrder1, signed_message1[0], signed_message1[1], 12])
+
+
+
+
+
+
+
+
+    # await admin1.send_transaction(
+    #     admin1, 
+    #     admin1.contract_address, 
+    #     "place_order", 
+    #     [
+    #         order_id_1, 
+    #         ticker1, 
+    #         price1, 
+    #         orderType1,
+    #         position1, 
+    #         direction1, 
+    #         closeOrder1, 
+    #         signed_message1[0], 
+    #         signed_message1[1], 
+    #         12
+    #     ]
+    # )
     # execution_info1 = await admin1.get_order_data(str_to_felt("sdaf")).call()
     # print(execution_info1.result.res)
 

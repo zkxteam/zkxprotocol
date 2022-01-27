@@ -25,12 +25,14 @@ struct Message:
 end
 
 struct OrderRequest:
-    member orderID: felt
-    member ticker: felt
-    member price: felt
-    member positionSize: felt
-    member direction: felt
-    member closeOrder: felt
+    member orderID : felt
+    member ticker : felt
+    member price : felt
+    member orderType : felt
+    member positionSize : felt
+    member direction : felt
+    member closeOrder : felt
+    member parentOrder : felt
 end
 
 struct Signature:
@@ -38,14 +40,17 @@ struct Signature:
     member s_value: felt
 end
 
-# status 0: partial
-# status 1: executed
-# status 2: close partial
-# status 3: close
+# status 0: initialized
+# status 1: partial
+# status 2: executed
+# status 3: close partial
+# status 4: close
 struct OrderDetails:
     member ticker: felt
     member price: felt
+    member executionPrice: felt
     member positionSize: felt
+    member orderType: felt
     member direction: felt
     member portionExecuted: felt
     member status: felt
@@ -74,6 +79,9 @@ end
 func authorized_registry() -> (res : felt):
 end
 
+@storage_var
+func allowance(address: felt) -> (res : felt):
+end
 
 @storage_var
 func locked_balance() -> (res : felt):
@@ -144,6 +152,17 @@ func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
+
+@view
+func get_allowance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    address_ : felt
+) -> (
+    res : felt
+):
+    let (res) = allowance.read(address = address_)
+    return (res=res)
+end
+
 #
 # Setters
 #
@@ -172,31 +191,48 @@ end
 # Business logic
 #
 
-# @external
-# func transfer_from{
-#     syscall_ptr : felt*, 
-#     pedersen_ptr : HashBuiltin*, 
-#     range_check_ptr,
-# }(
-#     amount : felt
-# ) -> ():
+@external
+func approve{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*, 
+    range_check_ptr
+}(  
+    address_ : felt,
+    allowance_ : felt
+) -> ():
+    alloc_locals
+    assert_only_self()
 
-#     let (caller) = get_caller_address()
+    let (authorized_registry_) = authorized_registry.read()
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
 
-#     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
-#     tempvar range_check_ptr = range_check_ptr
+    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = address_, action = 3)
+    assert is_trading_contract = 1
 
-#     let (authorized_registry_) = authorized_registry.read()
-#     let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3)
-#     assert is_trading_contract = 1
+    allowance.write(address = address_, value=allowance_)
 
-#     # tempvar syscall_ptr :felt* = syscall_ptr
-    
-#     let (curr_balance) = balance.read()
-#     assert_nn(curr_balance - amount)
-#     balance.write(curr_balance - amount)
-#     return (0)
-# end
+    return ()
+end
+
+@external
+func transfer_from{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*, 
+    range_check_ptr,
+}(
+    amount : felt
+) -> ():
+
+    let (caller) = get_caller_address()
+    let (allowance_) = allowance.read(address = caller)
+    let (balance_) = balance.read()
+
+    assert_le(amount, allowance_)
+    assert_nn(balance_ - amount)
+    allowance.write(address = caller, value = allowance_ - amount)
+    balance.write(balance_ - amount)
+    return ()
+end
 
 
 @view
@@ -311,92 +347,56 @@ func place_order{
 }(
     request : OrderRequest,
     signature : Signature,
-    size : felt
+    size : felt,
+    execution_price : felt
 ) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
 
-    # hash the parameters
-    let (hash) = hash_order(&request)
-    # check the validity of the signature
-    is_valid_signature_order(hash, signature)
-    
-    # check if it's a partial order (Initial check)
-    let (isPartial) = is_le(size, request.positionSize)
-
-    local status_
-    local pnl
+    # # hash the parameters
+    # let (hash) = hash_order(&request)
+    # # check the validity of the signature
+    # is_valid_signature_order(hash, signature)
     
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
         # Get the order details if already exists
         let (orderDetails) = order_mapping.read(orderID = request.orderID)
-        # If it's a new order
-        if orderDetails.positionSize == 0:
+        # Return if the position size after the executing the current order is more than the order's positionSize
+        assert_le(size + orderDetails.portionExecuted, request.positionSize)
+        # Check if the order is fully filled by executing the current one
 
-            if request.positionSize == size:
-                status_ = 1
-            else :
-                status_ = 0
-            end
+        if request.positionSize == size + orderDetails.portionExecuted:
+            status_ = 2
+        else :
+            status_ = 1
+        end
 
-            let new_order = OrderDetails(
-                ticker = request.ticker,
-                price = request.price,
-                positionSize = request.positionSize,
-                direction = request.direction,
-                portionExecuted = size,
-                status = status_
-            )
-            # Write to the mapping
-            order_mapping.write(orderID = request.orderID, value = new_order)
-            tempvar syscall_ptr :felt* = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
-            tempvar range_check_ptr = range_check_ptr
-        # If it's an existing order
-        else:
-            # Return if the position size after the executing the current order is more than the order's positionSize
-            assert_le(size + orderDetails.portionExecuted, request.positionSize)
-            # Check if the order is fully filled by executing the current one
-
-            if request.positionSize == size + orderDetails.portionExecuted:
-                status_ = 1
-            else :
-                status_ = 0
-            end
-
-            let updated_order = OrderDetails(
-                ticker = orderDetails.ticker,
-                price = orderDetails.price,
-                positionSize = orderDetails.positionSize,
-                direction = orderDetails.direction,
-                portionExecuted = orderDetails.portionExecuted + size,
-                status = status_
-            )
-            # Write to the mapping
-            order_mapping.write(orderID = request.orderID, value = updated_order)
-            tempvar syscall_ptr :felt* = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
-            tempvar range_check_ptr = range_check_ptr
-
-        # let order_amount = size * request.price
-        # modify_balance(order_amount*-1)
-        # pnl = order_amount
+        let updated_order = OrderDetails(
+            ticker = orderDetails.ticker,
+            price = orderDetails.price,
+            executionPrice = execution_price,
+            positionSize = orderDetails.positionSize,
+            direction = orderDetails.direction,
+            portionExecuted = orderDetails.portionExecuted + size,
+            status = status_
+        )
+        # Write to the mapping
+        order_mapping.write(orderID = request.orderID, value = updated_order)
 
         tempvar syscall_ptr :felt* = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         tempvar range_check_ptr = range_check_ptr
-        end
     else :
         # Get the order details 
-        let (orderDetails) = order_mapping.read(orderID = request.orderID)
+        let (orderDetails) = order_mapping.read(orderID = request.parentOrder)
 
         # Assert that it's the reverse direction of the current position
         assert_not_equal(request.direction, orderDetails.direction)
 
         # Assert that the order exists
-        assert_not_zero(orderDetails.positionSize)
+        assert_not_zero(orderDetails.portionExecuted)
         assert_nn(orderDetails.portionExecuted - size)
 
         if orderDetails.portionExecuted - size == 0:
@@ -408,20 +408,22 @@ func place_order{
         let updated_order = OrderDetails(
             ticker = orderDetails.ticker,
             price = orderDetails.price,
+            execution_price = orderDetails.execution_price,
             positionSize = orderDetails.positionSize,
+            orderType + orderDetails.orderType,
             direction = orderDetails.direction,
             portionExecuted = orderDetails.portionExecuted - size,
             status = status_
         )
         # Write to the mapping
-        order_mapping.write(orderID = request.orderID, value = updated_order)
+        order_mapping.write(orderID = request.parentOrder, value = updated_order)
 
-        tempvar syscall_ptr :felt* = syscall_ptr
+        tempvar syscall_ptr : felt* = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         tempvar range_check_ptr = range_check_ptr
     end
 
-    return (pnl)
+    return (1)
 end
 
 
@@ -435,7 +437,8 @@ func initialize_order{
     request : OrderRequest,
     signature : Signature,
     size : felt,
-    amount : felt
+    execution_price : felt,
+    amount : felt,
 ) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
@@ -453,6 +456,19 @@ func initialize_order{
     let (locked_amount) = locked_balance.read()
     locked_balance.write(locked_amount + amount) 
 
+    let new_order = OrderDetails(
+        ticker = request.ticker,
+        price = request.price,
+        executionPrice = execution_price,
+        positionSize = request.positionSize,
+        orderType = request.orderType,
+        direction = request.direction,
+        portionExecuted = 0,
+        status = 0
+    )
+    # Write to the mapping
+    order_mapping.write(orderID = request.orderID, value = new_order)
+
     return (1)
 end
 
@@ -468,7 +484,7 @@ func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (r
         let (hash_state_ptr) = hash_update(
             hash_state_ptr, 
             orderRequest, 
-            6
+            7
         )
         let (res) = hash_finalize(hash_state_ptr)
         let pedersen_ptr = hash_ptr
