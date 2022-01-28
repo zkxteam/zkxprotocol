@@ -14,8 +14,8 @@ bob_signer = Signer(123456789987654323)
 charlie_signer = Signer(123456789987654323)
 dave_signer = Signer(123456789987654323)
 
-long_trading_fees = parse_number(1.2)
-short_trading_fees = parse_number(0.8)
+long_trading_fees = parse_number(0.012)
+short_trading_fees = parse_number(0.008)
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -124,80 +124,206 @@ async def adminAuth_factory():
     await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [parse_number(1000000)]) 
     return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave
 
-@pytest.mark.asyncio
-async def test_set_balance_for_testing(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
+# @pytest.mark.asyncio
+# async def test_set_balance_for_testing(adminAuth_factory):
+#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
 
-    alice_balance = parse_number(100000)
-    bob_balance = parse_number(100000)
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [alice_balance]) 
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [bob_balance]) 
+#     alice_balance = parse_number(100000)
+#     bob_balance = parse_number(100000)
+#     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [alice_balance]) 
+#     await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [bob_balance]) 
 
-    alice_curr_balance = await alice.get_balance().call()
-    bob_curr_balance = await bob.get_balance().call()
+#     alice_curr_balance = await alice.get_balance().call()
+#     bob_curr_balance = await bob.get_balance().call()
 
  
-    assert alice_curr_balance.result.res == alice_balance
-    assert bob_curr_balance.result.res == bob_balance
+#     assert alice_curr_balance.result.res == alice_balance
+#     assert bob_curr_balance.result.res == bob_balance
 
-async def test_set_allowance_for_testing(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
+# async def test_set_allowance_for_testing(adminAuth_factory):
+#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
 
-    alice_balance = parse_number(100000)
-    bob_balance = parse_number(100000)
+#     alice_balance = parse_number(100000)
+#     bob_balance = parse_number(100000)
 
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [alice_balance]) 
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [bob_balance]) 
+#     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [alice_balance]) 
+#     await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [bob_balance]) 
 
-    alice_approved = parse_number(10000)
-    bob_approved = parse_number(10000)
+#     alice_approved = parse_number(10000)
+#     bob_approved = parse_number(10000)
 
-    await alice_signer.send_transaction(alice, alice.contract_address, 'approve', [trading.contract_address, alice_approved]) 
-    await bob_signer.send_transaction(bob, bob.contract_address, 'approve', [trading.contract_address, bob_approved])
+#     await alice_signer.send_transaction(alice, alice.contract_address, 'approve', [trading.contract_address, alice_approved]) 
+#     await bob_signer.send_transaction(bob, bob.contract_address, 'approve', [trading.contract_address, bob_approved])
 
-    alice_curr_approved = await alice.get_allowance(trading.contract_address).call()
-    bob_curr_approved = await alice.get_allowance(trading.contract_address).call()
+#     alice_curr_approved = await alice.get_allowance(trading.contract_address).call()
+#     bob_curr_approved = await alice.get_allowance(trading.contract_address).call()
 
-    assert alice_curr_approved.result.res == alice_approved
-    assert bob_curr_approved.result.res == bob_approved
+#     assert alice_curr_approved.result.res == alice_approved
+#     assert bob_curr_approved.result.res == bob_approved
 
    
    
 
 
 
+
+
+
+# @pytest.mark.asyncio
+# async def test_opening_and_closing(adminAuth_factory):
+#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
+
+#     ####### Opening of Orders #######
+#     size = parse_number(2)
+
+#     order_id_1 = str_to_felt("sdaf")
+#     ticker1 = str_to_felt("32f0406jz7qj8")
+#     price1 = parse_number(10789)
+#     orderType1 = 0
+#     position1 = parse_number(4)
+#     direction1 = 0
+#     closeOrder1 = 0
+#     parentOrder1 = 0
+
+#     order_id_2 = str_to_felt("f45g")
+#     ticker2 = str_to_felt("32f0406jz7qj8")
+#     price2 = parse_number(10789)
+#     orderType2 = 0
+#     position2 = parse_number(3)
+#     direction2 = 1
+#     closeOrder2 = 0
+#     parentOrder2 = 0
+
+#     execution_price = parse_number(10789)
+
+#     hash_computed1 = hash_order(order_id_1, ticker1, price1, orderType1, position1, direction1, closeOrder1)
+#     print(hash_computed1)
+
+#     hash_computed2 = hash_order(order_id_2, ticker2, price2, orderType2, position2, direction2, closeOrder2)
+#     print(hash_computed2)
+    
+#     signed_message1 = alice_signer.sign(hash_computed1)
+#     print(signed_message1)
+
+#     signed_message2 = bob_signer.sign(hash_computed2)
+#     print(signed_message2)
+
+#     res = await dave_signer.send_transaction( dave, trading.contract_address, "check_execution", [
+#         size,
+#         execution_price,
+#         2,
+#         alice.contract_address, signed_message1[0], signed_message1[1], order_id_1, ticker1, price1, orderType1, position1, direction1, closeOrder1, parentOrder1,
+#         bob.contract_address, signed_message2[0], signed_message2[1], order_id_2, ticker2, price2, orderType2, position2, direction2, closeOrder2, parentOrder2
+#     ])
+#     print(res.result)
+
+#     res = await fees.get_fees().call()
+#     print(res.result)
+
+#     orderState1 = await alice.get_order_data(order_ID = order_id_1).call()
+#     print(orderState1.result.res )
+
+#     orderState2 = await bob.get_order_data(order_ID = order_id_2).call()
+#     print(orderState2.result.res)
+
+
+#     ##### Closing Of Orders ########
+#     size2 = parse_number(2)
+
+#     order_id_3 = str_to_felt("erj4hd")
+#     ticker3 = str_to_felt("32f0406jz7qj8")
+#     price3 = parse_number(11000)
+#     orderType3 = 0
+#     position3 = parse_number(4)
+#     direction3 = 1
+#     closeOrder3 = 1
+#     parentOrder3 = str_to_felt("sdaf")
+
+#     order_id_4 = str_to_felt("3df34")
+#     ticker4 = str_to_felt("32f0406jz7qj8")
+#     price4 = parse_number(11000)
+#     orderType4 = 0
+#     position4 = parse_number(3)
+#     direction4 = 0
+#     closeOrder4 = 1
+#     parentOrder4 = str_to_felt("f45g")
+
+#     execution_price2 = parse_number(11000)
+
+#     hash_computed3 = hash_order(order_id_3, ticker3, price3, orderType3, position3, direction3, closeOrder3)
+#     print(hash_computed3)
+
+#     hash_computed4 = hash_order(order_id_4, ticker4, price4, orderType4, position4, direction4, closeOrder4)
+#     print(hash_computed4)
+    
+#     signed_message3 = alice_signer.sign(hash_computed3)
+#     print(signed_message3)
+
+#     signed_message4 = bob_signer.sign(hash_computed4)
+#     print(signed_message4)
+
+
+#     res = await dave_signer.send_transaction( dave, trading.contract_address, "check_execution", [
+#         size2,
+#         execution_price2,
+#         2,
+#         alice.contract_address, signed_message3[0], signed_message3[1], order_id_3, ticker3, price3, orderType3, position3, direction3, closeOrder3, parentOrder3,
+#         bob.contract_address, signed_message4[0], signed_message4[1], order_id_4, ticker4, price4, orderType4, position4, direction4, closeOrder4, parentOrder4
+#     ])
+#     print(res.result)
+
+#     orderState3 = await alice.get_order_data(order_ID = order_id_3).call()
+#     print(orderState3.result.res )
+
+#     orderState4 = await bob.get_order_data(order_ID = order_id_4).call()
+#     print(orderState4.result.res)
 
 
 
 @pytest.mark.asyncio
-async def test_execution_of_data(adminAuth_factory):
+async def test_partial_orders(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave = adminAuth_factory
 
-    size = 2
+    ####### Opening of Orders #######
+    size = parse_number(4)
 
     order_id_1 = str_to_felt("sdaf")
     ticker1 = str_to_felt("32f0406jz7qj8")
-    price1 = parse_number(10000)
+    price1 = parse_number(10789)
     orderType1 = 0
-    position1 = 4
+    position1 = parse_number(4)
     direction1 = 0
     closeOrder1 = 0
+    parentOrder1 = 0
 
     order_id_2 = str_to_felt("f45g")
     ticker2 = str_to_felt("32f0406jz7qj8")
-    price2 = parse_number(10000)
+    price2 = parse_number(10789)
     orderType2 = 0
-    position2 = 3
+    position2 = parse_number(2)
     direction2 = 1
     closeOrder2 = 0
+    parentOrder2 = 0
 
-    execution_price = 10000
+    order_id_3 = str_to_felt("3dfwrv")
+    ticker3 = str_to_felt("32f0406jz7qj8")
+    price3 = parse_number(10789)
+    orderType3 = 0
+    position3 = parse_number(2)
+    direction3 = 1
+    closeOrder3 = 0
+    parentOrder3 = 0
+
+    execution_price = parse_number(10000)
 
     hash_computed1 = hash_order(order_id_1, ticker1, price1, orderType1, position1, direction1, closeOrder1)
     print(hash_computed1)
 
     hash_computed2 = hash_order(order_id_2, ticker2, price2, orderType2, position2, direction2, closeOrder2)
     print(hash_computed2)
+
+    hash_computed3 = hash_order(order_id_3, ticker3, price3, orderType3, position3, direction3, closeOrder3)
+    print(hash_computed3)
     
     signed_message1 = alice_signer.sign(hash_computed1)
     print(signed_message1)
@@ -205,62 +331,96 @@ async def test_execution_of_data(adminAuth_factory):
     signed_message2 = bob_signer.sign(hash_computed2)
     print(signed_message2)
 
-    execution_info1 = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
-    print(execution_info1.result.currAsset)
+    signed_message3 = charlie_signer.sign(hash_computed3)
+    print(signed_message3)
 
     res = await dave_signer.send_transaction( dave, trading.contract_address, "check_execution", [
         size,
-        10000,
-        2,
-        alice.contract_address, signed_message1[0], signed_message1[1], order_id_1, ticker1, price1, orderType1, position1, direction1, closeOrder1, 
-        bob.contract_address, signed_message2[0], signed_message2[1], order_id_2, ticker2, price2, orderType2, position2, direction2, closeOrder2, 
+        execution_price,
+        3,
+        alice.contract_address, signed_message1[0], signed_message1[1], order_id_1, ticker1, price1, orderType1, position1, direction1, closeOrder1, parentOrder1,
+        bob.contract_address, signed_message2[0], signed_message2[1], order_id_2, ticker2, price2, orderType2, position2, direction2, closeOrder2, parentOrder2,
+        charlie.contract_address, signed_message3[0], signed_message3[1], order_id_3, ticker3, price3, orderType3, position3, direction3, closeOrder3, parentOrder3
     ])
     print(res.result)
 
-    res = await fees.get_fees().call()
+    orderState1 = await alice.get_order_data(order_ID = order_id_1).call()
+    print(orderState1.result.res )
+
+    orderState2 = await bob.get_order_data(order_ID = order_id_2).call()
+    print(orderState2.result.res)
+
+    orderState3 = await charlie.get_order_data(order_ID = order_id_3).call()
+    print(orderState3.result.res)
+
+
+    ##### Closing Of Orders ########
+    size2 = parse_number(1)
+
+    order_id_4 = str_to_felt("erj4hd")
+    ticker4 = str_to_felt("32f0406jz7qj8")
+    price4 = parse_number(16017)
+    orderType4 = 0
+    position4 = parse_number(2)
+    direction4 = 1
+    closeOrder4 = 1
+    parentOrder4 = order_id_1
+
+    order_id_5 = str_to_felt("3df34")
+    ticker5 = str_to_felt("32f0406jz7qj8")
+    price5 = parse_number(16078)
+    orderType5 = 0
+    position5 = parse_number(1.1)
+    direction5 = 0
+    closeOrder5 = 1
+    parentOrder5 = order_id_2
+
+    order_id_6 = str_to_felt("3df34")
+    ticker6 = str_to_felt("32f0406jz7qj8")
+    price6 = parse_number(16099)
+    orderType6 = 0
+    position6 = parse_number(1.1)
+    direction6 = 0
+    closeOrder6 = 1
+    parentOrder6 = order_id_3
+
+    execution_price2 = parse_number(17000)
+
+    hash_computed4 = hash_order(order_id_4, ticker4, price4, orderType4, position4, direction4, closeOrder4)
+    print(hash_computed4)
+
+    hash_computed5 = hash_order(order_id_5, ticker5, price5, orderType5, position5, direction5, closeOrder5)
+    print(hash_computed5)
+    
+    hash_computed6 = hash_order(order_id_6, ticker6, price6, orderType6, position6, direction6, closeOrder6)
+    print(hash_computed6)
+
+    signed_message4 = alice_signer.sign(hash_computed4)
+    print(signed_message4)
+
+    signed_message5 = bob_signer.sign(hash_computed5)
+    print(signed_message5)
+
+    signed_message6 = charlie_signer.sign(hash_computed6)
+    print(signed_message6)
+
+
+    res = await dave_signer.send_transaction( dave, trading.contract_address, "check_execution", [
+        size2,
+        execution_price2,
+        3,
+        alice.contract_address, signed_message4[0], signed_message4[1], order_id_4, ticker4, price4, orderType4, position4, direction4, closeOrder4, parentOrder4,
+        bob.contract_address, signed_message5[0], signed_message5[1], order_id_5, ticker5, price5, orderType5, position5, direction5, closeOrder5, parentOrder5,
+        charlie.contract_address, signed_message6[0], signed_message6[1], order_id_6, ticker6, price6, orderType6, position6, direction6, closeOrder6, parentOrder6
+    ])
     print(res.result)
 
-    order1 = await trading.get_asset(id=2).call()
-    print(order1.result)
+    orderState4 = await alice.get_order_data(order_ID = order_id_4).call()
+    print(orderState4.result.res )
 
-    order2 = await trading.get_asset(id=1).call()
-    print(order2.result)
+    orderState5 = await bob.get_order_data(order_ID = order_id_5).call()
+    print(orderState5.result.res)
 
-    lockedFunds1 = await alice.get_locked_balance().call()
-    print(lockedFunds1.result)
+    orderState6 = await bob.get_order_data(order_ID = order_id_6).call()
+    print(orderState6.result.res)
 
-    lockedFunds2 = await bob.get_locked_balance().call()
-    print(lockedFunds2.result)
-
-
-
-
-
-
-
-
-    # await admin1.send_transaction(
-    #     admin1, 
-    #     admin1.contract_address, 
-    #     "place_order", 
-    #     [
-    #         order_id_1, 
-    #         ticker1, 
-    #         price1, 
-    #         orderType1,
-    #         position1, 
-    #         direction1, 
-    #         closeOrder1, 
-    #         signed_message1[0], 
-    #         signed_message1[1], 
-    #         12
-    #     ]
-    # )
-    # execution_info1 = await admin1.get_order_data(str_to_felt("sdaf")).call()
-    # print(execution_info1.result.res)
-
-    # execution_info2 = await admin2.get_order_data(str_to_felt("f45g")).call()
-    # print(execution_info2.result.res)
-
-    # signed_message2 = signer2.sign(hash_computed)
-    # assert_revert(lambda: signer1.send_transaction(admin1, trading.contract_address, "execute_order", [ticker, price, position, direction, signer1.public_key, signed_message2[0], signed_message[1]]))

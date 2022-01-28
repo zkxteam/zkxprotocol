@@ -3,10 +3,11 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.registers import get_fp_and_pc
-from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
+from starkware.starknet.common.syscalls import get_contract_address
+from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le, assert_in_range
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.signature import verify_ecdsa_signature
-from starkware.cairo.common.math_cmp import is_le, is_lt
+from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.hash import hash2
 from starkware.cairo.common.hash_state import (
     hash_init, hash_finalize, hash_update
@@ -84,140 +85,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-func execute{
-    syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*,
-    range_check_ptr, 
-}(  
-    size : felt,
-    execution_price : felt,
-    request_list_len : felt,
-    request_list :  MultipleOrder*,
-    long_fees : felt,
-    short_fees : felt
-) -> (res : felt):
-    alloc_locals
-
-    # Check if the list is empty, if yes return 1
-    if request_list_len == 0:
-        return (1)
-    end
-
-    # Create a struct object for the order 
-    tempvar temp_order: MultipleOrder = MultipleOrder(
-        pub_key = [request_list].pub_key,
-        sig_r = [request_list].sig_r,
-        sig_s = [request_list].sig_s,
-        orderID = [request_list].orderID,
-        ticker = [request_list].ticker,
-        price = [request_list].price,
-        orderType = [request_list].orderType,
-        positionSize = [request_list].positionSize,
-        direction = [request_list].direction,
-        closeOrder = [request_list].closeOrder,
-        parentOrder = [request_list].parentOrder
-    )
-
-    # Assert that the size of the order is less than or equal to the positionSize in the Order
-    assert_le(size, temp_order.positionSize)
-
-    tempvar fees
-    # Calculate the fees depending on whether the order is long or short
-    if temp_order.direction == 1:
-        fees = long_fees
-    else :
-        fees = short_fees
-    end
-
-    # Calculate the amount of USDC required to execute the order
-    tempvar partial_order = is_lt(temp_order.positionSize, size)
-    tempvar order_size = 0
-    
-    if parent_order == 1:
-        order_size = temp_order.positionSize
-    else :
-        order_size = size
-    end
-    
-    # tempvar total_fees = temp_order.execution_price * order_size * fees
-    # tempvar amount = temp_order.price * order_size
-    # tempvar total_amount = total_fees + amount
-
-
-    # Create a temporary order object
-    let temp_order_request : OrderRequest = OrderRequest(
-        orderID = temp_order.orderID,
-        ticker = temp_order.ticker,
-        price = temp_order.price,
-        orderType = temp_order.orderType,
-        positionSize = temp_order.positionSize,
-        direction = temp_order.direction,
-        closeOrder = temp_order.closeOrder,
-        parentOrder = [request_list].parentOrder
-    )
-
-    # Create a temporary signature object
-    let temp_signature : Signature = Signature(
-        r_value = temp_order.sig_r,
-        s_value = temp_order.sig_s
-    )
-    
-    #Execute the order
-    IAccount.place_order(
-        temp_order_request,
-        temp_signature,
-        order_size,
-        execution_price,
-    )
-
-    # Recursive Call
-    return execute(
-        size,
-        execution_price,
-        request_list_len - 1,
-        request_list + MultipleOrder.SIZE,
-        long_fees,
-        short_fees
-    )
-end
-
-@external
-func execute_orders{
-    syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*,
-    range_check_ptr, 
-    ecdsa_ptr: SignatureBuiltin*
-}(
-    size : felt,
-    execution_price : felt,
-    request_list_len : felt,
-    request_list : MultipleOrder*
-) -> (res : felt):
-    alloc_locals
-    
-    assert_not_zero(size)
-
-    let (fees_address) = trading_contract_address.read()
-    let (long, short) = ITradingFees.get_fees(contract_address=fees_address)
-    
-    assert_not_zero(long)
-    assert_not_zero(short)
-
-    local long_fee = long
-    local short_fee = short
-
-    let (result) = execute(
-        size, 
-        execution_price,
-        request_list_len, 
-        request_list, 
-        long_fee,
-        short_fee
-    )
-    
-    return (1)
-end
-
 
 func perform_checks{
     syscall_ptr : felt*, 
@@ -226,7 +93,6 @@ func perform_checks{
 }(  
     size : felt,
     ticker : felt,
-    price : felt,
     execution_price : felt,
     request_list_len : felt,
     request_list :  MultipleOrder*,
@@ -237,7 +103,7 @@ func perform_checks{
 
     # Check if the list is empty, if yes return 1
     if request_list_len == 0:
-        return (1)
+        return (0)
     end
 
     # Create a struct object for the order 
@@ -255,32 +121,64 @@ func perform_checks{
         parentOrder = [request_list].parentOrder
     )
 
-    # Assert that the size of the order is less than or equal to the positionSize in the Order
-    assert_le(size, temp_order.positionSize)
+    # Check if the execution_price is correct
+    if temp_order.orderType == 0:
+        # if it's a market order, it must be within 2% of the index price
+        tempvar two_percent = (temp_order.price * 20000) / 10**6
+        tempvar lowerLimit = temp_order.price + two_percent
+        tempvar upperLimit = temp_order.price - two_percent
+        # assert_in_range(execution_price, lowerLimit, upperLimit)
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        # if it's a limit order 
+        if temp_order.direction == 1:
+            # if it's a long order
+            assert_le(execution_price, temp_order.price)
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            # if it's a short order
+            assert_le(temp_order.price, temp_order.price)
+            tempvar range_check_ptr = range_check_ptr
+        end
+        tempvar range_check_ptr = range_check_ptr
+    end
 
-    tempvar fees
-    
+
+    local fees_rate   
     # Calculate the fees depending on whether the order is long or short
     if temp_order.direction == 1:
-        fees = long_fees
+        assert fees_rate = long_fees
     else :
-        fees = short_fees
+        assert fees_rate = short_fees
     end
 
     # Calculate the amount of USDC required to execute the order
-    # Calculate the amount of USDC required to execute the order
-    tempvar partial_order = is_lt(temp_order.positionSize, size)
-    tempvar order_size = 0
+    let (cmp_res) = is_le(size, temp_order.positionSize)
+
+    local order_size
     
-    if parent_order == 1:
-        order_size = temp_order.positionSize
+    if cmp_res == 1:
+        assert order_size = size
     else :
-        order_size = size
+        assert order_size = temp_order.positionSize
     end
     
-    tempvar total_fees = temp_order.execution_price * order_size * fees
-    tempvar amount = temp_order.price * order_size
-    tempvar total_amount = total_fees + amount
+    tempvar fees = (execution_price * order_size * fees_rate) / 10**12
+    tempvar amount = (temp_order.price * order_size) / 10**6
+    tempvar total_amount = fees + amount
+
+    
+
+    # if temp_order.direction == 1:
+    #     if temp_order.closeOrder == 0:
+    #        let (contract_address) = get_contract_address()
+    #         let (approved) = IAccount.get_allowance(contract_address = temp_order.pub_key, address_ = contract_address)
+    #         assert_le(total_amount, approved)
+    #         tempvar syscall_ptr :felt* = syscall_ptr
+    #         tempvar range_check_ptr = range_check_ptr
+    #     end
+    # end
+            
 
     # Create a temporary order object
     let temp_order_request : OrderRequest = OrderRequest(
@@ -305,16 +203,17 @@ func perform_checks{
         contract_address = temp_order.pub_key, 
         request = temp_order_request, 
         signature = temp_signature, 
-        size = size, 
+        size = order_size, 
+        execution_price = execution_price,
         amount = total_amount,
-        execution_price = execution_price
+        
     )  
 
     # If it's the first order in the array
     if ticker == 0:
         # Check if the asset is tradable 
         let (asset_address) = asset_contract_address.read()
-        let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order_request.ticker)
+        let (asset : Asset) = IAsset.getAsset(contract_address = asset_address, id = temp_order.ticker)
 
         # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         assert_not_zero(asset.tradable)
@@ -323,7 +222,6 @@ func perform_checks{
         return perform_checks(
             size,
             temp_order.ticker,
-            temp_order.price,
             execution_price,
             request_list_len - 1,
             request_list + MultipleOrder.SIZE,
@@ -334,7 +232,6 @@ func perform_checks{
 
     # Assert that the order has the same ticker and price as the first order
     assert ticker = temp_order.ticker
-    assert price = temp_order.price
    
    # TODO: REMOVE testing purpose 
     asset_mapping.write(id=request_list_len, value=temp_order)
@@ -343,7 +240,6 @@ func perform_checks{
     return perform_checks(
         size,
         ticker,
-        price,
         execution_price,
         request_list_len - 1,
         request_list + MultipleOrder.SIZE,
@@ -381,36 +277,19 @@ func check_execution{
     let (result) = perform_checks(
         size, 
         0,
-        0,
         execution_price,
         request_list_len, 
         request_list, 
         long_fee,
         short_fee
-        
     )
-    
-    let (execution_result) = execute(
-        size,
-        execution_price,
-        request_list_len,
-        request_list,
-        long_fee,
-        short_fee
-    )
+
     return (result)
 end
 
 
 @contract_interface
 namespace IAccount:
-    func place_order(
-        request : OrderRequest,
-        signature : Signature,
-        size : felt
-    ) -> (res : felt):
-    end
-
     func initialize_order(
         request : OrderRequest,
         signature : Signature,
@@ -423,6 +302,12 @@ namespace IAccount:
     func transfer_from(
         amount : felt
     ) -> ():
+    end
+
+
+    func get_allowance(
+        address_ : felt
+    ) -> (res : felt):
     end
 end
 
