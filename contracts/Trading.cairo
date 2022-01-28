@@ -25,6 +25,7 @@ end
 func trading_contract_address() -> (res : felt):
 end
 
+# Struct to pass orders+signatures in a batch in the execute_batch fn
 struct MultipleOrder:
     member pub_key: felt
     member sig_r: felt
@@ -39,6 +40,7 @@ struct MultipleOrder:
     member parentOrder: felt
 end
 
+# Struct for passing the order request to Account Contract
 struct OrderRequest:
     member orderID: felt
     member ticker: felt
@@ -50,6 +52,7 @@ struct OrderRequest:
     member parentOrder: felt
 end
 
+# Struct for passing signature to Account Contract
 struct Signature:
     member r_value: felt
     member s_value: felt
@@ -62,21 +65,9 @@ struct Asset:
     member tradable: felt
 end
 
-@storage_var
-func asset_mapping(id : felt) -> (asset : MultipleOrder):
-end
-
-
-@view
-func get_asset{
-    syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*,
-    range_check_ptr
-}(id: felt) -> (asset : MultipleOrder):
-    let (asset) = asset_mapping.read(id=id)
-    return (asset)
-end
-
+# @notice Constructor for the contract
+# @param _asset_contract - Address of the deployed address contract
+# @param _trading_fees - Address of the deployed tradingfees contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     _asset_contract, _trading_fees):
@@ -85,8 +76,14 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-
-func perform_checks{
+# @notice Internal function called by execute_batch
+# @param size - Size of the order to be executed
+# @param ticker - The ticker of each order in the batch
+# @param execution_price - Price at which the orders must be executed
+# @param request_list_len - No of orders in the batch
+# @param request_list - The batch of the orders
+# @returns 1, if executed correctly
+func check_and_execute{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*,
     range_check_ptr, 
@@ -152,22 +149,28 @@ func perform_checks{
         assert fees_rate = short_fees
     end
 
-    # Calculate the amount of USDC required to execute the order
+    # Check if size is less than or equal to postionSize
     let (cmp_res) = is_le(size, temp_order.positionSize)
 
     local order_size
     
+
     if cmp_res == 1:
+        # If yes, make the order_size to be size
         assert order_size = size
     else :
+        # If no, make order_size to be the positionSize
         assert order_size = temp_order.positionSize
     end
     
+    # Calculate the fees for the order
     tempvar fees = (execution_price * order_size * fees_rate) / 10**12
     tempvar amount = (temp_order.price * order_size) / 10**6
+
+    # Amount the user must pay
     tempvar total_amount = fees + amount
 
-    
+    # TODO: Transfer of funds for acc long/short or open/close
 
     # if temp_order.direction == 1:
     #     if temp_order.closeOrder == 0:
@@ -199,7 +202,7 @@ func perform_checks{
     )
     
     # Call the account contract to initialize the order
-    IAccount.initialize_order(
+    IAccount.execute_order(
         contract_address = temp_order.pub_key, 
         request = temp_order_request, 
         signature = temp_signature, 
@@ -219,7 +222,7 @@ func perform_checks{
         assert_not_zero(asset.tradable)
 
         # Recursive call with the ticker and price to compare against
-        return perform_checks(
+        return check_and_execute(
             size,
             temp_order.ticker,
             execution_price,
@@ -233,11 +236,8 @@ func perform_checks{
     # Assert that the order has the same ticker and price as the first order
     assert ticker = temp_order.ticker
    
-   # TODO: REMOVE testing purpose 
-    asset_mapping.write(id=request_list_len, value=temp_order)
-
     # Recursive Call
-    return perform_checks(
+    return check_and_execute(
         size,
         ticker,
         execution_price,
@@ -248,9 +248,14 @@ func perform_checks{
     )
 end
 
-
+# @notice Function to execute multiple orders in a batch
+# @param size - Size of the order to be executed
+# @param execution_price - Price at which the orders must be executed
+# @param request_list_len - No of orders in the batch
+# @param request_list - The batch of the orders
+# @returns res - 1 if executed correctly
 @external
-func check_execution{
+func execute_batch{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*,
     range_check_ptr, 
@@ -263,18 +268,23 @@ func check_execution{
 ) -> (res : felt):
     alloc_locals
     
+    # Assert that the execution size is not 0
     assert_not_zero(size)
 
+    # Fetch the base fees for long and short orders
     let (fees_address) = trading_contract_address.read()
     let (long, short) = ITradingFees.get_fees(contract_address=fees_address)
     
+    # Assert that these fees are not 0
     assert_not_zero(long)
     assert_not_zero(short)
 
+    # Store it in a local var to send it to check_and_execute
     local long_fee = long
     local short_fee = short
 
-    let (result) = perform_checks(
+    # Recursively loop through the orders in the batch
+    let (result) = check_and_execute(
         size, 
         0,
         execution_price,
@@ -287,10 +297,10 @@ func check_execution{
     return (result)
 end
 
-
+# @notice Account interface
 @contract_interface
 namespace IAccount:
-    func initialize_order(
+    func execute_order(
         request : OrderRequest,
         signature : Signature,
         size : felt,

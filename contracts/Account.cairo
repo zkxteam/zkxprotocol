@@ -14,6 +14,7 @@ from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_
 # Structs
 #
 
+# Struct to pass the transactions to the contract
 struct Message:
     member sender : felt
     member to : felt
@@ -23,6 +24,7 @@ struct Message:
     member nonce : felt
 end
 
+# Struct to pass the order to this contract
 struct OrderRequest:
     member orderID : felt
     member ticker : felt
@@ -34,6 +36,7 @@ struct OrderRequest:
     member parentOrder : felt
 end
 
+# Struct to pass signatures to this contract
 struct Signature:
     member r_value: felt
     member s_value: felt
@@ -85,7 +88,6 @@ end
 @storage_var
 func locked_balance() -> (res : felt):
 end
-
 
 @storage_var
 func order_mapping(orderID: felt) -> (res : OrderDetails):
@@ -190,6 +192,9 @@ end
 # Business logic
 #
 
+# @notice Approve funds to be transfered by Trading Contract
+# @param address - Address to approve funds to
+# @param allowance_ - Amount of funds to approve
 @external
 func approve{
     syscall_ptr : felt*, 
@@ -213,6 +218,9 @@ func approve{
     return ()
 end
 
+
+# @notice External function called by the Trading Contractg
+# @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from{
     syscall_ptr : felt*, 
@@ -233,7 +241,10 @@ func transfer_from{
     return ()
 end
 
-
+# @notice Check if the transaction signature is valid
+# @param hash - Hash of the transaction parameters
+# @param singature_len - Length of the signatures
+# @param signature - Array of signatures
 @view
 func is_valid_signature{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
@@ -252,6 +263,14 @@ func is_valid_signature{
     return ()
 end
 
+# @notice Function to execute transactions signed by this account
+# @param to - Contract address to which to send the transaction
+# @param selector - Function selector of the function to call
+# @param calldata_len - Length of the paramaters to be passed to the function
+# @param calldata - Array of parameters 
+# @param nonce - (Currently not used)
+# @return response_len - Length of the return values from the function
+# @return response - Array of return values
 @external
 func execute{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
@@ -291,6 +310,9 @@ func execute{
     return (response_len=response.retdata_size, response=response.retdata)
 end
 
+# @notice Function to hash the transaction parameters
+# @param message - Struct of details to hash
+# @param res - Hash of the parameters
 func hash_message{pedersen_ptr : HashBuiltin*}(message : Message*) -> (res : felt):
     alloc_locals
     # we need to make `res_calldata` local
@@ -309,6 +331,10 @@ func hash_message{pedersen_ptr : HashBuiltin*}(message : Message*) -> (res : fel
     end
 end
 
+# @notice Function to hash the calldata
+# @param calldata - Array of params
+# @param calldata_size - Length of the params
+# @return res - hash of the calldata
 func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size : felt) -> (
         res : felt):
     let hash_ptr = pedersen_ptr
@@ -321,7 +347,7 @@ func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size 
     end
 end
 
-# TODO: Remove; Only for testing purposes
+# TODO: Remove; Only for testing purposes 
 @external
 func set_balance{
         syscall_ptr : felt*, 
@@ -335,25 +361,9 @@ func set_balance{
     return ()
 end
 
-
-
-@external
-func place_order{
-    syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*,
-    ecdsa_ptr : SignatureBuiltin*,
-    range_check_ptr, 
-}(
-    request : OrderRequest,
-    signature : Signature,
-    size : felt,
-    execution_price : felt
-) -> (res : felt):
-    alloc_locals
-    let (__fp__, _) = get_fp_and_pc()
-    return (1)
-end
-
+# @notice Function to hash the order parameters
+# @param message - Struct of order details to hash
+# @param res - Hash of the details
 func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (res: felt):
     alloc_locals
 
@@ -373,9 +383,15 @@ func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (r
 end
 
 
-
+# @notice Function called by Trading Contract
+# @param request - Details of the order to be executed
+# @param signature - Details of the signature
+# @param size - Size of the Order to be executed
+# @param execution_price - Price at which the order should be executed
+# @param amount - TODO: Amount of funds that user must send/receive 
+# @returns 1, if executed correctly
 @external
-func initialize_order{
+func execute_order{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*,
     ecdsa_ptr : SignatureBuiltin*,
@@ -390,6 +406,7 @@ func initialize_order{
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
 
+    # Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address()
     let (authorized_registry_) = authorized_registry.read()
     let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3)
@@ -409,12 +426,16 @@ func initialize_order{
         # If it's a new order
         if orderDetails.ticker == 0:
 
+            # Create if the order is being fully opened
+            # status_ == 1, partially opened
+            # status_ == 2, fully opened
             if request.positionSize == size:
                 status_ = 2
             else :
                 status_ = 1
             end
 
+            # Create a new struct with the updated details
             let new_order = OrderDetails(
                 ticker = request.ticker,
                 price = request.price,
@@ -446,6 +467,7 @@ func initialize_order{
                 status_ = 0
             end
             
+            # Create a new struct with the updated details
             let updated_order = OrderDetails(
                 ticker = orderDetails.ticker,
                 price = orderDetails.price,
@@ -477,12 +499,16 @@ func initialize_order{
         assert_not_zero(orderDetails.positionSize)
         assert_nn(orderDetails.portionExecuted - size)
 
+        # Check if the order is fully closed or not
+        # status_ == 4, fully closed
+        # status_ == 3, partially closed
         if orderDetails.portionExecuted - size == 0:
             status_ = 4
         else :
             status_ = 3
         end
 
+        # Create a new struct with the updated details
         let updated_order = OrderDetails(
             ticker = orderDetails.ticker,
             price = orderDetails.price,
@@ -494,7 +520,7 @@ func initialize_order{
             status = status_
         )
         
-        # Write to the mapping
+        # Write to the mapping 
         order_mapping.write(orderID = request.orderID, value = updated_order)
 
         tempvar syscall_ptr :felt* = syscall_ptr
@@ -505,6 +531,10 @@ func initialize_order{
     return(1)
 end
 
+# @notice view function which checks the signature passed is valid
+# @param hash - Hash of the order to check against 
+# @param signature - Signature passed to the contract to check against
+# @returns reverts, if there is an error
 @view
 func is_valid_signature_order{
         syscall_ptr : felt*, 
