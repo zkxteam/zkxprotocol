@@ -7,3 +7,7 @@ artifacts/
 .DS_Store
 
 tests/__pycache__/
+
+Brewfile
+Makefile
+new.json

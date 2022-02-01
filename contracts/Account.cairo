@@ -241,6 +241,32 @@ func transfer_from{
     return ()
 end
 
+
+# @notice External function called by the Trading Contractg
+# @param amount - Amount of funds to transfer from this contract
+@external
+func transfer{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*, 
+    range_check_ptr,
+}(
+    amount : felt
+) -> ():
+    alloc_locals
+
+    let (caller) = get_caller_address()
+    let (authorized_registry_) = authorized_registry.read()
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
+
+    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3)
+    assert is_trading_contract = 1
+
+    assert_nn(amount)
+    let (balance_) = balance.read()
+    balance.write(balance_ + amount)
+    return ()
+end
+
 # @notice Check if the transaction signature is valid
 # @param hash - Hash of the transaction parameters
 # @param singature_len - Length of the signatures
@@ -400,8 +426,7 @@ func execute_order{
     request : OrderRequest,
     signature : Signature,
     size : felt,
-    execution_price : felt,
-    amount : felt,
+    execution_price : felt
 ) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()

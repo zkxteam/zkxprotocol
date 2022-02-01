@@ -12,6 +12,9 @@ from starkware.cairo.common.hash import hash2
 from starkware.cairo.common.hash_state import (
     hash_init, hash_finalize, hash_update
 )
+from contracts.Math_64x61 import (
+    mul_fp, div_fp
+)
 
 @storage_var
 func balance() -> (res : felt):
@@ -63,6 +66,22 @@ struct Asset:
     member ticker: felt
     member short_name: felt
     member tradable: felt
+end
+
+# status 0: initialized
+# status 1: partial
+# status 2: executed
+# status 3: close partial
+# status 4: close
+struct OrderDetails:
+    member ticker: felt
+    member price: felt
+    member executionPrice: felt
+    member positionSize: felt
+    member orderType: felt
+    member direction: felt
+    member portionExecuted: felt
+    member status: felt
 end
 
 # @notice Constructor for the contract
@@ -121,10 +140,11 @@ func check_and_execute{
     # Check if the execution_price is correct
     if temp_order.orderType == 0:
         # if it's a market order, it must be within 2% of the index price
-        tempvar two_percent = (temp_order.price * 20000) / 10**6
-        tempvar lowerLimit = temp_order.price + two_percent
-        tempvar upperLimit = temp_order.price - two_percent
-        # assert_in_range(execution_price, lowerLimit, upperLimit)
+        let (two_percent) = mul_fp(temp_order.price, 46116860184273879)
+        tempvar lowerLimit = temp_order.price - two_percent
+        tempvar upperLimit = temp_order.price + two_percent
+    
+        assert_in_range(execution_price, lowerLimit, upperLimit)
         tempvar range_check_ptr = range_check_ptr
     else:
         # if it's a limit order 
@@ -163,24 +183,62 @@ func check_and_execute{
         assert order_size = temp_order.positionSize
     end
     
-    # Calculate the fees for the order
-    tempvar fees = (execution_price * order_size * fees_rate) / 10**12
-    tempvar amount = (temp_order.price * order_size) / 10**6
+   
+    if temp_order.closeOrder == 0:
+        # If the order is to be opened 
+        # Get the amount approved by the user
+        let (contract_address) = get_contract_address()
+        let (approved) = IAccount.get_allowance(contract_address = temp_order.pub_key, address_ = contract_address)
 
-    # Amount the user must pay
-    tempvar total_amount = fees + amount
+        # Calculate the fees for the order
+        let (amount_in) = mul_fp(execution_price, order_size)
+        let (fees) = mul_fp(fees_rate, amount_in)
 
-    # TODO: Transfer of funds for acc long/short or open/close
+        # Calculate the total amount by adding fees
+        tempvar total_amount = amount_in + fees
 
-    # if temp_order.direction == 1:
-    #     if temp_order.closeOrder == 0:
-    #        let (contract_address) = get_contract_address()
-    #         let (approved) = IAccount.get_allowance(contract_address = temp_order.pub_key, address_ = contract_address)
-    #         assert_le(total_amount, approved)
-    #         tempvar syscall_ptr :felt* = syscall_ptr
-    #         tempvar range_check_ptr = range_check_ptr
-    #     end
-    # end
+        # User must be able to pay the amount
+        assert_le(total_amount, approved)
+
+        # Transfer the amount to Holding Contract
+        IAccount.transfer_from(contract_address = temp_order.pub_key, amount = total_amount)
+        #  Add holding contract accounting
+        tempvar syscall_ptr :felt* = syscall_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        # If it's a close order
+        assert_not_zero(temp_order.parentOrder)
+
+        if temp_order.direction == 1:
+            let (amount_out) = mul_fp(execution_price, order_size)  
+            let (fees) = mul_fp(fees_rate, amount_out)
+
+            # Calculate the total amount by adding fees
+            tempvar total_amount = amount_out + fees
+
+            IAccount.transfer(contract_address = temp_order.pub_key, amount = total_amount)
+        else:
+            # Get order details
+            let (order_details : OrderDetails) = IAccount.get_order_data(contract_address = temp_order.pub_key, order_ID = temp_order.parentOrder)
+
+            # Calculate the amount to be paid to account
+            tempvar pnl = execution_price - order_details.executionPrice
+            tempvar price_adjusted = order_details.executionPrice - pnl
+            let (amount_out) = mul_fp(price_adjusted, order_size)
+            let (fees) = mul_fp(fees_rate, amount_out)
+
+            # Calculate the total amount by adding fees
+            tempvar total_amount = amount_out + fees
+
+            # Check if the user owes the exchange money
+            let (is_negative) = is_le(price_adjusted, 0)
+
+            if is_negative == 1:
+                amount_out = 0
+            end
+            IAccount.transfer(contract_address = temp_order.pub_key, amount = total_amount)
+        end
+    end
             
 
     # Create a temporary order object
@@ -208,8 +266,6 @@ func check_and_execute{
         signature = temp_signature, 
         size = order_size, 
         execution_price = execution_price,
-        amount = total_amount,
-        
     )  
 
     # If it's the first order in the array
@@ -305,7 +361,6 @@ namespace IAccount:
         signature : Signature,
         size : felt,
         execution_price : felt,
-        amount : felt
     ) -> (res : felt):
     end
 
@@ -318,6 +373,19 @@ namespace IAccount:
     func get_allowance(
         address_ : felt
     ) -> (res : felt):
+    end
+
+
+    func get_order_data(
+        order_ID : felt
+    ) -> (
+        res : OrderDetails
+    ):
+    end
+
+    func transfer(
+        amount : felt
+    ) -> ():
     end
 end
 
