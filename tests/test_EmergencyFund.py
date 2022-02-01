@@ -53,24 +53,30 @@ async def emergencyFund_factory():
         ]
     )
 
-    emergencyFund = await starknet.deploy(
-        "contracts/EmergencyFund.cairo",
-        constructor_calldata=[adminAuth.contract_address, 0]
+    holding = await starknet.deploy(
+        "contracts/Holding.cairo",
+        constructor_calldata=[adminAuth.contract_address]
     )
 
-    return emergencyFund, admin1, admin2
+    emergencyFund = await starknet.deploy(
+        "contracts/EmergencyFund.cairo",
+        constructor_calldata=[
+            adminAuth.contract_address, holding.contract_address]
+    )
+
+    return emergencyFund, holding, admin1, admin2
 
 
 @pytest.mark.asyncio
 async def test_fund_invalid(emergencyFund_factory):
-    emergencyFund, admin1, admin2 = emergencyFund_factory
+    emergencyFund, _, admin1, admin2 = emergencyFund_factory
     assert_revert(lambda: signer3.send_transaction(
         pytest.user1, emergencyFund.contract_address, 'fund', [str_to_felt("TSLA"), 0]))
 
 
 @pytest.mark.asyncio
 async def test_funding_flow(emergencyFund_factory):
-    emergencyFund, admin1, admin2 = emergencyFund_factory
+    emergencyFund, _, admin1, admin2 = emergencyFund_factory
 
     await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund', [str_to_felt("TSLA"), 10])
     execution_info = await emergencyFund.balance(str_to_felt("TSLA")).call()
@@ -78,4 +84,25 @@ async def test_funding_flow(emergencyFund_factory):
 
     await signer2.send_transaction(admin2, emergencyFund.contract_address, 'defund', [str_to_felt("TSLA"), 3])
     execution_info = await emergencyFund.balance(str_to_felt("TSLA")).call()
+    assert execution_info.result.amount == 7
+
+
+@pytest.mark.asyncio
+async def test_fund_through_funding_invalid(emergencyFund_factory):
+    emergencyFund, holding, admin1, admin2 = emergencyFund_factory
+    assert_revert(lambda: signer1.send_transaction(
+        admin1, holding.contract_address, 'fundHolding', [str_to_felt("TSLA"), 10]))
+
+
+@pytest.mark.asyncio
+async def test_fund_through_funding_contract(emergencyFund_factory):
+    emergencyFund, holding, admin1, admin2 = emergencyFund_factory
+    await signer1.send_transaction(admin1, holding.contract_address, 'update_emergency_address', [emergencyFund.contract_address])
+
+    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fundHolding', [str_to_felt("TSLA"), 10])
+    execution_info = await holding.balance(str_to_felt("TSLA")).call()
+    assert execution_info.result.amount == 10
+
+    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'defundHolding', [str_to_felt("TSLA"), 3])
+    execution_info = await holding.balance(str_to_felt("TSLA")).call()
     assert execution_info.result.amount == 7
