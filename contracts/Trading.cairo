@@ -25,7 +25,15 @@ func asset_contract_address() -> (res : felt):
 end
 
 @storage_var
-func trading_contract_address() -> (res : felt):
+func fees_contract_address() -> (res : felt):
+end
+
+@storage_var
+func holding_contract_address() -> (res : felt):
+end
+
+@storage_var
+func fees_balance_contract_address() -> (res : felt):
 end
 
 # Struct to pass orders+signatures in a batch in the execute_batch fn
@@ -89,9 +97,15 @@ end
 # @param _trading_fees - Address of the deployed tradingfees contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _asset_contract, _trading_fees):
+        _asset_contract, 
+        _fees_contract, 
+        _holding_contract, 
+        _fees_balance_contract
+    ):
     asset_contract_address.write(_asset_contract)
-    trading_contract_address.write(_trading_fees)
+    fees_contract_address.write(_fees_contract)
+    holding_contract_address.write(_holding_contract)
+    fees_balance_contract_address.write(_fees_balance_contract)
     return ()
 end
 
@@ -113,13 +127,14 @@ func check_and_execute{
     request_list_len : felt,
     request_list :  MultipleOrder*,
     long_fees : felt,
-    short_fees : felt
+    short_fees : felt,
+    sum : felt
 ) -> (res : felt):
     alloc_locals
 
     # Check if the list is empty, if yes return 1
     if request_list_len == 0:
-        return (0)
+        return (sum)
     end
 
     # Create a struct object for the order 
@@ -154,19 +169,10 @@ func check_and_execute{
             tempvar range_check_ptr = range_check_ptr
         else:
             # if it's a short order
-            assert_le(temp_order.price, temp_order.price)
+            assert_le(temp_order.price, execution_price)
             tempvar range_check_ptr = range_check_ptr
         end
         tempvar range_check_ptr = range_check_ptr
-    end
-
-
-    local fees_rate   
-    # Calculate the fees depending on whether the order is long or short
-    if temp_order.direction == 1:
-        assert fees_rate = long_fees
-    else :
-        assert fees_rate = short_fees
     end
 
     # Check if size is less than or equal to postionSize
@@ -182,41 +188,75 @@ func check_and_execute{
         # If no, make order_size to be the positionSize
         assert order_size = temp_order.positionSize
     end
+
+    local fees_rate   
+    local sum_temp
+    # Calculate the fees depending on whether the order is long or short
+    if temp_order.direction == 1:
+        assert fees_rate = long_fees
+        assert sum_temp = sum + order_size
+
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
+    else :
+        assert fees_rate = short_fees
+        assert sum_temp = sum - order_size
+
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
+    end
     
    
     if temp_order.closeOrder == 0:
         # If the order is to be opened 
         # Get the amount approved by the user
         let (contract_address) = get_contract_address()
+
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         let (approved) = IAccount.get_allowance(contract_address = temp_order.pub_key, address_ = contract_address)
 
         # Calculate the fees for the order
         let (amount_in) = mul_fp(execution_price, order_size)
         let (fees) = mul_fp(fees_rate, amount_in)
 
+        # Update the fees to be paid by user in fee balance contract
+        let (fees_balance_address) = fees_balance_contract_address.read()
+        IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, fee_to_add = fees)
+
         # Calculate the total amount by adding fees
         tempvar total_amount = amount_in + fees
 
         # User must be able to pay the amount
         assert_le(total_amount, approved)
-
+        
         # Transfer the amount to Holding Contract
         IAccount.transfer_from(contract_address = temp_order.pub_key, amount = total_amount)
-        #  Add holding contract accounting
-        tempvar syscall_ptr :felt* = syscall_ptr
-        tempvar range_check_ptr = range_check_ptr
+
+        # Deposit the funds sent the the user
+        let (holding_address) = holding_contract_address.read()
+        IHolding.deposit(contract_address = holding_address, ticker = temp_order.ticker, amount = total_amount, order_id = temp_order.orderID)
+
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
     else:
         # If it's a close order
         assert_not_zero(temp_order.parentOrder)
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
 
-        if temp_order.direction == 1:
+        if temp_order.direction == 0:
             let (amount_out) = mul_fp(execution_price, order_size)  
             let (fees) = mul_fp(fees_rate, amount_out)
 
-            # Calculate the total amount by adding fees
-            tempvar total_amount = amount_out + fees
+            # Calculate the total amount by removing fees
+            tempvar total_amount = amount_out - fees    
 
+            # Update the fees to be paid by user in fee balance contract
+            let (fees_balance_address) = fees_balance_contract_address.read()
+            IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, fee_to_add = fees)
+        
+            # Withdraw the funds sent the the user
+            let (holding_address) = holding_contract_address.read()
+            IHolding.withdraw(contract_address = holding_address, ticker = temp_order.ticker, amount = total_amount, order_id = temp_order.orderID)
             IAccount.transfer(contract_address = temp_order.pub_key, amount = total_amount)
+
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         else:
             # Get order details
             let (order_details : OrderDetails) = IAccount.get_order_data(contract_address = temp_order.pub_key, order_ID = temp_order.parentOrder)
@@ -228,7 +268,7 @@ func check_and_execute{
             let (fees) = mul_fp(fees_rate, amount_out)
 
             # Calculate the total amount by adding fees
-            tempvar total_amount = amount_out + fees
+            tempvar total_amount = amount_out - fees
 
             # Check if the user owes the exchange money
             let (is_negative) = is_le(price_adjusted, 0)
@@ -236,7 +276,18 @@ func check_and_execute{
             if is_negative == 1:
                 amount_out = 0
             end
+
+            # Update the fees to be paid by user in fee balance contract
+            let (fees_balance_address) = fees_balance_contract_address.read()
+            IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, fee_to_add = fees)
+
+            # Withdraw funds from Holding
+            let (holding_address) = holding_contract_address.read()
+            IHolding.withdraw(contract_address = holding_address, ticker = temp_order.ticker, amount = total_amount, order_id = temp_order.orderID)
+
+            # Add funds to the user
             IAccount.transfer(contract_address = temp_order.pub_key, amount = total_amount)
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         end
     end
             
@@ -250,15 +301,17 @@ func check_and_execute{
         positionSize = temp_order.positionSize,
         direction = temp_order.direction,
         closeOrder = temp_order.closeOrder,
-        parentOrder = [request_list].parentOrder
+        parentOrder = temp_order.parentOrder
     )
+
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
 
     # Create a temporary signature object
     let temp_signature : Signature = Signature(
         r_value = temp_order.sig_r,
         s_value = temp_order.sig_s
     )
-    
+
     # Call the account contract to initialize the order
     IAccount.execute_order(
         contract_address = temp_order.pub_key, 
@@ -285,10 +338,12 @@ func check_and_execute{
             request_list_len - 1,
             request_list + MultipleOrder.SIZE,
             long_fees,
-            short_fees
+            short_fees,
+            sum_temp
         )
-    end
 
+        
+    end
     # Assert that the order has the same ticker and price as the first order
     assert ticker = temp_order.ticker
    
@@ -300,7 +355,8 @@ func check_and_execute{
         request_list_len - 1,
         request_list + MultipleOrder.SIZE,
         long_fees,
-        short_fees
+        short_fees,
+        sum_temp
     )
 end
 
@@ -323,12 +379,9 @@ func execute_batch{
     request_list : MultipleOrder*,
 ) -> (res : felt):
     alloc_locals
-    
-    # Assert that the execution size is not 0
-    assert_not_zero(size)
 
     # Fetch the base fees for long and short orders
-    let (fees_address) = trading_contract_address.read()
+    let (fees_address) = fees_contract_address.read()
     let (long, short) = ITradingFees.get_fees(contract_address=fees_address)
     
     # Assert that these fees are not 0
@@ -347,10 +400,13 @@ func execute_batch{
         request_list_len, 
         request_list, 
         long_fee,
-        short_fee
+        short_fee,
+        0
     )
 
-    return (result)
+    # Check if every order has a counter order
+    assert result = 0
+    return (1)
 end
 
 # @notice Account interface
@@ -405,6 +461,34 @@ end
 namespace IAsset:
     func getAsset(id: felt) -> (
         currAsset: Asset
+    ):
+    end
+end
+
+# @notice Holding interface
+@contract_interface
+namespace IHolding:
+    func deposit(
+        ticker: felt, 
+        amount: felt, 
+        order_id: felt
+    ):
+    end
+
+    func withdraw(
+        ticker: felt, 
+        amount: felt, 
+        order_id: felt
+    ):
+    end
+end
+
+# @notice Fee Balance interface
+@contract_interface
+namespace IFeeBalance:
+    func update_fee_mapping(
+        address: felt,
+        fee_to_add: felt
     ):
     end
 end

@@ -455,9 +455,9 @@ func execute_order{
             # status_ == 1, partially opened
             # status_ == 2, fully opened
             if request.positionSize == size:
-                status_ = 2
+                assert status_ = 2
             else :
-                status_ = 1
+                assert status_ = 1
             end
 
             # Create a new struct with the updated details
@@ -481,15 +481,14 @@ func execute_order{
             # Return if the position size after the executing the current order is more than the order's positionSize
             assert_le(size + orderDetails.portionExecuted, request.positionSize)
 
-            # Check if the order is the process of being closed
+            # Check if the order is in the process of being closed
             assert_le(orderDetails.status, 2)
 
             # Check if the order is fully filled by executing the current one
-
             if request.positionSize == size + orderDetails.portionExecuted:
-                status_ = 1
+                status_ = 2
             else :
-                status_ = 0
+                status_ = 1
             end
             
             # Create a new struct with the updated details
@@ -528,9 +527,9 @@ func execute_order{
         # status_ == 4, fully closed
         # status_ == 3, partially closed
         if orderDetails.portionExecuted - size == 0:
-            status_ = 4
+            assert status_ = 4
         else :
-            status_ = 3
+            assert status_ = 3
         end
 
         # Create a new struct with the updated details
@@ -546,7 +545,7 @@ func execute_order{
         )
         
         # Write to the mapping 
-        order_mapping.write(orderID = request.orderID, value = updated_order)
+        order_mapping.write(orderID = request.parentOrder, value = updated_order)
 
         tempvar syscall_ptr :felt* = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 

@@ -149,6 +149,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     assert caller = trading_addr
     
     let current_amount : felt = balance_mapping.read(ticker=ticker)
+    assert_not_zero(current_amount - amount)
     balance_mapping.write(ticker=ticker, value=current_amount - amount)
 
     return()
