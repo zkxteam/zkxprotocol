@@ -5,8 +5,26 @@ from starkware.crypto.signature.signature import private_to_stark_key, sign
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.public.abi import get_selector_from_name
+from math import trunc
 
 MAX_UINT256 = (2**128 - 1, 2**128 - 1)
+
+SCALE = 2**61
+PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481
+PRIME_HALF = PRIME/2
+PI = 7244019458077122842
+
+def from64x61(num):
+    res = num
+    if num > PRIME_HALF:
+        res = res - PRIME
+    return res / SCALE
+
+def to64x61(num):
+    res = num * SCALE
+    if res > 2**125 or res <= -2*125:
+        raise Exception("Number is out of valid range")
+    return trunc(res)
 
 
 def str_to_felt(text):
@@ -81,3 +99,26 @@ def hash_message(sender, to, selector, calldata, nonce):
         nonce
     ]
     return compute_hash_on_elements(message)
+
+
+def hash_order(order_id, ticker, price, orderType, position, direction, closeOrder):
+    order = [ 
+        order_id,
+        ticker,
+        price,
+        orderType,
+        position,
+        direction,
+        closeOrder
+    ]
+    return compute_hash_on_elements(order)
+
+
+def convertList(res_list):
+    conv_list = list(map(lambda x: from64x61(x), res_list[1:7]))
+    conv_list.append(res_list[0])
+    conv_list.append(res_list[7])
+
+    return conv_list
+
+to64x61(0)

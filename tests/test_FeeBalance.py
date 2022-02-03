@@ -87,7 +87,6 @@ async def test_update_fee_mapping(feeBalance_factory):
 @pytest.mark.asyncio
 async def test_update_fee_mapping_different_user(feeBalance_factory):
     feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
-
     await signer1.send_transaction(admin1, callFeeBalance.contract_address, 'update', [pytest.user1.contract_address, 10])
 
     execution_info = await feeBalance.get_total_fee().call()
