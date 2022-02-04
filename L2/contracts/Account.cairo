@@ -1,6 +1,8 @@
 %lang starknet
 %builtins pedersen range_check ecdsa
 
+from starkware.cairo.common.alloc import alloc
+from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_contract_address
 from starkware.cairo.common.signature import verify_ecdsa_signature
@@ -9,6 +11,9 @@ from starkware.starknet.common.syscalls import call_contract, get_caller_address
 from starkware.cairo.common.hash_state import (hash_init, hash_finalize, hash_update, hash_update_single)
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn
+
+const L1_CONTRACT_ADDRESS = (0x168De57b85fFfD1b1f760cD845D804c0e611EC69)
+const MESSAGE_WITHDRAW = 0
 
 #
 # Structs
@@ -93,6 +98,12 @@ end
 func order_mapping(orderID: felt) -> (res : OrderDetails):
 end 
 
+# L1 User associated with the account
+@storage_var
+func L1_address() -> (res : felt):
+end
+
+
 #
 # Guards
 #
@@ -163,6 +174,14 @@ func get_allowance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (res) = allowance.read(address = address_)
     return (res=res)
 end
+
+@view
+func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+        res : felt):
+    let (res) = L1_address.read()
+    return (res=res)
+end
+
 
 #
 # Setters
@@ -583,10 +602,65 @@ func is_valid_signature_order{
     return ()
 end
 
+# @notice Function to withdraw funds
+# @param amount - The Amount of funds that user wants to withdraw
+@external
+func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        amount : felt):
+    # Make sure 'amount' is positive.
+    assert_nn(amount)
+
+    let (res) = balance.read()
+    tempvar new_balance = res - amount
+
+    # Make sure the new balance will be positive.
+    assert_nn(new_balance)
+
+    # Update the new balance.
+    balance.write(new_balance)
+
+    # Get the L1 Metamask address
+    let (L2_account_address) = get_contract_address()
+    let (user) = L1_address.read()
+
+    # Send the withdrawal message.
+    let (message_payload : felt*) = alloc()
+    assert message_payload[0] = MESSAGE_WITHDRAW
+    assert message_payload[1] = user
+    assert message_payload[2] = amount
+    send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=3, payload=message_payload)
+
+    return ()
+end
+
+
+
+# @notice Function to handle deposit from L1ZKX contract
+# @param from_address - The address from where deposit function is called from
+# @param user - User's Metamask account address
+# @param amount - The Amount of funds that user wants to withdraw
+@l1_handler
+func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        from_address : felt, user : felt, amount : felt):
+    # Make sure the message was sent by the intended L1 contract.
+    assert from_address = L1_CONTRACT_ADDRESS
+
+    # Update the L1 address 
+    L1_address.write(user)
+
+    # Read the current balance.
+    let (res) = balance.read()
+
+    # Compute and update the new balance.
+    tempvar new_balance = res + amount
+    balance.write(new_balance)
+
+    return ()
+end
+
 # @notice AuthorizedRegistry interface
 @contract_interface
 namespace IAuthorizedRegistry:
     func get_registry_value(address : felt, action : felt) -> (allowed : felt):
     end
 end
-
