@@ -36,6 +36,10 @@ end
 func fees_balance_contract_address() -> (res : felt):
 end
 
+@storage_var
+func result() -> (res : felt):
+end
+
 # Struct to pass orders+signatures in a batch in the execute_batch fn
 struct MultipleOrder:
     member pub_key: felt
@@ -109,6 +113,18 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
+# @notice View function to get result after execute_batch
+# @returns result value
+@view
+func get_result{
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr, 
+}() -> (result : felt):
+    let (result) = result.read()
+    return (result)
+end
+    
 # @notice Internal function called by execute_batch
 # @param size - Size of the order to be executed
 # @param ticker - The ticker of each order in the batch
@@ -377,8 +393,10 @@ func execute_batch{
     execution_price : felt,
     request_list_len : felt,
     request_list : MultipleOrder*,
-) -> (res : felt):
+) -> ():
     alloc_locals
+
+    result.write(0)
 
     # Fetch the base fees for long and short orders
     let (fees_address) = fees_contract_address.read()
@@ -406,7 +424,8 @@ func execute_batch{
 
     # Check if every order has a counter order
     assert result = 0
-    return (1)
+    result.write(1)
+    return ()
 end
 
 # @notice Account interface
