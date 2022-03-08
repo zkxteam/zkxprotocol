@@ -67,7 +67,7 @@ async def test_get_admin_mapping(adminAuth_factory):
 async def test_adding_asset_by_admin(adminAuth_factory):
     adminAuth, asset, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0])
+    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 0])
 
     execution_info = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
     fetched_asset = execution_info.result.currAsset
@@ -81,13 +81,13 @@ async def test_adding_asset_by_admin(adminAuth_factory):
 async def test_adding_asset_by_unauthorized_user(adminAuth_factory):
     adminAuth, asset, admin1, admin2, user1 = adminAuth_factory
 
-    assert_revert(lambda: signer3.send_transaction(user1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0]))
+    assert_revert(lambda: signer3.send_transaction(user1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 0]))
 
 
 @pytest.mark.asyncio
 async def test_modifying_asset_by_admin(adminAuth_factory):
     adminAuth, asset, admin1, admin2, user1 = adminAuth_factory
-    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0])
+    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 0])
 
     execution_info = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
     fetched_asset = execution_info.result.currAsset
@@ -96,7 +96,7 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
     assert fetched_asset.short_name == str_to_felt("Ethereum")
     assert  fetched_asset.tradable == 0 
 
-    await signer1.send_transaction(admin1,asset.contract_address, 'modifyAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETC"), str_to_felt("EthereumClassic"), 1])
+    await signer1.send_transaction(admin1,asset.contract_address, 'modifyAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETC"), str_to_felt("EthereumClassic"), 1, 0])
 
     execution_info1 = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
     fetched_asset1 = execution_info1.result.currAsset
@@ -109,7 +109,7 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
 async def test_modifying_asset_by_unauthorized_user(adminAuth_factory):
     adminAuth, asset, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0])
+    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 0])
 
     execution_info = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
     fetched_asset = execution_info.result.currAsset
@@ -118,13 +118,13 @@ async def test_modifying_asset_by_unauthorized_user(adminAuth_factory):
     assert fetched_asset.short_name == str_to_felt("Ethereum")
     assert fetched_asset.tradable == 0 
 
-    assert_revert(lambda: signer3.send_transaction(user1,asset.contract_address, 'modifyAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0]))
+    assert_revert(lambda: signer3.send_transaction(user1,asset.contract_address, 'modifyAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 0]))
 
 
 @pytest.mark.asyncio
 async def test_removing_asset_by_admin(adminAuth_factory):
     adminAuth, asset, admin1, admin2, user1 = adminAuth_factory
-    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0])
+    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 0])
 
     execution_info = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
     fetched_asset = execution_info.result.currAsset
@@ -146,7 +146,7 @@ async def test_removing_asset_by_admin(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_removing_asset_by_unauthorized_user(adminAuth_factory):
     adminAuth, asset, admin1, admin2, user1 = adminAuth_factory
-    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0])
+    await signer1.send_transaction(admin1,asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 0])
 
     execution_info = await asset.getAsset(str_to_felt("32f0406jz7qj8")).call()
     fetched_asset = execution_info.result.currAsset

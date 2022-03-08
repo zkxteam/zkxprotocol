@@ -74,6 +74,7 @@ struct Asset:
     member ticker: felt
     member short_name: felt
     member tradable: felt
+    member collateral: felt
 end
 
 # status 0: initialized
