@@ -12,7 +12,7 @@ from starkware.cairo.common.hash_state import (hash_init, hash_finalize, hash_up
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn
 
-const L1_CONTRACT_ADDRESS = (0x168De57b85fFfD1b1f760cD845D804c0e611EC69)
+const L1_CONTRACT_ADDRESS = (0xEE6cd124E83834CA4A1630F68a74f562530f6218)
 const MESSAGE_WITHDRAW = 0
 
 #
