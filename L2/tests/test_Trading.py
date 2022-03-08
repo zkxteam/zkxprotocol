@@ -140,8 +140,8 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [str_to_felt("65ksgn23nv"), to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'update_trading_address', [trading.contract_address])
     await admin1_signer.send_transaction(admin1, feeBalance.contract_address, 'update_caller_address', [trading.contract_address])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("BTC"), str_to_felt("Bitcoin"), 1])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [ str_to_felt("65ksgn23nv"), str_to_felt("ETH"), str_to_felt("Etherum"), 1])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [ str_to_felt("65ksgn23nv"), str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0])
     await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [to64x61(1000000)]) 
     await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [to64x61(1000000)]) 
     return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance
