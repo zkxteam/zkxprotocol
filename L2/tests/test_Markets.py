@@ -81,6 +81,12 @@ async def test_add_new_market_no_collateral(adminAuth_factory):
     assert_revert(lambda: signer3.send_transaction(user1,market.contract_address, 'addMarket', [ str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj6"), 1, 0]))
 
 @pytest.mark.asyncio
+async def test_add_new_market_invalid_asset(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    assert_revert(lambda: signer1.send_transaction(admin1,market.contract_address, 'addMarket', [ str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7ql8"), str_to_felt("32f0406jz7qj7"), 1, 0]))
+
+@pytest.mark.asyncio
 async def test_add_new_tradable_market_non_tradable_asset(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
