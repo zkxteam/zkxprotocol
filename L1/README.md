@@ -1,15 +1,15 @@
-# Basic Sample Hardhat Project
+# ZKX Protocol L1 contract and bridge
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+## Brief
 
-Try running some of the following tasks:
+We need to derive an address/key for the L2 smart contract/address.
+We can only rely on a piece of information that is (a) private; (b) unique. To get an entry point to generate an elliptic curve, we use a predefined message signed by the user's private key. This prototype is to demonstrate our ability to generate a deterministic entry point.
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-node scripts/sample-script.js
-npx hardhat help
-```
+## Installation
+
+Follows HardHat notion
+
+# Use
+- Connect wallet
+- Deposit
+- Withdraw
