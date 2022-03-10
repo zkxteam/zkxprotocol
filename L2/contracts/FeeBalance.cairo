@@ -15,11 +15,11 @@ func caller_address() -> (contract_address : felt):
 end
 
 @storage_var
-func fee_mapping(address : felt) -> (fee : felt):
+func fee_mapping(address : felt, assetID : felt) -> (fee : felt):
 end
 
 @storage_var
-func total_fee() -> (accumulated_fee : felt):
+func total_fee_per_asset(assetID: felt) -> (accumulated_fee : felt):
 end
 
 # @notice Constructor of the smart-contract
@@ -66,17 +66,21 @@ func update_fee_mapping{
     range_check_ptr
 }(
     address: felt,
+    assetID_: felt,
     fee_to_add: felt
 ):
     let (caller) = get_caller_address()
     let (caller_addr) = caller_address.read()
     assert caller = caller_addr
-    let current_fee : felt = fee_mapping.read(address=address)
+
+    let current_fee : felt = fee_mapping.read(address=address, assetID = assetID_)
     let new_fee: felt = current_fee + fee_to_add
-    fee_mapping.write(address=address, value=new_fee)
-    let current_total_fee: felt = total_fee.read()
-    let new_total_fee: felt = current_total_fee + fee_to_add
-    total_fee.write(value=new_total_fee)
+    fee_mapping.write(address=address, assetID = assetID_, value=new_fee)
+
+    let current_total_fee_per_asset : felt = total_fee_per_asset.read(assetID = assetID_)
+    let new_total_fee_per_asset: felt = current_total_fee_per_asset + fee_to_add
+    total_fee_per_asset.write(assetID = assetID_, value=new_total_fee_per_asset)
+
     return ()
 end
 
@@ -87,10 +91,12 @@ func get_total_fee{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*, 
     range_check_ptr
-}() -> (
+}(
+    assetID_: felt 
+) -> (
     fee: felt
 ): 
-    let (fee) = total_fee.read()
+    let (fee) = total_fee_per_asset.read(assetID=assetID_)
     return (fee)
 end
 
@@ -103,11 +109,12 @@ func get_user_fee{
     pedersen_ptr : HashBuiltin*, 
     range_check_ptr
 }(
-    address: felt
+    address: felt,
+    assetID_: felt,
 ) -> (
     fee: felt
 ): 
-    let (fee) = fee_mapping.read(address=address)
+    let (fee) = fee_mapping.read(address=address, assetID=assetID_)
     return (fee)
 end
 

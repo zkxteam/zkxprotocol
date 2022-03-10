@@ -17,10 +17,6 @@ from contracts.Math_64x61 import (
 )
 
 @storage_var
-func balance() -> (res : felt):
-end
-
-@storage_var
 func asset_contract_address() -> (res : felt):
 end
 
@@ -42,7 +38,8 @@ struct MultipleOrder:
     member sig_r: felt
     member sig_s: felt
     member orderID: felt
-    member ticker: felt
+    member assetID: felt
+    member collateralID: felt
     member price: felt
     member orderType: felt
     member positionSize: felt
@@ -54,7 +51,8 @@ end
 # Struct for passing the order request to Account Contract
 struct OrderRequest:
     member orderID: felt
-    member ticker: felt
+    member assetID: felt
+    member collateralID: felt
     member price: felt
     member orderType: felt
     member positionSize: felt
@@ -71,6 +69,7 @@ end
 
 # @notice struct to store details of assets
 struct Asset:
+    member assetID: felt
     member ticker: felt
     member short_name: felt
     member tradable: felt
@@ -83,7 +82,8 @@ end
 # status 3: close partial
 # status 4: close
 struct OrderDetails:
-    member ticker: felt
+    member assetID: felt
+    member collateralID: felt
     member price: felt
     member executionPrice: felt
     member positionSize: felt
@@ -123,14 +123,17 @@ func check_and_execute{
     range_check_ptr, 
 }(  
     size : felt,
-    ticker : felt,
+    assetID : felt,
+    collateralID : felt,
     execution_price : felt,
     request_list_len : felt,
     request_list :  MultipleOrder*,
     long_fees : felt,
     short_fees : felt,
     sum : felt
-) -> (res : felt):
+) -> (
+    res : felt
+):
     alloc_locals
 
     # Check if the list is empty, if yes return 1
@@ -144,7 +147,8 @@ func check_and_execute{
         sig_r = [request_list].sig_r,
         sig_s = [request_list].sig_s,
         orderID = [request_list].orderID,
-        ticker = [request_list].ticker,
+        assetID = [request_list].assetID,
+        collateralID = [request_list].collateralID,
         price = [request_list].price,
         orderType = [request_list].orderType,
         positionSize = [request_list].positionSize,
@@ -212,7 +216,7 @@ func check_and_execute{
         let (contract_address) = get_contract_address()
 
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
-        let (approved) = IAccount.get_allowance(contract_address = temp_order.pub_key, address_ = contract_address)
+        let (approved) = IAccount.get_allowance(contract_address = temp_order.pub_key, address_ = contract_address, assetID_ = temp_order.collateralID)
 
         # Calculate the fees for the order
         let (amount_in) = mul_fp(execution_price, order_size)
@@ -220,7 +224,7 @@ func check_and_execute{
 
         # Update the fees to be paid by user in fee balance contract
         let (fees_balance_address) = fees_balance_contract_address.read()
-        IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, fee_to_add = fees)
+        IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, assetID = temp_order.collateralID, fee_to_add = fees)
 
         # Calculate the total amount by adding fees
         tempvar total_amount = amount_in + fees
@@ -229,11 +233,11 @@ func check_and_execute{
         assert_le(total_amount, approved)
         
         # Transfer the amount to Holding Contract
-        IAccount.transfer_from(contract_address = temp_order.pub_key, amount = total_amount)
+        IAccount.transfer_from(contract_address = temp_order.pub_key, assetID_ = temp_order.collateralID, amount = total_amount)
 
         # Deposit the funds sent the the user
         let (holding_address) = holding_contract_address.read()
-        IHolding.deposit(contract_address = holding_address, ticker = temp_order.ticker, amount = total_amount, order_id = temp_order.orderID)
+        IHolding.deposit(contract_address = holding_address, assetID_ = temp_order.assetID, amount = total_amount)
 
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
     else:
@@ -250,12 +254,12 @@ func check_and_execute{
 
             # Update the fees to be paid by user in fee balance contract
             let (fees_balance_address) = fees_balance_contract_address.read()
-            IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, fee_to_add = fees)
+            IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, assetID = temp_order.collateralID, fee_to_add = fees)
         
-            # Withdraw the funds sent the the user
+            # Withdraw the funds to be sent to the user
             let (holding_address) = holding_contract_address.read()
-            IHolding.withdraw(contract_address = holding_address, ticker = temp_order.ticker, amount = total_amount, order_id = temp_order.orderID)
-            IAccount.transfer(contract_address = temp_order.pub_key, amount = total_amount)
+            IHolding.withdraw(contract_address = holding_address, assetID_ = temp_order.collateralID, amount = total_amount)
+            IAccount.transfer(contract_address = temp_order.pub_key, assetID_ = temp_order.collateralID, amount = total_amount)
 
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         else:
@@ -280,14 +284,14 @@ func check_and_execute{
 
             # Update the fees to be paid by user in fee balance contract
             let (fees_balance_address) = fees_balance_contract_address.read()
-            IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, fee_to_add = fees)
+            IFeeBalance.update_fee_mapping(contract_address = fees_balance_address, address = temp_order.pub_key, assetID = order_details.collateralID, fee_to_add = fees)
 
             # Withdraw funds from Holding
             let (holding_address) = holding_contract_address.read()
-            IHolding.withdraw(contract_address = holding_address, ticker = temp_order.ticker, amount = total_amount, order_id = temp_order.orderID)
+            IHolding.withdraw(contract_address = holding_address, assetID_ = temp_order.collateralID, amount = total_amount)
 
             # Add funds to the user
-            IAccount.transfer(contract_address = temp_order.pub_key, amount = total_amount)
+            IAccount.transfer(contract_address = temp_order.pub_key, assetID_ = temp_order.collateralID, amount = total_amount)
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         end
     end
@@ -296,7 +300,8 @@ func check_and_execute{
     # Create a temporary order object
     let temp_order_request : OrderRequest = OrderRequest(
         orderID = temp_order.orderID,
-        ticker = temp_order.ticker,
+        assetID = temp_order.assetID,
+        collateralID = temp_order.collateralID,
         price = temp_order.price,
         orderType = temp_order.orderType,
         positionSize = temp_order.positionSize,
@@ -323,18 +328,21 @@ func check_and_execute{
     )  
 
     # If it's the first order in the array
-    if ticker == 0:
+    if assetID == 0:
         # Check if the asset is tradable 
         let (asset_address) = asset_contract_address.read()
-        let (asset : Asset) = IAsset.getAsset(contract_address = asset_address, id = temp_order.ticker)
+        let (asset : Asset) = IAsset.getAsset(contract_address = asset_address, id = temp_order.assetID)
+        let (collateral : Asset) = IAsset.getAsset(contract_address = asset_address, id = temp_order.collateralID)
 
         # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         assert_not_zero(asset.tradable)
+        assert_not_zero(collateral.collateral)
 
         # Recursive call with the ticker and price to compare against
         return check_and_execute(
             size,
-            temp_order.ticker,
+            temp_order.assetID,
+            temp_order.collateralID,
             execution_price,
             request_list_len - 1,
             request_list + MultipleOrder.SIZE,
@@ -346,12 +354,14 @@ func check_and_execute{
         
     end
     # Assert that the order has the same ticker and price as the first order
-    assert ticker = temp_order.ticker
+    assert assetID = temp_order.assetID
+    assert collateralID = temp_order.collateralID
    
     # Recursive Call
     return check_and_execute(
         size,
-        ticker,
+        assetID,
+        collateralID,
         execution_price,
         request_list_len - 1,
         request_list + MultipleOrder.SIZE,
@@ -397,6 +407,7 @@ func execute_batch{
     let (result) = check_and_execute(
         size, 
         0,
+        0,
         execution_price,
         request_list_len, 
         request_list, 
@@ -422,13 +433,15 @@ namespace IAccount:
     end
 
     func transfer_from(
+        assetID_ : felt,
         amount : felt
     ) -> ():
     end
 
 
     func get_allowance(
-        address_ : felt
+        address_ : felt,
+        assetID_ : felt
     ) -> (res : felt):
     end
 
@@ -441,6 +454,7 @@ namespace IAccount:
     end
 
     func transfer(
+        assetID_ : felt,
         amount : felt
     ) -> ():
     end
@@ -470,16 +484,14 @@ end
 @contract_interface
 namespace IHolding:
     func deposit(
-        ticker: felt, 
+        assetID_: felt, 
         amount: felt, 
-        order_id: felt
     ):
     end
 
     func withdraw(
-        ticker: felt, 
+        assetID_: felt, 
         amount: felt, 
-        order_id: felt
     ):
     end
 end
@@ -489,6 +501,7 @@ end
 namespace IFeeBalance:
     func update_fee_mapping(
         address: felt,
+        assetID: felt,
         fee_to_add: felt
     ):
     end

@@ -26,6 +26,7 @@ end
 
 # @notice struct to store details of assets
 struct Asset:
+    member assetID: felt
     member ticker: felt
     member short_name: felt
     member tradable: felt
@@ -75,7 +76,7 @@ func addMarket{
     let (asset2 : Asset) = IAsset.getAsset(contract_address = asset_address, id = newMarket.asset_collateral)
 
     assert_not_zero(asset2.collateral)
-    assert_not_zero(asset1.ticker)
+    assert_not_zero(asset1.assetID)
 
     if newMarket.tradable == 2:
         market.write(id = id, value = Market(asset = newMarket.asset, asset_collateral = newMarket.asset_collateral, leverage = newMarket.leverage, tradable = asset1.tradable))
