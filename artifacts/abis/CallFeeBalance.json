@@ -1,0 +1,28 @@
+[
+    {
+        "inputs": [
+            {
+                "name": "_authAddress",
+                "type": "felt"
+            }
+        ],
+        "name": "constructor",
+        "outputs": [],
+        "type": "constructor"
+    },
+    {
+        "inputs": [
+            {
+                "name": "_address",
+                "type": "felt"
+            },
+            {
+                "name": "_fee_to_add",
+                "type": "felt"
+            }
+        ],
+        "name": "update",
+        "outputs": [],
+        "type": "function"
+    }
+]

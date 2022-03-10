@@ -1,0 +1,27 @@
+[
+    {
+        "inputs": [
+            {
+                "name": "x",
+                "type": "felt"
+            },
+            {
+                "name": "y",
+                "type": "felt"
+            }
+        ],
+        "name": "divide",
+        "outputs": [
+            {
+                "name": "x_",
+                "type": "felt"
+            },
+            {
+                "name": "y_",
+                "type": "felt"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    }
+]

@@ -1,0 +1,3 @@
+[console_scripts]
+nile = nile.main:cli
+

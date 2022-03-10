@@ -13,7 +13,6 @@ end
 
 # @notice struct to store details of assets
 struct Asset:
-    member assetID: felt
     member ticker: felt
     member short_name: felt
     member tradable: felt
