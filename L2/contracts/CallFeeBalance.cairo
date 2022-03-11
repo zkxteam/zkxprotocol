@@ -32,16 +32,16 @@ func update{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*,
     range_check_ptr
-}(_address: felt, _fee_to_add: felt) :
+}(_address: felt, _assetID: felt, _fee_to_add: felt) :
     alloc_locals
     let (fee_addr) = fee_address.read()
-    IFeeBalance.update_fee_mapping(contract_address = fee_addr, address = _address, fee_to_add = _fee_to_add)
+    IFeeBalance.update_fee_mapping(contract_address = fee_addr, address = _address, assetID_ = _assetID, fee_to_add = _fee_to_add)
     return()
 end
 
 # @notice FeeBalance interface
 @contract_interface
 namespace IFeeBalance:
-    func update_fee_mapping(address : felt, fee_to_add : felt):
+    func update_fee_mapping(address : felt, assetID_ : felt, fee_to_add : felt):
     end
 end

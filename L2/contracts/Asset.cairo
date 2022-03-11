@@ -73,7 +73,7 @@ func removeAsset{
     let (access) = IAdminAuth.get_admin_mapping(contract_address = auth_addr, address = caller, action = 1)
     assert_not_zero(access)
 
-    asset.write(id = id, value = Asset(assetID = 0, ticker = 0, short_name = 0, tradable = 0, collateral = 0))
+    asset.write(id = id, value = Asset(ticker = 0, short_name = 0, tradable = 0, collateral = 0))
     return ()
 end
 

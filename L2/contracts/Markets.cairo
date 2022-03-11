@@ -26,7 +26,6 @@ end
 
 # @notice struct to store details of assets
 struct Asset:
-    member assetID: felt
     member ticker: felt
     member short_name: felt
     member tradable: felt
@@ -46,10 +45,12 @@ func constructor{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*, 
     range_check_ptr
-}(_authAddress : felt, _asset_contract : felt):
-
+}(
+    _authAddress : felt, 
+    _asset_contract : felt
+):
     auth_address.write(value = _authAddress)
-    asset_contract_address.write(_asset_contract)
+    asset_contract_address.write(value = _asset_contract)
     return ()
 end
 
@@ -76,7 +77,7 @@ func addMarket{
     let (asset2 : Asset) = IAsset.getAsset(contract_address = asset_address, id = newMarket.asset_collateral)
 
     assert_not_zero(asset2.collateral)
-    assert_not_zero(asset1.assetID)
+    assert_not_zero(asset1.ticker)
 
     if newMarket.tradable == 2:
         market.write(id = id, value = Market(asset = newMarket.asset, asset_collateral = newMarket.asset_collateral, leverage = newMarket.leverage, tradable = asset1.tradable))

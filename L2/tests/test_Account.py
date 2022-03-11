@@ -5,9 +5,10 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starknet.compiler.compile import get_selector_from_name
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.testing.contract import StarknetContract
-from utils import Signer
+from utils import Signer, str_to_felt
 
 signer1 = Signer(123456789987654321)
+asset_ID = str_to_felt('2jfk5jfk6n1jfmvnd')
 
 Wrong_L1_ZKX_Contract_Address = 55
 Correct_L1_ZKX_Contract_Address = 0x168De57b85fFfD1b1f760cD845D804c0e611EC69
@@ -46,7 +47,7 @@ async def test_deposit_wrong_l1_address(
             from_address=Wrong_L1_ZKX_Contract_Address,
             to_address=account_contract.contract_address,
             selector=get_selector_from_name("deposit"),
-            payload=[User_Address, 1000],
+            payload=[User_Address, 1000, asset_ID],
         )
 
 
@@ -59,9 +60,9 @@ async def test_deposit_happy_flow(
         from_address=Correct_L1_ZKX_Contract_Address,
         to_address=account_contract.contract_address,
         selector=get_selector_from_name("deposit"),
-        payload=[User_Address, 1000],
+        payload=[User_Address, 1000, asset_ID],
     )
-    execution_info = await account_contract.get_balance().call()
+    execution_info = await account_contract.get_balance(asset_ID).call()
     assert execution_info.result == (1000,)
 
 
@@ -71,7 +72,7 @@ async def test_withdraw_amount_bigger_than_balance(
 ):
     with pytest.raises(StarkException, match="assert_nn\(new_balance\)"):
         await account_contract.withdraw(
-            amount=10000
+            amount=10000, assetID_ = asset_ID
         ).invoke(caller_address=Correct_L1_ZKX_Contract_Address)
 
 
@@ -84,13 +85,13 @@ async def test_withdraw_happy_flow(
         from_address=Correct_L1_ZKX_Contract_Address,
         to_address=account_contract.contract_address,
         selector=get_selector_from_name("deposit"),
-        payload=[User_Address, 1000],
+        payload=[User_Address, 1000, asset_ID],
     )
-    execution_info = await account_contract.get_balance().call()
+    execution_info = await account_contract.get_balance(asset_ID).call()
     assert execution_info.result == (2000,)
     await account_contract.withdraw(
-        amount=100
+        amount=100, assetID_ = asset_ID
     ).invoke(caller_address=Correct_L1_ZKX_Contract_Address)
-    execution_info = await account_contract.get_balance().call()
+    execution_info = await account_contract.get_balance(asset_ID).call()
     assert execution_info.result == (1900,)
    

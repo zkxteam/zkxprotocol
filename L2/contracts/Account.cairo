@@ -90,10 +90,6 @@ func authorized_registry() -> (res : felt):
 end
 
 @storage_var
-func allowance(address: felt, assetID: felt) -> (res : felt):
-end
-
-@storage_var
 func order_mapping(orderID: felt) -> (res : OrderDetails):
 end 
 
@@ -164,19 +160,6 @@ func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
-
-@view
-func get_allowance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    address_ : felt,
-    assetID_ : felt
-) -> (
-    res : felt
-):
-    let (res) = allowance.read(address = address_, assetID = assetID_)
-    return (res=res)
-end
-
-
 @view
 func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 ) -> (
@@ -217,34 +200,6 @@ end
 # Business logic
 #
 
-# @notice Approve funds to be transfered by Trading Contract
-# @param address - Address to approve funds to
-# @param allowance_ - Amount of funds to approve
-@external
-func approve{
-    syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, 
-    range_check_ptr
-}(  
-    address_ : felt,
-    assetID_ : felt,
-    allowance_ : felt
-) -> ():
-    alloc_locals
-    assert_only_self()
-
-    let (authorized_registry_) = authorized_registry.read()
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
-
-    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = address_, action = 3)
-    assert is_trading_contract = 1
-
-    allowance.write(address = address_, assetID = assetID_, value=allowance_)
-
-    return ()
-end
-
-
 # @notice External function called by the Trading Contract
 # @param amount - Amount of funds to transfer from this contract
 @external
@@ -256,14 +211,19 @@ func transfer_from{
     assetID_ : felt,
     amount : felt
 ) -> ():
+    alloc_locals
 
+    # Check if the caller is trading contract
     let (caller) = get_caller_address()
-    let (allowance_) = allowance.read(address = caller, assetID = assetID_)
     let (balance_) = balance.read(assetID = assetID_)
 
-    assert_le(amount, allowance_)
+    let (authorized_registry_) = authorized_registry.read()
+    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3) 
+
+    assert is_trading_contract = 1
+
+    # Check that the balance doesn't go negative
     assert_nn(balance_ - amount)
-    allowance.write(address = caller, assetID = assetID_, value = allowance_ - amount)
     balance.write(assetID = assetID_, value = balance_ - amount)
     return ()
 end

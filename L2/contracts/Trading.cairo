@@ -32,6 +32,18 @@ end
 func fees_balance_contract_address() -> (res : felt):
 end
 
+@storage_var
+func market_contract_address() -> (res : felt):
+end
+
+# @notice struct to store details of markets
+struct Market:
+    member asset: felt
+    member asset_collateral: felt
+    member leverage: felt
+    member tradable: felt
+end
+
 # Struct to pass orders+signatures in a batch in the execute_batch fn
 struct MultipleOrder:
     member pub_key: felt
@@ -69,7 +81,6 @@ end
 
 # @notice struct to store details of assets
 struct Asset:
-    member assetID: felt
     member ticker: felt
     member short_name: felt
     member tradable: felt
@@ -101,12 +112,14 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
         _asset_contract, 
         _fees_contract, 
         _holding_contract, 
-        _fees_balance_contract
+        _fees_balance_contract,
+        _market_contract
     ):
     asset_contract_address.write(_asset_contract)
     fees_contract_address.write(_fees_contract)
     holding_contract_address.write(_holding_contract)
     fees_balance_contract_address.write(_fees_balance_contract)
+    market_contract_address.write(_market_contract)
     return ()
 end
 
@@ -125,6 +138,7 @@ func check_and_execute{
     size : felt,
     assetID : felt,
     collateralID : felt,
+    marketID : felt,
     execution_price : felt,
     request_list_len : felt,
     request_list :  MultipleOrder*,
@@ -212,11 +226,10 @@ func check_and_execute{
    
     if temp_order.closeOrder == 0:
         # If the order is to be opened 
-        # Get the amount approved by the user
         let (contract_address) = get_contract_address()
 
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
-        let (approved) = IAccount.get_allowance(contract_address = temp_order.pub_key, address_ = contract_address, assetID_ = temp_order.collateralID)
+        let (user_balance) = IAccount.get_balance(contract_address = temp_order.pub_key, assetID_ = temp_order.collateralID)
 
         # Calculate the fees for the order
         let (amount_in) = mul_fp(execution_price, order_size)
@@ -230,14 +243,14 @@ func check_and_execute{
         tempvar total_amount = amount_in + fees
 
         # User must be able to pay the amount
-        assert_le(total_amount, approved)
+        assert_le(total_amount, user_balance)
         
         # Transfer the amount to Holding Contract
         IAccount.transfer_from(contract_address = temp_order.pub_key, assetID_ = temp_order.collateralID, amount = total_amount)
 
-        # Deposit the funds sent the the user
+        # Deposit the funds taken from the user
         let (holding_address) = holding_contract_address.read()
-        IHolding.deposit(contract_address = holding_address, assetID_ = temp_order.assetID, amount = total_amount)
+        IHolding.deposit(contract_address = holding_address, assetID_ = temp_order.collateralID, amount = total_amount)
 
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
     else:
@@ -331,18 +344,22 @@ func check_and_execute{
     if assetID == 0:
         # Check if the asset is tradable 
         let (asset_address) = asset_contract_address.read()
+        let (market_address) = market_contract_address.read()
         let (asset : Asset) = IAsset.getAsset(contract_address = asset_address, id = temp_order.assetID)
         let (collateral : Asset) = IAsset.getAsset(contract_address = asset_address, id = temp_order.collateralID)
+        let (market : Market) = IMarket.getMarket(contract_address = market_address, id = marketID)
 
         # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
         assert_not_zero(asset.tradable)
         assert_not_zero(collateral.collateral)
+        assert_not_zero(market.tradable)
 
         # Recursive call with the ticker and price to compare against
         return check_and_execute(
             size,
             temp_order.assetID,
             temp_order.collateralID,
+            marketID,
             execution_price,
             request_list_len - 1,
             request_list + MultipleOrder.SIZE,
@@ -362,6 +379,7 @@ func check_and_execute{
         size,
         assetID,
         collateralID,
+        marketID,
         execution_price,
         request_list_len - 1,
         request_list + MultipleOrder.SIZE,
@@ -386,6 +404,7 @@ func execute_batch{
 }(    
     size : felt,
     execution_price : felt,
+    marketID : felt,
     request_list_len : felt,
     request_list : MultipleOrder*,
 ) -> (res : felt):
@@ -408,6 +427,7 @@ func execute_batch{
         size, 
         0,
         0,
+        marketID,
         execution_price,
         request_list_len, 
         request_list, 
@@ -438,14 +458,6 @@ namespace IAccount:
     ) -> ():
     end
 
-
-    func get_allowance(
-        address_ : felt,
-        assetID_ : felt
-    ) -> (res : felt):
-    end
-
-
     func get_order_data(
         order_ID : felt
     ) -> (
@@ -457,6 +469,11 @@ namespace IAccount:
         assetID_ : felt,
         amount : felt
     ) -> ():
+    end
+
+    func get_balance(
+        assetID_ : felt
+    ) -> (res: felt):
     end
 end
 
@@ -503,6 +520,18 @@ namespace IFeeBalance:
         address: felt,
         assetID: felt,
         fee_to_add: felt
+    ):
+    end
+end
+
+
+# @notice Markets interface
+@contract_interface
+namespace IMarket:
+    func getMarket(
+        id: felt
+    ) -> (
+        currMarket: Market
     ):
     end
 end
