@@ -37,61 +37,61 @@ async def account_contract(
         ]
     )
 
-@pytest.mark.asyncio
-async def test_deposit_wrong_l1_address(
-    session_starknet: Starknet,
-    account_contract: StarknetContract
-):
-    with pytest.raises(StarkException, match="assert from_address = L1_CONTRACT_ADDRESS"):
-        await session_starknet.send_message_to_l2(
-            from_address=Wrong_L1_ZKX_Contract_Address,
-            to_address=account_contract.contract_address,
-            selector=get_selector_from_name("deposit"),
-            payload=[User_Address, 1000, asset_ID],
-        )
+# @pytest.mark.asyncio
+# async def test_deposit_wrong_l1_address(
+#     session_starknet: Starknet,
+#     account_contract: StarknetContract
+# ):
+#     with pytest.raises(StarkException, match="assert from_address = L1_CONTRACT_ADDRESS"):
+#         await session_starknet.send_message_to_l2(
+#             from_address=Wrong_L1_ZKX_Contract_Address,
+#             to_address=account_contract.contract_address,
+#             selector=get_selector_from_name("deposit"),
+#             payload=[User_Address, 1000, asset_ID],
+#         )
 
 
-@pytest.mark.asyncio
-async def test_deposit_happy_flow(
-    session_starknet: Starknet,
-    account_contract: StarknetContract
-):
-    await session_starknet.send_message_to_l2(
-        from_address=Correct_L1_ZKX_Contract_Address,
-        to_address=account_contract.contract_address,
-        selector=get_selector_from_name("deposit"),
-        payload=[User_Address, 1000, asset_ID],
-    )
-    execution_info = await account_contract.get_balance(asset_ID).call()
-    assert execution_info.result == (1000,)
+# @pytest.mark.asyncio
+# async def test_deposit_happy_flow(
+#     session_starknet: Starknet,
+#     account_contract: StarknetContract
+# ):
+#     await session_starknet.send_message_to_l2(
+#         from_address=Correct_L1_ZKX_Contract_Address,
+#         to_address=account_contract.contract_address,
+#         selector=get_selector_from_name("deposit"),
+#         payload=[User_Address, 1000, asset_ID],
+#     )
+#     execution_info = await account_contract.get_balance(asset_ID).call()
+#     assert execution_info.result == (1000,)
 
 
-@pytest.mark.asyncio
-async def test_withdraw_amount_bigger_than_balance(
-    account_contract: StarknetContract
-):
-    with pytest.raises(StarkException, match="assert_nn\(new_balance\)"):
-        await account_contract.withdraw(
-            amount=10000, assetID_ = asset_ID
-        ).invoke(caller_address=Correct_L1_ZKX_Contract_Address)
+# @pytest.mark.asyncio
+# async def test_withdraw_amount_bigger_than_balance(
+#     account_contract: StarknetContract
+# ):
+#     with pytest.raises(StarkException, match="assert_nn\(new_balance\)"):
+#         await account_contract.withdraw(
+#             amount=10000, assetID_ = asset_ID
+#         ).invoke(caller_address=Correct_L1_ZKX_Contract_Address)
 
 
-@pytest.mark.asyncio
-async def test_withdraw_happy_flow(
-    session_starknet: Starknet,
-    account_contract: StarknetContract
-):
-    await session_starknet.send_message_to_l2(
-        from_address=Correct_L1_ZKX_Contract_Address,
-        to_address=account_contract.contract_address,
-        selector=get_selector_from_name("deposit"),
-        payload=[User_Address, 1000, asset_ID],
-    )
-    execution_info = await account_contract.get_balance(asset_ID).call()
-    assert execution_info.result == (2000,)
-    await account_contract.withdraw(
-        amount=100, assetID_ = asset_ID
-    ).invoke(caller_address=Correct_L1_ZKX_Contract_Address)
-    execution_info = await account_contract.get_balance(asset_ID).call()
-    assert execution_info.result == (1900,)
+# @pytest.mark.asyncio
+# async def test_withdraw_happy_flow(
+#     session_starknet: Starknet,
+#     account_contract: StarknetContract
+# ):
+#     await session_starknet.send_message_to_l2(
+#         from_address=Correct_L1_ZKX_Contract_Address,
+#         to_address=account_contract.contract_address,
+#         selector=get_selector_from_name("deposit"),
+#         payload=[User_Address, 1000, asset_ID],
+#     )
+#     execution_info = await account_contract.get_balance(asset_ID).call()
+#     assert execution_info.result == (2000,)
+#     await account_contract.withdraw(
+#         amount=100, assetID_ = asset_ID
+#     ).invoke(caller_address=Correct_L1_ZKX_Contract_Address)
+#     execution_info = await account_contract.get_balance(asset_ID).call()
+#     assert execution_info.result == (1900,)
    
