@@ -32,7 +32,8 @@ end
 # Struct to pass the order to this contract
 struct OrderRequest:
     member orderID : felt
-    member ticker : felt
+    member assetID : felt
+    member collateralID : felt
     member price : felt
     member orderType : felt
     member positionSize : felt
@@ -53,7 +54,8 @@ end
 # status 3: close partial
 # status 4: close
 struct OrderDetails:
-    member ticker: felt
+    member assetID: felt
+    member collateralID: felt
     member price: felt
     member executionPrice: felt
     member positionSize: felt
@@ -62,7 +64,8 @@ struct OrderDetails:
     member portionExecuted: felt
     member status: felt
 end
-#
+
+
 # Storage
 #
 
@@ -79,19 +82,11 @@ func trading_volume() -> (res : felt):
 end
 
 @storage_var
-func balance() -> (res : felt):
+func balance(assetID: felt) -> (res : felt):
 end
 
 @storage_var
 func authorized_registry() -> (res : felt):
-end
-
-@storage_var
-func allowance(address: felt) -> (res : felt):
-end
-
-@storage_var
-func locked_balance() -> (res : felt):
 end
 
 @storage_var
@@ -121,8 +116,10 @@ end
 #
 
 @view
-func get_public_key{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-        res : felt):
+func get_public_key{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+) -> (
+    res : felt
+):
     let (res) = public_key.read()
     return (res=res)
 end
@@ -134,50 +131,40 @@ func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 end
 
 @view
-func get_trading_volume{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-        res : felt):
+func get_trading_volume{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+) -> (
+    res : felt
+):
     let (res) = trading_volume.read()
     return (res=res)
 end
 
 @view
-func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-        res : felt):
-    let (res) = balance.read()
-    return (res=res)
-end
-
-@view
-func get_locked_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-        res : felt):
-    let (res) = locked_balance.read()
-    return (res=res)
-end
-
-@view
-func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    order_ID : felt
-) -> (
-    res : OrderDetails
-):
-    let (res) = order_mapping.read(orderID=order_ID)
-    return (res=res)
-end
-
-
-@view
-func get_allowance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    address_ : felt
+func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt
 ) -> (
     res : felt
 ):
-    let (res) = allowance.read(address = address_)
+    let (res) = balance.read(assetID=assetID_)
+    return (res=res)
+end
+
+
+@view
+func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    orderID_ : felt
+) -> (
+    res : OrderDetails
+):
+    let (res) = order_mapping.read(orderID=orderID_)
     return (res=res)
 end
 
 @view
-func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-        res : felt):
+func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+) -> (
+    res : felt
+):
     let (res) = L1_address.read()
     return (res=res)
 end
@@ -189,7 +176,8 @@ end
 
 @external
 func set_public_key{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        new_public_key : felt):
+    new_public_key : felt
+):
     assert_only_self()
     public_key.write(new_public_key)
     return ()
@@ -201,7 +189,8 @@ end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        _public_key : felt, _registry : felt):
+    _public_key : felt, _registry : felt
+):
     public_key.write(_public_key)
     authorized_registry.write(_registry)
     return ()
@@ -211,34 +200,7 @@ end
 # Business logic
 #
 
-# @notice Approve funds to be transfered by Trading Contract
-# @param address - Address to approve funds to
-# @param allowance_ - Amount of funds to approve
-@external
-func approve{
-    syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, 
-    range_check_ptr
-}(  
-    address_ : felt,
-    allowance_ : felt
-) -> ():
-    alloc_locals
-    assert_only_self()
-
-    let (authorized_registry_) = authorized_registry.read()
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
-
-    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = address_, action = 3)
-    assert is_trading_contract = 1
-
-    allowance.write(address = address_, value=allowance_)
-
-    return ()
-end
-
-
-# @notice External function called by the Trading Contractg
+# @notice External function called by the Trading Contract
 # @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from{
@@ -246,29 +208,36 @@ func transfer_from{
     pedersen_ptr : HashBuiltin*, 
     range_check_ptr,
 }(
+    assetID_ : felt,
     amount : felt
 ) -> ():
+    alloc_locals
 
+    # Check if the caller is trading contract
     let (caller) = get_caller_address()
-    let (allowance_) = allowance.read(address = caller)
-    let (balance_) = balance.read()
+    let (balance_) = balance.read(assetID = assetID_)
 
-    assert_le(amount, allowance_)
+    let (authorized_registry_) = authorized_registry.read()
+    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3) 
+
+    assert is_trading_contract = 1
+
+    # Check that the balance doesn't go negative
     assert_nn(balance_ - amount)
-    allowance.write(address = caller, value = allowance_ - amount)
-    balance.write(balance_ - amount)
+    balance.write(assetID = assetID_, value = balance_ - amount)
     return ()
 end
 
 
-# @notice External function called by the Trading Contractg
-# @param amount - Amount of funds to transfer from this contract
+# @notice External function called by the Trading Contract
+# @param amount - Amount of funds to transfer to this contract
 @external
 func transfer{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*, 
     range_check_ptr,
 }(
+    assetID_ : felt,
     amount : felt
 ) -> ():
     alloc_locals
@@ -281,8 +250,8 @@ func transfer{
     assert is_trading_contract = 1
 
     assert_nn(amount)
-    let (balance_) = balance.read()
-    balance.write(balance_ + amount)
+    let (balance_) = balance.read(assetID = assetID_)
+    balance.write(assetID = assetID_, value = balance_ + amount)
     return ()
 end
 
@@ -395,14 +364,15 @@ end
 # TODO: Remove; Only for testing purposes 
 @external
 func set_balance{
-        syscall_ptr : felt*, 
-        pedersen_ptr : HashBuiltin*, 
-        range_check_ptr,
+    syscall_ptr : felt*, 
+    pedersen_ptr : HashBuiltin*, 
+    range_check_ptr,
 }(
+    assetID_: felt,
     amount: felt
 ):
-    let (curr_balance) = get_balance()
-    balance.write(curr_balance + amount)
+    let (curr_balance) = get_balance(assetID_)
+    balance.write(assetID = assetID_, value = curr_balance + amount)
     return ()
 end
 
@@ -415,11 +385,10 @@ func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (r
     let hash_ptr = pedersen_ptr
     with hash_ptr:
         let (hash_state_ptr) = hash_init()
-        # first three iterations are 'sender', 'to', and 'selector'
         let (hash_state_ptr) = hash_update(
             hash_state_ptr, 
             orderRequest, 
-            7
+            8
         )
         let (res) = hash_finalize(hash_state_ptr)
         let pedersen_ptr = hash_ptr
@@ -468,7 +437,7 @@ func execute_order{
         # Get the order details if already exists
         let (orderDetails) = order_mapping.read(orderID = request.orderID)
         # If it's a new order
-        if orderDetails.ticker == 0:
+        if orderDetails.assetID == 0:
 
             # Create if the order is being fully opened
             # status_ == 1, partially opened
@@ -481,7 +450,8 @@ func execute_order{
 
             # Create a new struct with the updated details
             let new_order = OrderDetails(
-                ticker = request.ticker,
+                assetID = request.assetID,
+                collateralID = request.collateralID,
                 price = request.price,
                 executionPrice = execution_price,
                 positionSize = request.positionSize,
@@ -512,7 +482,8 @@ func execute_order{
             
             # Create a new struct with the updated details
             let updated_order = OrderDetails(
-                ticker = orderDetails.ticker,
+                assetID = orderDetails.assetID,
+                collateralID = orderDetails.collateralID,
                 price = orderDetails.price,
                 executionPrice = orderDetails.executionPrice,
                 positionSize = orderDetails.positionSize,
@@ -553,7 +524,8 @@ func execute_order{
 
         # Create a new struct with the updated details
         let updated_order = OrderDetails(
-            ticker = orderDetails.ticker,
+            assetID = orderDetails.assetID,
+            collateralID = orderDetails.collateralID,
             price = orderDetails.price,
             executionPrice = orderDetails.executionPrice,
             positionSize = orderDetails.positionSize,
@@ -606,18 +578,20 @@ end
 # @param amount - The Amount of funds that user wants to withdraw
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        amount : felt):
+    assetID_ : felt,
+    amount : felt,
+):
     # Make sure 'amount' is positive.
     assert_nn(amount)
 
-    let (res) = balance.read()
+    let (res) = balance.read(assetID = assetID_)
     tempvar new_balance = res - amount
 
     # Make sure the new balance will be positive.
     assert_nn(new_balance)
 
     # Update the new balance.
-    balance.write(new_balance)
+    balance.write(assetID = assetID_, value = new_balance)
 
     # Get the L1 Metamask address
     let (L2_account_address) = get_contract_address()
@@ -641,7 +615,11 @@ end
 # @param amount - The Amount of funds that user wants to withdraw
 @l1_handler
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        from_address : felt, user : felt, amount : felt):
+    from_address : felt, 
+    user : felt, 
+    amount : felt,
+    assetID_ : felt,
+):
     # Make sure the message was sent by the intended L1 contract.
     assert from_address = L1_CONTRACT_ADDRESS
 
@@ -649,11 +627,11 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     L1_address.write(user)
 
     # Read the current balance.
-    let (res) = balance.read()
+    let (res) = balance.read(assetID = assetID_)
 
     # Compute and update the new balance.
     tempvar new_balance = res + amount
-    balance.write(new_balance)
+    balance.write(assetID = assetID_, value = new_balance)
 
     return ()
 end

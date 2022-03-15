@@ -21,9 +21,9 @@ end
 func emergency_address() -> (contract_address : felt):
 end
 
-# @notice Stores the mapping from ticker to its balance
+# @notice Stores the mapping from assetID to its balance
 @storage_var
-func balance_mapping(ticker : felt) -> (amount : felt):
+func balance_mapping(assetID : felt) -> (amount : felt):
 end
 
 # @notice Constructor of the smart-contract
@@ -40,7 +40,8 @@ end
 # @param address - address of trading contract
 @external
 func update_trading_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        address: felt):
+    address: felt
+):
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
@@ -56,7 +57,8 @@ end
 # @param address - address of trading contract
 @external
 func update_emergency_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        address: felt):
+    address: felt
+):
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
@@ -68,12 +70,14 @@ func update_emergency_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     return()
 end
 
-# @notice Manually add amount from ticker's balance
-# @param ticker - target ticker
-# @param amount - value to add to ticker's balance
+# @notice Manually add amount to assetID's balance
+# @param assetID - target assetID
+# @param amount - value to add to assetID's balance
 @external
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ticker: felt, amount: felt):
+    assetID_: felt, 
+    amount: felt
+):
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
@@ -85,18 +89,20 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         assert caller = emergency_addr
     end
 
-    let current_amount : felt = balance_mapping.read(ticker=ticker)
-    balance_mapping.write(ticker=ticker, value=current_amount + amount)
+    let current_amount : felt = balance_mapping.read(assetID = assetID_)
+    balance_mapping.write(assetID = assetID_, value = current_amount + amount)
 
     return()
 end
 
-# @notice Manually deduct amount from ticker's balance
-# @param ticker - target ticker
-# @param amount - value to deduct from ticker's balance
+# @notice Manually deduct amount from assetID's balance
+# @param assetID - target assetID
+# @param amount - value to deduct from assetID's balance
 @external
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ticker: felt, amount: felt):
+    assetID_: felt, 
+    amount: felt
+):
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
@@ -108,19 +114,20 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         assert caller = emergency_addr
     end
 
-    let current_amount : felt = balance_mapping.read(ticker=ticker)
-    balance_mapping.write(ticker=ticker, value=current_amount - amount)
+    let current_amount : felt = balance_mapping.read(assetID = assetID_)
+    balance_mapping.write(assetID = assetID_, value=current_amount - amount)
 
     return()
 end
 
-# @notice Deposit amount for a ticker by an order
-# @param ticker - target ticker
-# @param amount - value to deduct from ticker's balance
-# @param order_id - Order ID associated which triggers the deposit
+# @notice Deposit amount for a assetID by an order
+# @parama setID - target assetID
+# @param amount - value to deduct from assetID's balance
 @external
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ticker: felt, amount: felt, order_id: felt):
+    assetID_: felt, 
+    amount: felt, 
+):
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
@@ -128,19 +135,20 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 
     assert caller = trading_addr
     
-    let current_amount : felt = balance_mapping.read(ticker=ticker)
-    balance_mapping.write(ticker=ticker, value=current_amount + amount)
+    let current_amount : felt = balance_mapping.read(assetID = assetID_)
+    balance_mapping.write(assetID = assetID_, value = current_amount + amount)
 
     return()
 end
 
-# @notice Withdraw amount for a ticker by an order
-# @param ticker - target ticker
-# @param amount - value to deduct from ticker's balance
-# @param order_id - Order ID associated which triggers the withdrawal
+# @notice Withdraw amount for a assetID by an order
+# @param assetID - target assetID
+# @param amount - value to deduct from assetID's balance
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ticker: felt, amount: felt, order_id: felt):
+    assetID_: felt, 
+    amount: felt, 
+):
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
@@ -148,20 +156,23 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 
     assert caller = trading_addr
     
-    let current_amount : felt = balance_mapping.read(ticker=ticker)
+    let current_amount : felt = balance_mapping.read(assetID = assetID_)
     assert_not_zero(current_amount - amount)
-    balance_mapping.write(ticker=ticker, value=current_amount - amount)
+    balance_mapping.write(assetID = assetID_, value=current_amount - amount)
 
     return()
 end
 
-# @notice Displays the amount of the balance for the ticker (asset)
-# @param ticker - Target ticker
-# @return amount - Balance amount corresponding to the ticker
+# @notice Displays the amount of the balance for the assetID(asset)
+# @param assetID - Target assetID
+# @return amount - Balance amount corresponding to the assetID
 @view
-func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(ticker : felt) -> (
-        amount : felt):
-    let (amount) = balance_mapping.read(ticker=ticker)
+func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt
+) -> (
+    amount : felt
+):
+    let (amount) = balance_mapping.read(assetID = assetID_)
     return (amount)
 end
 

@@ -124,9 +124,7 @@ async def test_modify_base_fees(adminAuth_factory):
 
     execution_info = await fees.get_fees().call()
     result = execution_info.result
-
-    print(result)
-
+    
     assert result.long_fees == 13
     assert result.short_fees == 10
 

@@ -16,9 +16,9 @@ end
 func holding_address() -> (contract_address : felt):
 end
 
-# @notice Stores the mapping from ticker to its balance
+# @notice Stores the mapping from assetID to its balance
 @storage_var
-func balance_mapping(ticker : felt) -> (amount : felt):
+func balance_mapping(assetID : felt) -> (amount : felt):
 end
 
 # @notice Constructor of the smart-contract
@@ -26,92 +26,102 @@ end
 # @param _holdingAddress - Address of the holding contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        _authAddress : felt, _holdingAddress : felt):
+    _authAddress : felt, _holdingAddress : felt
+):
     auth_address.write(value=_authAddress)
     holding_address.write(value=_holdingAddress)
     return ()
 end
 
-# @notice Displays the amount of the balance for the ticker (asset)
-# @param ticker - Target ticker
+# @notice Displays the amount of the balance for the assetID (asset)
+# @param assetID - Target assetID
 @view
-func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(ticker : felt) -> (
-        amount : felt):
-    let (amount) = balance_mapping.read(ticker=ticker)
+func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt
+) -> (
+    amount : felt
+):
+    let (amount) = balance_mapping.read(assetID = assetID_)
     return (amount)
 end
 
-# @notice Manually add amount to ticker's balance by admins only
-# @param amount - value to add to ticker's balance
-# @param ticker - target ticker
+# @notice Manually add amount to assetID's balance by admins only
+# @param amount - value to add to assetID's balance
+# @param assetID - target assetID
 @external
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ticker : felt, amount : felt):
+    assetID_ : felt, amount : felt
+):
     alloc_locals
 
     let (caller) = get_caller_address()
     let (auth_addr) = auth_address.read()
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=0)
+        contract_address=auth_addr, address=caller, action=0
+    )
     assert_not_zero(access)
 
-    let current_amount : felt = balance_mapping.read(ticker=ticker)
-    balance_mapping.write(ticker=ticker, value=current_amount + amount)
+    let current_amount : felt = balance_mapping.read(assetID = assetID_)
+    balance_mapping.write(assetID = assetID_, value = current_amount + amount)
     return ()
 end
 
-# @notice Manually deduct amount from ticker's balance by admins only
-# @param amount - value to add to ticker's balance
-# @param ticker - target ticker
+# @notice Manually deduct amount from assetID's balance by admins only
+# @param amount - value to add to assetID's balance
+# @param assetID_ - target assetID
 @external
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ticker : felt, amount : felt):
+    assetID_ : felt, amount : felt
+):
     alloc_locals
 
     let (caller) = get_caller_address()
     let (auth_addr) = auth_address.read()
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=0)
+        contract_address=auth_addr, 
+        address=caller, action=0
+    )
     assert_not_zero(access)
 
-    let current_amount : felt = balance_mapping.read(ticker=ticker)
-    balance_mapping.write(ticker=ticker, value=current_amount - amount)
+    let current_amount : felt = balance_mapping.read(assetID = assetID_)
+    balance_mapping.write(assetID = assetID_, value = current_amount - amount)
 
     return ()
 end
 
-# @notice Manually add amount to ticker's balance in emergency fund and funding contract by admins only
-# @param amount - value to add to ticker's balance
-# @param ticker - target ticker
+# @notice Manually add amount to assetID's balance in emergency fund and funding contract by admins only
+# @param amount - value to add to assetID's balance
+# @param assetID_ - target assetID
 @external
 func fundHolding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ticker : felt, amount : felt):
+    assetID_ : felt, amount : felt
+):
     alloc_locals
 
     let (caller) = get_caller_address()
     let (auth_addr) = auth_address.read()
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=0)
+        contract_address = auth_addr, address = caller, action=0)
     assert_not_zero(access)
 
-    let current_amount : felt = balance_mapping.read(ticker=ticker)
-    balance_mapping.write(ticker=ticker, value=current_amount + amount)
+    let current_amount : felt = balance_mapping.read(assetID = assetID_)
+    balance_mapping.write(assetID = assetID_, value = current_amount + amount)
 
     let (holding_addr) = holding_address.read()
-    IHolding.fund(contract_address=holding_addr, ticker=ticker, amount=amount)
+    IHolding.fund(contract_address = holding_addr, assetID = assetID_, amount = amount)
 
     return ()
 end
 
-# @notice Manually deduct amount from ticker's balance in emergency fund and funding contract by admins only
-# @param amount - value to add to ticker's balance
-# @param ticker - target ticker
+# @notice Manually deduct amount from assetID's balance in emergency fund and funding contract by admins only
+# @param amount - value to add to assetID's balance
+# @param assetID - target assetID
 @external
 func defundHolding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ticker : felt, amount : felt):
+        assetID : felt, amount : felt):
     alloc_locals
 
     let (caller) = get_caller_address()
@@ -121,11 +131,11 @@ func defundHolding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         contract_address=auth_addr, address=caller, action=0)
     assert_not_zero(access)
 
-    let current_amount : felt = balance_mapping.read(ticker=ticker)
-    balance_mapping.write(ticker=ticker, value=current_amount - amount)
+    let current_amount : felt = balance_mapping.read(assetID=assetID)
+    balance_mapping.write(assetID=assetID, value=current_amount - amount)
 
     let (holding_addr) = holding_address.read()
-    IHolding.defund(contract_address=holding_addr, ticker=ticker, amount=amount)
+    IHolding.defund(contract_address=holding_addr, assetID=assetID, amount=amount)
 
     return ()
 end
@@ -140,9 +150,9 @@ end
 # @notice Holding interface
 @contract_interface
 namespace IHolding:
-    func fund(ticker : felt, amount : felt):
+    func fund(assetID : felt, amount : felt):
     end
 
-    func defund(ticker : felt, amount : felt):
+    func defund(assetID : felt, amount : felt):
     end
 end

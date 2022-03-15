@@ -45,10 +45,12 @@ func constructor{
     syscall_ptr : felt*, 
     pedersen_ptr : HashBuiltin*, 
     range_check_ptr
-}(_authAddress : felt, _asset_contract : felt):
-
+}(
+    _authAddress : felt, 
+    _asset_contract : felt
+):
     auth_address.write(value = _authAddress)
-    asset_contract_address.write(_asset_contract)
+    asset_contract_address.write(value = _asset_contract)
     return ()
 end
 
