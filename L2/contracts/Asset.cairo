@@ -2,9 +2,14 @@
 
 %builtins pedersen range_check ecdsa
 
+from starkware.cairo.common.alloc import alloc
+from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
+
+const L1_CONTRACT_ADDRESS = (0xEE6cd124E83834CA4A1630F68a74f562530f6218)
+const ADD_ASSET = 1
 
 # @notice Stores the address of AdminAuth contract
 @storage_var
@@ -110,6 +115,24 @@ func getAsset{
 
     let (currAsset) = asset.read(id = id)
     return (currAsset)
+end
+
+# @notice Function to update asset list in L1
+# @param amount - The Amount of funds that user wants to withdraw
+@external
+func updateAssetListInL1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetId : felt,
+    ticker : felt,
+):
+
+    # Send the add asset message.
+    let (message_payload : felt*) = alloc()
+    assert message_payload[0] = ADD_ASSET
+    assert message_payload[1] = ticker
+    assert message_payload[2] = assetId
+    send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=3, payload=message_payload)
+
+    return ()
 end
 
 
