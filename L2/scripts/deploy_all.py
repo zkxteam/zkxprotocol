@@ -26,7 +26,7 @@ def deploy_all():
 
     # deploy Admin Auth Contracts
     # admin_auth = deploy_command("AdminAuth", [admin1, admin2], network, "AdminAuth")
-    admin_auth = deploy_command("AdminAuth", ["0xd687a698b6c39372fc0ef753a03a71843d8399b673fe31aa9e56549f91a49d", "0x4f0650b2db56943974ab0b412a02448a40fe2287c5c2f4115b851cdc435fef4"], network, "AdminAuth")
+    admin_auth = deploy_command("AdminAuth", ["0x0258c7fd9f3b93377616f36aa98dee7662036edcb77b92d95af5ad40be667c5d", "0x018759214450497e7f3f650fa45ec6cec1796c0ad6cc3812ef290bfc50ed6fba"], network, "AdminAuth")
 
     # Append all the arguments
     argument_list = [long_trading_fees, short_trading_fees, admin_auth] + tier1_details + tier2_details + tier3_details + trade1_access + trade2_access + trade3_access
@@ -38,6 +38,9 @@ def deploy_all():
     # Deploy Asset Contract
     asset = deploy_command("Asset", [admin_auth], network, "Asset")
 
+    # Deploy Market Contract
+    market = deploy_command("Markets", [admin_auth, asset], network, "Markets")
+
     # Deploy FeeBalance Contract
     feeBalance = deploy_command("FeeBalance", [admin_auth], network, "FeeBalance")
 
@@ -48,6 +51,6 @@ def deploy_all():
     emergencyFund = deploy_command("EmergencyFund", [admin_auth, holding], network, "EmergencyFund")
 
     # Deploy Trading Contract
-    trading = deploy_command("Trading", [asset, fees, holding, feeBalance], network, "Trading")
+    trading = deploy_command("Trading", [asset, fees, holding, feeBalance, market], network, "Trading")
 
 deploy_all()

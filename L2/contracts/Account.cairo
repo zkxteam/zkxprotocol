@@ -12,7 +12,7 @@ from starkware.cairo.common.hash_state import (hash_init, hash_finalize, hash_up
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn
 
-const L1_CONTRACT_ADDRESS = (0xEE6cd124E83834CA4A1630F68a74f562530f6218)
+const L1_CONTRACT_ADDRESS = (0x88d2EE8A225D281cAa435F532F51c9844F05a4d9)
 const MESSAGE_WITHDRAW = 0
 
 #
@@ -160,6 +160,7 @@ func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
+# @notice get L1 address of the user
 @view
 func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 ) -> (
@@ -602,7 +603,8 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     assert message_payload[0] = MESSAGE_WITHDRAW
     assert message_payload[1] = user
     assert message_payload[2] = amount
-    send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=3, payload=message_payload)
+    assert message_payload[3] = assetID_
+    send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=4, payload=message_payload)
 
     return ()
 end
