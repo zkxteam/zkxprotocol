@@ -16,15 +16,15 @@ contract L1ZKXContract is AccessControl{
     event LogDeposit(address sender, uint256 amount, uint256 collateralId, uint256 l2Recipient);
     event LogWithdrawal(address recipient, uint256 amount);
     event LogAssetListUpdated(uint256 ticker, uint256 collateralId);
-    event LogAssetContractAddressUpdated(uint256 ticker, address assetContractAddresses_);
+    event LogTokenContractAddressUpdated(uint256 ticker, address tokenContractAddresses_);
 
     using SafeMath for uint256;
 
     // The StarkNet core contract.
     IStarknetCore starknetCore;
 
-    // Maps asset with the asset contract addresses
-    mapping(uint256 => address) public assetContractAddress;
+    // Maps token with the token contract addresses
+    mapping(uint256 => address) public tokenContractAddress;
 
     // Maps ticker with the asset ID
     mapping(uint256 => uint256) public assetID;
@@ -69,14 +69,6 @@ contract L1ZKXContract is AccessControl{
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-
-    /**
-     * @dev function to get the L2 contract address for the corresponding L1 account address
-     **/
-    function getL2ContractAddress(uint256 user) public view returns (uint256) {
-        return l2ContractAddress[user];
-    }
-
     /**
      * @dev function to update asset list in L1
      * @param ticker - The asset that needs to be added to the list
@@ -111,14 +103,14 @@ contract L1ZKXContract is AccessControl{
      /**
      * @dev function to set asset contract address
      * @param ticker - The asset that needs to be added to the list
-     * @param  assetContractAddress_ - address of the asset contract
+     * @param  tokenContractAddress_ - address of the asset contract
      **/
-    function setAssetContractAddress (uint256 ticker,
-        address assetContractAddress_) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setTokenContractAddress (uint256 ticker,
+        address tokenContractAddress_) public onlyRole(DEFAULT_ADMIN_ROLE) {
 
         // Update the asset list
-        assetContractAddress[ticker] = assetContractAddress_;
-        emit LogAssetContractAddressUpdated(ticker, assetContractAddress_);
+        tokenContractAddress[ticker] = tokenContractAddress_;
+        emit LogTokenContractAddressUpdated(ticker, tokenContractAddress_);
     }
 
 
@@ -132,7 +124,7 @@ contract L1ZKXContract is AccessControl{
         uint256 ticker
     ) public {
         uint256 user = uint256(uint160(address(msg.sender)));
-        uint256 l2AccountAddress = getL2ContractAddress(user);
+        uint256 l2AccountAddress = l2ContractAddress[user];
 
         uint256 collateralId = assetID[ticker];
         // Construct the withdrawal message's payload.
@@ -146,7 +138,7 @@ contract L1ZKXContract is AccessControl{
         // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(l2AccountAddress, payload);
 
-        address tokenContract = assetContractAddress[ticker];
+        address tokenContract = tokenContractAddress[ticker];
         IERC20(tokenContract).transfer(address(uint160(user)), amount);
 
         emit LogWithdrawal(address(uint160(user)), amount);                                                                                                                                                                                                                                     
@@ -170,7 +162,7 @@ contract L1ZKXContract is AccessControl{
         // Update the User balance.
         userBalance[user][collateralId] = userBalance[user][collateralId].sub(amount);
 
-        uint256 l2Recipient = getL2ContractAddress(user);
+        uint256 l2Recipient = l2ContractAddress[user];
 
         // Construct the deposit message's payload.
         uint256[] memory payload = new uint256[](3);
@@ -200,7 +192,7 @@ contract L1ZKXContract is AccessControl{
             l2ContractAddress[uint256(uint160(address(msg.sender)))] = l2AccountAddress;
         }
 
-        address tokenContract = assetContractAddress[ticker];
+        address tokenContract = tokenContractAddress[ticker];
         uint balance = IERC20(tokenContract).balanceOf(msg.sender);
         require(balance >= amount, "User is trying to deposit more than he has");
 
