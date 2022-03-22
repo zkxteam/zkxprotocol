@@ -8,7 +8,7 @@ import "./IStarknetCore.sol";
 
 
 /**
-  Contract for L1 <-> L2 interaction between an L2 StarkNet Account contract and this
+  Contract for L1 <-> L2 interaction between an L2 contracts and this
   L1 ZKX contract.
 */
 contract L1ZKXContract is AccessControl{
@@ -29,10 +29,7 @@ contract L1ZKXContract is AccessControl{
     // Maps ticker with the asset ID
     mapping(uint256 => uint256) public assetID;
 
-    // Maps asset id with the amount of collateral available 
-    //mapping(uint256 => uint256) public collateralBalance;
-
-    // Maps the user address to the asset balance mapping
+    // Maps the user address to the corresponding asset balance 
     mapping(uint256 => mapping(uint256 => uint256)) public userBalance;
 
     // Maps L1 metamask account address to the l2 account contract address
@@ -43,8 +40,6 @@ contract L1ZKXContract is AccessControl{
     
     uint256 constant MESSAGE_WITHDRAW = 0;
     uint256 constant ADD_ASSET = 1;
-    address admin_address = 0x463f2125e3bc6BA05eF5DfC4A7979Cb5B004E1ac;
-
 
     // The selector of the "deposit" l1_handler.
     uint256 constant DEPOSIT_SELECTOR =
@@ -52,18 +47,10 @@ contract L1ZKXContract is AccessControl{
 
     // Asset Contract address
     uint256 zkxAssetContractAddress = 
-        0x0322f2b0aa7c053c8af5260ac6411aaae4cab234b4bb77c06d92e959359a37a8;
+        0x0090423a5ed4af17a990770592812b2c5f002d76ae161238eea3c3a2bdd20613;
 
     uint256 constant FIELD_PRIME =
         0x800000000000011000000000000000000000000000000000000000000000001;
-
-    /**
-      Initializes the contract state.
-    */
-    constructor(IStarknetCore starknetCore_) {
-        starknetCore = starknetCore_;
-        _setupRole(DEFAULT_ADMIN_ROLE, admin_address);
-    }
 
     /**
       Modifier to verify valid L2 address.
@@ -72,6 +59,14 @@ contract L1ZKXContract is AccessControl{
         require(l2Address != 0, "L2_ADDRESS_OUT_OF_RANGE");
         require(l2Address < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
         _;
+    }
+
+    /**
+      Initializes the contract state.
+    */
+    constructor(IStarknetCore starknetCore_) {
+        starknetCore = starknetCore_;
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
 
@@ -217,5 +212,4 @@ contract L1ZKXContract is AccessControl{
             userBalance[uint256(uint160(address(msg.sender)))][collateralId].add(amount);
         depositToL2(uint256(uint160(address(msg.sender))), collateralId, amount);
     }
-
 }

@@ -12,7 +12,7 @@ from starkware.cairo.common.hash_state import (hash_init, hash_finalize, hash_up
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn
 
-const L1_CONTRACT_ADDRESS = (0xa7AFace126763F8d6E99750F0A2d99576c61459d)
+const L1_CONTRACT_ADDRESS = (0x88d2EE8A225D281cAa435F532F51c9844F05a4d9)
 const MESSAGE_WITHDRAW = 0
 
 #
@@ -160,6 +160,7 @@ func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
+# @notice get L1 address of the user
 @view
 func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 ) -> (
