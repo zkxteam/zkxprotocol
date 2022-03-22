@@ -1,4 +1,10 @@
-artifacts/
-env/
-tests/
-Brewfile
+L1/node_modules/
+L2/node_modules/
+L1/package-lock.json
+L2/package-lock.json
+L2/scripts/__pycache__/
+L1/yarn.lock
+L2/yarn.lock
+L1/.env
+L2/.env
+L2/.pytest_cache
