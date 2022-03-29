@@ -178,17 +178,23 @@ func check_and_execute{
         tempvar lowerLimit = temp_order.price - two_percent
         tempvar upperLimit = temp_order.price + two_percent
     
-        assert_in_range(execution_price, lowerLimit, upperLimit)
+        with_attr error_message("Execution price is not in range."):
+            assert_in_range(execution_price, lowerLimit, upperLimit)
+        end
         tempvar range_check_ptr = range_check_ptr
     else:
         # if it's a limit order 
         if temp_order.direction == 1:
             # if it's a long order
-            assert_le(execution_price, temp_order.price)
+            with_attr error_message("limit-long order execution price should be less than limit price."):
+                assert_le(execution_price, temp_order.price)
+            end
             tempvar range_check_ptr = range_check_ptr
         else:
             # if it's a short order
-            assert_le(temp_order.price, execution_price)
+            with_attr error_message("limit-short order limit price should be less than execution price."):
+                assert_le(temp_order.price, execution_price)
+            end
             tempvar range_check_ptr = range_check_ptr
         end
         tempvar range_check_ptr = range_check_ptr
@@ -243,7 +249,9 @@ func check_and_execute{
         tempvar total_amount = amount_in + fees
 
         # User must be able to pay the amount
-        assert_le(total_amount, user_balance)
+        with_attr error_message("User balance is less than value of the position in trading contract."):
+            assert_le(total_amount, user_balance)
+        end
         
         # Transfer the amount to Holding Contract
         IAccount.transfer_from(contract_address = temp_order.pub_key, assetID_ = temp_order.collateralID, amount = total_amount)
@@ -255,7 +263,10 @@ func check_and_execute{
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
     else:
         # If it's a close order
-        assert_not_zero(temp_order.parentOrder)
+        with_attr error_message("parentOrder field of closing order request is zero in trading contract."):
+            assert_not_zero(temp_order.parentOrder)
+        end
+        
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
 
         if temp_order.direction == 0:
@@ -350,9 +361,17 @@ func check_and_execute{
         let (market : Market) = IMarket.getMarket(contract_address = market_address, id = marketID)
 
         # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
-        assert_not_zero(asset.tradable)
-        assert_not_zero(collateral.collateral)
-        assert_not_zero(market.tradable)
+        with_attr error_message("asset is non tradable in trading contract."):
+            assert_not_zero(asset.tradable)
+        end 
+        
+        with_attr error_message("asset is non collaterable in trading contract."):
+            assert_not_zero(collateral.collateral)
+        end 
+        
+        with_attr error_message("market is non tradable in trading contract."):
+            assert_not_zero(market.tradable)
+        end 
 
         # Recursive call with the ticker and price to compare against
         return check_and_execute(
@@ -371,8 +390,14 @@ func check_and_execute{
         
     end
     # Assert that the order has the same ticker and price as the first order
-    assert assetID = temp_order.assetID
-    assert collateralID = temp_order.collateralID
+    with_attr error_message("assetID is not same as opposite order's assetID in trading contract."):
+        assert assetID = temp_order.assetID
+    end 
+    
+    with_attr error_message("collateralID is not same as opposite order's collateralID in trading contract."):
+        assert collateralID = temp_order.collateralID
+    end 
+    
    
     # Recursive Call
     return check_and_execute(
@@ -415,8 +440,13 @@ func execute_batch{
     let (long, short) = ITradingFees.get_fees(contract_address=fees_address)
     
     # Assert that these fees are not 0
-    assert_not_zero(long)
-    assert_not_zero(short)
+    with_attr error_message("long must not be zero. Got long={long}."):
+        assert_not_zero(long)
+    end
+
+    with_attr error_message("short must not be zero. Got short={short}."):
+        assert_not_zero(short)
+    end
 
     # Store it in a local var to send it to check_and_execute
     local long_fee = long
@@ -437,7 +467,9 @@ func execute_batch{
     )
 
     # Check if every order has a counter order
-    assert result = 0
+    with_attr error_message("check and execute returned non zero integer."):
+        assert result = 0
+    end
     return (1)
 end
 

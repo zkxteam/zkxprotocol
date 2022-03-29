@@ -53,4 +53,7 @@ def deploy_all():
     # Deploy Trading Contract
     trading = deploy_command("Trading", [asset, fees, holding, feeBalance, market], network, "Trading")
 
+    #Deploy Registry Contract
+    registry = deploy_command("AuthorizedRegistry", [admin_auth], network, "AuthorizedRegistry")
+
 deploy_all()
