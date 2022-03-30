@@ -440,12 +440,8 @@ func execute_order{
 
     # hash the parameters
     let (hash) = hash_order(&request)
-    # check the validity of the signature
-
-    with_attr error_message("calling is valid signature order in account contract."):
-        assert 1 = 2
-    end
     
+    # check the validity of the signature
     is_valid_signature_order(hash, signature)
 
     tempvar status_
