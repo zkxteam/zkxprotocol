@@ -221,10 +221,15 @@ func transfer_from{
     let (authorized_registry_) = authorized_registry.read()
     let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3) 
 
-    assert is_trading_contract = 1
-
+    with_attr error_message("Trading contract is not authorized to do transferFrom in account contract."):
+        assert is_trading_contract = 1
+    end
+    
     # Check that the balance doesn't go negative
-    assert_nn(balance_ - amount)
+    with_attr error_message("Users balance is negative in account contract."):
+        assert_nn(balance_ - amount)
+    end
+    
     balance.write(assetID = assetID_, value = balance_ - amount)
     return ()
 end
@@ -248,9 +253,14 @@ func transfer{
     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr 
 
     let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3)
-    assert is_trading_contract = 1
+    with_attr error_message("Trading contract is not authorized to do transfer in account contract."):
+        assert is_trading_contract = 1
+    end
 
-    assert_nn(amount)
+    with_attr error_message("Amount supplied shouldn't be negative in account contract."):
+        assert_nn(amount)
+    end
+    
     let (balance_) = balance.read(assetID = assetID_)
     balance.write(assetID = assetID_, value = balance_ + amount)
     return ()
@@ -424,10 +434,13 @@ func execute_order{
     let (caller) = get_caller_address()
     let (authorized_registry_) = authorized_registry.read()
     let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(contract_address = authorized_registry_, address = caller, action = 3)
-    assert is_trading_contract = 1
+    with_attr error_message("Trading contract is not authorized to execute order in account contract."):
+        assert is_trading_contract = 1
+    end
 
     # hash the parameters
     let (hash) = hash_order(&request)
+    
     # check the validity of the signature
     is_valid_signature_order(hash, signature)
 
@@ -469,7 +482,10 @@ func execute_order{
         # If it's an existing order
         else:
             # Return if the position size after the executing the current order is more than the order's positionSize
-            assert_le(size + orderDetails.portionExecuted, request.positionSize)
+            with_attr error_message("Paritally executed + remaining should be less than position in account contract."):
+                assert_le(size + orderDetails.portionExecuted, request.positionSize)
+            end
+            
 
             # Check if the order is in the process of being closed
             assert_le(orderDetails.status, 2)

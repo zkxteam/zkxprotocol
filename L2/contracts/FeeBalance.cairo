@@ -51,7 +51,9 @@ func update_caller_address{
     let (auth_addr) = auth_address.read()
 
     let (access) = IAdminAuth.get_admin_mapping(contract_address = auth_addr, address = caller, action = 0)
-    assert_not_zero(access)
+    with_attr error_message("Access is denied to update caller address in feeBalance contract."):
+        assert_not_zero(access)
+    end
     caller_address.write(value=address)
     return()
 end
@@ -71,7 +73,9 @@ func update_fee_mapping{
 ):
     let (caller) = get_caller_address()
     let (caller_addr) = caller_address.read()
-    assert caller = caller_addr
+    with_attr error_message("Access is denied since caller is not trading contract in feeBalance."):
+        assert caller = caller_addr
+    end 
 
     let current_fee : felt = fee_mapping.read(address=address, assetID = assetID_)
     let new_fee: felt = current_fee + fee_to_add

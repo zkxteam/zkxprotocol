@@ -4,7 +4,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_not_zero, assert_nn
 
 # @notice Stores the address of AdminAuth contract
 @storage_var
@@ -133,7 +133,9 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (caller) = get_caller_address()
     let (trading_addr) = trading_address.read()
 
-    assert caller = trading_addr
+    with_attr error_message("Access is denied for deposit since caller is not trading contract in Holding contract."):
+        assert caller = trading_addr
+    end 
     
     let current_amount : felt = balance_mapping.read(assetID = assetID_)
     balance_mapping.write(assetID = assetID_, value = current_amount + amount)
@@ -154,10 +156,15 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (caller) = get_caller_address()
     let (trading_addr) = trading_address.read()
 
-    assert caller = trading_addr
+    with_attr error_message("Access is denied for withdraw since caller is not trading contract in Holding contract."):
+        assert caller = trading_addr
+    end 
     
     let current_amount : felt = balance_mapping.read(assetID = assetID_)
-    assert_not_zero(current_amount - amount)
+    with_attr error_message("Updated amount shouldn't be negative in Holding contract."):
+        assert_nn(current_amount - amount)
+    end 
+    
     balance_mapping.write(assetID = assetID_, value=current_amount - amount)
 
     return()
