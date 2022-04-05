@@ -30,6 +30,18 @@ struct Asset:
     member short_name: felt
     member tradable: felt
     member collateral: felt
+    member tick_size: felt
+    member step_size: felt
+    member minimum_order_size: felt
+    member minimum_leverage: felt
+    member maximum_leverage: felt
+    member currently_allowed_leverage: felt
+    member maintenance_margin_fraction: felt
+    member initial_margin_fraction: felt
+    member incremental_initial_margin_fraction: felt
+    member incremental_position_size: felt
+    member baseline_position_size: felt
+    member maximum_position_size: felt
 end
 
 # @notice Mapping between market ID and Market data
