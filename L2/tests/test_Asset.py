@@ -119,7 +119,7 @@ async def test_modifying_asset_by_unauthorized_user(adminAuth_factory):
     assert fetched_asset.short_name == str_to_felt("Ethereum")
     assert fetched_asset.tradable == 0 
 
-    assert_revert(lambda: signer3.send_transaction(user1,asset.contract_address, 'modifyAsset', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 0]))
+    assert_revert(lambda: signer3.send_transaction(user1,asset.contract_address, 'modify_core_settings', [ str_to_felt("32f0406jz7qj8"), str_to_felt("ETH"), str_to_felt("Ethereum"), 0, 1, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
 
 @pytest.mark.asyncio
 async def test_modifying_trade_settings_by_admin(adminAuth_factory):
