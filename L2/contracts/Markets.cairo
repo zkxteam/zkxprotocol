@@ -30,6 +30,7 @@ struct Asset:
     member short_name: felt
     member tradable: felt
     member collateral: felt
+    member metadata_id: felt
     member tick_size: felt
     member step_size: felt
     member minimum_order_size: felt
@@ -83,7 +84,7 @@ func addMarket{
     let (access) = IAdminAuth.get_admin_mapping(contract_address = auth_addr, address = caller, action = 0)
     assert_not_zero(access)
 
-     # Getting asset details
+    # Getting asset details
     let (asset_address) = asset_contract_address.read()
     let (asset1 : Asset) = IAsset.getAsset(contract_address = asset_address, id = newMarket.asset)
     let (asset2 : Asset) = IAsset.getAsset(contract_address = asset_address, id = newMarket.asset_collateral)
