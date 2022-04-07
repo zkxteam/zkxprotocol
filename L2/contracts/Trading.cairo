@@ -85,6 +85,7 @@ struct Asset:
     member short_name: felt
     member tradable: felt
     member collateral: felt
+    member token_decimal: felt
     member metadata_id: felt
     member tick_size: felt
     member step_size: felt
