@@ -189,7 +189,6 @@ func check_and_execute{
 
     # Check whether the leverage is less than currently allowed leverage of the asset
     let (asset_address) = asset_contract_address.read()
-    let (market_address) = market_contract_address.read()
     let (asset : Asset) = IAsset.getAsset(contract_address = asset_address, id = temp_order.assetID)
     with_attr error_message("leverage is not less than currently allowed leverage of the asset"):
         assert_le(temp_order.leverage, asset.currently_allowed_leverage)
