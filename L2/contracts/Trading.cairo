@@ -58,6 +58,7 @@ struct MultipleOrder:
     member direction: felt
     member closeOrder: felt
     member parentOrder: felt
+    member leverage: felt
 end
 
 # Struct for passing the order request to Account Contract
@@ -70,6 +71,7 @@ struct OrderRequest:
     member positionSize: felt
     member direction: felt
     member closeOrder: felt
+    member leverage: felt
     member parentOrder: felt
 end
 
@@ -181,8 +183,17 @@ func check_and_execute{
         positionSize = [request_list].positionSize,
         direction = [request_list].direction,
         closeOrder = [request_list].closeOrder,
-        parentOrder = [request_list].parentOrder
+        parentOrder = [request_list].parentOrder,
+        leverage = [request_list].leverage
     )
+
+    # Check whether the leverage is less than currently allowed leverage of the asset
+    let (asset_address) = asset_contract_address.read()
+    let (market_address) = market_contract_address.read()
+    let (asset : Asset) = IAsset.getAsset(contract_address = asset_address, id = temp_order.assetID)
+    with_attr error_message("leverage is not less than currently allowed leverage of the asset"):
+        assert_le(temp_order.leverage, asset.currently_allowed_leverage)
+    end
 
     # Check if the execution_price is correct
     if temp_order.orderType == 0:
@@ -344,6 +355,7 @@ func check_and_execute{
         positionSize = temp_order.positionSize,
         direction = temp_order.direction,
         closeOrder = temp_order.closeOrder,
+        leverage = temp_order.leverage,
         parentOrder = temp_order.parentOrder
     )
 
@@ -384,7 +396,7 @@ func check_and_execute{
         
         with_attr error_message("market is non tradable in trading contract."):
             assert_not_zero(market.tradable)
-        end 
+        end
 
         # Recursive call with the ticker and price to compare against
         return check_and_execute(
