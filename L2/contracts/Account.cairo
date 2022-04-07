@@ -39,6 +39,7 @@ struct OrderRequest:
     member positionSize : felt
     member direction : felt
     member closeOrder : felt
+    member leverage :  felt
     member parentOrder : felt
 end
 
@@ -399,7 +400,7 @@ func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (r
         let (hash_state_ptr) = hash_update(
             hash_state_ptr, 
             orderRequest, 
-            8
+            9
         )
         let (res) = hash_finalize(hash_state_ptr)
         let pedersen_ptr = hash_ptr
