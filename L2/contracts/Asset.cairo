@@ -15,6 +15,7 @@ const ADD_ASSET = 1
 
 # @notice struct to store details of assets
 struct Asset:
+    member asset_version: felt
     member ticker: felt
     member short_name: felt
     member tradable: felt
@@ -52,6 +53,11 @@ end
 # @notice stores the address of risk management contract
 @storage_var
 func risk_management_address() -> (res : felt):
+end
+
+# @notice stores the version of the asset contract
+@storage_var
+func version() -> (res : felt):
 end
 
 # @notice Mapping between asset ID and Asset data
@@ -113,6 +119,15 @@ func getAsset{
     return (currAsset)
 end
 
+# @notice Getter function for getting version
+# @returns  - Returns the version
+@view
+func get_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (version : felt):
+    let (res) = version.read()
+    return (version=res)
+end
+
 
 #
 # Constructor
@@ -172,9 +187,9 @@ func removeAsset{
     let (access) = IAdminAuth.get_admin_mapping(contract_address = auth_addr, address = caller, action = 1)
     assert_not_zero(access)
 
-    asset.write(id = id, value = Asset(ticker = 0, short_name = 0, tradable = 0, collateral = 0, token_decimal = 0, metadata_id = 0, tick_size = 0, 
-    step_size = 0, minimum_order_size = 0, minimum_leverage = 0, maximum_leverage = 0, currently_allowed_leverage = 0, 
-    maintenance_margin_fraction = 0, initial_margin_fraction = 0, incremental_initial_margin_fraction = 0, 
+    asset.write(id = id, value = Asset(asset_version = 0, ticker = 0, short_name = 0, tradable = 0, collateral = 0, token_decimal = 0, 
+    metadata_id = 0, tick_size = 0, step_size = 0, minimum_order_size = 0, minimum_leverage = 0, maximum_leverage = 0, 
+    currently_allowed_leverage = 0, maintenance_margin_fraction = 0, initial_margin_fraction = 0, incremental_initial_margin_fraction = 0, 
     incremental_position_size = 0, baseline_position_size = 0, maximum_position_size = 0))
     return ()
 end
@@ -202,9 +217,9 @@ func modify_core_settings{
 
     let (_asset : Asset) = asset.read(id = id)
 
-    asset.write(id = id, value = Asset(ticker = _asset.ticker, short_name = short_name, tradable = tradable, collateral = collateral, 
-    token_decimal = token_decimal, metadata_id = metadata_id, tick_size = _asset.tick_size, step_size = _asset.step_size, minimum_order_size = _asset.minimum_order_size, 
-    minimum_leverage = _asset.minimum_leverage, maximum_leverage = _asset.maximum_leverage, 
+    asset.write(id = id, value = Asset(asset_version = _asset.asset_version, ticker = _asset.ticker, short_name = short_name, tradable = tradable, 
+    collateral = collateral, token_decimal = token_decimal, metadata_id = metadata_id, tick_size = _asset.tick_size, step_size = _asset.step_size, 
+    minimum_order_size = _asset.minimum_order_size, minimum_leverage = _asset.minimum_leverage, maximum_leverage = _asset.maximum_leverage, 
     currently_allowed_leverage = _asset.currently_allowed_leverage, maintenance_margin_fraction = _asset.maintenance_margin_fraction, 
     initial_margin_fraction = _asset.initial_margin_fraction, incremental_initial_margin_fraction = _asset.incremental_initial_margin_fraction, 
     incremental_position_size = _asset.incremental_position_size, baseline_position_size = _asset.baseline_position_size, 
@@ -245,14 +260,17 @@ incremental_position_size: felt, baseline_position_size: felt, maximum_position_
         assert caller = risk_management_addr
     end
 
+    let (ver) = version.read()
+    version.write(value = ver + 1)
+
     let (_asset : Asset) = asset.read(id = id)
 
-    asset.write(id = id, value = Asset(ticker = _asset.ticker, short_name = _asset.short_name, tradable = _asset.tradable, 
-    collateral = _asset.collateral, token_decimal = _asset.token_decimal, metadata_id = _asset.metadata_id, tick_size = tick_size, step_size = step_size, minimum_order_size = minimum_order_size, 
-    minimum_leverage = minimum_leverage, maximum_leverage = maximum_leverage, currently_allowed_leverage = currently_allowed_leverage, 
-    maintenance_margin_fraction = maintenance_margin_fraction, initial_margin_fraction = initial_margin_fraction, 
-    incremental_initial_margin_fraction = incremental_initial_margin_fraction, incremental_position_size = incremental_position_size, 
-    baseline_position_size = baseline_position_size, maximum_position_size = maximum_position_size))
+    asset.write(id = id, value = Asset(asset_version = _asset.asset_version + 1,ticker = _asset.ticker, short_name = _asset.short_name, tradable = _asset.tradable, 
+    collateral = _asset.collateral, token_decimal = _asset.token_decimal, metadata_id = _asset.metadata_id, tick_size = tick_size, step_size = step_size, 
+    minimum_order_size = minimum_order_size, minimum_leverage = minimum_leverage, maximum_leverage = maximum_leverage, 
+    currently_allowed_leverage = currently_allowed_leverage, maintenance_margin_fraction = maintenance_margin_fraction, 
+    initial_margin_fraction = initial_margin_fraction, incremental_initial_margin_fraction = incremental_initial_margin_fraction, 
+    incremental_position_size = incremental_position_size, baseline_position_size = baseline_position_size, maximum_position_size = maximum_position_size))
     return ()
 end
 
