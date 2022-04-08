@@ -83,6 +83,7 @@ end
 
 # @notice struct to store details of assets
 struct Asset:
+    member asset_version: felt
     member ticker: felt
     member short_name: felt
     member tradable: felt
