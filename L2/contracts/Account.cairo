@@ -11,6 +11,11 @@ from starkware.starknet.common.syscalls import call_contract, get_caller_address
 from starkware.cairo.common.hash_state import (hash_init, hash_finalize, hash_update, hash_update_single)
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn
+from starkware.cairo.common.pow import pow
+
+from contracts.Math_64x61 import (
+    mul_fp, div_fp, to64x61, from64x61
+)
 
 const L1_CONTRACT_ADDRESS = (0x88d2EE8A225D281cAa435F532F51c9844F05a4d9)
 const MESSAGE_WITHDRAW = 0
@@ -66,7 +71,29 @@ struct OrderDetails:
     member status: felt
 end
 
+# @notice struct to store details of assets
+struct Asset:
+    member ticker: felt
+    member short_name: felt
+    member tradable: felt
+    member collateral: felt
+    member token_decimal: felt
+    member metadata_id: felt
+    member tick_size: felt
+    member step_size: felt
+    member minimum_order_size: felt
+    member minimum_leverage: felt
+    member maximum_leverage: felt
+    member currently_allowed_leverage: felt
+    member maintenance_margin_fraction: felt
+    member initial_margin_fraction: felt
+    member incremental_initial_margin_fraction: felt
+    member incremental_position_size: felt
+    member baseline_position_size: felt
+    member maximum_position_size: felt
+end
 
+#
 # Storage
 #
 
@@ -99,6 +126,9 @@ end
 func L1_address() -> (res : felt):
 end
 
+@storage_var
+func asset_contract_address() -> (res : felt):
+end
 
 #
 # Guards
@@ -599,6 +629,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     assetID_ : felt,
     amount : felt,
 ):
+    alloc_locals
     # Make sure 'amount' is positive.
     assert_nn(amount)
 
@@ -611,6 +642,17 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     # Update the new balance.
     balance.write(assetID = assetID_, value = new_balance)
 
+    # Reading token decimal field of an asset
+    let (asset_address) = asset_contract_address.read()
+    let (asset : Asset) = IAsset.getAsset(contract_address = asset_address, id = assetID_)
+    tempvar decimal = asset.token_decimal
+
+    let (ten_power_decimal) = pow(10, decimal)
+    let (decimal_in_64x61_format) = to64x61(ten_power_decimal)
+
+    let (amount_times_ten_power_decimal) = mul_fp(amount, decimal_in_64x61_format)
+    let (amount_in_felt) = from64x61(amount_times_ten_power_decimal)
+    
     # Get the L1 Metamask address
     let (L2_account_address) = get_contract_address()
     let (user) = L1_address.read()
@@ -619,7 +661,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (message_payload : felt*) = alloc()
     assert message_payload[0] = MESSAGE_WITHDRAW
     assert message_payload[1] = user
-    assert message_payload[2] = amount
+    assert message_payload[2] = amount_in_felt
     assert message_payload[3] = assetID_
     send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=4, payload=message_payload)
 
@@ -639,17 +681,29 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     amount : felt,
     assetID_ : felt,
 ):
+    alloc_locals
     # Make sure the message was sent by the intended L1 contract.
     assert from_address = L1_CONTRACT_ADDRESS
 
     # Update the L1 address 
     L1_address.write(user)
 
+    # Reading token decimal field of an asset
+    let (asset_address) = asset_contract_address.read()
+    let (asset : Asset) = IAsset.getAsset(contract_address = asset_address, id = assetID_)
+    tempvar decimal = asset.token_decimal
+    
+    let (ten_power_decimal) = pow(10, decimal)
+    let (decimal_in_64x61_format) = to64x61(ten_power_decimal)
+
+    let (amount_in_64x61_format) = to64x61(amount)
+    let (amount_in_decimal_representation) = div_fp(amount_in_64x61_format, decimal_in_64x61_format)
+
     # Read the current balance.
     let (res) = balance.read(assetID = assetID_)
 
     # Compute and update the new balance.
-    tempvar new_balance = res + amount
+    tempvar new_balance = res + amount_in_decimal_representation
     balance.write(assetID = assetID_, value = new_balance)
 
     return ()
@@ -659,5 +713,14 @@ end
 @contract_interface
 namespace IAuthorizedRegistry:
     func get_registry_value(address : felt, action : felt) -> (allowed : felt):
+    end
+end
+
+# @notice Asset interface
+@contract_interface
+namespace IAsset:
+    func getAsset(id: felt) -> (
+        currAsset: Asset
+    ):
     end
 end
