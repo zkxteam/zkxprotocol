@@ -101,6 +101,7 @@ end
 # @notice Deposit amount for a assetID by an order
 # @parama setID - target assetID
 # @param amount - value to deduct from assetID's balance
+# @param positionID_ - ID of the position
 @external
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     assetID_: felt, 
@@ -140,6 +141,7 @@ end
 
 # @notice Displays the amount of liquidation fees paid by each poistionID
 # @param assetID_ - Target assetID
+# @param positionID_ - Id of the position
 # @return amount - Liquidation fee paid by the position
 @view
 func liq_amount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
