@@ -253,7 +253,7 @@ async def test_revert_balance_low(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -269,7 +269,7 @@ async def test_revert_balance_low(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -336,7 +336,7 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -352,7 +352,7 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -420,7 +420,7 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -436,7 +436,7 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -504,7 +504,7 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -520,7 +520,7 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -587,7 +587,7 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -604,7 +604,7 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -672,7 +672,7 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -688,7 +688,7 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -759,7 +759,7 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -777,7 +777,7 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance_UST = await bob.get_balance(assetID_ = UST_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -846,7 +846,7 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -863,7 +863,7 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -930,7 +930,7 @@ async def test_revert_wrong_signature(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -986,7 +986,7 @@ async def test_revert_wrong_signature(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1052,7 +1052,7 @@ async def test_revert_wrong_signature(adminAuth_factory):
 
     alice_curr_balance_after = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance_after = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance_after = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_after = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_after = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_after = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_after = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1120,7 +1120,7 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1190,7 +1190,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1237,7 +1237,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(USDC_ID).call()
     bob_curr_balance = await bob.get_balance(USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1337,7 +1337,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
 
     alice_curr_balance_after = await alice.get_balance(collateralID_3).call()
     bob_curr_balance_after = await bob.get_balance(collateralID_4).call()
-    holdingBalance_after = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_after = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_after = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_after = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_after = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1406,7 +1406,7 @@ async def test_opening_and_closing_partial_orders(adminAuth_factory):
     fees2 = await fixed_math.mul_fp(amount2.result.res, long_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1458,7 +1458,7 @@ async def test_opening_and_closing_partial_orders(adminAuth_factory):
 
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1558,7 +1558,7 @@ async def test_opening_and_closing_partial_orders(adminAuth_factory):
 
     alice_curr_balance_after = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance_after = await bob.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance_after = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_after = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_after = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_after = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_after = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1648,7 +1648,7 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     fees3 = await fixed_math.mul_fp(amount3.result.res, long_trading_fees).call()
     total_amount3 = amount3.result.res + fees3.result.res
     
-    holdingBalance_before = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_before = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_before = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_before = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1713,7 +1713,7 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     alice_curr_balance = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance = await bob.get_balance(assetID_ = USDC_ID).call()
     charlie_curr_balance = await charlie.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_curr = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()
@@ -1846,7 +1846,7 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     alice_curr_balance_after = await alice.get_balance(assetID_ = USDC_ID).call()
     bob_curr_balance_after = await bob.get_balance(assetID_ = USDC_ID).call()
     charlie_curr_balance_after = await charlie.get_balance(assetID_ = USDC_ID).call()
-    holdingBalance_after = await holding.balance(assetID_ = USDC_ID).call()
+    holdingBalance_after = await holding.balance(asset_id_ = USDC_ID).call()
     feeBalance_after = await feeBalance.get_total_fee(assetID_ = USDC_ID).call()
     alice_total_fees_after = await feeBalance.get_user_fee(address = alice.contract_address, assetID_ = USDC_ID).call()
     bob_total_fees_after = await feeBalance.get_user_fee(address = bob.contract_address, assetID_ = USDC_ID).call()

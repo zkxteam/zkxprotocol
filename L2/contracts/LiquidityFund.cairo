@@ -4,7 +4,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.math import assert_not_zero, assert_le
+from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
 
 # @notice Stores the address of AdminAuth contract
 @storage_var
@@ -16,14 +16,14 @@ end
 func trading_address() -> (contract_address : felt):
 end
 
-# @notice Stores the address of EmergencyFund contract
-@storage_var
-func emergency_address() -> (contract_address : felt):
-end
-
 # @notice Stores the mapping from asset_id to its balance
 @storage_var
 func balance_mapping(asset_id : felt) -> (amount : felt):
+end
+
+# @notice Stores the mapping from asset to positions 
+@storage_var
+func asset_liq_position(asset_id : felt, position_id : felt) -> (value : felt):
 end
 
 # @notice Constructor of the smart-contract
@@ -35,7 +35,7 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-# @notice Funtion to update trading contract address which
+# @notice Funtion to update trading contract address
 # @param address - address of trading contract
 @external
 func update_trading_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -52,26 +52,10 @@ func update_trading_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     return()
 end
 
-# @notice Funtion to update emergencyFund contract address which
-# @param address - address of trading contract
-@external
-func update_emergency_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    address: felt
-):
-    alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
 
-    let (access) = IAdminAuth.get_admin_mapping(contract_address = auth_addr, address = caller, action = 0)
-    assert_not_zero(access)
-    emergency_address.write(value=address)
-    return()
-end
-
-# @notice Manually add amount to asset_id's balance
-# @param asset_id - target asset_id
-# @param amount - value to add to asset_id's balance
+# @notice Manually add amount to asset's balance
+# @param asset_id_ - target asset id
+# @param amount - value to add to asset's balance
 @external
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_: felt, 
@@ -81,12 +65,9 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     # Auth Check
     let (caller) = get_caller_address()
     let (auth_addr) = auth_address.read()
-    let (emergency_addr) = emergency_address.read()
 
     let (access) = IAdminAuth.get_admin_mapping(contract_address = auth_addr, address = caller, action = 0)
-    if access == 0:
-        assert caller = emergency_addr
-    end
+    assert_not_zero(access)
 
     let current_amount : felt = balance_mapping.read(asset_id = asset_id_)
     balance_mapping.write(asset_id = asset_id_, value = current_amount + amount)
@@ -94,9 +75,9 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     return()
 end
 
-# @notice Manually deduct amount from asset_id's balance
-# @param asset_id - target asset_id
-# @param amount - value to deduct from asset_id's balance
+# @notice Manually deduct amount from asset's balance
+# @param asset_id_ - target asset id
+# @param amount - value to deduct from asset's balance
 @external
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_: felt, 
@@ -106,13 +87,10 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     # Auth Check
     let (caller) = get_caller_address()
     let (auth_addr) = auth_address.read()
-    let (emergency_addr) = emergency_address.read()
 
     let (access) = IAdminAuth.get_admin_mapping(contract_address = auth_addr, address = caller, action = 0)
-    if access == 0:
-        assert caller = emergency_addr
-    end
-
+    assert_not_zero(access)
+    
     let current_amount : felt = balance_mapping.read(asset_id = asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount, current_amount)
@@ -122,43 +100,50 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     return()
 end
 
-# @notice Deposit amount for a asset_id by an order
-# @parama setID - target asset_id
-# @param amount - value to deduct from asset_id's balance
+# @notice Deposit amount for a asset by an order
+# @parama asset_id_ - target asset id
+# @param amount - value to deduct from asset's balance
+# @param position_id_ - id of the position
 @external
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_: felt, 
     amount: felt, 
+    position_id_: felt
 ):
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
     let (trading_addr) = trading_address.read()
 
-    with_attr error_message("Access is denied for deposit since caller is not trading contract in Holding contract."):
+    with_attr error_message("Access is denied for deposit since caller is not trading contract in LiquidityFund contract."):
         assert caller = trading_addr
     end 
     
     let current_amount : felt = balance_mapping.read(asset_id = asset_id_)
     balance_mapping.write(asset_id = asset_id_, value = current_amount + amount)
 
+    let current_liq_amount : felt = asset_liq_position.read(asset_id = asset_id_, position_id = position_id_)
+    asset_liq_position.write(asset_id = asset_id_, position_id = position_id_, value = current_liq_amount + amount)
+
     return()
 end
 
-# @notice Withdraw amount for a asset_id by an order
-# @param asset_id - target asset_id
-# @param amount - value to deduct from asset_id's balance
+# @notice Withdraw amount for a asset by an order
+# @parama asset_id_ - target asset id
+# @param amount - value to deduct from asset's balance
+# @param position_id_ - id of the position
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_: felt, 
     amount: felt, 
+    position_id_: felt
 ):
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
     let (trading_addr) = trading_address.read()
 
-    with_attr error_message("Access is denied for withdraw since caller is not trading contract in Holding contract."):
+    with_attr error_message("Access is denied for withdraw since caller is not trading contract in LiquidityFund contract."):
         assert caller = trading_addr
     end 
     
@@ -166,14 +151,20 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount, current_amount)
     end
-    balance_mapping.write(asset_id = asset_id_, value=current_amount - amount)
+    balance_mapping.write(asset_id = asset_id_, value = current_amount - amount)
+
+    let current_liq_amount : felt = asset_liq_position.read(asset_id = asset_id_, position_id = position_id_)
+    with_attr error_message("Amount to be deducted is more than asset position's balance"):
+        assert_le(amount, current_liq_amount)
+    end
+    asset_liq_position.write(asset_id = asset_id_, position_id = position_id_, value = current_liq_amount - amount)
 
     return()
 end
 
-# @notice Displays the amount of the balance for the asset_id(asset)
-# @param asset_id - Target asset_id
-# @return amount - Balance amount corresponding to the asset_id
+# @notice Displays the amount of the balance for the assetID(asset)
+# @param asset_id_ - Target assetID
+# @return amount - Balance amount corresponding to the assetID
 @view
 func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt
@@ -181,6 +172,21 @@ func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     amount : felt
 ):
     let (amount) = balance_mapping.read(asset_id = asset_id_)
+    return (amount)
+end
+
+# @notice Displays the amount of liquidation fees paid by each poistionID
+# @param asset_id_ - Target assetID
+# @param position_id_ - Id of the position
+# @return amount - Liquidation fee paid by the position
+@view
+func liq_amount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    asset_id_ : felt,
+    position_id_ : felt 
+) -> (
+    amount : felt
+):
+    let (amount) = asset_liq_position.read(asset_id = asset_id_, position_id = position_id_)
     return (amount)
 end
 
