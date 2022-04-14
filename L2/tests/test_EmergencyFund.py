@@ -91,7 +91,7 @@ async def test_funding_flow(emergencyFund_factory):
 async def test_fund_through_funding_invalid(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2 = emergencyFund_factory
     assert_revert(lambda: signer1.send_transaction(
-        admin1, holding.contract_address, 'fundHolding', [str_to_felt("TSLA"), 10]))
+        admin1, holding.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10]))
 
 
 @pytest.mark.asyncio
@@ -99,10 +99,10 @@ async def test_fund_through_funding_contract(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2 = emergencyFund_factory
     await signer1.send_transaction(admin1, holding.contract_address, 'update_emergency_address', [emergencyFund.contract_address])
 
-    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fundHolding', [str_to_felt("TSLA"), 10])
+    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10])
     execution_info = await holding.balance(str_to_felt("TSLA")).call()
     assert execution_info.result.amount == 10
 
-    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'defundHolding', [str_to_felt("TSLA"), 3])
+    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 3])
     execution_info = await holding.balance(str_to_felt("TSLA")).call()
     assert execution_info.result.amount == 7
