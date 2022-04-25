@@ -461,6 +461,9 @@ func execute_order{
     # check the validity of the signature
     is_valid_signature_order(hash, signature)
 
+    # Calculate the amount of the asset to be executed
+    let (portion_to_be_executed) = div_fp(size, request.leverage)
+
     tempvar status_
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
@@ -487,7 +490,7 @@ func execute_order{
                 positionSize=request.positionSize,
                 orderType=request.orderType,
                 direction=request.direction,
-                portionExecuted=size,
+                portionExecuted=portion_to_be_executed,
                 status=status_,
                 marginAmount=margin_amount,
                 borrowedAmount=borrowed_amount,
@@ -534,10 +537,6 @@ func execute_order{
             tempvar syscall_ptr : felt* = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
-
-            tempvar syscall_ptr : felt* = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
         end
     else:
         # Get the order details
@@ -570,6 +569,8 @@ func execute_order{
             direction=orderDetails.direction,
             portionExecuted=orderDetails.portionExecuted - size,
             status=status_,
+            marginAmount=orderDetails.marginAmount,
+            borrowedAmount=orderDetails.borrowedAmount,
         )
 
         # Write to the mapping
