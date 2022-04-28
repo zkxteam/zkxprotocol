@@ -40,6 +40,7 @@ end
 func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id_ : felt
 ) -> (res : felt):
+    alloc_locals
     let (pos_id) = position_array.read(index=id_)
     if pos_id == 0:
         return (0)
