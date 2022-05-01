@@ -170,8 +170,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         return (sum)
     end
 
-    local margin_amount_ : felt = 0
-    local borrowed_amount_ : felt = 0
+    local margin_amount_
+    local borrowed_amount_
 
     # Create a struct object for the order
     tempvar temp_order : MultipleOrder = MultipleOrder(
@@ -249,55 +249,61 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assert fees_rate = long_fees
         assert sum_temp = sum + order_size
 
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
     else:
         assert fees_rate = short_fees
         assert sum_temp = sum - order_size
 
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
     end
 
     if temp_order.closeOrder == 0:
         # If the order is to be opened
         let (contract_address) = get_contract_address()
 
+        # Get order details
+        let (order_details : OrderDetails) = IAccount.get_order_data(
+            contract_address=temp_order.pub_key, order_ID=temp_order.orderID
+        )
+        let margin_amount = order_details.marginAmount
+        let borrowed_amount = order_details.borrowedAmount
+
         let (order_size_by_leverage) = div_fp(order_size, temp_order.leverage)
         let (total_position_value) = mul_fp(order_size_by_leverage, execution_price)
-        let (leveraged_position_value) = mul_fp(total_position_value, temp_order.leverage)
-        let required_margin = leveraged_position_value - total_position_value
+        let (leveraged_position_value) = mul_fp(order_size, execution_price)
+        tempvar amount_to_be_borrowed = leveraged_position_value - total_position_value
 
         # Calculate borrowed and margin amounts to be stored in account contract
-        margin_amount_ = total_position_value
-        borrowed_amount_ = required_margin
+        margin_amount_ = margin_amount + total_position_value
+        borrowed_amount_ = borrowed_amount + amount_to_be_borrowed
 
         # Deduct the amount from liquidity funds if order is leveraged
-        let (is_non_leveraged) = is_le(temp_order.leverage, 1)
-        # tempvar syscall_ptr = syscall_ptr
-        # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        # tempvar range_check_ptr = range_check_ptr
+        let (is_non_leveraged) = is_le(temp_order.leverage, 2305843009213693952)
+
         if is_non_leveraged == 0:
             let (liquidity_fund_address) = liquidity_fund_contract_address.read()
             ILiquidityFund.withdraw(
                 contract_address=liquidity_fund_address,
                 asset_id_=temp_order.collateralID,
-                amount=required_margin,
+                amount=borrowed_amount_,
                 position_id_=temp_order.orderID,
             )
-            # tempvar syscall_ptr = syscall_ptr
-            # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            # tempvar range_check_ptr = range_check_ptr
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
 
-        # tempvar syscall_ptr = syscall_ptr
-        # tempvar range_check_ptr = range_check_ptr
         let (user_balance) = IAccount.get_balance(
             contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
         )
 
         # Calculate the fees for the order
         let (fees) = mul_fp(fees_rate, leveraged_position_value)
-
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
 
         # Update the fees to be paid by user in fee balance contract
         let (fees_balance_address) = fees_balance_contract_address.read()
@@ -309,7 +315,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
 
         # Calculate the total amount by adding fees
-        tempvar total_amount = leveraged_position_value + fees
+        tempvar total_amount = total_position_value + fees
 
         # User must be able to pay the amount
         with_attr error_message(
@@ -327,10 +333,14 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         # Deposit the funds taken from the user
         let (holding_address) = holding_contract_address.read()
         IHolding.deposit(
-            contract_address=holding_address, assetID_=temp_order.collateralID, amount=total_amount
+            contract_address=holding_address,
+            assetID_=temp_order.collateralID,
+            amount=leveraged_position_value,
         )
 
+        tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
     else:
         # If it's a close order
         with_attr error_message(
@@ -338,116 +348,102 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             assert_not_zero(temp_order.parentOrder)
         end
 
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        local actual_execution_price
 
+        # Get order details
+        let (order_details : OrderDetails) = IAccount.get_order_data(
+            contract_address=temp_order.pub_key, order_ID=temp_order.parentOrder
+        )
+        let margin_amount = order_details.marginAmount
+        let borrowed_amount = order_details.borrowedAmount
+
+        # current order is short order
         if temp_order.direction == 0:
-            # Get order details
-            let (order_details : OrderDetails) = IAccount.get_order_data(
-                contract_address=temp_order.pub_key, order_ID=temp_order.parentOrder
-            )
-            let margin_amount = order_details.marginAmount
-            let borrowed_amount = order_details.borrowedAmount
-
-            let (order_size_by_leverage) = div_fp(order_size, temp_order.leverage)
-            let (amount_out) = mul_fp(execution_price, order_size_by_leverage)
-            let (leveraged_amount_out) = mul_fp(amount_out, temp_order.leverage)
-            let borrowed_value = leveraged_amount_out - amount_out
-            let (fees) = mul_fp(fees_rate, leveraged_amount_out)
-
-            # Calculate the total amount by removing fees
-            tempvar total_amount = leveraged_amount_out - fees
-
-            # Deposit the borrowed amount to liquidity funds if order is leveraged
-            let (is_non_leveraged) = is_le(temp_order.leverage, 1)
-            # tempvar syscall_ptr = syscall_ptr
-            # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            # tempvar range_check_ptr = range_check_ptr
-            if is_non_leveraged == 0:
-                let (liquidity_fund_address) = liquidity_fund_contract_address.read()
-                ILiquidityFund.deposit(
-                    contract_address=liquidity_fund_address,
-                    asset_id_=temp_order.collateralID,
-                    amount=borrowed_value,
-                    position_id_=temp_order.orderID,
-                )
-                # tempvar syscall_ptr = syscall_ptr
-                # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                # tempvar range_check_ptr = range_check_ptr
-            end
-
-            # tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            # tempvar range_check_ptr = range_check_ptr
-            # Update the fees to be paid by user in fee balance contract
-            let (fees_balance_address) = fees_balance_contract_address.read()
-            IFeeBalance.update_fee_mapping(
-                contract_address=fees_balance_address,
-                address=temp_order.pub_key,
-                assetID=temp_order.collateralID,
-                fee_to_add=fees,
-            )
-
-            # Withdraw the funds to be sent to the user
-            let (holding_address) = holding_contract_address.read()
-            IHolding.withdraw(
-                contract_address=holding_address,
-                assetID_=temp_order.collateralID,
-                amount=total_amount,
-            )
-            IAccount.transfer(
-                contract_address=temp_order.pub_key,
-                assetID_=temp_order.collateralID,
-                amount=total_amount,
-            )
-
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            actual_execution_price = execution_price
+            tempvar range_check_ptr = range_check_ptr
+            # current order is long order
         else:
-            # Get order details
-            let (order_details : OrderDetails) = IAccount.get_order_data(
-                contract_address=temp_order.pub_key, order_ID=temp_order.parentOrder
+            let (average_execution_price) = div_fp(
+                order_details.marginAmount, order_details.portionExecuted
             )
-
-            # Calculate the amount to be paid to account
-            tempvar pnl = execution_price - order_details.executionPrice
-            tempvar price_adjusted = order_details.executionPrice - pnl
-            let (amount_out) = mul_fp(price_adjusted, order_size)
-            let (fees) = mul_fp(fees_rate, amount_out)
-
-            # Calculate the total amount by adding fees
-            tempvar total_amount = amount_out - fees
+            tempvar pnl = execution_price - average_execution_price
+            actual_execution_price = order_details.executionPrice - pnl
 
             # Check if the user owes the exchange money
-            let (is_negative) = is_le(price_adjusted, 0)
+            let (is_negative) = is_le(actual_execution_price, 0)
 
             if is_negative == 1:
-                amount_out = 0
+                actual_execution_price = 0
             end
-
-            # Update the fees to be paid by user in fee balance contract
-            let (fees_balance_address) = fees_balance_contract_address.read()
-            IFeeBalance.update_fee_mapping(
-                contract_address=fees_balance_address,
-                address=temp_order.pub_key,
-                assetID=order_details.collateralID,
-                fee_to_add=fees,
-            )
-
-            # Withdraw funds from Holding
-            let (holding_address) = holding_contract_address.read()
-            IHolding.withdraw(
-                contract_address=holding_address,
-                assetID_=temp_order.collateralID,
-                amount=total_amount,
-            )
-
-            # Add funds to the user
-            IAccount.transfer(
-                contract_address=temp_order.pub_key,
-                assetID_=temp_order.collateralID,
-                amount=total_amount,
-            )
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
+
+        let (order_size_by_leverage) = div_fp(order_size, temp_order.leverage)
+        let (amount_out) = mul_fp(actual_execution_price, order_size_by_leverage)
+        let (leveraged_amount_out) = mul_fp(amount_out, temp_order.leverage)
+
+        # Calculate the amount that needs to be returned to liquidity fund
+        let (previous_executed_amount) = mul_fp(order_details.portionExecuted, temp_order.leverage)
+        let (percent_of_order) = div_fp(order_size, previous_executed_amount)
+        let (value_to_be_returned) = mul_fp(borrowed_amount, percent_of_order)
+        let (margin_to_be_reduced) = mul_fp(margin_amount, percent_of_order)
+
+        # Deposit the borrowed amount to liquidity funds if order is leveraged
+        let (is_non_leveraged) = is_le(temp_order.leverage, 2305843009213693952)
+
+        if is_non_leveraged == 0:
+            let (liquidity_fund_address) = liquidity_fund_contract_address.read()
+            ILiquidityFund.deposit(
+                contract_address=liquidity_fund_address,
+                asset_id_=temp_order.collateralID,
+                amount=value_to_be_returned,
+                position_id_=temp_order.orderID,
+            )
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        end
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+
+        # Withdraw the funds to be sent to the user
+        let (amount_to_be_withdrawn) = mul_fp(percent_of_order, order_details.portionExecuted)
+        let (value_to_be_withdrawn) = mul_fp(amount_to_be_withdrawn, actual_execution_price)
+
+        # Calculate new values for margin and borrowed amounts
+        borrowed_amount_ = borrowed_amount - value_to_be_returned
+        let margin_amount_temp = margin_amount - margin_to_be_reduced
+
+        # Make margin amount as 0 if the value is negative
+        let (is_margin_negative) = is_le(margin_amount_temp, 0)
+
+        if is_margin_negative == 1:
+            margin_amount_ = 0
+        else:
+            margin_amount_ = margin_amount_temp
+        end
+
+        let (holding_address) = holding_contract_address.read()
+        IHolding.withdraw(
+            contract_address=holding_address,
+            assetID_=temp_order.collateralID,
+            amount=leveraged_amount_out,
+        )
+
+        IAccount.transfer(
+            contract_address=temp_order.pub_key,
+            assetID_=temp_order.collateralID,
+            amount=leveraged_amount_out,
+        )
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
     end
 
     # Create a temporary order object
@@ -464,10 +460,12 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         parentOrder=temp_order.parentOrder,
     )
 
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-
     # Create a temporary signature object
     let temp_signature : Signature = Signature(r_value=temp_order.sig_r, s_value=temp_order.sig_s)
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
 
     # Call the account contract to initialize the order
     IAccount.execute_order(

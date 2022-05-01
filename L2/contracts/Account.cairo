@@ -464,7 +464,7 @@ func execute_order{
     # Calculate the amount of the asset to be executed
     let (portion_to_be_executed) = div_fp(size, request.leverage)
 
-    tempvar status_
+    local status_
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
@@ -475,7 +475,8 @@ func execute_order{
             # Create if the order is being fully opened
             # status_ == 1, partially opened
             # status_ == 2, fully opened
-            if request.positionSize == size:
+            let (leveraged_position) = mul_fp(request.positionSize, request.leverage)
+            if leveraged_position == size:
                 assert status_ = 2
             else:
                 assert status_ = 1
@@ -503,16 +504,17 @@ func execute_order{
             # If it's an existing order
         else:
             # Return if the position size after the executing the current order is more than the order's positionSize
+            let (size_by_leverage) = div_fp(size, request.leverage)
             with_attr error_message(
                     "Paritally executed + remaining should be less than position in account contract."):
-                assert_le(size + orderDetails.portionExecuted, request.positionSize)
+                assert_le(size_by_leverage + orderDetails.portionExecuted, request.positionSize)
             end
 
             # Check if the order is in the process of being closed
-            assert_le(orderDetails.status, 2)
+            assert_le(orderDetails.status, 3)
 
             # Check if the order is fully filled by executing the current one
-            if request.positionSize == size + orderDetails.portionExecuted:
+            if request.positionSize == portion_to_be_executed + orderDetails.portionExecuted:
                 status_ = 2
             else:
                 status_ = 1
@@ -527,7 +529,7 @@ func execute_order{
                 positionSize=orderDetails.positionSize,
                 orderType=request.orderType,
                 direction=orderDetails.direction,
-                portionExecuted=orderDetails.portionExecuted + size,
+                portionExecuted=orderDetails.portionExecuted + portion_to_be_executed,
                 status=status_,
                 marginAmount=margin_amount,
                 borrowedAmount=borrowed_amount,
@@ -547,12 +549,12 @@ func execute_order{
 
         # Assert that the order exists
         assert_not_zero(orderDetails.positionSize)
-        assert_nn(orderDetails.portionExecuted - size)
+        assert_nn(orderDetails.portionExecuted - portion_to_be_executed)
 
         # Check if the order is fully closed or not
         # status_ == 4, fully closed
         # status_ == 3, partially closed
-        if orderDetails.portionExecuted - size == 0:
+        if orderDetails.portionExecuted - portion_to_be_executed == 0:
             assert status_ = 4
         else:
             assert status_ = 3
@@ -564,13 +566,13 @@ func execute_order{
             collateralID=orderDetails.collateralID,
             price=orderDetails.price,
             executionPrice=orderDetails.executionPrice,
-            positionSize=orderDetails.positionSize,
+            positionSize=orderDetails.positionSize - portion_to_be_executed,
             orderType=orderDetails.orderType,
             direction=orderDetails.direction,
-            portionExecuted=orderDetails.portionExecuted - size,
+            portionExecuted=orderDetails.portionExecuted - portion_to_be_executed,
             status=status_,
-            marginAmount=orderDetails.marginAmount,
-            borrowedAmount=orderDetails.borrowedAmount,
+            marginAmount=margin_amount,
+            borrowedAmount=borrowed_amount,
         )
 
         # Write to the mapping
