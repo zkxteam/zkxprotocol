@@ -72,6 +72,8 @@ struct OrderDetails:
     member direction : felt
     member portionExecuted : felt
     member status : felt
+    member marginAmount : felt
+    member borrowedAmount : felt
 end
 
 # @notice struct to store details of assets
@@ -548,9 +550,14 @@ end
 @external
 func execute_order{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ecdsa_ptr : SignatureBuiltin*, range_check_ptr
-}(request : OrderRequest, signature : Signature, size : felt, execution_price : felt) -> (
-    res : felt
-):
+}(
+    request : OrderRequest,
+    signature : Signature,
+    size : felt,
+    execution_price : felt,
+    margin_amount : felt,
+    borrowed_amount : felt,
+) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
 
@@ -571,7 +578,7 @@ func execute_order{
     # check the validity of the signature
     is_valid_signature_order(hash, signature)
 
-    tempvar status_
+    local status_
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
@@ -599,6 +606,8 @@ func execute_order{
                 direction=request.direction,
                 portionExecuted=size,
                 status=status_,
+                marginAmount=margin_amount,
+                borrowedAmount=borrowed_amount,
             )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=new_order)
@@ -608,13 +617,14 @@ func execute_order{
             # If it's an existing order
         else:
             # Return if the position size after the executing the current order is more than the order's positionSize
+            let (size_by_leverage) = div_fp(size, request.leverage)
             with_attr error_message(
                     "Paritally executed + remaining should be less than position in account contract."):
                 assert_le(size + orderDetails.portionExecuted, request.positionSize)
             end
 
             # Check if the order is in the process of being closed
-            assert_le(orderDetails.status, 2)
+            assert_le(orderDetails.status, 3)
 
             # Check if the order is fully filled by executing the current one
             if request.positionSize == size + orderDetails.portionExecuted:
@@ -634,13 +644,11 @@ func execute_order{
                 direction=orderDetails.direction,
                 portionExecuted=orderDetails.portionExecuted + size,
                 status=status_,
+                marginAmount=margin_amount,
+                borrowedAmount=borrowed_amount,
             )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=updated_order)
-            tempvar syscall_ptr : felt* = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-
             tempvar syscall_ptr : felt* = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
@@ -671,11 +679,13 @@ func execute_order{
             collateralID=orderDetails.collateralID,
             price=orderDetails.price,
             executionPrice=orderDetails.executionPrice,
-            positionSize=orderDetails.positionSize,
+            positionSize=orderDetails.positionSize - size,
             orderType=orderDetails.orderType,
             direction=orderDetails.direction,
             portionExecuted=orderDetails.portionExecuted - size,
             status=status_,
+            marginAmount=margin_amount,
+            borrowedAmount=borrowed_amount,
         )
 
         # Write to the mapping
