@@ -229,8 +229,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     # Check if size is less than or equal to postionSize
-    let (position_size) = mul_fp(temp_order.positionSize, temp_order.leverage)
-    let (cmp_res) = is_le(size, position_size)
+    let (cmp_res) = is_le(size, temp_order.positionSize)
 
     local order_size
 
@@ -239,7 +238,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assert order_size = size
     else:
         # If no, make order_size to be the positionSize
-        assert order_size = position_size
+        assert order_size = temp_order.positionSize
     end
 
     local fees_rate
@@ -268,9 +267,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
 
-        let (order_size_by_leverage) = div_fp(order_size, temp_order.leverage)
-        let (total_position_value) = mul_fp(order_size_by_leverage, execution_price)
         let (leveraged_position_value) = mul_fp(order_size, execution_price)
+        let (total_position_value) = div_fp(leveraged_position_value, temp_order.leverage)
         tempvar amount_to_be_borrowed = leveraged_position_value - total_position_value
 
         # Calculate borrowed and margin amounts to be stored in account contract
@@ -363,9 +361,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             tempvar range_check_ptr = range_check_ptr
             # current order is long order
         else:
-            let (average_execution_price) = div_fp(
-                order_details.marginAmount, order_details.portionExecuted
-            )
+            let (total_value) = mul_fp(order_details.marginAmount, temp_order.leverage)
+            let (average_execution_price) = div_fp(total_value, order_details.portionExecuted)
             tempvar pnl = execution_price - average_execution_price
             actual_execution_price = order_details.executionPrice - pnl
 
@@ -378,13 +375,10 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             tempvar range_check_ptr = range_check_ptr
         end
 
-        let (order_size_by_leverage) = div_fp(order_size, temp_order.leverage)
-        let (amount_out) = mul_fp(actual_execution_price, order_size_by_leverage)
-        let (leveraged_amount_out) = mul_fp(amount_out, temp_order.leverage)
+        let (leveraged_amount_out) = mul_fp(order_size, actual_execution_price)
 
         # Calculate the amount that needs to be returned to liquidity fund
-        let (previous_executed_amount) = mul_fp(order_details.portionExecuted, temp_order.leverage)
-        let (percent_of_order) = div_fp(order_size, previous_executed_amount)
+        let (percent_of_order) = div_fp(order_size, order_details.portionExecuted)
         let (value_to_be_returned) = mul_fp(borrowed_amount, percent_of_order)
         let (margin_to_be_reduced) = mul_fp(margin_amount, percent_of_order)
 
@@ -410,10 +404,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
-
-        # Withdraw the funds to be sent to the user
-        let (amount_to_be_withdrawn) = mul_fp(percent_of_order, order_details.portionExecuted)
-        let (value_to_be_withdrawn) = mul_fp(amount_to_be_withdrawn, actual_execution_price)
 
         # Calculate new values for margin and borrowed amounts
         borrowed_amount_ = borrowed_amount - value_to_be_returned

@@ -461,9 +461,6 @@ func execute_order{
     # check the validity of the signature
     is_valid_signature_order(hash, signature)
 
-    # Calculate the amount of the asset to be executed
-    let (portion_to_be_executed) = div_fp(size, request.leverage)
-
     local status_
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
@@ -475,8 +472,7 @@ func execute_order{
             # Create if the order is being fully opened
             # status_ == 1, partially opened
             # status_ == 2, fully opened
-            let (leveraged_position) = mul_fp(request.positionSize, request.leverage)
-            if leveraged_position == size:
+            if request.positionSize == size:
                 assert status_ = 2
             else:
                 assert status_ = 1
@@ -491,7 +487,7 @@ func execute_order{
                 positionSize=request.positionSize,
                 orderType=request.orderType,
                 direction=request.direction,
-                portionExecuted=portion_to_be_executed,
+                portionExecuted=size,
                 status=status_,
                 marginAmount=margin_amount,
                 borrowedAmount=borrowed_amount,
@@ -507,14 +503,14 @@ func execute_order{
             let (size_by_leverage) = div_fp(size, request.leverage)
             with_attr error_message(
                     "Paritally executed + remaining should be less than position in account contract."):
-                assert_le(size_by_leverage + orderDetails.portionExecuted, request.positionSize)
+                assert_le(size + orderDetails.portionExecuted, request.positionSize)
             end
 
             # Check if the order is in the process of being closed
             assert_le(orderDetails.status, 3)
 
             # Check if the order is fully filled by executing the current one
-            if request.positionSize == portion_to_be_executed + orderDetails.portionExecuted:
+            if request.positionSize == size + orderDetails.portionExecuted:
                 status_ = 2
             else:
                 status_ = 1
@@ -529,7 +525,7 @@ func execute_order{
                 positionSize=orderDetails.positionSize,
                 orderType=request.orderType,
                 direction=orderDetails.direction,
-                portionExecuted=orderDetails.portionExecuted + portion_to_be_executed,
+                portionExecuted=orderDetails.portionExecuted + size,
                 status=status_,
                 marginAmount=margin_amount,
                 borrowedAmount=borrowed_amount,
@@ -549,12 +545,12 @@ func execute_order{
 
         # Assert that the order exists
         assert_not_zero(orderDetails.positionSize)
-        assert_nn(orderDetails.portionExecuted - portion_to_be_executed)
+        assert_nn(orderDetails.portionExecuted - size)
 
         # Check if the order is fully closed or not
         # status_ == 4, fully closed
         # status_ == 3, partially closed
-        if orderDetails.portionExecuted - portion_to_be_executed == 0:
+        if orderDetails.portionExecuted - size == 0:
             assert status_ = 4
         else:
             assert status_ = 3
@@ -566,10 +562,10 @@ func execute_order{
             collateralID=orderDetails.collateralID,
             price=orderDetails.price,
             executionPrice=orderDetails.executionPrice,
-            positionSize=orderDetails.positionSize - portion_to_be_executed,
+            positionSize=orderDetails.positionSize - size,
             orderType=orderDetails.orderType,
             direction=orderDetails.direction,
-            portionExecuted=orderDetails.portionExecuted - portion_to_be_executed,
+            portionExecuted=orderDetails.portionExecuted - size,
             status=status_,
             marginAmount=margin_amount,
             borrowedAmount=borrowed_amount,

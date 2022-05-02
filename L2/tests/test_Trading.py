@@ -1575,7 +1575,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
     orderType1 = 0
-    position1 = to64x61(1)
+    position1 = to64x61(2)
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
@@ -1586,7 +1586,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     collateralID_2 = USDC_ID
     price2 = to64x61(5000)
     orderType2 = 0
-    position2 = to64x61(1)
+    position2 = to64x61(2)
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
@@ -1638,7 +1638,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         position1,
         orderType1,
         direction1, 
-        to64x61(1), 
+        to64x61(2), 
         2,
         to64x61(5000),
         to64x61(5000)
@@ -1655,7 +1655,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         position2,
         orderType2,
         direction2, 
-        to64x61(1), 
+        to64x61(2), 
         2,
         to64x61(5000),
         to64x61(5000)
@@ -1684,7 +1684,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     collateralID_3 = USDC_ID
     price3 = to64x61(6000)
     orderType3 = 0
-    position3 = to64x61(1)
+    position3 = to64x61(2)
     direction3 = 1
     closeOrder3 = 1
     parentOrder3 = order_id_1
@@ -1695,7 +1695,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     collateralID_4 = USDC_ID
     price4 = to64x61(6000)
     orderType4 = 0
-    position4 = to64x61(1)
+    position4 = to64x61(2)
     direction4 = 0
     closeOrder4 = 1
     parentOrder4 = order_id_2
@@ -1805,7 +1805,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
     orderType1 = 0
-    position1 = to64x61(1)
+    position1 = to64x61(10)
     direction1 = 1
     closeOrder1 = 0
     parentOrder1 = 0
@@ -1868,7 +1868,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         position1,
         orderType1,
         direction1, 
-        to64x61(0.5), 
+        to64x61(5), 
         1,
         to64x61(2500),
         to64x61(22500)
@@ -1914,7 +1914,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     collateralID_3 = USDC_ID
     price3 = to64x61(6000)
     orderType3 = 0
-    position3 = to64x61(1)
+    position3 = to64x61(10)
     direction3 = 0
     closeOrder3 = 1
     parentOrder3 = order_id_1
@@ -1972,10 +1972,10 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         collateralID_3,
         price1, 
         execution_price1, 
-        to64x61(0.75),
+        to64x61(7.5),
         orderType1,
         direction1, 
-        to64x61(0.25), 
+        to64x61(2.5), 
         3,
         to64x61(1250),
         to64x61(11250)
@@ -2025,7 +2025,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
     orderType1 = 0
-    position1 = to64x61(0.75)
+    position1 = to64x61(7.5)
     direction1 = 1
     closeOrder1 = 0
     parentOrder1 = 0
@@ -2088,7 +2088,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         position1,
         orderType1,
         direction1, 
-        to64x61(0.5), 
+        to64x61(5), 
         1,
         to64x61(2500),
         to64x61(22500)
