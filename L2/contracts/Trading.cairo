@@ -283,7 +283,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             ILiquidityFund.withdraw(
                 contract_address=liquidity_fund_address,
                 asset_id_=temp_order.collateralID,
-                amount=borrowed_amount_,
+                amount=amount_to_be_borrowed,
                 position_id_=temp_order.orderID,
             )
             tempvar syscall_ptr = syscall_ptr
@@ -364,7 +364,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             let (total_value) = mul_fp(order_details.marginAmount, temp_order.leverage)
             let (average_execution_price) = div_fp(total_value, order_details.portionExecuted)
             tempvar pnl = execution_price - average_execution_price
-            actual_execution_price = order_details.executionPrice - pnl
+            actual_execution_price = average_execution_price - pnl
 
             # Check if the user owes the exchange money
             let (is_negative) = is_le(actual_execution_price, 0)
