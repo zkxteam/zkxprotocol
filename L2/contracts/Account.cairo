@@ -1,12 +1,13 @@
 %lang starknet
-%builtins pedersen range_check ecdsa
+%builtins pedersen range_check ecdsa bitwise
 
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
+from starkware.cairo.common.bitwise import bitwise_and
 from starkware.starknet.common.syscalls import get_contract_address
 from starkware.cairo.common.signature import verify_ecdsa_signature
-from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
+from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin, BitwiseBuiltin
 from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_signature
 from starkware.cairo.common.hash_state import (
     hash_init,
@@ -62,7 +63,28 @@ end
 # status 2: executed
 # status 3: close partial
 # status 4: close
+# status 5: toBeLiquidated
 struct OrderDetails:
+    member assetID : felt
+    member collateralID : felt
+    member price : felt
+    member executionPrice : felt
+    member positionSize : felt
+    member orderType : felt
+    member direction : felt
+    member portionExecuted : felt
+    member status : felt
+    member marginAmount : felt
+    member borrowedAmount : felt
+end
+
+# status 0: initialized
+# status 1: partial
+# status 2: executed
+# status 3: close partial
+# status 4: close
+struct OrderDetailsWithIDs:
+    member orderID : felt
     member assetID : felt
     member collateralID : felt
     member price : felt
@@ -465,63 +487,68 @@ end
 # @param array_list - Array of OrderRequests filled up to the index
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of OrderDetails
-func populate_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    array_list_len : felt, array_list : OrderDetails*
-) -> (array_list_len : felt, array_list : OrderDetails*):
-    let (pos) = position_array.read(index=array_list_len)
+func populate_array{
+    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(
+    collateral_id : felt, iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
+) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    alloc_locals
+    let (pos) = position_array.read(index=iterator)
 
     if pos == 0:
         return (array_list_len, array_list)
     end
 
-    let (pos_deets) = order_mapping.read(orderID=pos)
+    let (pos_deets : OrderDetails) = order_mapping.read(orderID=pos)
+    let order_details_w_id = OrderDetailsWithIDs(
+        orderID=pos,
+        assetID=pos_deets.assetID,
+        collateralID=pos_deets.collateralID,
+        price=pos_deets.price,
+        executionPrice=pos_deets.executionPrice,
+        positionSize=pos_deets.positionSize,
+        orderType=pos_deets.orderType,
+        direction=pos_deets.direction,
+        portionExecuted=pos_deets.portionExecuted,
+        status=pos_deets.status,
+        marginAmount=pos_deets.marginAmount,
+        borrowedAmount=pos_deets.borrowedAmount,
+    )
 
-    assert array_list[array_list_len] = pos_deets
-    return populate_array(array_list_len + 1, array_list)
+    local difference = collateral_id - pos_deets.collateralID
+    local is_valid_collateral
+
+    if difference == 0:
+        is_valid_collateral = 1
+    else:
+        is_valid_collateral = 0
+    end
+
+    let (is_valid_state) = is_le(pos_deets.status, 3)
+
+    let (is_valid) = bitwise_and(is_valid_collateral, is_valid_state)
+
+    if is_valid == 1:
+        assert array_list[array_list_len] = order_details_w_id
+        return populate_array(collateral_id, iterator + 1, array_list_len + 1, array_list)
+    else:
+        return populate_array(collateral_id, iterator + 1, array_list_len, array_list)
+    end
 end
 
 # @notice Function to get all the open positions
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of OrderDetails
 @view
-func return_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    array_list_len : felt, array_list : OrderDetails*
-):
+func return_array{
+    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(collateral_id : felt) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
     alloc_locals
 
-    let (array_list : OrderDetails*) = alloc()
-    return populate_array(array_list_len=0, array_list=array_list)
-end
-
-# @notice Internal Function called by return array to recursively add positions to the array and return it
-# @param array_list_len - Index of the current OrderRequest to be added in this recursive call
-# @param array_list - Array of OrderRequests filled up to the index
-# @returns array_list_len - Length of the array_list
-# @returns array_list - Fully populated list of OrderDetails
-func populate_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    array_list_len : felt, array_list : felt*
-) -> (array_list_len : felt, array_list : felt*):
-    let (pos) = position_array.read(index=array_list_len)
-
-    if pos == 0:
-        return (array_list_len, array_list)
-    end
-
-    assert array_list[array_list_len] = pos
-    return populate_array(array_list_len + 1, array_list)
-end
-
-# @notice Function to get all the open position IDs
-# @returns array_list_len - Length of the array_list
-# @returns array_list - Fully populated list of Order Ids
-@view
-func return_array_ids{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    array_list_len : felt, array_list : felt*
-):
-    alloc_locals
-
-    let (array_list : felt*) = alloc()
-    return populate_array(array_list_len=0, array_list=array_list)
+    let (array_list : OrderDetailsWithIDs*) = alloc()
+    return populate_array(
+        collateral_id=collateral_id, iterator=0, array_list_len=0, array_list=array_list
+    )
 end
 
 # @notice Function to hash the order parameters
@@ -803,7 +830,7 @@ end
 func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt
 ):
-    let (orderDetails) = order_mapping.read(orderID=id)
+    let (orderDetails : OrderDetails) = order_mapping.read(orderID=id)
 
     # Create a new struct with the updated details
     let updated_order = OrderDetails(
@@ -814,12 +841,16 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         positionSize=orderDetails.positionSize,
         orderType=orderDetails.orderType,
         direction=orderDetails.direction,
-        portionExecuted=0,
-        status=4,
+        portionExecuted=orderDetails.portionExecuted,
+        status=5,
+        marginAmount=orderDetails.marginAmount,
+        borrowedAmount=orderDetails.borrowedAmount,
     )
 
     # Write to the mapping
     order_mapping.write(orderID=id, value=updated_order)
+
+    return ()
 end
 
 # @notice AuthorizedRegistry interface
