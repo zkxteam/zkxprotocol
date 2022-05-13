@@ -120,6 +120,11 @@ struct Asset:
     member maximum_position_size : felt
 end
 
+struct CollateralBalance:
+    member assetID : felt
+    member balance : felt
+end
+
 #
 # Storage
 #
@@ -162,11 +167,20 @@ end
 func position_array(index : felt) -> (position_id : felt):
 end
 
-# Length of the array
+# Stores all collaterals held by the user
+@storage_var
+func collateral_array(index : felt) -> (collateral_id : felt):
+end
+
+# Length of the position array
 @storage_var
 func position_array_len() -> (len : felt):
 end
 
+# Length of the collateral array
+@storage_var
+func collateral_array_len() -> (len : felt):
+end
 #
 # Guards
 #
@@ -436,6 +450,18 @@ func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 ):
     let (curr_balance) = get_balance(assetID_)
     balance.write(assetID=assetID_, value=curr_balance + amount)
+    let (array_len) = collateral_array_len.read()
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
+    if curr_balance == 0:
+        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
     return ()
 end
 
@@ -483,15 +509,16 @@ func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 end
 
 # @notice Internal Function called by return array to recursively add positions to the array and return it
-# @param array_list_len - Index of the current OrderRequest to be added in this recursive call
+# @param iterator - Index of the position_array currently pointing to
+# @param array_list_len - Stores the current length of the populated array
 # @param array_list - Array of OrderRequests filled up to the index
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of OrderDetails
-func populate_array{
+func populate_array_positions{
     bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(
-    collateral_id : felt, iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
-) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+}(iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*) -> (
+    array_list_len : felt, array_list : OrderDetailsWithIDs*
+):
     alloc_locals
     let (pos) = position_array.read(index=iterator)
 
@@ -515,24 +542,13 @@ func populate_array{
         borrowedAmount=pos_deets.borrowedAmount,
     )
 
-    local difference = collateral_id - pos_deets.collateralID
-    local is_valid_collateral
-
-    if difference == 0:
-        is_valid_collateral = 1
-    else:
-        is_valid_collateral = 0
-    end
-
     let (is_valid_state) = is_le(pos_deets.status, 3)
 
-    let (is_valid) = bitwise_and(is_valid_collateral, is_valid_state)
-
-    if is_valid == 1:
+    if is_valid_state == 1:
         assert array_list[array_list_len] = order_details_w_id
-        return populate_array(collateral_id, iterator + 1, array_list_len + 1, array_list)
+        return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
     else:
-        return populate_array(collateral_id, iterator + 1, array_list_len, array_list)
+        return populate_array_positions(iterator + 1, array_list_len, array_list)
     end
 end
 
@@ -540,15 +556,53 @@ end
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of OrderDetails
 @view
-func return_array{
+func return_array_positions{
     bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(collateral_id : felt) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+}() -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
     alloc_locals
 
     let (array_list : OrderDetailsWithIDs*) = alloc()
-    return populate_array(
-        collateral_id=collateral_id, iterator=0, array_list_len=0, array_list=array_list
+    return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
+end
+
+# @notice Internal Function called by return_array_collaterals to recursively add collateralBalance to the array and return it
+# @param iterator - Index of the position_array currently pointing to
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of CollateralBalance filled up to the index
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of CollateralBalance
+func populate_array_collaterals{
+    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(array_list_len : felt, array_list : CollateralBalance*) -> (
+    array_list_len : felt, array_list : CollateralBalance*
+):
+    alloc_locals
+    let (collateral_id) = collateral_array.read(index=array_list_len)
+
+    if collateral_id == 0:
+        return (array_list_len, array_list)
+    end
+
+    let (collateral_balance : felt) = balance.read(assetID=collateral_id)
+    let collateral_balance_struct = CollateralBalance(
+        assetID=collateral_id, balance=collateral_balance
     )
+
+    assert array_list[array_list_len] = collateral_balance_struct
+    return populate_array_collaterals(array_list_len + 1, array_list)
+end
+
+# @notice Function to get all use collaterals
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of CollateralBalance
+@view
+func return_array_collaterals{
+    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}() -> (array_list_len : felt, array_list : CollateralBalance*):
+    alloc_locals
+
+    let (array_list : CollateralBalance*) = alloc()
+    return populate_array_collaterals(array_list_len=0, array_list=array_list)
 end
 
 # @notice Function to hash the order parameters
@@ -638,6 +692,11 @@ func execute_order{
             )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=new_order)
+
+            let (arr_len) = position_array_len.read()
+            position_array.write(index=arr_len, value=request.orderID)
+            position_array_len.write(arr_len + 1)
+
             tempvar syscall_ptr : felt* = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
@@ -823,9 +882,43 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tempvar new_balance = res + amount_in_decimal_representation
     balance.write(assetID=assetID_, value=new_balance)
 
+    let (array_len) = collateral_array_len.read()
+    let (balance_collateral) = balance.read(assetID=assetID_)
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
+    if balance_collateral == 0:
+        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
     return ()
 end
 
+func add_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    new_asset_id : felt, iterator : felt, length : felt
+):
+    alloc_locals
+    if iterator == length:
+        collateral_array.write(index=iterator, value=new_asset_id)
+        collateral_array_len.write(iterator + 1)
+        return ()
+    end
+
+    let (collateral_id) = collateral_array.read(index=iterator)
+    local difference = collateral_id - new_asset_id
+    if difference == 0:
+        return ()
+    end
+
+    return add_collateral(new_asset_id=new_asset_id, iterator=iterator + 1, length=length)
+end
+
+# @notice Function called by liquidate contract to mark the position as liquidated
+# @param id - Order Id of the position to be marked
 @external
 func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt

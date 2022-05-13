@@ -1,5 +1,4 @@
 %lang starknet
-
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.registers import get_fp_and_pc
@@ -20,12 +19,12 @@ from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.hash_state import hash_init, hash_finalize, hash_update
 from contracts.Math_64x61 import mul_fp, div_fp
 
+# @notice struct for passing the order request to Account Contract
 # status 0: initialized
 # status 1: partial
 # status 2: executed
 # status 3: close partial
 # status 4: close
-# Struct for passing the order request to Account Contract
 struct OrderDetailsWithIDs:
     member orderID : felt
     member assetID : felt
@@ -41,14 +40,18 @@ struct OrderDetailsWithIDs:
     member borrowedAmount : felt
 end
 
+# @notice struct to pass price data to the contract
 struct PriceData:
     member assetID : felt
     member collateralID : felt
-    member price : felt
+    member assetPrice : felt
+    member collateralPrice : felt
 end
 
-@storage_var
-func maintanence_margin() -> (res : felt):
+# @notice struct to balances of collaterals from account
+struct CollateralBalance:
+    member assetID : felt
+    member balance : felt
 end
 
 # @notice Stores the address of AdminAuth contract
@@ -56,62 +59,177 @@ end
 func auth_address() -> (contract_address : felt):
 end
 
+# @notice Address of the asset contract
+@storage_var
+func asset_address() -> (contract_address : felt):
+end
+
+#################
+# To be removed #
+@storage_var
+func maintanence() -> (maintanence : felt):
+end
+
+@storage_var
+func acc_value() -> (acc_value : felt):
+end
+
+@storage_var
+func collateral_total() -> (collateral_total : felt):
+end
+#################
+
+# @notice Constructor of the contract
+# @param _auth_address - Address of the adminAuth contract
+# @param _asset_address - Address of the asset contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _maintanence_margin : felt, _auth_address : felt
+    _auth_address : felt, _asset_address : felt
 ):
     auth_address.write(_auth_address)
-    maintanence_margin.write(_maintanence_margin)
-
+    asset_address.write(_asset_address)
     return ()
 end
 
-@external
-func set_maintanence_margin{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _maintanence_margin
+####################
+# To be removed    #
+@view
+func return_maintanence{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    res : felt
 ):
-    alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (_maintanence) = maintanence.read()
+    return (res=_maintanence)
+end
 
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=0
-    )
-    assert_not_zero(access)
+@view
+func return_acc_value{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    res : felt
+):
+    let (_acc_value) = acc_value.read()
+    return (res=_acc_value)
+end
 
-    with_attr error_message("Invalid maintanence margin"):
-        assert_nn_le(_maintanence_margin, 2305843009213693952)
+@view
+func return_collateral_total{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (res : felt):
+    let (_ct) = collateral_total.read()
+    return (res=_ct)
+end
+#####################
+
+# @notice Finds the usd value of all the collaterals in account contract
+# @param prices_len - Length of the prices array
+# @param prices - Array containing prices of corresponding collaterals in collaterals array
+# @param collaterals_len - Length of the collateral array
+# @param collaterals - Array containing balance of each collateral of the user
+# @param total_value - Stores the total value in usd of all the collaterals recursed over
+# @returns usd_value - Value of the collaterals held by user in usd
+func find_collateral_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    prices_len : felt,
+    prices : PriceData*,
+    collaterals_len : felt,
+    collaterals : CollateralBalance*,
+    total_value : felt,
+) -> (usd_value : felt):
+    # If the length of the collateral array is 0, return
+    if collaterals_len == 0:
+        # # To remove ####
+        collateral_total.write(total_value)
+        #################
+        return (total_value)
     end
 
-    return ()
-end
+    # Create a temporary struct to read data from the array element of prices
+    tempvar price_details : PriceData = PriceData(
+        assetID=[prices].assetID,
+        collateralID=[prices].collateralID,
+        assetPrice=[prices].assetPrice,
+        collateralPrice=[prices].collateralPrice
+        )
 
+    # Create a temporary struct to read data from the array element of collaterals
+    tempvar collateral_details : CollateralBalance = CollateralBalance(
+        assetID=[collaterals].assetID,
+        balance=[collaterals].balance
+        )
+    # Check if the passed prices list is in proper order and the price is not negative
+    with_attr error_message("assetID and collateralID do not match"):
+        assert price_details.collateralID = collateral_details.assetID
+        assert_nn(price_details.collateralPrice)
+        assert price_details.assetPrice = 0
+    end
+
+    # Calculate the value of the current collateral
+    let (collateral_value_usd) = mul_fp(collateral_details.balance, price_details.collateralPrice)
+
+    # Recurse over the next element
+    return find_collateral_balance(
+        prices_len=prices_len - 1,
+        prices=prices + PriceData.SIZE,
+        collaterals_len=collaterals_len - 1,
+        collaterals=collaterals + CollateralBalance.SIZE,
+        total_value=total_value + collateral_value_usd,
+    )
+end
+# @notice Function that is called recursively by check_recurse
+# @param account_address - Account address of the user
+# @param positions_len - Length of the positions array
+# @param postions - Array with all the position details
+# @param prices_len - Length of the prices array
+# @param prices - Array with all the price details
+# @param total_account_value - Collateral value - borrowed value + positionSize * price
+# @param total_maintanence_requirement - maintanence ratio of the asset * value of the position when executed
+# @param least_collateral_ratio - The least collateral ratio among the positions
+# @param least_collateral_ratio_position - The positionID of the postion which is having the least collateral ratio
+# @returns is_liquidation - 1 if positions are marked to be liquidated
+# @returns least_collateral_ratio_position - The positionID of the least collateralized position
 func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address : felt,
-    collateral_id : felt,
     positions_len : felt,
     positions : OrderDetailsWithIDs*,
     prices_len : felt,
     prices : PriceData*,
-    maintanence_total_num : felt,
-    maintanence_total_den : felt,
-) -> (res : felt):
+    total_account_value : felt,
+    total_maintanence_requirement : felt,
+    least_collateral_ratio : felt,
+    least_collateral_ratio_position : felt,
+) -> (is_liquidation, least_collateral_ratio_position : felt):
     alloc_locals
-    # Check if the list is empty, if yes return 1
-    if positions_len == 0:
-        let (user_balance) = IAccount.get_balance(
-            contract_address=account_address, assetID_=collateral_id
-        )
-        maintanence_total_num = maintanence_total_num + user_balance
-        let (account_margin) = div_fp(maintanence_total_num, maintanence_total_den)
 
-        let (minimum_margin) = maintanence_margin.read()
-        let (is_liquidation) = is_le(account_margin, minimum_margin)
-        return (is_liquidation)
+    # Check if the list is empty, if yes return the result
+    if positions_len == 0:
+        # Fetch all the collaterals that the user holds
+        let (collaterals_len : felt,
+            collaterals : CollateralBalance*) = IAccount.return_array_collaterals(
+            contract_address=account_address
+        )
+
+        # Calculate the value of all the collaterals in usd
+        let (user_balance) = find_collateral_balance(
+            prices_len=prices_len,
+            prices=prices,
+            collaterals_len=collaterals_len,
+            collaterals=collaterals,
+            total_value=0,
+        )
+
+        # Add the collateral value to the total_account_value
+        local total_account_value_collateral = total_account_value + user_balance
+
+        # # To Remove
+        # ######################
+        maintanence.write(total_maintanence_requirement)
+        acc_value.write(total_account_value_collateral)
+        # ######################
+
+        # Check if the maintanence margin is not satisfied
+        let (is_liquidation) = is_le(total_account_value_collateral, total_maintanence_requirement)
+
+        # Return if the account should be liquidated or not and the orderId of the least colalteralized position
+        return (is_liquidation, least_collateral_ratio_position)
     end
 
-    # Create a struct object for the order
+    # Create a temporary struct to read data from the array element of positions
     tempvar order_details : OrderDetailsWithIDs = OrderDetailsWithIDs(
         orderID=[positions].orderID,
         assetID=[positions].assetID,
@@ -127,55 +245,98 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         borrowedAmount=[positions].borrowedAmount
         )
 
-    tempvar asset_price : PriceData = PriceData(
+    # Create a temporary struct to read data from the array element of prices
+    tempvar price_details : PriceData = PriceData(
         assetID=[prices].assetID,
         collateralID=[prices].collateralID,
-        price=[prices].price
+        assetPrice=[prices].assetPrice,
+        collateralPrice=[prices].collateralPrice
         )
 
+    # Check if there is a mismatch in prices array and positions array
     with_attr error_message("assetID and collateralID do not match"):
-        assert order_details.assetID = asset_price.assetID
-        assert order_details.collateralID = asset_price.collateralID
+        assert order_details.assetID = price_details.assetID
+        assert order_details.collateralID = price_details.collateralID
     end
 
+    # Check if the prices are not negative
     with_attr error("price is invalid or the array is out of bounds"):
-        assert_nn(asset_price.price)
-        assert_not_zero(asset_price.price)
+        assert_nn(price_details.collateralPrice)
+        assert_nn(price_details.assetPrice)
     end
 
-    local pnl
+    # Fetch the maintatanence margin requirement from asset contract
+    let (asset_contract) = asset_address.read()
+    let (req_margin) = IAsset.get_maintanence_margin(
+        contract_address=asset_contract, id=order_details.assetID
+    )
 
+    # Calculate the required margin in usd
+    local total_value = order_details.marginAmount + order_details.borrowedAmount
+    let (average_execution_price : felt) = div_fp(total_value, order_details.portionExecuted)
+    let (maintanence_position) = mul_fp(average_execution_price, order_details.portionExecuted)
+    let (maintanence_requirement) = mul_fp(req_margin, maintanence_position)
+    let (maintanence_requirement_usd) = mul_fp(
+        maintanence_requirement, price_details.collateralPrice
+    )
+
+    # Calculate pnl to check if it is the least collateralized position
+    local price_diff_
     if order_details.direction == 1:
-        let (pnl_temp) = mul_fp(
-            asset_price.price - order_details.executionPrice, order_details.portionExecuted
-        )
-        pnl = pnl_temp
+        tempvar price_diff = price_details.assetPrice - average_execution_price
+        price_diff_ = price_diff
     else:
-        let (pnl_temp) = mul_fp(
-            order_details.executionPrice - asset_price.price, order_details.portionExecuted
-        )
-        pnl = pnl_temp
+        tempvar price_diff = average_execution_price - price_details.assetPrice
+        price_diff_ = price_diff
     end
 
-    local maintanence_num = order_details.marginAmount - pnl
-    let (maintanence_den) = mul_fp(order_details.executionPrice, order_details.portionExecuted)
+    let (pnl) = mul_fp(price_diff_, order_details.portionExecuted)
 
+    # Calculate the value of the current account margin in usd
+    local position_value = maintanence_position - order_details.borrowedAmount + pnl
+    let (net_position_value_usd : felt) = mul_fp(position_value, price_details.collateralPrice)
+
+    # Margin ratio calculation
+    local numerator = order_details.marginAmount + pnl
+    let (denominator) = mul_fp(order_details.portionExecuted, price_details.assetPrice)
+    let (collateral_ratio_position) = div_fp(numerator, denominator)
+
+    let (if_lesser) = is_le(collateral_ratio_position, least_collateral_ratio)
+
+    # If it is the lowest, update least_collateral_ratio and least_collateral_ratio_position
+    local least_collateral_ratio_
+    local least_collateral_ratio_position_
+    if if_lesser == 1:
+        assert least_collateral_ratio_ = collateral_ratio_position
+        assert least_collateral_ratio_position_ = order_details.orderID
+    else:
+        assert least_collateral_ratio_ = least_collateral_ratio
+        assert least_collateral_ratio_position_ = least_collateral_ratio_position
+    end
+
+    # Recurse over to the next position
     return check_liquidation_recurse(
         account_address=account_address,
-        collateral_id=collateral_id,
         positions_len=positions_len - 1,
         positions=positions + OrderDetailsWithIDs.SIZE,
         prices_len=prices_len - 1,
         prices=prices + PriceData.SIZE,
-        maintanence_total_num=maintanence_total_num + maintanence_num,
-        maintanence_total_den=maintanence_total_den + maintanence_den,
+        total_account_value=total_account_value + net_position_value_usd,
+        total_maintanence_requirement=total_maintanence_requirement + maintanence_requirement_usd,
+        least_collateral_ratio=least_collateral_ratio_,
+        least_collateral_ratio_position=least_collateral_ratio_position_,
     )
 end
 
+# @notice Function to check and mark the positions to be liquidated
+# @param account_address - Account address of the user
+# @param prices_len - Length of the prices array
+# @param prices - Array with all the price details
+# @returns res - 1 if positions are marked to be liquidated
 @external
 func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    account_address : felt, prices_len : felt, prices : PriceData*, collateral_id : felt
-) -> (res : felt):
+    account_address : felt, prices_len : felt, prices : PriceData*
+) -> (liq_result : felt, least_collateral_ratio_position : felt):
     alloc_locals
 
     # Check if the list is empty
@@ -183,69 +344,46 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assert_not_zero(prices_len)
     end
 
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array(
-        contract_address=account_address, collateral_id=collateral_id
+    # Fetch all the positions from the Account contract
+    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
+        contract_address=account_address
     )
 
+    # Check if the list is empty
     with_attr error_message("Position array length is 0"):
         assert_not_zero(positions_len)
-        assert positions_len = prices_len
     end
 
-    let (liq_result) = check_liquidation_recurse(
+    # Recurse through all positions to see if it needs to liquidated
+    let (liq_result, least_collateral_ratio_position) = check_liquidation_recurse(
         account_address=account_address,
-        collateral_id=collateral_id,
         positions_len=positions_len,
         positions=positions,
         prices_len=prices_len,
         prices=prices,
-        maintanence_total_num=0,
-        maintanence_total_den=0,
+        total_account_value=0,
+        total_maintanence_requirement=0,
+        least_collateral_ratio=2305843009213693952,
+        least_collateral_ratio_position=0,
     )
 
+    # To be fixed
     if liq_result == 1:
-        liquidate(account_address, positions_len, positions)
-        return (1)
-    else:
-        return (0)
-    end
-end
-
-func liquidate{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    account_address : felt, positions_len : felt, positions : OrderDetailsWithIDs*
-) -> (res : felt):
-    alloc_locals
-    # Check if the list is empty
-    if positions_len == 0:
-        return (1)
-    end
-
-    # Create a struct object for the order
-    tempvar order_details : OrderDetailsWithIDs = OrderDetailsWithIDs(
-        orderID=[positions].orderID,
-        assetID=[positions].assetID,
-        collateralID=[positions].collateralID,
-        price=[positions].price,
-        executionPrice=[positions].executionPrice,
-        positionSize=[positions].positionSize,
-        orderType=[positions].orderType,
-        direction=[positions].direction,
-        portionExecuted=[positions].portionExecuted,
-        status=[positions].status,
-        marginAmount=[positions].marginAmount,
-        borrowedAmount=[positions].borrowedAmount
+        IAccount.liquidate_position(
+            contract_address=account_address, id=least_collateral_ratio_position
         )
+    end
 
-    IAccount.liquidate_position(contract_address=account_address, id=order_details.orderID)
-
-    return liquidate(account_address, positions_len - 1, positions + OrderDetailsWithIDs.SIZE)
+    return (liq_result, least_collateral_ratio_position)
 end
 
+# @notice Account interface
 @contract_interface
 namespace IAccount:
-    func return_array(collateral_id : felt) -> (
-        array_list_len : felt, array_list : OrderDetailsWithIDs*
-    ):
+    func return_array_positions() -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    end
+
+    func return_array_collaterals() -> (array_list_len : felt, array_list : CollateralBalance*):
     end
 
     func liquidate_position(id : felt) -> ():
@@ -259,5 +397,11 @@ end
 @contract_interface
 namespace IAdminAuth:
     func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
+    end
+end
+
+@contract_interface
+namespace IAsset:
+    func get_maintanence_margin(id : felt) -> (maintanence_margin : felt):
     end
 end
