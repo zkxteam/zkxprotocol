@@ -34,8 +34,6 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory():
-    print("In 64x61", to64x61(0.041891891891891894))
-    print("In decimal", from64x61(172938225691027040))
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
@@ -392,6 +390,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     print("liquidation resul...", liquidate_result_bob.result.response[0],
           liquidate_result_bob.result.response[1])
 
+    assert liquidate_result_bob.result.response[0] == 0
     assert liquidate_result_bob.result.response[1] == order_id_2
 
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
@@ -538,6 +537,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     print("liquidation resul...", liquidate_result_alice.result.response[0], " ",
           liquidate_result_alice.result.response[1])
 
+    assert liquidate_result_alice.result.response[0] == 0
     assert liquidate_result_alice.result.response[1] == order_id_3
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
@@ -593,6 +593,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     print("liquidation resul...", liquidate_result_bob.result.response[0],
           liquidate_result_bob.result.response[1])
 
+    assert liquidate_result_bob.result.response[0] == 0
     assert liquidate_result_bob.result.response[1] == order_id_4
 
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
@@ -652,26 +653,30 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
     print("liquidation resul...", liquidate_result_alice.result.response[0], " ",
           liquidate_result_alice.result.response[1])
 
-    # assert liquidate_result_alice.result.response[1] == order_id_3
+    assert liquidate_result_alice.result.response[1] == str_to_felt(
+        "343uofdsjxz")
+    assert liquidate_result_alice.result.response[0] == 1
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
 
-    # assert from64x61(alice_balance_usdc.result.res) == 317.6
+    assert from64x61(alice_balance_usdc.result.res) == 317.6
 
     alice_balance_ust = await alice.get_balance(UST_ID).call()
     print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
 
-    # assert from64x61(alice_balance_ust.result.res) == 1000
+    assert from64x61(alice_balance_ust.result.res) == 1000
 
     alice_maintanence = await liquidate.return_maintanence().call()
     print("Alice maintanence requirement:",
           from64x61(alice_maintanence.result.res))
 
-    # assert from64x61(alice_maintanence.result.res) == 811.125
+    assert from64x61(alice_maintanence.result.res) == 811.125
 
     alice_acc_value = await liquidate.return_acc_value().call()
     print("Alice acc value:", from64x61(alice_acc_value.result.res))
+
+    assert from64x61(alice_acc_value.result.res) == 787.73
 
     order_state = await alice.get_order_data(orderID_=liquidate_result_alice.result.response[1]).call()
     res4 = list(order_state.result.res)
