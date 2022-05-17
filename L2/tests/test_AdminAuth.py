@@ -11,11 +11,13 @@ signer3 = Signer(123456789987654323)
 signer4 = Signer(123456789987654323)
 signer5 = Signer(123456789987654324)
 
+
 @pytest.fixture
 def global_var():
     pytest.user1 = None
     pytest.user2 = None
     pytest.user3 = None
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -60,6 +62,7 @@ async def adminAuth_factory():
 
     return adminAuth, admin1, admin2
 
+
 @pytest.mark.asyncio
 async def test_get_admin_mapping(adminAuth_factory):
     adminAuth, admin1, admin2 = adminAuth_factory
@@ -70,6 +73,7 @@ async def test_get_admin_mapping(adminAuth_factory):
     execution_info1 = await adminAuth.get_admin_mapping(admin2.contract_address, 0).call()
     assert execution_info1.result.allowed == 1
 
+
 @pytest.mark.asyncio
 async def test_update_admin_mapping_non_admin(adminAuth_factory):
     adminAuth, admin1, _ = adminAuth_factory
@@ -78,6 +82,7 @@ async def test_update_admin_mapping_non_admin(adminAuth_factory):
 
     execution_info = await adminAuth.get_admin_mapping(pytest.user1.contract_address, 1).call()
     assert execution_info.result.allowed == 1
+
 
 @pytest.mark.asyncio
 async def test_update_admin_mapping_one_approval(adminAuth_factory):
@@ -88,7 +93,9 @@ async def test_update_admin_mapping_one_approval(adminAuth_factory):
     execution_info1 = await adminAuth.get_admin_mapping(pytest.user2.contract_address, 0).call()
     assert execution_info1.result.allowed == admin1.contract_address
 
-    assert_revert(lambda: signer4.send_transaction(pytest.user2, adminAuth.contract_address, 'update_admin_mapping', [pytest.user2.contract_address, 0, 1]))
+    assert_revert(lambda: signer4.send_transaction(pytest.user2, adminAuth.contract_address,
+                  'update_admin_mapping', [pytest.user2.contract_address, 0, 1]))
+
 
 @pytest.mark.asyncio
 async def test_update_admin_mapping_same_approval(adminAuth_factory):
@@ -99,13 +106,17 @@ async def test_update_admin_mapping_same_approval(adminAuth_factory):
     execution_info1 = await adminAuth.get_admin_mapping(pytest.user2.contract_address, 0).call()
     assert execution_info1.result.allowed == admin1.contract_address
 
-    assert_revert(lambda: signer1.send_transaction(pytest.user2, adminAuth.contract_address, 'update_admin_mapping', [pytest.user3.contract_address, 0, 1]))
+    assert_revert(lambda: signer1.send_transaction(pytest.user2, adminAuth.contract_address,
+                  'update_admin_mapping', [pytest.user3.contract_address, 0, 1]))
+
 
 @pytest.mark.asyncio
 async def test_update_admin_mapping_no_permission(adminAuth_factory):
     adminAuth, _, _ = adminAuth_factory
 
-    assert_revert(lambda: signer3.send_transaction(pytest.user1, adminAuth.contract_address, 'update_admin_mapping', [pytest.user1.contract_address, 0, 1]))
+    assert_revert(lambda: signer3.send_transaction(pytest.user1, adminAuth.contract_address,
+                  'update_admin_mapping', [pytest.user1.contract_address, 0, 1]))
+
 
 @pytest.mark.asyncio
 async def test_update_admin_mapping_admin(adminAuth_factory):
@@ -120,6 +131,7 @@ async def test_update_admin_mapping_admin(adminAuth_factory):
 
     execution_info2 = await adminAuth.get_admin_mapping(pytest.user1.contract_address, 0).call()
     assert execution_info2.result.allowed == 1
+
 
 @pytest.mark.asyncio
 async def test_update_admin_mapping_revoke(adminAuth_factory):

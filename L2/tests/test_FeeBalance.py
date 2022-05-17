@@ -12,10 +12,12 @@ signer4 = Signer(123456789987654324)
 
 asset_ID = str_to_felt("c83jv93i4hksdk")
 
+
 @pytest.fixture
 def global_var():
     pytest.user1 = None
     pytest.user2 = None
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -65,11 +67,13 @@ async def feeBalance_factory():
 
     return feeBalance, callFeeBalance, admin1, admin2
 
+
 @pytest.mark.asyncio
 async def test_update_fee_mapping_invalid(feeBalance_factory):
     feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
 
-    assert_revert(lambda: signer1.send_transaction(admin1, feeBalance.contract_address, 'update_fee_mapping', [pytest.user1.contract_address, 10]))
+    assert_revert(lambda: signer1.send_transaction(admin1, feeBalance.contract_address,
+                  'update_fee_mapping', [pytest.user1.contract_address, 10]))
 
 
 @pytest.mark.asyncio
@@ -85,6 +89,7 @@ async def test_update_fee_mapping(feeBalance_factory):
 
     execution_info = await feeBalance.get_user_fee(pytest.user1.contract_address, asset_ID).call()
     assert execution_info.result.fee == 10
+
 
 @pytest.mark.asyncio
 async def test_update_fee_mapping_different_user(feeBalance_factory):

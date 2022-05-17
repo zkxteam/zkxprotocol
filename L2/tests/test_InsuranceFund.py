@@ -9,9 +9,11 @@ signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
 signer3 = Signer(123456789987654323)
 
+
 @pytest.fixture
 def global_var():
     pytest.user1 = None
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -51,6 +53,7 @@ async def holding_factory():
 
     return adminAuth, insurance, admin1, admin2
 
+
 @pytest.mark.asyncio
 async def test_fund_admin(holding_factory):
     _, insurance, admin1, _ = holding_factory
@@ -60,11 +63,14 @@ async def test_fund_admin(holding_factory):
     execution_info = await insurance.balance(str_to_felt("USDC")).call()
     assert execution_info.result.amount == 100
 
+
 @pytest.mark.asyncio
 async def test_fund_reject(holding_factory):
     _, insurance, _, _ = holding_factory
 
-    assert_revert(lambda: signer3.send_transaction(pytest.user1,insurance.contract_address, 'fund', [ str_to_felt("USDC"), 100]))
+    assert_revert(lambda: signer3.send_transaction(
+        pytest.user1, insurance.contract_address, 'fund', [str_to_felt("USDC"), 100]))
+
 
 @pytest.mark.asyncio
 async def test_defund_admin(holding_factory):
@@ -75,8 +81,10 @@ async def test_defund_admin(holding_factory):
     execution_info = await insurance.balance(str_to_felt("USDC")).call()
     assert execution_info.result.amount == 0
 
+
 @pytest.mark.asyncio
 async def test_defund_reject(holding_factory):
     _, insurance, _, _ = holding_factory
 
-    assert_revert(lambda: signer3.send_transaction(pytest.user1,insurance.contract_address, 'defund', [ str_to_felt("USDC"), 100]))
+    assert_revert(lambda: signer3.send_transaction(
+        pytest.user1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 100]))

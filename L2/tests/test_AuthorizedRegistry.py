@@ -10,9 +10,11 @@ signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
 signer3 = Signer(123456789987654323)
 
+
 @pytest.fixture(scope='module')
 def event_loop():
     return asyncio.new_event_loop()
+
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory():
@@ -51,6 +53,7 @@ async def adminAuth_factory():
 
     return adminAuth, registry, admin1, admin2, user1
 
+
 @pytest.mark.asyncio
 async def test_get_admin_mapping(adminAuth_factory):
     adminAuth, _, admin1, admin2, user1 = adminAuth_factory
@@ -60,6 +63,7 @@ async def test_get_admin_mapping(adminAuth_factory):
 
     execution_info1 = await adminAuth.get_admin_mapping(admin2.contract_address, 3).call()
     assert execution_info1.result.allowed == 0
+
 
 @pytest.mark.asyncio
 async def test_modify_registry_by_admin(adminAuth_factory):
@@ -72,10 +76,14 @@ async def test_modify_registry_by_admin(adminAuth_factory):
 
     assert result == 1
 
+
 @pytest.mark.asyncio
 async def test_modify_registry_by_unauthorized(adminAuth_factory):
     adminAuth, registry, admin1, admin2, user1 = adminAuth_factory
 
-    assert_revert(lambda: signer3.send_transaction(user1, registry.contract_address, 'update_registry', [1, 1, 1]))
-    assert_revert(lambda: signer3.send_transaction(user1, registry.contract_address, 'update_registry', [1, 1, 0]))
-    assert_revert(lambda: signer3.send_transaction(user1, registry.contract_address, 'update_registry', [2, 1, 1]))
+    assert_revert(lambda: signer3.send_transaction(
+        user1, registry.contract_address, 'update_registry', [1, 1, 1]))
+    assert_revert(lambda: signer3.send_transaction(
+        user1, registry.contract_address, 'update_registry', [1, 1, 0]))
+    assert_revert(lambda: signer3.send_transaction(
+        user1, registry.contract_address, 'update_registry', [2, 1, 1]))

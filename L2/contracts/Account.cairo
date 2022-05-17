@@ -1,12 +1,13 @@
 %lang starknet
-%builtins pedersen range_check ecdsa
+%builtins pedersen range_check ecdsa bitwise
 
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
+from starkware.cairo.common.bitwise import bitwise_and
 from starkware.starknet.common.syscalls import get_contract_address
 from starkware.cairo.common.signature import verify_ecdsa_signature
-from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
+from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin, BitwiseBuiltin
 from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_signature
 from starkware.cairo.common.hash_state import (
     hash_init,
@@ -62,7 +63,28 @@ end
 # status 2: executed
 # status 3: close partial
 # status 4: close
+# status 5: toBeLiquidated
 struct OrderDetails:
+    member assetID : felt
+    member collateralID : felt
+    member price : felt
+    member executionPrice : felt
+    member positionSize : felt
+    member orderType : felt
+    member direction : felt
+    member portionExecuted : felt
+    member status : felt
+    member marginAmount : felt
+    member borrowedAmount : felt
+end
+
+# status 0: initialized
+# status 1: partial
+# status 2: executed
+# status 3: close partial
+# status 4: close
+struct OrderDetailsWithIDs:
+    member orderID : felt
     member assetID : felt
     member collateralID : felt
     member price : felt
@@ -96,6 +118,11 @@ struct Asset:
     member incremental_position_size : felt
     member baseline_position_size : felt
     member maximum_position_size : felt
+end
+
+struct CollateralBalance:
+    member assetID : felt
+    member balance : felt
 end
 
 #
@@ -135,6 +162,25 @@ end
 func asset_contract_address() -> (res : felt):
 end
 
+# Store positions to facilitate liquidation request
+@storage_var
+func position_array(index : felt) -> (position_id : felt):
+end
+
+# Stores all collaterals held by the user
+@storage_var
+func collateral_array(index : felt) -> (collateral_id : felt):
+end
+
+# Length of the position array
+@storage_var
+func position_array_len() -> (len : felt):
+end
+
+# Length of the collateral array
+@storage_var
+func collateral_array_len() -> (len : felt):
+end
 #
 # Guards
 #
@@ -404,7 +450,159 @@ func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 ):
     let (curr_balance) = get_balance(assetID_)
     balance.write(assetID=assetID_, value=curr_balance + amount)
+    let (array_len) = collateral_array_len.read()
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
+    if curr_balance == 0:
+        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
     return ()
+end
+
+# @notice Internal function to add a position to the array when it is opened
+# @param id_ - OrderRequest Id to be added
+# @returns 1 - If successfully added
+func add_to_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    id_ : felt
+) -> (res : felt):
+    let (arr_len) = position_array_len.read()
+    position_array.write(index=arr_len, value=id_)
+    position_array_len.write(arr_len + 1)
+    return (1)
+end
+
+# @notice External function called to remove a fully closed position
+# @param id_ - Index of the element in the array
+# @returns 1 - If successfully removed
+func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    id_ : felt
+) -> (res : felt):
+    alloc_locals
+
+    let (pos_id) = position_array.read(index=id_)
+    if pos_id == 0:
+        with_attr error_message("No order exists in that index"):
+            assert 1 = 0
+        end
+    end
+
+    let (posDetails : OrderDetails) = order_mapping.read(orderID=pos_id)
+
+    with_attr error_message("The order is not fully closed yet."):
+        assert posDetails.status = 4
+    end
+
+    let (arr_len) = position_array_len.read()
+    let (last_id) = position_array.read(index=arr_len - 1)
+
+    position_array.write(index=id_, value=last_id)
+    position_array.write(index=arr_len - 1, value=0)
+
+    position_array_len.write(arr_len - 1)
+    return (1)
+end
+
+# @notice Internal Function called by return array to recursively add positions to the array and return it
+# @param iterator - Index of the position_array currently pointing to
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of OrderRequests filled up to the index
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of OrderDetails
+func populate_array_positions{
+    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*) -> (
+    array_list_len : felt, array_list : OrderDetailsWithIDs*
+):
+    alloc_locals
+    let (pos) = position_array.read(index=iterator)
+
+    if pos == 0:
+        return (array_list_len, array_list)
+    end
+
+    let (pos_deets : OrderDetails) = order_mapping.read(orderID=pos)
+    let order_details_w_id = OrderDetailsWithIDs(
+        orderID=pos,
+        assetID=pos_deets.assetID,
+        collateralID=pos_deets.collateralID,
+        price=pos_deets.price,
+        executionPrice=pos_deets.executionPrice,
+        positionSize=pos_deets.positionSize,
+        orderType=pos_deets.orderType,
+        direction=pos_deets.direction,
+        portionExecuted=pos_deets.portionExecuted,
+        status=pos_deets.status,
+        marginAmount=pos_deets.marginAmount,
+        borrowedAmount=pos_deets.borrowedAmount,
+    )
+
+    let (is_valid_state) = is_le(pos_deets.status, 3)
+
+    if is_valid_state == 1:
+        assert array_list[array_list_len] = order_details_w_id
+        return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
+    else:
+        return populate_array_positions(iterator + 1, array_list_len, array_list)
+    end
+end
+
+# @notice Function to get all the open positions
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of OrderDetails
+@view
+func return_array_positions{
+    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}() -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    alloc_locals
+
+    let (array_list : OrderDetailsWithIDs*) = alloc()
+    return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
+end
+
+# @notice Internal Function called by return_array_collaterals to recursively add collateralBalance to the array and return it
+# @param iterator - Index of the position_array currently pointing to
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of CollateralBalance filled up to the index
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of CollateralBalance
+func populate_array_collaterals{
+    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(array_list_len : felt, array_list : CollateralBalance*) -> (
+    array_list_len : felt, array_list : CollateralBalance*
+):
+    alloc_locals
+    let (collateral_id) = collateral_array.read(index=array_list_len)
+
+    if collateral_id == 0:
+        return (array_list_len, array_list)
+    end
+
+    let (collateral_balance : felt) = balance.read(assetID=collateral_id)
+    let collateral_balance_struct = CollateralBalance(
+        assetID=collateral_id, balance=collateral_balance
+    )
+
+    assert array_list[array_list_len] = collateral_balance_struct
+    return populate_array_collaterals(array_list_len + 1, array_list)
+end
+
+# @notice Function to get all use collaterals
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of CollateralBalance
+@view
+func return_array_collaterals{
+    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}() -> (array_list_len : felt, array_list : CollateralBalance*):
+    alloc_locals
+
+    let (array_list : CollateralBalance*) = alloc()
+    return populate_array_collaterals(array_list_len=0, array_list=array_list)
 end
 
 # @notice Function to hash the order parameters
@@ -494,6 +692,11 @@ func execute_order{
             )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=new_order)
+
+            let (arr_len) = position_array_len.read()
+            position_array.write(index=arr_len, value=request.orderID)
+            position_array_len.write(arr_len + 1)
+
             tempvar syscall_ptr : felt* = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
@@ -678,6 +881,67 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     # Compute and update the new balance.
     tempvar new_balance = res + amount_in_decimal_representation
     balance.write(assetID=assetID_, value=new_balance)
+
+    let (array_len) = collateral_array_len.read()
+    let (balance_collateral) = balance.read(assetID=assetID_)
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
+    if balance_collateral == 0:
+        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
+    return ()
+end
+
+func add_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    new_asset_id : felt, iterator : felt, length : felt
+):
+    alloc_locals
+    if iterator == length:
+        collateral_array.write(index=iterator, value=new_asset_id)
+        collateral_array_len.write(iterator + 1)
+        return ()
+    end
+
+    let (collateral_id) = collateral_array.read(index=iterator)
+    local difference = collateral_id - new_asset_id
+    if difference == 0:
+        return ()
+    end
+
+    return add_collateral(new_asset_id=new_asset_id, iterator=iterator + 1, length=length)
+end
+
+# @notice Function called by liquidate contract to mark the position as liquidated
+# @param id - Order Id of the position to be marked
+@external
+func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    id : felt
+):
+    let (orderDetails : OrderDetails) = order_mapping.read(orderID=id)
+
+    # Create a new struct with the updated details
+    let updated_order = OrderDetails(
+        assetID=orderDetails.assetID,
+        collateralID=orderDetails.collateralID,
+        price=orderDetails.price,
+        executionPrice=orderDetails.executionPrice,
+        positionSize=orderDetails.positionSize,
+        orderType=orderDetails.orderType,
+        direction=orderDetails.direction,
+        portionExecuted=orderDetails.portionExecuted,
+        status=5,
+        marginAmount=orderDetails.marginAmount,
+        borrowedAmount=orderDetails.borrowedAmount,
+    )
+
+    # Write to the mapping
+    order_mapping.write(orderID=id, value=updated_order)
 
     return ()
 end

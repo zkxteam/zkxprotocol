@@ -14,11 +14,13 @@ PRIME = 361850278866613121369732278309507010562310721533159669997309205613587202
 PRIME_HALF = PRIME/2
 PI = 7244019458077122842
 
+
 def from64x61(num):
     res = num
     if num > PRIME_HALF:
         res = res - PRIME
     return res / SCALE
+
 
 def to64x61(num):
     res = num * SCALE
@@ -102,7 +104,7 @@ def hash_message(sender, to, selector, calldata, nonce):
 
 
 def hash_order(order_id, ticker, collateral, price, orderType, position, direction, closeOrder, leverage):
-    order = [ 
+    order = [
         order_id,
         ticker,
         collateral,
@@ -122,5 +124,3 @@ def convertList(res_list):
     conv_list.append(res_list[7])
 
     return conv_list
-
-to64x61(0)
