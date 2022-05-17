@@ -56,7 +56,7 @@ end
 
 # @notice Stores the address of AdminAuth contract
 @storage_var
-func auth_address() -> (contract_address : felt):
+func auth_registry() -> (contract_address : felt):
 end
 
 # @notice Address of the asset contract
@@ -67,7 +67,7 @@ end
 #################
 # To be removed #
 @storage_var
-func maintanence() -> (maintanence : felt):
+func maintenance() -> (maintenance : felt):
 end
 
 @storage_var
@@ -84,9 +84,9 @@ end
 # @param _asset_address - Address of the asset contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _auth_address : felt, _asset_address : felt
+    _auth_registry : felt, _asset_address : felt
 ):
-    auth_address.write(_auth_address)
+    auth_registry.write(_auth_registry)
     asset_address.write(_asset_address)
     return ()
 end
@@ -94,11 +94,11 @@ end
 ####################
 # To be removed    #
 @view
-func return_maintanence{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+func return_maintenance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     res : felt
 ):
-    let (_maintanence) = maintanence.read()
-    return (res=_maintanence)
+    let (_maintenance) = maintenance.read()
+    return (res=_maintenance)
 end
 
 @view
@@ -178,7 +178,7 @@ end
 # @param prices_len - Length of the prices array
 # @param prices - Array with all the price details
 # @param total_account_value - Collateral value - borrowed value + positionSize * price
-# @param total_maintanence_requirement - maintanence ratio of the asset * value of the position when executed
+# @param total_maintenance_requirement - maintenance ratio of the asset * value of the position when executed
 # @param least_collateral_ratio - The least collateral ratio among the positions
 # @param least_collateral_ratio_position - The positionID of the postion which is having the least collateral ratio
 # @returns is_liquidation - 1 if positions are marked to be liquidated
@@ -190,7 +190,7 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     prices_len : felt,
     prices : PriceData*,
     total_account_value : felt,
-    total_maintanence_requirement : felt,
+    total_maintenance_requirement : felt,
     least_collateral_ratio : felt,
     least_collateral_ratio_position : felt,
 ) -> (is_liquidation, least_collateral_ratio_position : felt):
@@ -218,12 +218,12 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 
         # # To Remove
         # ######################
-        maintanence.write(total_maintanence_requirement)
+        maintenance.write(total_maintenance_requirement)
         acc_value.write(total_account_value_collateral)
         # ######################
 
-        # Check if the maintanence margin is not satisfied
-        let (is_liquidation) = is_le(total_account_value_collateral, total_maintanence_requirement)
+        # Check if the maintenance margin is not satisfied
+        let (is_liquidation) = is_le(total_account_value_collateral, total_maintenance_requirement)
 
         # Return if the account should be liquidated or not and the orderId of the least colalteralized position
         return (is_liquidation, least_collateral_ratio_position)
@@ -267,17 +267,17 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 
     # Fetch the maintatanence margin requirement from asset contract
     let (asset_contract) = asset_address.read()
-    let (req_margin) = IAsset.get_maintanence_margin(
+    let (req_margin) = IAsset.get_maintenance_margin(
         contract_address=asset_contract, id=order_details.assetID
     )
 
     # Calculate the required margin in usd
     local total_value = order_details.marginAmount + order_details.borrowedAmount
     let (average_execution_price : felt) = div_fp(total_value, order_details.portionExecuted)
-    let (maintanence_position) = mul_fp(average_execution_price, order_details.portionExecuted)
-    let (maintanence_requirement) = mul_fp(req_margin, maintanence_position)
-    let (maintanence_requirement_usd) = mul_fp(
-        maintanence_requirement, price_details.collateralPrice
+    let (maintenance_position) = mul_fp(average_execution_price, order_details.portionExecuted)
+    let (maintenance_requirement) = mul_fp(req_margin, maintenance_position)
+    let (maintenance_requirement_usd) = mul_fp(
+        maintenance_requirement, price_details.collateralPrice
     )
 
     # Calculate pnl to check if it is the least collateralized position
@@ -293,7 +293,7 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     let (pnl) = mul_fp(price_diff_, order_details.portionExecuted)
 
     # Calculate the value of the current account margin in usd
-    local position_value = maintanence_position - order_details.borrowedAmount + pnl
+    local position_value = maintenance_position - order_details.borrowedAmount + pnl
     let (net_position_value_usd : felt) = mul_fp(position_value, price_details.collateralPrice)
 
     # Margin ratio calculation
@@ -322,7 +322,7 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         prices_len=prices_len - 1,
         prices=prices + PriceData.SIZE,
         total_account_value=total_account_value + net_position_value_usd,
-        total_maintanence_requirement=total_maintanence_requirement + maintanence_requirement_usd,
+        total_maintenance_requirement=total_maintenance_requirement + maintenance_requirement_usd,
         least_collateral_ratio=least_collateral_ratio_,
         least_collateral_ratio_position=least_collateral_ratio_position_,
     )
@@ -338,6 +338,18 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     account_address : felt, prices_len : felt, prices : PriceData*
 ) -> (liq_result : felt, least_collateral_ratio_position : felt):
     alloc_locals
+
+    # Check if the caller is the liquidator contract
+    let (caller) = get_caller_address()
+    let (authorized_registry) = auth_registry.read()
+
+    let (is_liquidator) = IAuthorizedRegistry.get_registry_value(
+        contract_address=authorized_registry, address=caller, action=4
+    )
+
+    with_attr error_message("Only liquidator is allowed to call for liquidation"):
+        assert is_liquidator = 1
+    end
 
     # Check if the list is empty
     with_attr error_message("Invalid Input"):
@@ -362,7 +374,7 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         prices_len=prices_len,
         prices=prices,
         total_account_value=0,
-        total_maintanence_requirement=0,
+        total_maintenance_requirement=0,
         least_collateral_ratio=2305843009213693952,
         least_collateral_ratio_position=0,
     )
@@ -400,15 +412,15 @@ namespace IAccount:
     end
 end
 
-# @notice AdminAuth interface
 @contract_interface
-namespace IAdminAuth:
-    func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
+namespace IAsset:
+    func get_maintenance_margin(id : felt) -> (maintenance_margin : felt):
     end
 end
 
+# @notice AuthorizedRegistry interface
 @contract_interface
-namespace IAsset:
-    func get_maintanence_margin(id : felt) -> (maintanence_margin : felt):
+namespace IAuthorizedRegistry:
+    func get_registry_value(address : felt, action : felt) -> (allowed : felt):
     end
 end

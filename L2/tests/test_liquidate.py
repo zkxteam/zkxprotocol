@@ -11,7 +11,7 @@ admin2_signer = Signer(123456789987654322)
 alice_signer = Signer(123456789987654323)
 bob_signer = Signer(123456789987654324)
 charlie_signer = Signer(123456789987654325)
-dave_signer = Signer(123456789987654326)
+liquidator_signer = Signer(123456789987654326)
 
 long_trading_fees = to64x61(0.012)
 short_trading_fees = to64x61(0.008)
@@ -107,10 +107,10 @@ async def adminAuth_factory():
         ]
     )
 
-    dave = await starknet.deploy(
+    liquidator = await starknet.deploy(
         "contracts/Account.cairo",
         constructor_calldata=[
-            dave_signer.public_key,
+            liquidator_signer.public_key,
             registry.contract_address
         ]
     )
@@ -161,7 +161,7 @@ async def adminAuth_factory():
     liquidate = await starknet.deploy(
         "contracts/Liquidate.cairo",
         constructor_calldata=[
-            adminAuth.contract_address,
+            registry.contract_address,
             asset.contract_address
         ]
     )
@@ -183,6 +183,7 @@ async def adminAuth_factory():
 
     # Add the deployed trading contract to the list of trusted contracts in the registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [trading.contract_address, 3, 1])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [liquidator.contract_address, 4, 1])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
@@ -204,12 +205,12 @@ async def adminAuth_factory():
     # Set the balance of admin1 and admin2
     await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
     await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
-    return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, liquidate
+    return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate
 
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, liquidate = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate = adminAuth_factory
 
     alice_usdc = to64x61(5500)
     alice_ust = to64x61(1000)
@@ -257,7 +258,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+    res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
         size,
         execution_price1,
         marketID_1,
@@ -316,7 +317,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     ######## Alice's liquidation result 1 ##########
     ##############################################
 
-    liquidate_result_alice = await dave_signer.send_transaction(dave, liquidate.contract_address, "check_liquidation", [
+    liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
         alice.contract_address,
         # 1 Position + 2 Collaterals
         3,
@@ -351,11 +352,11 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    alice_maintanence = await liquidate.return_maintanence().call()
-    print("Alice maintanence requirement:",
-          from64x61(alice_maintanence.result.res))
+    alice_maintenance = await liquidate.return_maintenance().call()
+    print("Alice maintenance requirement:",
+          from64x61(alice_maintenance.result.res))
 
-    assert from64x61(alice_maintanence.result.res) == 787.5
+    assert from64x61(alice_maintenance.result.res) == 787.5
 
     alice_acc_value = await liquidate.return_acc_value().call()
     print("Alice acc value:", from64x61(alice_acc_value.result.res))
@@ -366,7 +367,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     ######## Bob's liquidation result 1 ##########
     ##############################################
 
-    liquidate_result_bob = await dave_signer.send_transaction(dave, liquidate.contract_address, "check_liquidation", [
+    liquidate_result_bob = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
         bob.contract_address,
         # 1 Position + 2 Collaterals
         3,
@@ -403,11 +404,11 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(bob_balance_ust.result.res) == 5500
 
-    bob_maintanence = await liquidate.return_maintanence().call()
-    print("Bob maintanence requirement:",
-          from64x61(bob_maintanence.result.res))
+    bob_maintenance = await liquidate.return_maintenance().call()
+    print("Bob maintenance requirement:",
+          from64x61(bob_maintenance.result.res))
 
-    assert from64x61(bob_maintanence.result.res) == 787.5
+    assert from64x61(bob_maintenance.result.res) == 787.5
 
     bob_acc_value = await liquidate.return_acc_value().call()
     print("bob acc value:", from64x61(bob_acc_value.result.res))
@@ -450,7 +451,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     signed_message3 = alice_signer.sign(hash_computed3)
     signed_message4 = bob_signer.sign(hash_computed4)
 
-    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+    res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
         size2,
         execution_price2,
         marketID_2,
@@ -509,7 +510,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     ######## Alice's liquidation result 2 ##########
     ##############################################
 
-    liquidate_result_alice = await dave_signer.send_transaction(dave, liquidate.contract_address, "check_liquidation", [
+    liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
         alice.contract_address,
         # 2 Position + 2 Collaterals
         4,
@@ -550,11 +551,11 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    alice_maintanence = await liquidate.return_maintanence().call()
-    print("Alice maintanence requirement:",
-          from64x61(alice_maintanence.result.res))
+    alice_maintenance = await liquidate.return_maintenance().call()
+    print("Alice maintenance requirement:",
+          from64x61(alice_maintenance.result.res))
 
-    assert from64x61(alice_maintanence.result.res) == 811.125
+    assert from64x61(alice_maintenance.result.res) == 811.125
 
     alice_acc_value = await liquidate.return_acc_value().call()
     print("Alice acc value:", from64x61(alice_acc_value.result.res))
@@ -564,7 +565,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     ##############################################
     ######## Bob's liquidation result 2 ##########
     ##############################################
-    liquidate_result_bob = await dave_signer.send_transaction(dave, liquidate.contract_address, "check_liquidation", [
+    liquidate_result_bob = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
         bob.contract_address,
         # 2 Position + 2 Collaterals
         4,
@@ -606,11 +607,11 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(bob_balance_ust.result.res) == 5500
 
-    bob_maintanence = await liquidate.return_maintanence().call()
-    print("Bob maintanence requirement:",
-          from64x61(bob_maintanence.result.res))
+    bob_maintenance = await liquidate.return_maintenance().call()
+    print("Bob maintenance requirement:",
+          from64x61(bob_maintenance.result.res))
 
-    assert from64x61(bob_maintanence.result.res) == 811.125
+    assert from64x61(bob_maintenance.result.res) == 811.125
 
     bob_acc_value = await liquidate.return_acc_value().call()
     print("bob acc value:", from64x61(bob_acc_value.result.res))
@@ -620,12 +621,12 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, liquidate = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate = adminAuth_factory
     ##############################################
     ######## Alice's liquidation result 3 ##########
     ##############################################
 
-    liquidate_result_alice = await dave_signer.send_transaction(dave, liquidate.contract_address, "check_liquidation", [
+    liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
         alice.contract_address,
         # 2 Position + 2 Collaterals
         4,
@@ -667,11 +668,11 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    alice_maintanence = await liquidate.return_maintanence().call()
-    print("Alice maintanence requirement:",
-          from64x61(alice_maintanence.result.res))
+    alice_maintenance = await liquidate.return_maintenance().call()
+    print("Alice maintenance requirement:",
+          from64x61(alice_maintenance.result.res))
 
-    assert from64x61(alice_maintanence.result.res) == 811.125
+    assert from64x61(alice_maintenance.result.res) == 811.125
 
     alice_acc_value = await liquidate.return_acc_value().call()
     print("Alice acc value:", from64x61(alice_acc_value.result.res))
@@ -682,3 +683,40 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
     res4 = list(order_state.result.res)
 
     print(res4)
+
+
+@pytest.mark.asyncio
+async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate = adminAuth_factory
+    ##############################################
+    ######## Bob's liquidation result 3 ##########
+    ##############################################
+
+    ##############################################
+    ######## Bob's liquidation result 2 ##########
+    ##############################################
+    assert_revert(lambda: charlie_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+        bob.contract_address,
+        # 2 Position + 2 Collaterals
+        4,
+        # Position 1 - BTC long
+        BTC_ID,
+        USDC_ID,
+        to64x61(6000),
+        to64x61(1.05),
+        # Position 2 - ETH long
+        ETH_ID,
+        USDC_ID,
+        to64x61(86),
+        to64x61(1.05),
+        # Collateral 1 - USDC
+        0,
+        USDC_ID,
+        0,
+        to64x61(1.05),
+        # Collateral 2 - UST
+        0,
+        UST_ID,
+        0,
+        to64x61(0.05)
+    ]))
