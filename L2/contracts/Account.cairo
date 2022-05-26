@@ -526,23 +526,23 @@ func populate_array_positions{
         return (array_list_len, array_list)
     end
 
-    let (pos_deets : OrderDetails) = order_mapping.read(orderID=pos)
+    let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
     let order_details_w_id = OrderDetailsWithIDs(
         orderID=pos,
-        assetID=pos_deets.assetID,
-        collateralID=pos_deets.collateralID,
-        price=pos_deets.price,
-        executionPrice=pos_deets.executionPrice,
-        positionSize=pos_deets.positionSize,
-        orderType=pos_deets.orderType,
-        direction=pos_deets.direction,
-        portionExecuted=pos_deets.portionExecuted,
-        status=pos_deets.status,
-        marginAmount=pos_deets.marginAmount,
-        borrowedAmount=pos_deets.borrowedAmount,
+        assetID=pos_details.assetID,
+        collateralID=pos_details.collateralID,
+        price=pos_details.price,
+        executionPrice=pos_details.executionPrice,
+        positionSize=pos_details.positionSize,
+        orderType=pos_details.orderType,
+        direction=pos_details.direction,
+        portionExecuted=pos_details.portionExecuted,
+        status=pos_details.status,
+        marginAmount=pos_details.marginAmount,
+        borrowedAmount=pos_details.borrowedAmount,
     )
 
-    let (is_valid_state) = is_le(pos_deets.status, 3)
+    let (is_valid_state) = is_le(pos_details.status, 3)
 
     if is_valid_state == 1:
         assert array_list[array_list_len] = order_details_w_id
@@ -630,7 +630,7 @@ end
 # @returns 1, if executed correctly
 @external
 func execute_order{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ecdsa_ptr : SignatureBuiltin*, range_check_ptr
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
 }(
     request : OrderRequest,
     signature : Signature,
@@ -638,6 +638,8 @@ func execute_order{
     execution_price : felt,
     margin_amount : felt,
     borrowed_amount : felt,
+    is_liquidation : felt,
+    liquidator_address : felt,
 ) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
@@ -656,8 +658,15 @@ func execute_order{
     # hash the parameters
     let (hash) = hash_order(&request)
 
-    # check the validity of the signature
-    is_valid_signature_order(hash, signature)
+    if is_liquidation == 0:
+        # check the validity of the signature
+        is_valid_signature_order(hash, signature)
+        tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
+    else:
+        # check the validity of the signature of the liquidator
+        is_valid_signature_order_liquidation(hash, signature, liquidator_address)
+        tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
+    end
 
     local status_
     # closeOrder == 0 -> Open a new position
@@ -696,10 +705,10 @@ func execute_order{
             let (arr_len) = position_array_len.read()
             position_array.write(index=arr_len, value=request.orderID)
             position_array_len.write(arr_len + 1)
-
-            tempvar syscall_ptr : felt* = syscall_ptr
+            tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
+            tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
             # If it's an existing order
         else:
             # Return if the position size after the executing the current order is more than the order's positionSize
@@ -735,10 +744,15 @@ func execute_order{
             )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=updated_order)
-            tempvar syscall_ptr : felt* = syscall_ptr
+            tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
+            tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
         end
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+        tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     else:
         # Get the order details
         let (orderDetails) = order_mapping.read(orderID=request.parentOrder)
@@ -776,12 +790,11 @@ func execute_order{
 
         # Write to the mapping
         order_mapping.write(orderID=request.parentOrder, value=updated_order)
-
-        tempvar syscall_ptr : felt* = syscall_ptr
+        tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
+        tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     end
-
     return (1)
 end
 
@@ -794,6 +807,33 @@ func is_valid_signature_order{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
 }(hash : felt, signature : Signature) -> ():
     let (_public_key) = public_key.read()
+    let sig_r = signature.r_value
+    let sig_s = signature.s_value
+
+    verify_ecdsa_signature(
+        message=hash, public_key=_public_key, signature_r=sig_r, signature_s=sig_s
+    )
+
+    return ()
+end
+
+# @notice view function which checks the signature passed is valid
+# @param hash - Hash of the order to check against
+# @param signature - Signature passed to the contract to check against
+# @returns reverts, if there is an error
+@view
+func is_valid_signature_order_liquidation{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
+}(hash : felt, signature : Signature, liquidator : felt) -> ():
+    let (is_authorized) = IAuthorizedRegistry.get_registry_value(
+        contract_address=liquidator, address=liquidator, action=4
+    )
+
+    with_attr error_message("The signer is not a authorized liquidator"):
+        assert is_authorized = 1
+    end
+
+    let (_public_key) = IAccount.get_public_key(contract_address=liquidator)
     let sig_r = signature.r_value
     let sig_s = signature.s_value
 
@@ -957,5 +997,12 @@ end
 @contract_interface
 namespace IAsset:
     func getAsset(id : felt) -> (currAsset : Asset):
+    end
+end
+
+# @notice Account interface
+@contract_interface
+namespace IAccount:
+    func get_public_key() -> (res : felt):
     end
 end
