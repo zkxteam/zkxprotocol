@@ -261,11 +261,11 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         contract_address=temp_order.pub_key, order_ID=temp_order.orderID
     )
 
+    let margin_amount = order_details.marginAmount
+    let borrowed_amount = order_details.borrowedAmount
+
     if temp_order.closeOrder == 0:
         # If the order is to be opened
-        
-        let margin_amount = order_details.marginAmount
-        let borrowed_amount = order_details.borrowedAmount
 
         let (leveraged_position_value) = mul_fp(order_size, execution_price)
         let (total_position_value) = div_fp(leveraged_position_value, temp_order.leverage)
@@ -347,9 +347,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         end
 
         local actual_execution_price
-
-        let margin_amount = order_details.marginAmount
-        let borrowed_amount = order_details.borrowedAmount
 
         # current order is short order
         if temp_order.direction == 0:
