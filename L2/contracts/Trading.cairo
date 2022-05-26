@@ -256,14 +256,14 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
     end
 
+    # Get order details
+    let (order_details : OrderDetails) = IAccount.get_order_data(
+        contract_address=temp_order.pub_key, order_ID=temp_order.orderID
+    )
+
     if temp_order.closeOrder == 0:
         # If the order is to be opened
-        let (contract_address) = get_contract_address()
-
-        # Get order details
-        let (order_details : OrderDetails) = IAccount.get_order_data(
-            contract_address=temp_order.pub_key, order_ID=temp_order.orderID
-        )
+        
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
 
@@ -348,10 +348,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         local actual_execution_price
 
-        # Get order details
-        let (order_details : OrderDetails) = IAccount.get_order_data(
-            contract_address=temp_order.pub_key, order_ID=temp_order.parentOrder
-        )
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
 
