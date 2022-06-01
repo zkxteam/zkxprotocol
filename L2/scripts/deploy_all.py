@@ -36,7 +36,7 @@ def deploy_all():
     fees = deploy_command("TradingFees", arguments_list_str, network, "TradingFees")
 
     # Deploy Asset Contract
-    asset = deploy_command("Asset", [admin_auth], network, "Asset")
+    asset = deploy_command("Asset", [admin_auth, admin_auth], network, "Asset")
 
     # Deploy Market Contract
     market = deploy_command("Markets", [admin_auth, asset], network, "Markets")
@@ -50,10 +50,16 @@ def deploy_all():
     # Deploy Emergency Fund Contract
     emergencyFund = deploy_command("EmergencyFund", [admin_auth, holding], network, "EmergencyFund")
 
+    # Deploy Liquidity fund Contract
+    liquidityFund = deploy_command("LiquidityFund", [admin_auth], network, "LiquidityFund")
+
     # Deploy Trading Contract
-    trading = deploy_command("Trading", [asset, fees, holding, feeBalance, market], network, "Trading")
+    trading = deploy_command("Trading", [asset, fees, holding, feeBalance, market, liquidityFund], network, "Trading")
 
     #Deploy Registry Contract
     registry = deploy_command("AuthorizedRegistry", [admin_auth], network, "AuthorizedRegistry")
+
+    #Deploy Liquidate Contract
+    liquidate = deploy_command("Liquidate", [registry, asset], network, "Liquidate")
 
 deploy_all()
