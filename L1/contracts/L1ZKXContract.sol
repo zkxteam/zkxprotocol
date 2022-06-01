@@ -97,8 +97,8 @@ contract L1ZKXContract is AccessControl{
 
     /**
      * @dev function to remove asset from list in L1
-     * @param ticker - The asset that needs to be added to the list
-     * @param  assetId - Id of the asset created
+     * @param ticker - The asset that needs to be removed from the list
+     * @param  assetId - Id of the asset to be removed
      **/
     function removeAssetFromList (uint256 ticker,
         uint256 assetId) public onlyRole(DEFAULT_ADMIN_ROLE) {
