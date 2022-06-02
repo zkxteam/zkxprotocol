@@ -8,9 +8,9 @@ signer3 = Signer(123456789987654323)
 
 long_trading_fees = 12
 short_trading_fees = 8
-tier1_details = [0, 0, 1]
-tier2_details = [100, 100, 3]
-tier3_details = [500, 500, 4]
+tier1_details = [100, 1]
+tier2_details = [500, 3]
+tier3_details = [2000, 4]
 trade1_access = [1, 0, 0]
 trade2_access = [1, 1, 0]
 trade3_access = [1, 1, 1]
@@ -34,9 +34,12 @@ def deploy_all():
 
     #Deploy Registry Contract
     registry = deploy_command("AuthorizedRegistry", [admin_auth], network, "AuthorizedRegistry")
+
+    # Deploy the Fee Discount Contract
+    feeDiscount = deploy_command("FeeDiscount", [], network, "FeeDiscount")
     
     # Deploy the Trading fees Contract
-    fees = deploy_command("TradingFees", arguments_list_str, network, "TradingFees")
+    fees = deploy_command("TradingFees", [admin_auth, feeDiscount], network, "TradingFees")
 
     # Deploy Asset Contract
     asset = deploy_command("Asset", [registry, 1], network, "Asset")
@@ -58,6 +61,9 @@ def deploy_all():
 
     # Deploy Liquidity Fund Contract
     liquidityFund = deploy_command("LiquidityFund", [registry, 1], network, "LiquidityFund")
+
+    # Deploy Liquidity fund Contract
+    liquidityFund = deploy_command("LiquidityFund", [admin_auth], network, "LiquidityFund")
 
     # Deploy Liquidity fund Contract
     liquidityFund = deploy_command("LiquidityFund", [admin_auth], network, "LiquidityFund")

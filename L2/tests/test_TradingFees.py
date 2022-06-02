@@ -9,10 +9,6 @@ signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
 signer3 = Signer(123456789987654323)
 
-long_trading_fees = 12
-short_trading_fees = 8
-
-
 @pytest.fixture(scope='module')
 def event_loop():
     return asyncio.new_event_loop()
@@ -44,145 +40,146 @@ async def adminAuth_factory():
         ]
     )
 
+    feeDiscount = await starknet.deploy(
+        "contracts/FeeDiscount.cairo",
+        constructor_calldata=[]
+    )
+
     fees = await starknet.deploy(
         "contracts/TradingFees.cairo",
         constructor_calldata=[
-            long_trading_fees,
-            short_trading_fees,
             adminAuth.contract_address,
-            0, 0, 1,
-            100, 100, 3,
-            500, 500, 4,
-            1, 0, 0,
-            1, 1, 0,
-            1, 1, 1
+            feeDiscount.contract_address
         ]
     )
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
 
-    return adminAuth, fees, admin1, admin2, user1
+    await signer1.send_transaction(admin1, feeDiscount.contract_address, 'add_user_tokens', [user1.contract_address, 100])
+
+    return adminAuth, fees, admin1, admin2, user1, feeDiscount
 
 
 @pytest.mark.asyncio
 async def test_get_admin_mapping(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    execution_info = await adminAuth.get_admin_mapping(admin1.contract_address, 2).call()
+    execution_info = await adminAuth.get_admin_mapping(admin1.contract_address, 4).call()
     assert execution_info.result.allowed == 1
 
-    execution_info1 = await adminAuth.get_admin_mapping(admin2.contract_address, 2).call()
+    execution_info1 = await adminAuth.get_admin_mapping(admin2.contract_address, 4).call()
     assert execution_info1.result.allowed == 0
 
-
-@pytest.mark.asyncio
-async def test_modify_tier_by_admin(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, user1 = adminAuth_factory
-
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_tier_criteria', [1, 10, 10, 2])
-
-    execution_info = await fees.get_tier_criteria(1).call()
-    result = execution_info.result.tier_criteria_curr
-
-    assert result.min_balance == 10
-    assert result.min_trading_vol == 10
-    assert result.discount == 2
-
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_tier_criteria', [2, 110, 110, 3])
-
-    execution_info = await fees.get_tier_criteria(2).call()
-    result = execution_info.result.tier_criteria_curr
-
-    assert result.min_balance == 110
-    assert result.min_trading_vol == 110
-    assert result.discount == 3
-
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_tier_criteria', [3, 600, 600, 6])
-
-    execution_info = await fees.get_tier_criteria(3).call()
-    result = execution_info.result.tier_criteria_curr
-
-    assert result.min_balance == 600
-    assert result.min_trading_vol == 600
-    assert result.discount == 6
+    execution_info2 = await feeDiscount.get_user_tokens(user1.contract_address).call()
+    assert execution_info2.result.value == 100
 
 
 @pytest.mark.asyncio
-async def test_modify_tier_by_user(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, user1 = adminAuth_factory
+async def test_update_base_fees(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    assert_revert(lambda: signer3.send_transaction(
-        user1, fees.contract_address, 'update_tier_criteria', [1, 10, 10, 2]))
+    await signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, 46116860184273880, 115292150460684704])
 
-    assert_revert(lambda: signer3.send_transaction(
-        user1, fees.contract_address, 'update_tier_criteria', [2, 110, 110, 3]))
+    execution_info = await fees.get_base_fees(1).call()
+    result = execution_info.result.base_fee
 
-    assert_revert(lambda: signer3.send_transaction(
-        user1, fees.contract_address, 'update_tier_criteria', [3, 600, 600, 5]))
+    assert result.numberOfTokens == 0
+    assert result.makerFee == 46116860184273880
+    assert result.takerFee == 115292150460684704
+
+    await signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 1000, 34587645138205408, 92233720368547760])
+
+    execution_info = await fees.get_base_fees(2).call()
+    result = execution_info.result.base_fee
+
+    assert result.numberOfTokens == 1000
+    assert result.makerFee == 34587645138205408
+    assert result.takerFee == 92233720368547760
+
+    await signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [3, 5000, 23058430092136940, 80704505322479296])
+
+    execution_info = await fees.get_base_fees(3).call()
+    result = execution_info.result.base_fee
+
+    assert result.numberOfTokens == 5000
+    assert result.makerFee == 23058430092136940
+    assert result.takerFee == 80704505322479296
 
 
 @pytest.mark.asyncio
-async def test_modify_base_fees(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, user1 = adminAuth_factory
+async def test_update_discount(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_fees', [13, 10])
+    await signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [1, 0, 6917529027641081856])
 
-    execution_info = await fees.get_fees().call()
+    execution_info = await fees.get_discount(1).call()
+    result = execution_info.result.discount
+
+    assert result.numberOfTokens == 0
+    assert result.discount == 6917529027641081856
+
+    await signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 1000, 11529215046068469760])
+
+    execution_info = await fees.get_discount(2).call()
+    result = execution_info.result.discount
+
+    assert result.numberOfTokens == 1000
+    assert result.discount == 11529215046068469760
+
+    await signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, 23058430092136939520])
+
+    execution_info = await fees.get_discount(3).call()
+    result = execution_info.result.discount
+
+    assert result.numberOfTokens == 5000
+    assert result.discount == 23058430092136939520
+
+@pytest.mark.asyncio
+async def test_get_fee_and_discount_tier1(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
+
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 0).call()
     result = execution_info.result
+    assert result.base_fee == 46116860184273880
+    assert result.discount == 6917529027641081856
 
-    assert result.long_fees == 13
-    assert result.short_fees == 10
-
-
-@pytest.mark.asyncio
-async def test_modify_base_fees_by_user(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, user1 = adminAuth_factory
-
-    assert_revert(lambda: signer3.send_transaction(
-        user1, fees.contract_address, 'update_fees', [13, 10]))
-
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
+    result = execution_info.result
+    assert result.base_fee == 115292150460684704
+    assert result.discount == 6917529027641081856
 
 @pytest.mark.asyncio
-async def test_modify_trade_access(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, user1 = adminAuth_factory
+async def test_get_fee_and_discount_tier2(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_trade_access', [1, 1, 1, 1])
+    await signer1.send_transaction(admin1, feeDiscount.contract_address, 'add_user_tokens', [user1.contract_address, 1000])
 
-    execution_info = await fees.get_trade_access(1).call()
-    result = execution_info.result.trade_access_curr
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 0).call()
+    result = execution_info.result
+    assert result.base_fee == 34587645138205408
+    assert result.discount == 11529215046068469760
 
-    assert result.market == 1
-    assert result.limit == 1
-    assert result.stop == 1
-
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_trade_access', [2, 1, 0, 1])
-
-    execution_info = await fees.get_trade_access(2).call()
-    result = execution_info.result.trade_access_curr
-
-    assert result.market == 1
-    assert result.limit == 0
-    assert result.stop == 1
-
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_trade_access', [3, 1, 0, 0])
-
-    execution_info = await fees.get_trade_access(3).call()
-    result = execution_info.result.trade_access_curr
-
-    assert result.market == 1
-    assert result.limit == 0
-    assert result.stop == 0
-
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
+    result = execution_info.result
+    assert result.base_fee == 92233720368547760
+    assert result.discount == 11529215046068469760
 
 @pytest.mark.asyncio
-async def test_modify_trade_access_by_user(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, user1 = adminAuth_factory
+async def test_update_max_base_fee_tier(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    assert_revert(lambda: signer3.send_transaction(
-        user1, fees.contract_address, 'update_trade_access', [1, 1, 1, 1]))
+    await signer1.send_transaction(admin1, fees.contract_address, 'update_max_base_fee_tier', [0])
 
-    assert_revert(lambda: signer3.send_transaction(
-        user1, fees.contract_address, 'update_trade_access', [2, 1, 1, 1]))
+    execution_info = await fees.get_max_base_fee_tier().call()
+    result = execution_info.result
+    assert result.value == 0
 
-    assert_revert(lambda: signer3.send_transaction(
-        user1, fees.contract_address, 'update_trade_access', [3, 0, 0, 1]))
+@pytest.mark.asyncio
+async def test_update_max_discount_tier(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
+
+    await signer1.send_transaction(admin1, fees.contract_address, 'update_max_discount_tier', [0])
+
+    execution_info = await fees.get_max_discount_tier().call()
+    result = execution_info.result
+    assert result.value == 0

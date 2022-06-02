@@ -4,6 +4,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math_cmp import is_le, is_nn
 from starkware.starknet.common.syscalls import get_caller_address
 
 # @notice Stores the address of AdminAuth contract
@@ -11,84 +12,62 @@ from starkware.starknet.common.syscalls import get_caller_address
 func auth_address() -> (contract_address : felt):
 end
 
-# @notice struct to store tier criteria
-struct Tier_Details:
-    member min_balance : felt
-    member min_trading_vol : felt
+# @notice Stores the address of FeeDiscount contract
+@storage_var
+func fee_discount_address() -> (contract_address : felt):
+end
+
+# @notice Stores the maximum base fee tier
+@storage_var
+func max_base_fee_tier() -> (value : felt):
+end
+
+# @notice Stores the maximum discount tier
+@storage_var
+func max_discount_tier() -> (value : felt):
+end
+
+# @notice Struct to store base fee percentage for each tier for maker and taker
+struct BaseFee:
+    member numberOfTokens : felt
+    member makerFee : felt
+    member takerFee : felt
+end
+
+# @notice Struct to store discount percentage for each tier
+struct Discount:
+    member numberOfTokens : felt
     member discount : felt
 end
 
-# @notice struct to store access to trading functionalities
-struct Trade_Details:
-    member market : felt
-    member limit : felt
-    member stop : felt
+# @notice Stores base fee percentage for each tier for maker and tker
+@storage_var
+func base_fee_tiers(tier : felt) -> (value : BaseFee):
 end
 
-# @notice Stores the base trading fees
-# long position = (0 => fees)
-# short position = (1 => fees)
+# @notice Stores discount percentage for each tier
 @storage_var
-func base_trading_fees(direction : felt) -> (values : felt):
-end
-
-# @notice Stores the criteria for assigning the user to a tier
-@storage_var
-func tier_criteria(tier_level : felt) -> (value : Tier_Details):
-end
-
-# @notice Stores the trading functionalities a tier user has access to
-@storage_var
-func trade_access(tier_level : felt) -> (value : Trade_Details):
+func discount_tiers(tier : felt) -> (value : Discount):
 end
 
 # @notice Constructor for the smart-contract
-# @param long_fees - Base fees for the long positions
-# @param short_fees - Base fees for the short positions
-# @param _authAddress - Address of the AdminAuth Contract
-# @param tier_details1 - Struct object to init tier level 1
-# @param tier_details2 - Struct object to init tier level 2
-# @param tier_details3 - Struct object to init tier level 3
-# @param trade_access1 - Struct object to init trade acccess for level 1
-# @param trade_access2 - Struct object to init trade acccess for level 2
-# @param trade_access3 - Struct object to init trade acccess for level 3
+# @param auth_address_ - Address of the AdminAuth Contract
+# @param fee_discount_address_ - Address of the FeeDiscount Contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    long_fees_new : felt,
-    short_fees_new : felt,
-    _authAddress : felt,
-    tier_details1 : Tier_Details,
-    tier_details2 : Tier_Details,
-    tier_details3 : Tier_Details,
-    trade_access1 : Trade_Details,
-    trade_access2 : Trade_Details,
-    trade_access3 : Trade_Details,
+    auth_address_ : felt, fee_discount_address_ : felt
 ):
-    # long position => 1.2
-    base_trading_fees.write(direction=0, value=long_fees_new)
-    # short position => 0.8
-    base_trading_fees.write(direction=1, value=short_fees_new)
-
-    # Set the tier criteria
-    tier_criteria.write(tier_level=1, value=tier_details1)
-    tier_criteria.write(tier_level=2, value=tier_details2)
-    tier_criteria.write(tier_level=3, value=tier_details3)
-
-    # Set the trade access for each criteria
-    trade_access.write(tier_level=1, value=trade_access1)
-    trade_access.write(tier_level=2, value=trade_access2)
-    trade_access.write(tier_level=3, value=trade_access3)
-
-    auth_address.write(value=_authAddress)
+    auth_address.write(value=auth_address_)
+    fee_discount_address.write(value=fee_discount_address_)
     return ()
 end
 
-# @notice Function to modify fees only callable by the admins with action access=2
-# @param long_fees_mod - New fees for the long positions
-# @param short_fees_mod - New fees for the short positions
+# @notice Function to update base fee details
+# @param tier_ - fee tier
+# @param fee_details - base fee for the current tier
 @external
-func update_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    long_fees_mod : felt, short_fees_mod : felt
+func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tier_ : felt, fee_details : BaseFee
 ):
     alloc_locals
     # Auth Check
@@ -98,19 +77,32 @@ func update_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
         contract_address=auth_addr, address=caller, action=4
     )
     assert_not_zero(access)
+
+    # Update max base fee tier if new tier is the biggest
+    let (current_max_base_fee_tier) = max_base_fee_tier.read()
+    let (result) = is_le(current_max_base_fee_tier, tier_)
+    if result == 1:
+        max_base_fee_tier.write(value=tier_)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
 
     # Update the fees
-    base_trading_fees.write(direction=0, value=long_fees_mod)
-    base_trading_fees.write(direction=1, value=short_fees_mod)
+    base_fee_tiers.write(tier=tier_, value=fee_details)
     return ()
 end
 
-# @notice Function to modify tier details only callable by the admins with action access=2
-# @param tier_level - Level of Tier to modify
-# @param tier_criteria_- Struct object with modidified data
+# @notice Function to update discount details
+# @param tier - Level of Tier to modify
+# @param tier_criteria_- Dicsount for the current tier
 @external
-func update_tier_criteria{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    tier_level : felt, tier_criteria_new : Tier_Details
+func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tier_ : felt, discount_details : Discount
 ):
     alloc_locals
     # Auth Check
@@ -121,17 +113,30 @@ func update_tier_criteria{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     )
     assert_not_zero(access)
 
-    # Set the tier criteria
-    tier_criteria.write(tier_level=tier_level, value=tier_criteria_new)
+    # Update max discount tier if new tier is the biggest
+    let (current_max_discount_tier) = max_discount_tier.read()
+    let (result) = is_le(current_max_discount_tier, tier_)
+    if result == 1:
+        max_discount_tier.write(value=tier_)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
+    # Update the discount
+    discount_tiers.write(tier=tier_, value=discount_details)
     return ()
 end
 
-# @notice Function to modify trade access only callable by the admins with action access=2
-# @param tier_level - Level of Tier to modify
-# @param tier_criteria_- Struct object with modidified data
+# @notice Function to modify max base fee tier
+# @param tier_ - value for max base fee tier
 @external
-func update_trade_access{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    tier_level : felt, trade_access_new : Trade_Details
+func update_max_base_fee_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tier_ : felt
 ):
     alloc_locals
     # Auth Check
@@ -142,42 +147,150 @@ func update_trade_access{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     )
     assert_not_zero(access)
 
-    # Set the tier criteria
-    trade_access.write(tier_level=tier_level, value=trade_access_new)
+    max_base_fee_tier.write(value=tier_)
     return ()
 end
 
-# @notice Getter function for tier details
-@view
-func get_tier_criteria{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    tier_level : felt
-) -> (tier_criteria_curr : Tier_Details):
-    let (tier_criteria_curr) = tier_criteria.read(tier_level=tier_level)
-    return (tier_criteria_curr)
-end
-
-# @notice Getter function for trade access details
-@view
-func get_trade_access{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    tier_level : felt
-) -> (trade_access_curr : Trade_Details):
-    let (trade_access_curr) = trade_access.read(tier_level=tier_level)
-    return (trade_access_curr)
-end
-
-# @notice Getter function for fees
-@view
-func get_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    long_fees : felt, short_fees : felt
+# @notice Function to modify max discount tier
+# @param tier_ - value for max discount tier
+@external
+func update_max_discount_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tier_ : felt
 ):
-    let (long_fees) = base_trading_fees.read(direction=0)
-    let (short_fees) = base_trading_fees.read(direction=1)
-    return (long_fees, short_fees)
+    alloc_locals
+    # Auth Check
+    let (caller) = get_caller_address()
+    let (auth_addr) = auth_address.read()
+    let (access) = IAdminAuth.get_admin_mapping(
+        contract_address=auth_addr, address=caller, action=4
+    )
+    assert_not_zero(access)
+
+    max_discount_tier.write(value=tier_)
+    return ()
+end
+
+# @notice Getter function for base fees
+# @param tier_ - tier level
+# @returns base_fee - BaseFee struct for the tier
+@view
+func get_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tier_ : felt
+) -> (base_fee : BaseFee):
+    let (base_fee) = base_fee_tiers.read(tier=tier_)
+    return (base_fee)
+end
+
+# @notice Getter function for discount
+# @param tier_ - tier level
+# @returns base_fee - Discount struct for the tier
+@view
+func get_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tier_ : felt
+) -> (discount : Discount):
+    let (discount) = discount_tiers.read(tier=tier_)
+    return (discount)
+end
+
+# @notice Getter function for max base fee tier
+# @returns value - Max base fee tier
+@view
+func get_max_base_fee_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    value : felt
+):
+    let (value) = max_base_fee_tier.read()
+    return (value)
+end
+
+# @notice Getter function for max discount tier
+# @returns value - Max discount tier
+@view
+func get_max_discount_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    value : felt
+):
+    let (value) = max_discount_tier.read()
+    return (value)
+end
+
+# @notice Recursive funtion to find the base fee tier of the user
+# @param  number_of_tokens_ - number of the tokens of the user
+# @param tier_ - tier level
+# @returns base_fee_maker - base fee for the maker for the tier
+# @returns base_fee_maker - base fee for the taker for the tier
+func find_user_base_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    number_of_tokens_ : felt, tier_ : felt
+) -> (base_fee_maker : felt, base_fee_taker : felt):
+    alloc_locals
+    let (fee_details) = base_fee_tiers.read(tier=tier_)
+    let sub_result = number_of_tokens_ - fee_details.numberOfTokens
+    let (result) = is_nn(sub_result)
+    if result == 1:
+        return (base_fee_maker=fee_details.makerFee, base_fee_taker=fee_details.takerFee)
+    else:
+        return find_user_base_fee(number_of_tokens_, tier_ - 1)
+    end
+end
+
+# @notice Recursive funtion to find the discount tier of the user
+# @param  number_of_tokens_ - number of the tokens of the user
+# @param tier_ - tier level
+# @returns discount - discount for the tier
+func find_user_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    number_of_tokens_ : felt, tier_ : felt
+) -> (discount : felt):
+    alloc_locals
+    let (discount_details) = discount_tiers.read(tier=tier_)
+    let sub_result = number_of_tokens_ - discount_details.numberOfTokens
+    let (result) = is_nn(sub_result)
+    if result == 1:
+        return (discount=discount_details.discount)
+    else:
+        return find_user_discount(number_of_tokens_, tier_ - 1)
+    end
+end
+
+# @notice Function which returns discount for a user
+# @param address_ - address of the user
+# @param side_ - 0 if maker, 1 if taker
+# @returns base_fee - base fee for the user
+# @returns discount - discount for the user
+@view
+func get_user_fee_and_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    address_ : felt, side_ : felt
+) -> (base_fee : felt, discount : felt):
+    alloc_locals
+    let (fee_discount_addr) = fee_discount_address.read()
+    let (number_of_tokens) = IFeeDiscount.get_user_tokens(
+        contract_address=fee_discount_addr, address=address_
+    )
+
+    let (max_base_fee_level) = max_base_fee_tier.read()
+    let (base_fee_maker, base_fee_taker) = find_user_base_fee(
+        number_of_tokens_=number_of_tokens, tier_=max_base_fee_level
+    )
+
+    let (max_discount_level) = max_discount_tier.read()
+    let (discount) = find_user_discount(
+        number_of_tokens_=number_of_tokens, tier_=max_discount_level
+    )
+
+    if side_ == 0:
+        return (base_fee=base_fee_maker, discount=discount)
+    else:
+        return (base_fee=base_fee_taker, discount=discount)
+    end
 end
 
 # @notice AdminAuth interface
 @contract_interface
 namespace IAdminAuth:
     func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
+    end
+end
+
+# @notice FeeDiscount interface
+@contract_interface
+namespace IFeeDiscount:
+    func get_user_tokens(address : felt) -> (value : felt):
     end
 end
