@@ -24,7 +24,7 @@ def from64x61(num):
 
 def to64x61(num):
     res = num * SCALE
-    if res > 2**125 or res <= -2*125:
+    if res > 2**125 or res <= -2**125:
         raise Exception("Number is out of valid range")
     return trunc(res)
 
@@ -103,7 +103,7 @@ def hash_message(sender, to, selector, calldata, nonce):
     return compute_hash_on_elements(message)
 
 
-def hash_order(order_id, ticker, collateral, price, orderType, position, direction, closeOrder, leverage):
+def hash_order(order_id, ticker, collateral, price, orderType, position, direction, closeOrder, leverage, isLiquidation):
     order = [
         order_id,
         ticker,
@@ -113,7 +113,8 @@ def hash_order(order_id, ticker, collateral, price, orderType, position, directi
         position,
         direction,
         closeOrder,
-        leverage
+        leverage,
+        isLiquidation
     ]
     return compute_hash_on_elements(order)
 

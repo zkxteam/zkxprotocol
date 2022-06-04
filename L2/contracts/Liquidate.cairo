@@ -54,7 +54,7 @@ struct CollateralBalance:
     member balance : felt
 end
 
-# @notice Stores the address of AdminAuth contract
+# @notice Stores the address of Admin Registry contract
 @storage_var
 func auth_registry() -> (contract_address : felt):
 end
@@ -80,7 +80,7 @@ end
 #################
 
 # @notice Constructor of the contract
-# @param _auth_address - Address of the adminAuth contract
+# @param _admin_authorized_address - Address of the adminAuth contract
 # @param _asset_address - Address of the asset contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -344,7 +344,7 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     let (authorized_registry) = auth_registry.read()
 
     let (is_liquidator) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry, address=caller, action=4
+        contract_address=authorized_registry, address=caller, action=12
     )
 
     with_attr error_message("Only liquidator is allowed to call for liquidation"):
@@ -379,7 +379,6 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         least_collateral_ratio_position=0,
     )
 
-    # To be fixed
     if liq_result == 1:
         IAccount.liquidate_position(
             contract_address=account_address, id=least_collateral_ratio_position

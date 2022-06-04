@@ -8,7 +8,12 @@ from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
 
 # @notice Stores the address of AdminAuth contract
 @storage_var
-func auth_address() -> (contract_address : felt):
+func admin_authorized_address() -> (contract_address : felt):
+end
+
+# @notice Stores the address of AdminAuth contract
+@storage_var
+func authorized_registry() -> (contract_address : felt):
 end
 
 # @notice Stores the address of Trading contract
@@ -27,31 +32,13 @@ func asset_liq_position(asset_id : felt, position_id : felt) -> (value : felt):
 end
 
 # @notice Constructor of the smart-contract
-# @param auth_address_ - Address of the adminAuth contract
+# @param admin_authorized_address_ - Address of the adminAuth contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    auth_address_ : felt
+    admin_authorized_address_ : felt, authorized_registry_ : felt
 ):
-    auth_address.write(value=auth_address_)
-    return ()
-end
-
-# @notice Funtion to update trading contract address
-# @param address - address of trading contract
-@external
-func update_trading_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    address : felt
-):
-    alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=0
-    )
-    assert_not_zero(access)
-    trading_address.write(value=address)
+    admin_authorized_address.write(value=admin_authorized_address_)
+    authorized_registry.write(value=authorized_registry_)
     return ()
 end
 
@@ -65,12 +52,30 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (auth_addr) = admin_authorized_address.read()
 
     let (access) = IAdminAuth.get_admin_mapping(
         contract_address=auth_addr, address=caller, action=0
     )
-    assert_not_zero(access)
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
+
+    if access == 0:
+        let (authorized_registry_) = authorized_registry.read()
+        let (is_emergency_contract) = IAuthorizedRegistry.get_registry_value(
+            contract_address=authorized_registry_, address=caller, action=8
+        )
+
+        with_attr error_message("Caller is not authorized to do the transfer"):
+            assert is_emergency_contract = 1
+        end
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
     balance_mapping.write(asset_id=asset_id_, value=current_amount + amount)
@@ -88,12 +93,29 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (auth_addr) = admin_authorized_address.read()
 
     let (access) = IAdminAuth.get_admin_mapping(
         contract_address=auth_addr, address=caller, action=0
     )
-    assert_not_zero(access)
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
+
+    if access == 0:
+        let (authorized_registry_) = authorized_registry.read()
+        let (is_emergency_contract) = IAuthorizedRegistry.get_registry_value(
+            contract_address=authorized_registry_, address=caller, action=8
+        )
+
+        with_attr error_message("Caller is not authorized to do the transfer"):
+            assert is_emergency_contract = 1
+        end
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
@@ -113,13 +135,18 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt, position_id_ : felt
 ):
     alloc_locals
-    # Auth Check
+
     let (caller) = get_caller_address()
-    let (trading_addr) = trading_address.read()
+    let (authorized_registry_) = authorized_registry.read()
+
+    # Auth Check
+    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(
+        contract_address=authorized_registry_, address=caller, action=3
+    )
 
     with_attr error_message(
-            "Access is denied for deposit since caller is not trading contract in LiquidityFund contract."):
-        assert caller = trading_addr
+            "Trading contract is not authorized to do transferFrom in account contract."):
+        assert is_trading_contract = 1
     end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
@@ -144,13 +171,18 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     asset_id_ : felt, amount : felt, position_id_ : felt
 ):
     alloc_locals
-    # Auth Check
+
     let (caller) = get_caller_address()
-    let (trading_addr) = trading_address.read()
+    let (authorized_registry_) = authorized_registry.read()
+
+    # Auth Check
+    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(
+        contract_address=authorized_registry_, address=caller, action=3
+    )
 
     with_attr error_message(
-            "Access is denied for withdraw since caller is not trading contract in LiquidityFund contract."):
-        assert caller = trading_addr
+            "Trading contract is not authorized to do transferFrom in account contract."):
+        assert is_trading_contract = 1
     end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
@@ -197,5 +229,12 @@ end
 @contract_interface
 namespace IAdminAuth:
     func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
+    end
+end
+
+# @notice AuthorizedRegistry interface
+@contract_interface
+namespace IAuthorizedRegistry:
+    func get_registry_value(address : felt, action : felt) -> (allowed : felt):
     end
 end
