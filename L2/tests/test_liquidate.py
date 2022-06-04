@@ -924,6 +924,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(11500)
+
     orderType2 = 0
     position2 = to64x61(2)
     direction2 = 0
@@ -949,6 +950,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     leveraged_amount_out1 = await fixed_math.mul_fp(adjusted_price1, size).call()
     value_to_be_returned1 = to64x61(7357.5) - leveraged_amount_out1.result.res
 
+
     res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
         size,
         execution_price1,
@@ -965,12 +967,14 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     print(res1)
     print(from64x61(res1[2]))
 
+
     assert res1 == [
         assetID_1,
         collateralID_1,
         to64x61(7357.5),
         to64x61(7357.5),
         0,
+
         orderType1,
         0,
         to64x61(0),
@@ -995,6 +999,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         2,
         to64x61(11500),
         to64x61(11500)
+
     ]
 
     insurance_balance = await insuranceFund.balance(asset_id_=USDC_ID).call()
@@ -1010,6 +1015,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     assert from64x61(insurance_balance.result.amount) == from64x61(
         insurance_balance_before.result.amount - value_to_be_returned1)
     assert charlie_curr_balance.result.res == to64x61(0)
+
 
 
 @pytest.mark.asyncio

@@ -451,7 +451,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     amount=value_to_be_returned,
                     position_id_=temp_order.orderID,
                 )
-
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
@@ -544,7 +543,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                         tempvar range_check_ptr = range_check_ptr
                     end
-
                     tempvar syscall_ptr = syscall_ptr
                     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                     tempvar range_check_ptr = range_check_ptr
@@ -620,10 +618,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Create a temporary signature object
     let temp_signature : Signature = Signature(r_value=temp_order.sig_r, s_value=temp_order.sig_s)
-
-    tempvar syscall_ptr = syscall_ptr
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-    tempvar range_check_ptr = range_check_ptr
 
     # Call the account contract to initialize the order
     IAccount.execute_order(
