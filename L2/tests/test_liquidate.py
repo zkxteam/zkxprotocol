@@ -794,13 +794,14 @@ async def test_liquidation_flow(adminAuth_factory):
     orderState1 = await alice.get_order_data(orderID_=parentOrder1).call()
     res1 = list(orderState1.result.res)
     print(res1)
+    print(from64x61(res1[2]))
 
     assert res1 == [
         assetID_1,
         collateralID_1,
-        price1,
-        execution_price1,
-        position1,
+        to64x61(5000),
+        to64x61(5000),
+        0,
         orderType1,
         0,
         to64x61(0),
@@ -834,9 +835,12 @@ async def test_liquidation_flow(adminAuth_factory):
     alice_curr_balance = await alice.get_balance(USDC_ID).call()
     print("alice balance after", from64x61(alice_curr_balance.result.res))
 
-    # assert insurance_balance.result.amount == insurance_balance_before.result.res + \
-    #     net_acc_value
-    # assert alice_curr_balance.result.res == alice_curr_balance_before.result.res
+    account_value = await trading.return_net_acc().call()
+    print("account value:", from64x61(account_value.result.res))
+
+    assert insurance_balance.result.amount == insurance_balance_before.result.res + \
+        net_acc_value
+    assert alice_curr_balance.result.res == alice_curr_balance_before.result.res
 
 
 @pytest.mark.asyncio

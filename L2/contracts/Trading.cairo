@@ -58,6 +58,10 @@ end
 func liquidity_fund_contract_address() -> (res : felt):
 end
 
+@storage_var
+func net_acc() -> (res : felt):
+end
+
 # @notice struct to store details of markets
 struct Market:
     member asset : felt
@@ -148,6 +152,16 @@ struct OrderDetails:
     member marginAmount : felt
     member borrowedAmount : felt
 end
+
+###
+@view
+func return_net_acc{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    res : felt
+):
+    let (net_acc_) = net_acc.read()
+    return (res=net_acc_)
+end
+####
 
 # @notice Constructor for the contract
 # @param _asset_contract - Address of the deployed address contract
@@ -483,7 +497,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
                     IInsuranceFund.withdraw(
                         contract_address=insurance_fund,
-                        asset_id_=temp_order.assetID,
+                        asset_id_=temp_order.collateralID,
                         amount=deficit,
                         position_id_=temp_order.orderID,
                     )
@@ -493,9 +507,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 else:
                     let (insurance_fund) = insurance_fund_contract_address.read()
 
+                    ##
+                    net_acc.write(net_acc_value)
+                    # #
+
                     IInsuranceFund.deposit(
                         contract_address=insurance_fund,
-                        asset_id_=temp_order.assetID,
+                        asset_id_=temp_order.emp_order.collateralID,
                         amount=net_acc_value,
                         position_id_=temp_order.orderID,
                     )
@@ -511,10 +529,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     amount=leveraged_amount_out,
                 )
 
-                tempvar syscall_ptr = syscall_ptr
-                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                tempvar range_check_ptr = range_check_ptr
-
                 let (liquidity_fund_address) = liquidity_fund_contract_address.read()
 
                 ILiquidityFund.deposit(
@@ -523,8 +537,24 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     amount=value_to_be_returned,
                     position_id_=temp_order.orderID,
                 )
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
+                with_attr error_message("The position cannot be liqudiated w/o status 5"):
+                    assert 1 = 0
+                end
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
             end
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
     end
 
     # Create a temporary order object
@@ -545,6 +575,10 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Create a temporary signature object
     let temp_signature : Signature = Signature(r_value=temp_order.sig_r, s_value=temp_order.sig_s)
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
 
     # Call the account contract to initialize the order
     IAccount.execute_order(
