@@ -513,7 +513,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
                     IInsuranceFund.deposit(
                         contract_address=insurance_fund,
-                        asset_id_=temp_order.emp_order.collateralID,
+                        asset_id_=temp_order.collateralID,
                         amount=net_acc_value,
                         position_id_=temp_order.orderID,
                     )
