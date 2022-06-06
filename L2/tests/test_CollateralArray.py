@@ -69,4 +69,3 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     assert from64x61(
         alice_list_1.result.array_list[1].balance) == from64x61(alice_balance_ust)
     assert len(alice_list_1.result.array_list) == 2
-

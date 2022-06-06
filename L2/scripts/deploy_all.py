@@ -31,33 +31,50 @@ def deploy_all():
     # Append all the arguments
     argument_list = [long_trading_fees, short_trading_fees, admin_auth] + tier1_details + tier2_details + tier3_details + trade1_access + trade2_access + trade3_access
     arguments_list_str = list(map(str, argument_list))
+
+    #Deploy Registry Contract
+    registry = deploy_command("AuthorizedRegistry", [admin_auth], network, "AuthorizedRegistry")
     
     # Deploy the Trading fees Contract
     fees = deploy_command("TradingFees", arguments_list_str, network, "TradingFees")
 
     # Deploy Asset Contract
+<<<<<<< HEAD
     asset = deploy_command("Asset", [admin_auth, admin_auth], network, "Asset")
+=======
+    asset = deploy_command("Asset", [registry, 1], network, "Asset")
+>>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
 
     # Deploy Market Contract
-    market = deploy_command("Markets", [admin_auth, asset], network, "Markets")
+    market = deploy_command("Markets", [registry, 1], network, "Markets")
 
     # Deploy FeeBalance Contract
-    feeBalance = deploy_command("FeeBalance", [admin_auth], network, "FeeBalance")
+    feeBalance = deploy_command("FeeBalance", [registry, 1], network, "FeeBalance")
 
     # Deploy Holding Contract
-    holding = deploy_command("Holding", [admin_auth], network, "Holding")
+    holding = deploy_command("Holding", [registry, 1], network, "Holding")
 
     # Deploy Emergency Fund Contract
-    emergencyFund = deploy_command("EmergencyFund", [admin_auth, holding], network, "EmergencyFund")
+    emergencyFund = deploy_command("EmergencyFund", [registry, 1], network, "EmergencyFund")
+    
+    # Deploy Insurance Fund Contract
+    insuranceFund = deploy_command("InsuranceFund", [registry, 1], network, "InsuranceFund")
+
+    # Deploy Liquidity Fund Contract
+    liquidityFund = deploy_command("LiquidityFund", [registry, 1], network, "LiquidityFund")
 
     # Deploy Liquidity fund Contract
     liquidityFund = deploy_command("LiquidityFund", [admin_auth], network, "LiquidityFund")
 
     # Deploy Trading Contract
+<<<<<<< HEAD
     trading = deploy_command("Trading", [asset, fees, holding, feeBalance, market, liquidityFund], network, "Trading")
+=======
+    trading = deploy_command("Trading", [registry, 1], network, "Trading")
+>>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
 
-    #Deploy Registry Contract
-    registry = deploy_command("AuthorizedRegistry", [admin_auth], network, "AuthorizedRegistry")
+    # Deploy Liquidate Contract
+    liquidate = deploy_command("Liquidate", [registry, 1], network, "Liquidate")
 
     #Deploy Liquidate Contract
     liquidate = deploy_command("Liquidate", [registry, asset], network, "Liquidate")

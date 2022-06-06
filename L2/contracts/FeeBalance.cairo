@@ -6,8 +6,14 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.math import assert_not_zero
 
+# @notice Stores the contract version
 @storage_var
-func auth_address() -> (contract_address : felt):
+func contract_version() -> (version : felt):
+end
+
+# @notice Stores the address of AdminAuth contract
+@storage_var
+func registry_address() -> (contract_address : felt):
 end
 
 @storage_var
@@ -18,19 +24,15 @@ end
 func total_fee_per_asset(assetID : felt) -> (accumulated_fee : felt):
 end
 
-# @notice Stores the address of the auth registry
-@storage_var
-func authorized_registry() -> (res : felt):
-end
-
 # @notice Constructor of the smart-contract
-# @param _authAddress - Address of the adminAuth contract
+# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    admin_authorized_address_ : felt, authorized_registry_ : felt
+    registry_address_ : felt, version_ : felt
 ):
-    auth_address.write(value=admin_authorized_address_)
-    authorized_registry.write(value=authorized_registry_)
+    registry_address.write(value=registry_address_)
+    contract_version.write(value=version_)
     return ()
 end
 
@@ -44,14 +46,14 @@ func update_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     alloc_locals
 
     let (caller) = get_caller_address()
-    let (authorized_registry_) = authorized_registry.read()
-
-    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry_, address=caller, action=3
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (trading_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=5, version=version
     )
 
-    with_attr error_message("Access is denied since caller is not trading contract in feeBalance."):
-        assert is_trading_contract = 1
+    with_attr error_message("Access is denied since caller is not trading contract"):
+        assert caller = trading_address
     end
 
     let current_fee : felt = fee_mapping.read(address=address, assetID=assetID_)
@@ -86,16 +88,16 @@ func get_user_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     return (fee)
 end
 
+# @notice AuthorizedRegistry interface
+@contract_interface
+namespace IAuthorizedRegistry:
+    func get_contract_address(index : felt, version : felt) -> (address : felt):
+    end
+end
+
 # @notice AdminAuth interface
 @contract_interface
 namespace IAdminAuth:
     func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
-    end
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_registry_value(address : felt, action : felt) -> (allowed : felt):
     end
 end

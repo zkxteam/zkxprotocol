@@ -41,19 +41,19 @@ end
 # Storage
 #
 
+# @notice Stores the contract version
+@storage_var
+func contract_version() -> (version : felt):
+end
+
 # @notice Stores the address of AdminAuth contract
 @storage_var
-func auth_address() -> (contract_address : felt):
+func registry_address() -> (contract_address : felt):
 end
 
 # @notice stores the address of L1 zkx contract
 @storage_var
 func L1_zkx_address() -> (res : felt):
-end
-
-# @notice stores the address of risk management contract
-@storage_var
-func risk_management_address() -> (res : felt):
 end
 
 # @notice stores the version of the asset contract
@@ -64,6 +64,22 @@ end
 # @notice Mapping between asset ID and Asset data
 @storage_var
 func asset(id : felt) -> (res : Asset):
+end
+
+#
+# Constructor
+#
+
+# @notice Constructor of the smart-contract
+# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param version_ Version of this contract
+@constructor
+func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    registry_address_ : felt, version_ : felt
+):
+    registry_address.write(value=registry_address_)
+    contract_version.write(value=version_)
+    return ()
 end
 
 #
@@ -79,10 +95,14 @@ func set_L1_zkx_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=1
+        contract_address=auth_address, address=caller, action=1
     )
     assert_not_zero(access)
 
@@ -136,21 +156,6 @@ func get_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 end
 
 #
-# Constructor
-#
-
-# @notice Constructor of the smart-contract
-# @param _authAddress Address of the adminAuth contract
-@constructor
-func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _authAddress : felt, _riskManagementAddress : felt
-):
-    auth_address.write(value=_authAddress)
-    risk_management_address.write(value=_riskManagementAddress)
-    return ()
-end
-
-#
 # Business logic
 #
 
@@ -164,9 +169,14 @@ func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
+
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=1
+        contract_address=auth_address, address=caller, action=1
     )
     assert_not_zero(access)
 
@@ -184,10 +194,14 @@ func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=1
+        contract_address=auth_address, address=caller, action=1
     )
     assert_not_zero(access)
 
@@ -225,10 +239,14 @@ func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=1
+        contract_address=auth_address, address=caller, action=1
     )
     assert_not_zero(access)
 
@@ -280,11 +298,17 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
-    let (risk_management_addr) = risk_management_address.read()
+    let (registry) = registry_address.read()
+    let (ver) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=ver
+    )
+    let (risk_management_addr) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=2, version=ver
+    )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=1
+        contract_address=auth_address, address=caller, action=1
     )
     if access == 0:
         assert caller = risk_management_addr
@@ -316,10 +340,14 @@ func updateAssetListInL1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=1
+        contract_address=auth_address, address=caller, action=1
     )
     assert_not_zero(access)
 
@@ -334,6 +362,13 @@ func updateAssetListInL1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=3, payload=message_payload)
 
     return ()
+end
+
+# @notice AuthorizedRegistry interface
+@contract_interface
+namespace IAuthorizedRegistry:
+    func get_contract_address(index : felt, version : felt) -> (address : felt):
+    end
 end
 
 # @notice AdminAuth interface
