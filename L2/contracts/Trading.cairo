@@ -433,10 +433,17 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         borrowed_amount_ = borrowed_amount - value_to_be_returned
         margin_amount_ = margin_amount - margin_to_be_reduced
 
+        # Check if the position is to be liquidated
         let (not_liquidation) = is_le(order_details.status, 3)
 
+        # If it's just a close order
         if not_liquidation == 1:
+            # If no leverage is used
             if temp_order.leverage == 2305843009213693952:
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
                 let (liquidity_fund_address) = liquidity_fund_contract_address.read()
                 ILiquidityFund.deposit(
                     contract_address=liquidity_fund_address,
@@ -444,25 +451,26 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     amount=value_to_be_returned,
                     position_id_=temp_order.orderID,
                 )
-                tempvar syscall_ptr = syscall_ptr
-                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                tempvar range_check_ptr = range_check_ptr
-            else:
+
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
             end
 
             let (holding_address) = holding_contract_address.read()
+
+            # Withdraw the position from the holding fund
             IHolding.withdraw(
                 contract_address=holding_address,
                 assetID_=temp_order.collateralID,
                 amount=leveraged_amount_out,
             )
 
+            # Check if the posiiton is underwater
             let (is_loss) = is_le(net_acc_value, 0)
 
             if is_loss == 1:
+                # If yes, make the user balance negative
                 IAccount.transfer_from(
                     contract_address=temp_order.pub_key,
                     assetID_=temp_order.collateralID,
@@ -472,6 +480,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
             else:
+                # If not, transfer the remaining to user
                 IAccount.transfer(
                     contract_address=temp_order.pub_key,
                     assetID_=temp_order.collateralID,
@@ -486,31 +495,63 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
         else:
+            # Liquidation order
             if order_details.status == 5:
                 # Check if the account value for the position is negative
                 let (is_negative) = is_le(net_acc_value, 0)
 
                 if is_negative == 1:
-                    let (insurance_fund) = insurance_fund_contract_address.read()
-
+                    # Absolute value of the acc value
                     let (deficit) = abs_value(net_acc_value)
 
-                    IInsuranceFund.withdraw(
-                        contract_address=insurance_fund,
-                        asset_id_=temp_order.collateralID,
-                        amount=deficit,
-                        position_id_=temp_order.orderID,
+                    # Get the user balance
+                    let (user_balance) = IAccount.get_balance(
+                        contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
                     )
+
+                    # Check if the user's balance can cover the deficit
+                    let (is_payable) = is_le(deficit, user_balance)
+
+                    if is_payable == 1:
+                        # Transfer the full amount from the user
+                        IAccount.transfer_from(
+                            contract_address=temp_order.pub_key,
+                            assetID_=temp_order.collateralID,
+                            amount=deficit,
+                        )
+                        tempvar syscall_ptr = syscall_ptr
+                        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                        tempvar range_check_ptr = range_check_ptr
+                    else:
+                        # Transfer the partial amount from the user
+                        IAccount.transfer_from(
+                            contract_address=temp_order.pub_key,
+                            assetID_=temp_order.collateralID,
+                            amount=user_balance,
+                        )
+
+                        let (insurance_fund) = insurance_fund_contract_address.read()
+
+                        # Transfer the remaining amount from Insurance Fund
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund,
+                            asset_id_=temp_order.collateralID,
+                            amount=deficit,
+                            position_id_=temp_order.orderID,
+                        )
+
+                        tempvar syscall_ptr = syscall_ptr
+                        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                        tempvar range_check_ptr = range_check_ptr
+                    end
+
                     tempvar syscall_ptr = syscall_ptr
                     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                     tempvar range_check_ptr = range_check_ptr
                 else:
                     let (insurance_fund) = insurance_fund_contract_address.read()
 
-                    ##
-                    net_acc.write(net_acc_value)
-                    # #
-
+                    # Deposit the user's remaining balance in Insurance Fund
                     IInsuranceFund.deposit(
                         contract_address=insurance_fund,
                         asset_id_=temp_order.collateralID,
@@ -523,6 +564,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 end
 
                 let (holding_address) = holding_contract_address.read()
+
+                # Withdraw the position from holding fund
                 IHolding.withdraw(
                     contract_address=holding_address,
                     assetID_=temp_order.collateralID,
@@ -531,6 +574,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
                 let (liquidity_fund_address) = liquidity_fund_contract_address.read()
 
+                # Return the borrowed fund to the Liquidity fund
                 ILiquidityFund.deposit(
                     contract_address=liquidity_fund_address,
                     asset_id_=temp_order.collateralID,
@@ -541,6 +585,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
             else:
+                # The position is not marked as "to be liquidated" aka status 5
                 with_attr error_message("The position cannot be liqudiated w/o status 5"):
                     assert 1 = 0
                 end

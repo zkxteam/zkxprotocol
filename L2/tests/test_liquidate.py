@@ -946,8 +946,8 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     diff1 = to64x61(7357.5) - execution_price1
 
     adjusted_price1 = to64x61(7357.5 + from64x61(diff1))
-    pnl1 = await fixed_math.mul_fp(diff1, size).call()
-    net_acc_value = pnl1.result.res + to64x61(7357.5)
+    leveraged_amount_out1 = await fixed_math.mul_fp(adjusted_price1, size).call()
+    value_to_be_returned1 = to64x61(7357.5) - leveraged_amount_out1.result.res
 
     res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
         size,
@@ -1002,14 +1002,14 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         insurance_balance.result.amount))
 
     charlie_curr_balance = await charlie.get_balance(USDC_ID).call()
-    print("alice balance after", from64x61(charlie_curr_balance.result.res))
+    print("charlie balance after", from64x61(charlie_curr_balance.result.res))
 
     account_value = await trading.return_net_acc().call()
     print("account value:", from64x61(account_value.result.res))
 
-    assert from64x61(insurance_balance.result.amount) == from64x61(insurance_balance_before.result.amount +
-                                                                   net_acc_value)
-    assert charlie_curr_balance.result.res == charlie_curr_balance_before.result.res
+    assert from64x61(insurance_balance.result.amount) == from64x61(
+        insurance_balance_before.result.amount - value_to_be_returned1)
+    assert charlie_curr_balance.result.res == to64x61(0)
 
 
 @pytest.mark.asyncio
