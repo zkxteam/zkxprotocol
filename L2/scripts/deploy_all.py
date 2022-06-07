@@ -39,11 +39,7 @@ def deploy_all():
     fees = deploy_command("TradingFees", arguments_list_str, network, "TradingFees")
 
     # Deploy Asset Contract
-<<<<<<< HEAD
-    asset = deploy_command("Asset", [admin_auth, admin_auth], network, "Asset")
-=======
     asset = deploy_command("Asset", [registry, 1], network, "Asset")
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
 
     # Deploy Market Contract
     market = deploy_command("Markets", [registry, 1], network, "Markets")
@@ -67,11 +63,7 @@ def deploy_all():
     liquidityFund = deploy_command("LiquidityFund", [admin_auth], network, "LiquidityFund")
 
     # Deploy Trading Contract
-<<<<<<< HEAD
-    trading = deploy_command("Trading", [asset, fees, holding, feeBalance, market, liquidityFund], network, "Trading")
-=======
     trading = deploy_command("Trading", [registry, 1], network, "Trading")
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
 
     # Deploy Liquidate Contract
     liquidate = deploy_command("Liquidate", [registry, 1], network, "Liquidate")

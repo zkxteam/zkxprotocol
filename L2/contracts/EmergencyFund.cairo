@@ -111,27 +111,11 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-<<<<<<< HEAD
-    let (auth_addr) = admin_authorized_address.read()
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=0
-    )
-
-    with_attr error_message("The caller is not authorized to do funding"):
-        assert_not_zero(access)
-    end
-
-    let (authorized_registry_) = authorized_registry.read()
-    let (is_holding) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry_, address=holding_address, action=5
-=======
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=0, version=version
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
@@ -162,27 +146,11 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-<<<<<<< HEAD
-    let (auth_addr) = admin_authorized_address.read()
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=0
-    )
-
-    with_attr error_message("The caller is not authorized to do funding"):
-        assert_not_zero(access)
-    end
-
-    let (authorized_registry_) = authorized_registry.read()
-    let (is_liquidity) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry_, address=liquidity_address, action=6
-=======
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=0, version=version
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
@@ -213,27 +181,11 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-<<<<<<< HEAD
-    let (auth_addr) = admin_authorized_address.read()
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=0
-    )
-
-    with_attr error_message("The caller is not authorized to do funding"):
-        assert_not_zero(access)
-    end
-
-    let (authorized_registry_) = authorized_registry.read()
-    let (is_insurance) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry_, address=insurance_address, action=7
-=======
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=0, version=version
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
@@ -259,7 +211,7 @@ end
 # @param asset_id - target asset_id
 @external
 func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id : felt, amount : felt, holding_address : felt
+    asset_id : felt, amount : felt
 ):
     alloc_locals
 
@@ -276,19 +228,6 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
     assert_not_zero(access)
 
-<<<<<<< HEAD
-    let (authorized_registry_) = authorized_registry.read()
-    let (is_holding) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry_, address=holding_address, action=5
-    )
-
-    with_attr error_message("The given address is not authorized to do transfer"):
-        assert is_holding = 1
-    end
-
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id)
-    IHolding.defund(contract_address=holding_address, asset_id=asset_id, amount=amount)
-=======
     # Get holding contract address
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=7, version=version
@@ -332,7 +271,6 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     IInsurance.defund(contract_address=insurance_address, asset_id=asset_id, amount=amount)
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id)
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
     balance_mapping.write(asset_id=asset_id, value=current_amount + amount)
 
     return ()

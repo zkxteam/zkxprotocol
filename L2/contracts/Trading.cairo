@@ -133,7 +133,6 @@ struct OrderDetails:
     member borrowedAmount : felt
 end
 
-<<<<<<< HEAD
 ###
 @view
 func return_net_acc{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
@@ -144,14 +143,9 @@ func return_net_acc{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 end
 ####
 
-# @notice Constructor for the contract
-# @param _asset_contract - Address of the deployed address contract
-# @param _trading_fees - Address of the deployed tradingfees contract
-=======
 # @notice Constructor of the smart-contract
-# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
@@ -422,17 +416,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         if not_liquidation == 1:
             # If no leverage is used
             if temp_order.leverage == 2305843009213693952:
-<<<<<<< HEAD
-                tempvar syscall_ptr = syscall_ptr
-                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                tempvar range_check_ptr = range_check_ptr
-            else:
-                let (liquidity_fund_address) = liquidity_fund_contract_address.read()
-=======
                 let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
                     contract_address=registry, index=9, version=version
                 )
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
                 ILiquidityFund.deposit(
                     contract_address=liquidity_fund_address,
                     asset_id_=temp_order.collateralID,
@@ -442,18 +428,16 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
+            else:
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
             end
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
 
-<<<<<<< HEAD
-            let (holding_address) = holding_contract_address.read()
-
-            # Withdraw the position from the holding fund
-=======
             let (holding_address) = IAuthorizedRegistry.get_contract_address(
                 contract_address=registry, index=7, version=version
             )
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
             IHolding.withdraw(
                 contract_address=holding_address,
                 assetID_=temp_order.collateralID,
@@ -484,7 +468,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
             end
-
             tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
@@ -498,22 +481,12 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     contract_address=registry, index=10, version=version
                 )
                 if is_negative == 1:
-<<<<<<< HEAD
                     # Absolute value of the acc value
                     let (deficit) = abs_value(net_acc_value)
 
                     # Get the user balance
                     let (user_balance) = IAccount.get_balance(
                         contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
-=======
-                    let (deficit) = abs_value(net_acc_value)
-
-                    IInsuranceFund.withdraw(
-                        contract_address=insurance_fund_address,
-                        asset_id_=temp_order.collateralID,
-                        amount=deficit,
-                        position_id_=temp_order.orderID,
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
                     )
 
                     # Check if the user's balance can cover the deficit
@@ -537,11 +510,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                             amount=user_balance,
                         )
 
-                        let (insurance_fund) = insurance_fund_contract_address.read()
-
                         # Transfer the remaining amount from Insurance Fund
                         IInsuranceFund.withdraw(
-                            contract_address=insurance_fund,
+                            contract_address=insurance_fund_address,
                             asset_id_=temp_order.collateralID,
                             amount=deficit,
                             position_id_=temp_order.orderID,
@@ -555,16 +526,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                     tempvar range_check_ptr = range_check_ptr
                 else:
-<<<<<<< HEAD
-                    let (insurance_fund) = insurance_fund_contract_address.read()
-
                     # Deposit the user's remaining balance in Insurance Fund
                     IInsuranceFund.deposit(
-                        contract_address=insurance_fund,
-=======
-                    IInsuranceFund.deposit(
                         contract_address=insurance_fund_address,
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
                         asset_id_=temp_order.collateralID,
                         amount=net_acc_value,
                         position_id_=temp_order.orderID,
@@ -575,28 +539,19 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 end
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
 
-<<<<<<< HEAD
-                let (holding_address) = holding_contract_address.read()
-
                 # Withdraw the position from holding fund
-=======
                 let (holding_address) = IAuthorizedRegistry.get_contract_address(
                     contract_address=registry, index=7, version=version
                 )
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
                 IHolding.withdraw(
                     contract_address=holding_address,
                     assetID_=temp_order.collateralID,
                     amount=leveraged_amount_out,
                 )
 
-<<<<<<< HEAD
-                let (liquidity_fund_address) = liquidity_fund_contract_address.read()
-=======
                 let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
                     contract_address=registry, index=9, version=version
                 )
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
 
                 # Return the borrowed fund to the Liquidity fund
                 ILiquidityFund.deposit(
@@ -605,21 +560,15 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     amount=value_to_be_returned,
                     position_id_=temp_order.orderID,
                 )
-<<<<<<< HEAD
-=======
 
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
             else:
-<<<<<<< HEAD
                 # The position is not marked as "to be liquidated" aka status 5
                 with_attr error_message("The position cannot be liqudiated w/o status 5"):
                     assert 1 = 0
                 end
-=======
->>>>>>> 160c6f5 (ZKX-309 revamps auth registry)
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
