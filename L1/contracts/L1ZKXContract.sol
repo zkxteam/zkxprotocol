@@ -16,6 +16,7 @@ contract L1ZKXContract is AccessControl{
     event LogDeposit(address sender, uint256 amount, uint256 collateralId, uint256 l2Recipient);
     event LogWithdrawal(address recipient, uint256 amount);
     event LogAssetListUpdated(uint256 ticker, uint256 collateralId);
+    event LogAssetRemovedFromList(uint256 ticker, uint256 collateralId);
     event LogTokenContractAddressUpdated(uint256 ticker, address tokenContractAddresses_);
 
     using SafeMath for uint256;
@@ -40,6 +41,7 @@ contract L1ZKXContract is AccessControl{
     
     uint256 constant MESSAGE_WITHDRAW = 0;
     uint256 constant ADD_ASSET = 1;
+    uint256 constant REMOVE_ASSET = 2;
 
     // The selector of the "deposit" l1_handler.
     uint256 constant DEPOSIT_SELECTOR =
@@ -77,7 +79,7 @@ contract L1ZKXContract is AccessControl{
     function updateAssetListInL1 (uint256 ticker,
         uint256 assetId) public onlyRole(DEFAULT_ADMIN_ROLE) {
 
-        // Construct the withdrawal message's payload.
+        // Construct the update asset list message's payload.
         uint256[] memory payload = new uint256[](3);
         payload[0] = ADD_ASSET;
         payload[1] = ticker;
@@ -91,6 +93,41 @@ contract L1ZKXContract is AccessControl{
         assetID[ticker] = assetId;
         assetList.push(ticker);
         emit LogAssetListUpdated(ticker, assetId);
+    }
+
+    /**
+     * @dev function to remove asset from list in L1
+     * @param ticker - The asset that needs to be removed from the list
+     * @param  assetId - Id of the asset to be removed
+     **/
+    function removeAssetFromList (uint256 ticker,
+        uint256 assetId) public onlyRole(DEFAULT_ADMIN_ROLE) {
+
+        // Construct the remove asset message's payload.
+        uint256[] memory payload = new uint256[](3);
+        payload[0] = REMOVE_ASSET;
+        payload[1] = ticker;
+        payload[2] = assetId;
+
+        // Consume the message from the StarkNet core contract.
+        // This will revert the (Ethereum) transaction if the message does not exist.
+        starknetCore.consumeMessageFromL2(zkxAssetContractAddress, payload);
+
+        // Update the asset mapping
+        assetID[ticker] = 0;
+
+        // Remove the asset from the asset list
+        uint256 index;
+        for (uint i = 0; i<assetList.length; i++){
+            if (assetList[i] == ticker) {
+                index = i;
+                break;
+            }
+        }
+        assetList[index] = assetList[assetList.length-1];
+        assetList.pop();
+
+        emit LogAssetRemovedFromList(ticker, assetId);
     }
 
     /**
