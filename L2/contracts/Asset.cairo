@@ -117,7 +117,7 @@ end
 # @param id - Id of the asset
 # @return maintanence_margin - Returns the maintanence margin of the asset
 @view
-func get_maintanence_margin{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+func get_maintenance_margin{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt
 ) -> (maintanence_margin : felt):
     let (curr_asset) = asset.read(id=id)

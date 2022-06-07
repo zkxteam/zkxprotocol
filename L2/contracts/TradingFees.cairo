@@ -95,7 +95,7 @@ func update_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     let (caller) = get_caller_address()
     let (auth_addr) = auth_address.read()
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=2
+        contract_address=auth_addr, address=caller, action=4
     )
     assert_not_zero(access)
 
@@ -117,7 +117,7 @@ func update_tier_criteria{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     let (caller) = get_caller_address()
     let (auth_addr) = auth_address.read()
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=2
+        contract_address=auth_addr, address=caller, action=4
     )
     assert_not_zero(access)
 
@@ -138,7 +138,7 @@ func update_trade_access{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     let (caller) = get_caller_address()
     let (auth_addr) = auth_address.read()
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=2
+        contract_address=auth_addr, address=caller, action=4
     )
     assert_not_zero(access)
 
