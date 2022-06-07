@@ -3,8 +3,20 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.registers import get_fp_and_pc
-from starkware.starknet.common.syscalls import get_contract_address
-from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le, assert_in_range
+from starkware.starknet.common.syscalls import (
+    get_contract_address,
+    call_contract,
+    get_caller_address,
+    get_tx_signature,
+)
+from starkware.cairo.common.math import (
+    assert_not_zero,
+    assert_nn,
+    assert_le,
+    assert_in_range,
+    assert_lt,
+)
+from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.math_cmp import is_le
@@ -32,8 +44,22 @@ end
 func market_contract_address() -> (res : felt):
 end
 
+# @notice Stores the address of Auth Registry contract
+@storage_var
+func auth_registry_contract_address() -> (contract_address : felt):
+end
+
+# @notice Stores the address of Auth Registry contract
+@storage_var
+func insurance_fund_contract_address() -> (contract_address : felt):
+end
+
 @storage_var
 func liquidity_fund_contract_address() -> (res : felt):
+end
+
+@storage_var
+func net_acc() -> (res : felt):
 end
 
 # @notice struct to store details of markets
@@ -59,6 +85,8 @@ struct MultipleOrder:
     member closeOrder : felt
     member parentOrder : felt
     member leverage : felt
+    member isLiquidation : felt
+    member liquidatorAddress : felt
 end
 
 # Struct for passing the order request to Account Contract
@@ -72,6 +100,8 @@ struct OrderRequest:
     member direction : felt
     member closeOrder : felt
     member leverage : felt
+    member isLiquidation : felt
+    member liquidatorAddress : felt
     member parentOrder : felt
 end
 
@@ -123,6 +153,16 @@ struct OrderDetails:
     member borrowedAmount : felt
 end
 
+###
+@view
+func return_net_acc{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    res : felt
+):
+    let (net_acc_) = net_acc.read()
+    return (res=net_acc_)
+end
+####
+
 # @notice Constructor for the contract
 # @param _asset_contract - Address of the deployed address contract
 # @param _trading_fees - Address of the deployed tradingfees contract
@@ -134,6 +174,8 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     _fees_balance_contract,
     _market_contract,
     _liquidity_fund_contract,
+    _auth_registry,
+    _insurance_fund,
 ):
     asset_contract_address.write(_asset_contract)
     fees_contract_address.write(_fees_contract)
@@ -141,6 +183,8 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     fees_balance_contract_address.write(_fees_balance_contract)
     market_contract_address.write(_market_contract)
     liquidity_fund_contract_address.write(_liquidity_fund_contract)
+    auth_registry_contract_address.write(_auth_registry)
+    insurance_fund_contract_address.write(_insurance_fund)
     return ()
 end
 
@@ -187,28 +231,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         direction=[request_list].direction,
         closeOrder=[request_list].closeOrder,
         parentOrder=[request_list].parentOrder,
-        leverage=[request_list].leverage
+        leverage=[request_list].leverage,
+        isLiquidation=[request_list].isLiquidation,
+        liquidatorAddress=[request_list].liquidatorAddress
         )
 
-    # Check whether the leverage is less than currently allowed leverage of the asset
-    let (asset_address) = asset_contract_address.read()
-    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order.assetID)
-    with_attr error_message("leverage is not less than currently allowed leverage of the asset"):
-        assert_le(temp_order.leverage, asset.currently_allowed_leverage)
-    end
-
     # Check if the execution_price is correct
-    if temp_order.orderType == 0:
-        # if it's a market order, it must be within 2% of the index price
-        let (two_percent) = mul_fp(temp_order.price, 46116860184273879)
-        tempvar lowerLimit = temp_order.price - two_percent
-        tempvar upperLimit = temp_order.price + two_percent
-
-        with_attr error_message("Execution price is not in range."):
-            assert_in_range(execution_price, lowerLimit, upperLimit)
-        end
-        tempvar range_check_ptr = range_check_ptr
-    else:
+    if temp_order.orderType == 1:
         # if it's a limit order
         if temp_order.direction == 1:
             # if it's a long order
@@ -224,6 +253,16 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 assert_le(temp_order.price, execution_price)
             end
             tempvar range_check_ptr = range_check_ptr
+        end
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        # if it's a market order, it must be within 2% of the index price
+        let (two_percent) = mul_fp(temp_order.price, 46116860184273879)
+        tempvar lowerLimit = temp_order.price - two_percent
+        tempvar upperLimit = temp_order.price + two_percent
+
+        with_attr error_message("Execution price is not in range."):
+            assert_in_range(execution_price, lowerLimit, upperLimit)
         end
         tempvar range_check_ptr = range_check_ptr
     end
@@ -243,22 +282,21 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     local fees_rate
     local sum_temp
-    # Calculate the fees depending on whether the order is long or short
+
     if temp_order.direction == 1:
-        assert fees_rate = long_fees
         assert sum_temp = sum + order_size
-
-        # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
     else:
-        assert fees_rate = short_fees
         assert sum_temp = sum - order_size
-
-        # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
     end
 
+    # If the order is to be opened
     if temp_order.closeOrder == 0:
-        # If the order is to be opened
-        let (contract_address) = get_contract_address()
+        # Calculate the fees depending on whether the order is long or short
+        if temp_order.direction == 1:
+            assert fees_rate = long_fees
+        else:
+            assert fees_rate = short_fees
+        end
 
         # Get order details
         let (order_details : OrderDetails) = IAccount.get_order_data(
@@ -340,41 +378,50 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     else:
-        # If it's a close order
+        # If it's a close order or a liquidation order
         with_attr error_message(
                 "parentOrder field of closing order request is zero in trading contract."):
             assert_not_zero(temp_order.parentOrder)
         end
 
-        local actual_execution_price
-
         # Get order details
         let (order_details : OrderDetails) = IAccount.get_order_data(
             contract_address=temp_order.pub_key, order_ID=temp_order.parentOrder
         )
+
+        with_attr error_message("parentOrder doesn't exist"):
+            assert_not_zero(order_details.assetID)
+        end
+
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
 
+        # calculate avg execution price
+        let (total_value) = mul_fp(order_details.marginAmount, temp_order.leverage)
+        let (average_execution_price) = div_fp(total_value, order_details.portionExecuted)
+
+        local diff
+        local actual_execution_price
+
         # current order is short order
         if temp_order.direction == 0:
+            # Open order was a long order
             actual_execution_price = execution_price
+            diff = execution_price - average_execution_price
             tempvar range_check_ptr = range_check_ptr
-            # current order is long order
         else:
-            let (total_value) = mul_fp(order_details.marginAmount, temp_order.leverage)
-            let (average_execution_price) = div_fp(total_value, order_details.portionExecuted)
-            tempvar pnl = execution_price - average_execution_price
-            actual_execution_price = average_execution_price - pnl
+            # Open order was a short order
+            diff = average_execution_price - execution_price
+            actual_execution_price = average_execution_price + diff
 
-            # Check if the user owes the exchange money
-            let (is_negative) = is_le(actual_execution_price, 0)
-
-            if is_negative == 1:
-                actual_execution_price = 0
-            end
             tempvar range_check_ptr = range_check_ptr
         end
 
+        # Calculate pnl and net account value
+        let (pnl) = mul_fp(order_details.portionExecuted, diff)
+        tempvar net_acc_value = margin_amount + pnl
+
+        # Total value of the asset at current price
         let (leveraged_amount_out) = mul_fp(order_size, actual_execution_price)
 
         # Calculate the amount that needs to be returned to liquidity fund
@@ -382,55 +429,174 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let (value_to_be_returned) = mul_fp(borrowed_amount, percent_of_order)
         let (margin_to_be_reduced) = mul_fp(margin_amount, percent_of_order)
 
-        # Deposit the borrowed amount to liquidity funds if order is leveraged
-        let (is_non_leveraged) = is_le(temp_order.leverage, 2305843009213693952)
-
-        if is_non_leveraged == 0:
-            let (liquidity_fund_address) = liquidity_fund_contract_address.read()
-            ILiquidityFund.deposit(
-                contract_address=liquidity_fund_address,
-                asset_id_=temp_order.collateralID,
-                amount=value_to_be_returned,
-                position_id_=temp_order.orderID,
-            )
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        else:
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        end
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-
         # Calculate new values for margin and borrowed amounts
         borrowed_amount_ = borrowed_amount - value_to_be_returned
-        let margin_amount_temp = margin_amount - margin_to_be_reduced
+        margin_amount_ = margin_amount - margin_to_be_reduced
 
-        # Make margin amount as 0 if the value is negative
-        let (is_margin_negative) = is_le(margin_amount_temp, 0)
+        # Check if the position is to be liquidated
+        let (not_liquidation) = is_le(order_details.status, 3)
 
-        if is_margin_negative == 1:
-            margin_amount_ = 0
+        # If it's just a close order
+        if not_liquidation == 1:
+            # If no leverage is used
+            if temp_order.leverage == 2305843009213693952:
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
+                let (liquidity_fund_address) = liquidity_fund_contract_address.read()
+                ILiquidityFund.deposit(
+                    contract_address=liquidity_fund_address,
+                    asset_id_=temp_order.collateralID,
+                    amount=value_to_be_returned,
+                    position_id_=temp_order.orderID,
+                )
+
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            end
+
+            let (holding_address) = holding_contract_address.read()
+
+            # Withdraw the position from the holding fund
+            IHolding.withdraw(
+                contract_address=holding_address,
+                assetID_=temp_order.collateralID,
+                amount=leveraged_amount_out,
+            )
+
+            # Check if the posiiton is underwater
+            let (is_loss) = is_le(net_acc_value, 0)
+
+            if is_loss == 1:
+                # If yes, make the user balance negative
+                IAccount.transfer_from(
+                    contract_address=temp_order.pub_key,
+                    assetID_=temp_order.collateralID,
+                    amount=leveraged_amount_out - value_to_be_returned,
+                )
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
+                # If not, transfer the remaining to user
+                IAccount.transfer(
+                    contract_address=temp_order.pub_key,
+                    assetID_=temp_order.collateralID,
+                    amount=leveraged_amount_out - value_to_be_returned,
+                )
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            end
+
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         else:
-            margin_amount_ = margin_amount_temp
+            # Liquidation order
+            if order_details.status == 5:
+                # Check if the account value for the position is negative
+                let (is_negative) = is_le(net_acc_value, 0)
+
+                if is_negative == 1:
+                    # Absolute value of the acc value
+                    let (deficit) = abs_value(net_acc_value)
+
+                    # Get the user balance
+                    let (user_balance) = IAccount.get_balance(
+                        contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
+                    )
+
+                    # Check if the user's balance can cover the deficit
+                    let (is_payable) = is_le(deficit, user_balance)
+
+                    if is_payable == 1:
+                        # Transfer the full amount from the user
+                        IAccount.transfer_from(
+                            contract_address=temp_order.pub_key,
+                            assetID_=temp_order.collateralID,
+                            amount=deficit,
+                        )
+                        tempvar syscall_ptr = syscall_ptr
+                        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                        tempvar range_check_ptr = range_check_ptr
+                    else:
+                        # Transfer the partial amount from the user
+                        IAccount.transfer_from(
+                            contract_address=temp_order.pub_key,
+                            assetID_=temp_order.collateralID,
+                            amount=user_balance,
+                        )
+
+                        let (insurance_fund) = insurance_fund_contract_address.read()
+
+                        # Transfer the remaining amount from Insurance Fund
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund,
+                            asset_id_=temp_order.collateralID,
+                            amount=deficit,
+                            position_id_=temp_order.orderID,
+                        )
+
+                        tempvar syscall_ptr = syscall_ptr
+                        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                        tempvar range_check_ptr = range_check_ptr
+                    end
+
+                    tempvar syscall_ptr = syscall_ptr
+                    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                    tempvar range_check_ptr = range_check_ptr
+                else:
+                    let (insurance_fund) = insurance_fund_contract_address.read()
+
+                    # Deposit the user's remaining balance in Insurance Fund
+                    IInsuranceFund.deposit(
+                        contract_address=insurance_fund,
+                        asset_id_=temp_order.collateralID,
+                        amount=net_acc_value,
+                        position_id_=temp_order.orderID,
+                    )
+                    tempvar syscall_ptr = syscall_ptr
+                    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                    tempvar range_check_ptr = range_check_ptr
+                end
+
+                let (holding_address) = holding_contract_address.read()
+
+                # Withdraw the position from holding fund
+                IHolding.withdraw(
+                    contract_address=holding_address,
+                    assetID_=temp_order.collateralID,
+                    amount=leveraged_amount_out,
+                )
+
+                let (liquidity_fund_address) = liquidity_fund_contract_address.read()
+
+                # Return the borrowed fund to the Liquidity fund
+                ILiquidityFund.deposit(
+                    contract_address=liquidity_fund_address,
+                    asset_id_=temp_order.collateralID,
+                    amount=value_to_be_returned,
+                    position_id_=temp_order.orderID,
+                )
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
+                # The position is not marked as "to be liquidated" aka status 5
+                with_attr error_message("The position cannot be liqudiated w/o status 5"):
+                    assert 1 = 0
+                end
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            end
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
-
-        let (holding_address) = holding_contract_address.read()
-        IHolding.withdraw(
-            contract_address=holding_address,
-            assetID_=temp_order.collateralID,
-            amount=leveraged_amount_out,
-        )
-
-        IAccount.transfer(
-            contract_address=temp_order.pub_key,
-            assetID_=temp_order.collateralID,
-            amount=leveraged_amount_out,
-        )
-
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
@@ -447,6 +613,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         direction=temp_order.direction,
         closeOrder=temp_order.closeOrder,
         leverage=temp_order.leverage,
+        isLiquidation=temp_order.isLiquidation,
+        liquidatorAddress=temp_order.liquidatorAddress,
         parentOrder=temp_order.parentOrder,
     )
 
@@ -514,6 +682,14 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     with_attr error_message(
             "collateralID is not same as opposite order's collateralID in trading contract."):
         assert collateralID = temp_order.collateralID
+    end
+
+    # Check whether the leverage is less than currently allowed leverage of the asset
+    let (asset_address) = asset_contract_address.read()
+    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order.assetID)
+
+    with_attr error_message("leverage is not less than currently allowed leverage of the asset"):
+        assert_le(temp_order.leverage, asset.currently_allowed_leverage)
     end
 
     # Recursive Call
@@ -658,5 +834,21 @@ namespace ILiquidityFund:
     end
 
     func withdraw(asset_id_ : felt, amount : felt, position_id_):
+    end
+end
+
+@contract_interface
+namespace IInsuranceFund:
+    func deposit(asset_id_ : felt, amount : felt, position_id_ : felt):
+    end
+
+    func withdraw(asset_id_ : felt, amount : felt, position_id_ : felt):
+    end
+end
+
+# @notice AuthorizedRegistry interface
+@contract_interface
+namespace IAuthorizedRegistry:
+    func get_registry_value(address : felt, action : felt) -> (allowed : felt):
     end
 end

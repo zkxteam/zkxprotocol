@@ -4,7 +4,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
-from starkware.cairo.common.bitwise import bitwise_and
+from starkware.cairo.common.bitwise import bitwise_or
 from starkware.starknet.common.syscalls import get_contract_address
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin, BitwiseBuiltin
@@ -49,6 +49,8 @@ struct OrderRequest:
     member direction : felt
     member closeOrder : felt
     member leverage : felt
+    member isLiquidation : felt
+    member liquidatorAddress : felt
     member parentOrder : felt
 end
 
@@ -64,6 +66,7 @@ end
 # status 3: close partial
 # status 4: close
 # status 5: toBeLiquidated
+# status 6: fullyLiquidated
 struct OrderDetails:
     member assetID : felt
     member collateralID : felt
@@ -296,11 +299,6 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         assert is_trading_contract = 1
     end
 
-    # Check that the balance doesn't go negative
-    with_attr error_message("Users balance is negative in account contract."):
-        assert_nn(balance_ - amount)
-    end
-
     balance.write(assetID=assetID_, value=balance_ - amount)
     return ()
 end
@@ -480,6 +478,7 @@ end
 # @notice External function called to remove a fully closed position
 # @param id_ - Index of the element in the array
 # @returns 1 - If successfully removed
+@external
 func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id_ : felt
 ) -> (res : felt):
@@ -514,11 +513,9 @@ end
 # @param array_list - Array of OrderRequests filled up to the index
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of OrderDetails
-func populate_array_positions{
-    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*) -> (
-    array_list_len : felt, array_list : OrderDetailsWithIDs*
-):
+func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
+) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
     alloc_locals
     let (pos) = position_array.read(index=iterator)
 
@@ -526,23 +523,23 @@ func populate_array_positions{
         return (array_list_len, array_list)
     end
 
-    let (pos_deets : OrderDetails) = order_mapping.read(orderID=pos)
+    let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
     let order_details_w_id = OrderDetailsWithIDs(
         orderID=pos,
-        assetID=pos_deets.assetID,
-        collateralID=pos_deets.collateralID,
-        price=pos_deets.price,
-        executionPrice=pos_deets.executionPrice,
-        positionSize=pos_deets.positionSize,
-        orderType=pos_deets.orderType,
-        direction=pos_deets.direction,
-        portionExecuted=pos_deets.portionExecuted,
-        status=pos_deets.status,
-        marginAmount=pos_deets.marginAmount,
-        borrowedAmount=pos_deets.borrowedAmount,
+        assetID=pos_details.assetID,
+        collateralID=pos_details.collateralID,
+        price=pos_details.price,
+        executionPrice=pos_details.executionPrice,
+        positionSize=pos_details.positionSize,
+        orderType=pos_details.orderType,
+        direction=pos_details.direction,
+        portionExecuted=pos_details.portionExecuted,
+        status=pos_details.status,
+        marginAmount=pos_details.marginAmount,
+        borrowedAmount=pos_details.borrowedAmount,
     )
 
-    let (is_valid_state) = is_le(pos_deets.status, 3)
+    let (is_valid_state) = is_le(pos_details.status, 3)
 
     if is_valid_state == 1:
         assert array_list[array_list_len] = order_details_w_id
@@ -556,9 +553,8 @@ end
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of OrderDetails
 @view
-func return_array_positions{
-    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}() -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
     alloc_locals
 
     let (array_list : OrderDetailsWithIDs*) = alloc()
@@ -571,11 +567,9 @@ end
 # @param array_list - Array of CollateralBalance filled up to the index
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of CollateralBalance
-func populate_array_collaterals{
-    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(array_list_len : felt, array_list : CollateralBalance*) -> (
+func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     array_list_len : felt, array_list : CollateralBalance*
-):
+) -> (array_list_len : felt, array_list : CollateralBalance*):
     alloc_locals
     let (collateral_id) = collateral_array.read(index=array_list_len)
 
@@ -596,9 +590,8 @@ end
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of CollateralBalance
 @view
-func return_array_collaterals{
-    bitwise_ptr : BitwiseBuiltin*, syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}() -> (array_list_len : felt, array_list : CollateralBalance*):
+func return_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (array_list_len : felt, array_list : CollateralBalance*):
     alloc_locals
 
     let (array_list : CollateralBalance*) = alloc()
@@ -614,7 +607,7 @@ func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (r
     let hash_ptr = pedersen_ptr
     with hash_ptr:
         let (hash_state_ptr) = hash_init()
-        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 9)
+        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 10)
         let (res) = hash_finalize(hash_state_ptr)
         let pedersen_ptr = hash_ptr
         return (res=res)
@@ -630,7 +623,7 @@ end
 # @returns 1, if executed correctly
 @external
 func execute_order{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ecdsa_ptr : SignatureBuiltin*, range_check_ptr
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
 }(
     request : OrderRequest,
     signature : Signature,
@@ -656,8 +649,8 @@ func execute_order{
     # hash the parameters
     let (hash) = hash_order(&request)
 
-    # check the validity of the signature
-    is_valid_signature_order(hash, signature)
+    # check if signed by the user/liquidator
+    is_valid_signature_order(hash, signature, request.isLiquidation, request.liquidatorAddress)
 
     local status_
     # closeOrder == 0 -> Open a new position
@@ -693,13 +686,11 @@ func execute_order{
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=new_order)
 
-            let (arr_len) = position_array_len.read()
-            position_array.write(index=arr_len, value=request.orderID)
-            position_array_len.write(arr_len + 1)
-
-            tempvar syscall_ptr : felt* = syscall_ptr
+            add_to_array(request.orderID)
+            tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
+            tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
             # If it's an existing order
         else:
             # Return if the position size after the executing the current order is more than the order's positionSize
@@ -735,10 +726,15 @@ func execute_order{
             )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=updated_order)
-            tempvar syscall_ptr : felt* = syscall_ptr
+            tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
+            tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
         end
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+        tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     else:
         # Get the order details
         let (orderDetails) = order_mapping.read(orderID=request.parentOrder)
@@ -754,9 +750,17 @@ func execute_order{
         # status_ == 4, fully closed
         # status_ == 3, partially closed
         if orderDetails.portionExecuted - size == 0:
-            assert status_ = 4
+            if request.isLiquidation == 1:
+                assert status_ = 6
+            else:
+                assert status_ = 4
+            end
         else:
-            assert status_ = 3
+            if request.isLiquidation == 1:
+                assert status_ = 5
+            else:
+                assert status_ = 3
+            end
         end
 
         # Create a new struct with the updated details
@@ -776,12 +780,11 @@ func execute_order{
 
         # Write to the mapping
         order_mapping.write(orderID=request.parentOrder, value=updated_order)
-
-        tempvar syscall_ptr : felt* = syscall_ptr
+        tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
+        tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     end
-
     return (1)
 end
 
@@ -792,15 +795,41 @@ end
 @view
 func is_valid_signature_order{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
-}(hash : felt, signature : Signature) -> ():
-    let (_public_key) = public_key.read()
+}(hash : felt, signature : Signature, is_liquidator, liquidator_address : felt) -> ():
+    alloc_locals
+
     let sig_r = signature.r_value
     let sig_s = signature.s_value
+    local pub_key
 
-    verify_ecdsa_signature(
-        message=hash, public_key=_public_key, signature_r=sig_r, signature_s=sig_s
-    )
+    if is_liquidator == 1:
+        let (auth_addr) = authorized_registry.read()
+        let (is_authorized) = IAuthorizedRegistry.get_registry_value(
+            contract_address=auth_addr, address=liquidator_address, action=12
+        )
 
+        with_attr error_message("The signer is not a authorized liquidator"):
+            assert is_authorized = 1
+        end
+
+        let (_public_key) = IAccount.get_public_key(contract_address=liquidator_address)
+        pub_key = _public_key
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+        tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
+    else:
+        let (acc_pub_key) = public_key.read()
+        pub_key = acc_pub_key
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+        tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
+    end
+
+    verify_ecdsa_signature(message=hash, public_key=pub_key, signature_r=sig_r, signature_s=sig_s)
     return ()
 end
 
@@ -923,7 +952,25 @@ end
 func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt
 ):
+    alloc_locals
+
     let (orderDetails : OrderDetails) = order_mapping.read(orderID=id)
+
+    # Check if the caller is the liquidator contract
+    let (caller) = get_caller_address()
+    let (auth_registry) = authorized_registry.read()
+
+    let (is_liquidate) = IAuthorizedRegistry.get_registry_value(
+        contract_address=auth_registry, address=caller, action=11
+    )
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
+
+    with_attr error_message("Only liquidate contract is allowed to call for liquidation"):
+        assert is_liquidate = 1
+    end
 
     # Create a new struct with the updated details
     let updated_order = OrderDetails(
@@ -957,5 +1004,12 @@ end
 @contract_interface
 namespace IAsset:
     func getAsset(id : felt) -> (currAsset : Asset):
+    end
+end
+
+# @notice Account interface
+@contract_interface
+namespace IAccount:
+    func get_public_key() -> (res : felt):
     end
 end

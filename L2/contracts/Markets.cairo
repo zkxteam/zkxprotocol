@@ -19,23 +19,23 @@ end
 # @notice struct to store details of markets
 struct Market:
     member asset : felt
-    member asset_collateral : felt
+    member assetCollateral : felt
     member leverage : felt
     member tradable : felt
 end
 
 # @notice struct to store details of assets
 struct Asset:
-    member asset_version : felt
+    member assetVersion : felt
     member ticker : felt
-    member short_name : felt
+    member shortName : felt
     member tradable : felt
     member collateral : felt
-    member token_decimal : felt
-    member metadata_id : felt
-    member tick_size : felt
-    member step_size : felt
-    member minimum_order_size : felt
+    member tokenDecimal : felt
+    member metadataID : felt
+    member tickSize : felt
+    member stepSize : felt
+    member minimumOrderSize : felt
     member minimum_leverage : felt
     member maximum_leverage : felt
     member currently_allowed_leverage : felt
@@ -85,7 +85,7 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     let (asset_address) = asset_contract_address.read()
     let (asset1 : Asset) = IAsset.getAsset(contract_address=asset_address, id=newMarket.asset)
     let (asset2 : Asset) = IAsset.getAsset(
-        contract_address=asset_address, id=newMarket.asset_collateral
+        contract_address=asset_address, id=newMarket.assetCollateral
     )
 
     assert_not_zero(asset2.collateral)
@@ -94,7 +94,7 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     if newMarket.tradable == 2:
         market.write(
             id=id,
-            value=Market(asset=newMarket.asset, asset_collateral=newMarket.asset_collateral, leverage=newMarket.leverage, tradable=asset1.tradable),
+            value=Market(asset=newMarket.asset, assetCollateral=newMarket.assetCollateral, leverage=newMarket.leverage, tradable=asset1.tradable),
         )
     else:
         if newMarket.tradable == 1:
@@ -120,7 +120,7 @@ func removeMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     )
     assert_not_zero(access)
 
-    market.write(id=id, value=Market(asset=0, asset_collateral=0, leverage=0, tradable=0))
+    market.write(id=id, value=Market(asset=0, assetCollateral=0, leverage=0, tradable=0))
     return ()
 end
 
@@ -145,7 +145,7 @@ func modifyLeverage{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 
     market.write(
         id=id,
-        value=Market(asset=_market.asset, asset_collateral=_market.asset_collateral, leverage=leverage, tradable=_market.tradable),
+        value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=leverage, tradable=_market.tradable),
     )
     return ()
 end
@@ -175,7 +175,7 @@ func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     if _market.tradable == 2:
         market.write(
             id=id,
-            value=Market(asset=_market.asset, asset_collateral=_market.asset_collateral, leverage=_market.leverage, tradable=asset1.tradable),
+            value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=_market.leverage, tradable=asset1.tradable),
         )
     else:
         if tradable == 1:
@@ -183,7 +183,7 @@ func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         end
         market.write(
             id=id,
-            value=Market(asset=_market.asset, asset_collateral=_market.asset_collateral, leverage=_market.leverage, tradable=tradable),
+            value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=_market.leverage, tradable=tradable),
         )
     end
 

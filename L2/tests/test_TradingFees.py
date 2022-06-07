@@ -59,7 +59,7 @@ async def adminAuth_factory():
         ]
     )
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
 
     return adminAuth, fees, admin1, admin2, user1
 
@@ -68,10 +68,10 @@ async def adminAuth_factory():
 async def test_get_admin_mapping(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1 = adminAuth_factory
 
-    execution_info = await adminAuth.get_admin_mapping(admin1.contract_address, 4).call()
+    execution_info = await adminAuth.get_admin_mapping(admin1.contract_address, 2).call()
     assert execution_info.result.allowed == 1
 
-    execution_info1 = await adminAuth.get_admin_mapping(admin2.contract_address, 4).call()
+    execution_info1 = await adminAuth.get_admin_mapping(admin2.contract_address, 2).call()
     assert execution_info1.result.allowed == 0
 
 

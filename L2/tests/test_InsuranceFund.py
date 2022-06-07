@@ -46,10 +46,21 @@ async def holding_factory():
         ]
     )
 
+    registry = await starknet.deploy(
+        "contracts/AuthorizedRegistry.cairo",
+        constructor_calldata=[
+            adminAuth.contract_address
+        ]
+    )
+
     insurance = await starknet.deploy(
         "contracts/InsuranceFund.cairo",
-        constructor_calldata=[adminAuth.contract_address]
+        constructor_calldata=[
+            adminAuth.contract_address, registry.contract_address]
     )
+
+    # Access 2 allows adding trusted contracts to the registry
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
 
     return adminAuth, insurance, admin1, admin2
 

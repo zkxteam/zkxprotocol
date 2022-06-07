@@ -57,8 +57,8 @@ async def adminAuth_factory():
         ]
     )
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
     await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj8"), 0, str_to_felt("ETH"), str_to_felt("Ethereum"), 1, 0, 18, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
     await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj7"), 0, str_to_felt("USDC"), str_to_felt("USDCoin"), 0, 1, 6, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
     await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj6"), 0, str_to_felt("DOT"), str_to_felt("Polkadot"), 0, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
@@ -111,7 +111,7 @@ async def test_add_new_market(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == 1
 
 
@@ -125,7 +125,7 @@ async def test_add_new_market_non_tradable(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
-    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == 1
     assert fetched_market.tradable == 0
 
@@ -140,7 +140,7 @@ async def test_add_new_market_default_tradable(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
-    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == 1
     assert fetched_market.tradable == 0
 
@@ -178,7 +178,7 @@ async def test_modify_leverage(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
-    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == 2
 
 
@@ -200,7 +200,7 @@ async def test_modify_tradable(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
-    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == 2
     assert fetched_market.tradable == 0
 
@@ -216,7 +216,7 @@ async def test_modify_tradable_0_to_1(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == 1
     assert fetched_market.tradable == 1
 
@@ -239,5 +239,5 @@ async def test_remove_market(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == 0
-    assert fetched_market.asset_collateral == 0
+    assert fetched_market.assetCollateral == 0
     assert fetched_market.leverage == 0

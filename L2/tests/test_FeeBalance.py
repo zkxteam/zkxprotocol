@@ -55,15 +55,26 @@ async def feeBalance_factory():
         ]
     )
 
+    registry = await starknet.deploy(
+        "contracts/AuthorizedRegistry.cairo",
+        constructor_calldata=[
+            adminAuth.contract_address
+        ]
+    )
+
     feeBalance = await starknet.deploy(
         "contracts/FeeBalance.cairo",
-        constructor_calldata=[adminAuth.contract_address]
+        constructor_calldata=[
+            adminAuth.contract_address, registry.contract_address]
     )
 
     callFeeBalance = await starknet.deploy(
         "contracts/CallFeeBalance.cairo",
         constructor_calldata=[feeBalance.contract_address]
     )
+
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_registry', [callFeeBalance.contract_address, 3, 1])
 
     return feeBalance, callFeeBalance, admin1, admin2
 
@@ -72,15 +83,13 @@ async def feeBalance_factory():
 async def test_update_fee_mapping_invalid(feeBalance_factory):
     feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
 
-    assert_revert(lambda: signer1.send_transaction(admin1, feeBalance.contract_address,
+    assert_revert(lambda: signer3.send_transaction(admin1, feeBalance.contract_address,
                   'update_fee_mapping', [pytest.user1.contract_address, 10]))
 
 
 @pytest.mark.asyncio
 async def test_update_fee_mapping(feeBalance_factory):
     feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
-
-    await signer1.send_transaction(admin1, feeBalance.contract_address, 'update_caller_address', [callFeeBalance.contract_address])
 
     await signer1.send_transaction(admin1, callFeeBalance.contract_address, 'update', [pytest.user1.contract_address, asset_ID, 10])
 

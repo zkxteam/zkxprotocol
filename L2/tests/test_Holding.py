@@ -46,9 +46,17 @@ async def holding_factory():
         ]
     )
 
+    registry = await starknet.deploy(
+        "contracts/AuthorizedRegistry.cairo",
+        constructor_calldata=[
+            adminAuth.contract_address
+        ]
+    )
+
     holding = await starknet.deploy(
         "contracts/Holding.cairo",
-        constructor_calldata=[adminAuth.contract_address]
+        constructor_calldata=[
+            adminAuth.contract_address, registry.contract_address]
     )
 
     return adminAuth, holding, admin1, admin2

@@ -7,7 +7,6 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, convertList
 
 alice_signer = Signer(123456789987654323)
-print("1 in 64x61", to64x61(1))
 
 BTC_ID = str_to_felt("32f0406jz7qj8")
 ETH_ID = str_to_felt("65ksgn23nv")

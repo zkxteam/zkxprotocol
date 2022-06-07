@@ -53,16 +53,28 @@ async def emergencyFund_factory():
         ]
     )
 
+    registry = await starknet.deploy(
+        "contracts/AuthorizedRegistry.cairo",
+        constructor_calldata=[
+            adminAuth.contract_address
+        ]
+    )
+
     holding = await starknet.deploy(
         "contracts/Holding.cairo",
-        constructor_calldata=[adminAuth.contract_address]
+        constructor_calldata=[
+            adminAuth.contract_address, registry.contract_address]
     )
 
     emergencyFund = await starknet.deploy(
         "contracts/EmergencyFund.cairo",
         constructor_calldata=[
-            adminAuth.contract_address, holding.contract_address]
+            adminAuth.contract_address, registry.contract_address]
     )
+    # Access 2 allows adding trusted contracts to the registry
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_registry', [emergencyFund.contract_address, 8, 1])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_registry', [holding.contract_address, 5, 1])
 
     return emergencyFund, holding, admin1, admin2
 
@@ -91,18 +103,17 @@ async def test_funding_flow(emergencyFund_factory):
 async def test_fund_through_funding_invalid(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2 = emergencyFund_factory
     assert_revert(lambda: signer1.send_transaction(
-        admin1, holding.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10]))
+        admin1, holding.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10, holding.contract_address]))
 
 
 @pytest.mark.asyncio
 async def test_fund_through_funding_contract(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2 = emergencyFund_factory
-    await signer1.send_transaction(admin1, holding.contract_address, 'update_emergency_address', [emergencyFund.contract_address])
 
-    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10])
+    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10, holding.contract_address])
     execution_info = await holding.balance(str_to_felt("TSLA")).call()
     assert execution_info.result.amount == 10
 
-    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 3])
+    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 3, holding.contract_address])
     execution_info = await holding.balance(str_to_felt("TSLA")).call()
     assert execution_info.result.amount == 7

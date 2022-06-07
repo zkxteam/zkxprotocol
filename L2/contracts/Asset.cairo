@@ -113,13 +113,13 @@ func getAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     return (currAsset)
 end
 
-# @notice Return the maintanence margin for the asset
+# @notice Return the maintenance margin for the asset
 # @param id - Id of the asset
-# @return maintanence_margin - Returns the maintanence margin of the asset
+# @return maintenance_margin - Returns the maintenance margin of the asset
 @view
 func get_maintenance_margin{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt
-) -> (maintanence_margin : felt):
+) -> (maintenance_margin : felt):
     let (curr_asset) = asset.read(id=id)
     return (curr_asset.maintenance_margin_fraction)
 end
