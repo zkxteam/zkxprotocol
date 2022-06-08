@@ -54,14 +54,14 @@ struct CollateralBalance:
     member balance : felt
 end
 
-# @notice Stores the address of Admin Registry contract
+# @notice Stores the contract version
 @storage_var
-func auth_registry() -> (contract_address : felt):
+func contract_version() -> (version : felt):
 end
 
-# @notice Address of the asset contract
+# @notice Stores the address of Authorized Registry contract
 @storage_var
-func asset_address() -> (contract_address : felt):
+func registry_address() -> (contract_address : felt):
 end
 
 #################
@@ -79,15 +79,15 @@ func collateral_total() -> (collateral_total : felt):
 end
 #################
 
-# @notice Constructor of the contract
-# @param _admin_authorized_address - Address of the adminAuth contract
-# @param _asset_address - Address of the asset contract
+# @notice Constructor of the smart-contract
+# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _auth_registry : felt, _asset_address : felt
+    registry_address_ : felt, version_ : felt
 ):
-    auth_registry.write(_auth_registry)
-    asset_address.write(_asset_address)
+    registry_address.write(value=registry_address_)
+    contract_version.write(value=version_)
     return ()
 end
 
@@ -199,10 +199,9 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     # Check if the list is empty, if yes return the result
     if positions_len == 0:
         # Fetch all the collaterals that the user holds
-        let (collaterals_len : felt,
-            collaterals : CollateralBalance*) = IAccount.return_array_collaterals(
-            contract_address=account_address
-        )
+        let (
+            collaterals_len : felt, collaterals : CollateralBalance*
+        ) = IAccount.return_array_collaterals(contract_address=account_address)
 
         # Calculate the value of all the collaterals in usd
         let (user_balance) = find_collateral_balance(
@@ -266,9 +265,13 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     end
 
     # Fetch the maintatanence margin requirement from asset contract
-    let (asset_contract) = asset_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=1, version=version
+    )
     let (req_margin) = IAsset.get_maintenance_margin(
-        contract_address=asset_contract, id=order_details.assetID
+        contract_address=asset_address, id=order_details.assetID
     )
 
     # Calculate the required margin in usd
@@ -341,15 +344,6 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Check if the caller is the liquidator contract
     let (caller) = get_caller_address()
-    let (authorized_registry) = auth_registry.read()
-
-    let (is_liquidator) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry, address=caller, action=12
-    )
-
-    with_attr error_message("Only liquidator is allowed to call for liquidation"):
-        assert is_liquidator = 1
-    end
 
     # Check if the list is empty
     with_attr error_message("Invalid Input"):
@@ -411,15 +405,16 @@ namespace IAccount:
     end
 end
 
-@contract_interface
-namespace IAsset:
-    func get_maintenance_margin(id : felt) -> (maintenance_margin : felt):
-    end
-end
-
 # @notice AuthorizedRegistry interface
 @contract_interface
 namespace IAuthorizedRegistry:
-    func get_registry_value(address : felt, action : felt) -> (allowed : felt):
+    func get_contract_address(index : felt, version : felt) -> (address : felt):
+    end
+end
+
+# @notice Asset interface
+@contract_interface
+namespace IAsset:
+    func get_maintenance_margin(id : felt) -> (maintenance_margin : felt):
     end
 end

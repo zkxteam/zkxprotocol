@@ -29,22 +29,22 @@ async def feeBalance_factory():
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0]
+        constructor_calldata=[signer1.public_key, 0, 1]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0]
+        constructor_calldata=[signer2.public_key, 0, 1]
     )
 
     pytest.user1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, 0]
+        constructor_calldata=[signer3.public_key, 0, 1]
     )
 
     pytest.user2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer4.public_key, 0]
+        constructor_calldata=[signer4.public_key, 0, 1]
     )
 
     adminAuth = await starknet.deploy(
@@ -65,7 +65,9 @@ async def feeBalance_factory():
     feeBalance = await starknet.deploy(
         "contracts/FeeBalance.cairo",
         constructor_calldata=[
-            adminAuth.contract_address, registry.contract_address]
+            registry.contract_address,
+            1
+        ]
     )
 
     callFeeBalance = await starknet.deploy(
@@ -73,8 +75,9 @@ async def feeBalance_factory():
         constructor_calldata=[feeBalance.contract_address]
     )
 
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_registry', [callFeeBalance.contract_address, 3, 1])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [5, 1, callFeeBalance.contract_address])
 
     return feeBalance, callFeeBalance, admin1, admin2
 

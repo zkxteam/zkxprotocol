@@ -132,6 +132,16 @@ end
 # Storage
 #
 
+# @notice Stores the contract version
+@storage_var
+func contract_version() -> (version : felt):
+end
+
+# @notice Stores the address of Authorized Registry contract
+@storage_var
+func registry_address() -> (contract_address : felt):
+end
+
 @storage_var
 func current_nonce() -> (res : felt):
 end
@@ -149,20 +159,12 @@ func balance(assetID : felt) -> (res : felt):
 end
 
 @storage_var
-func authorized_registry() -> (res : felt):
-end
-
-@storage_var
 func order_mapping(orderID : felt) -> (res : OrderDetails):
 end
 
 # L1 User associated with the account
 @storage_var
 func L1_address() -> (res : felt):
-end
-
-@storage_var
-func asset_contract_address() -> (res : felt):
 end
 
 # Store positions to facilitate liquidation request
@@ -266,10 +268,11 @@ end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _public_key : felt, _registry : felt
+    public_key_ : felt, registry_address_ : felt, version_ : felt
 ):
-    public_key.write(_public_key)
-    authorized_registry.write(_registry)
+    public_key.write(public_key_)
+    registry_address.write(value=registry_address_)
+    contract_version.write(value=version_)
     return ()
 end
 
@@ -287,16 +290,16 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
     let (balance_) = balance.read(assetID=assetID_)
 
-    let (authorized_registry_) = authorized_registry.read()
-    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry_, address=caller, action=3
+    let (trading_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=5, version=version
     )
 
-    with_attr error_message(
-            "Trading contract is not authorized to do transferFrom in account contract."):
-        assert is_trading_contract = 1
+    with_attr error_message("Caller is not authorized to do transferFrom in account contract."):
+        assert caller = trading_address
     end
 
     balance.write(assetID=assetID_, value=balance_ - amount)
@@ -312,15 +315,16 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     alloc_locals
 
     let (caller) = get_caller_address()
-    let (authorized_registry_) = authorized_registry.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
 
-    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry_, address=caller, action=3
+    let (trading_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=5, version=version
     )
     with_attr error_message(
             "Trading contract is not authorized to do transfer in account contract."):
-        assert is_trading_contract = 1
+        assert caller = trading_address
     end
 
     with_attr error_message("Amount supplied shouldn't be negative in account contract."):
@@ -637,13 +641,15 @@ func execute_order{
 
     # Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address()
-    let (authorized_registry_) = authorized_registry.read()
-    let (is_trading_contract) = IAuthorizedRegistry.get_registry_value(
-        contract_address=authorized_registry_, address=caller, action=3
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    let (trading_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=5, version=version
     )
     with_attr error_message(
             "Trading contract is not authorized to execute order in account contract."):
-        assert is_trading_contract = 1
+        assert caller = trading_address
     end
 
     # hash the parameters
@@ -795,7 +801,7 @@ end
 @view
 func is_valid_signature_order{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
-}(hash : felt, signature : Signature, is_liquidator, liquidator_address : felt) -> ():
+}(hash : felt, signature : Signature, is_liquidator, liquidator_address_ : felt) -> ():
     alloc_locals
 
     let sig_r = signature.r_value
@@ -803,13 +809,17 @@ func is_valid_signature_order{
     local pub_key
 
     if is_liquidator == 1:
-        let (auth_addr) = authorized_registry.read()
-        let (is_authorized) = IAuthorizedRegistry.get_registry_value(
-            contract_address=auth_addr, address=liquidator_address, action=12
+        let (caller) = get_caller_address()
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+
+        # Get liquidator's contract address
+        let (liquidator_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=13, version=version
         )
 
         with_attr error_message("The signer is not a authorized liquidator"):
-            assert is_authorized = 1
+            assert liquidator_address = liquidator_address_
         end
 
         let (_public_key) = IAccount.get_public_key(contract_address=liquidator_address)
@@ -853,7 +863,14 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     balance.write(assetID=assetID_, value=new_balance)
 
     # Reading token decimal field of an asset
-    let (asset_address) = asset_contract_address.read()
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Get asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=1, version=version
+    )
     let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_)
     tempvar decimal = asset.token_decimal
 
@@ -894,7 +911,14 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     L1_address.write(user)
 
     # Reading token decimal field of an asset
-    let (asset_address) = asset_contract_address.read()
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Get asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=1, version=version
+    )
     let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_)
     tempvar decimal = asset.token_decimal
 
@@ -958,18 +982,14 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
 
     # Check if the caller is the liquidator contract
     let (caller) = get_caller_address()
-    let (auth_registry) = authorized_registry.read()
-
-    let (is_liquidate) = IAuthorizedRegistry.get_registry_value(
-        contract_address=auth_registry, address=caller, action=11
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=11, version=version
     )
 
-    tempvar syscall_ptr = syscall_ptr
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-    tempvar range_check_ptr = range_check_ptr
-
     with_attr error_message("Only liquidate contract is allowed to call for liquidation"):
-        assert is_liquidate = 1
+        assert caller = liquidate_address
     end
 
     # Create a new struct with the updated details
@@ -996,7 +1016,7 @@ end
 # @notice AuthorizedRegistry interface
 @contract_interface
 namespace IAuthorizedRegistry:
-    func get_registry_value(address : felt, action : felt) -> (allowed : felt):
+    func get_contract_address(index : felt, version : felt) -> (address : felt):
     end
 end
 

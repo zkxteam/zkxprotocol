@@ -1,3 +1,4 @@
+from copyreg import constructor
 import pytest
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
@@ -21,6 +22,9 @@ USDC_ID = str_to_felt("fghj3am52qpzsib")
 UST_ID = str_to_felt("yjk45lvmasopq")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
+TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
+DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
+TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
 
 @pytest.fixture(scope='module')
@@ -30,16 +34,15 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory():
-
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, 0]
+        constructor_calldata=[admin1_signer.public_key, 0, 1]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin2_signer.public_key, 0]
+        constructor_calldata=[admin2_signer.public_key, 0, 1]
     )
 
     adminAuth = await starknet.deploy(
@@ -65,14 +68,6 @@ async def adminAuth_factory():
         ]
     )
 
-    asset = await starknet.deploy(
-        "contracts/Asset.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address,
-            0
-        ]
-    )
-
     registry = await starknet.deploy(
         "contracts/AuthorizedRegistry.cairo",
         constructor_calldata=[
@@ -80,11 +75,20 @@ async def adminAuth_factory():
         ]
     )
 
+    asset = await starknet.deploy(
+        "contracts/Asset.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1
+        ]
+    )
+
     alice = await starknet.deploy(
         "contracts/Account.cairo",
         constructor_calldata=[
             alice_signer.public_key,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -92,7 +96,8 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             bob_signer.public_key,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -100,7 +105,8 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             charlie_signer.public_key,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -108,7 +114,8 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             liquidator_signer.public_key,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -121,48 +128,40 @@ async def adminAuth_factory():
     holding = await starknet.deploy(
         "contracts/Holding.cairo",
         constructor_calldata=[
-            adminAuth.contract_address, registry.contract_address]
+            registry.contract_address,
+            1
+        ]
     )
 
     feeBalance = await starknet.deploy(
         "contracts/FeeBalance.cairo",
         constructor_calldata=[
-            adminAuth.contract_address, registry.contract_address]
+            registry.contract_address,
+            1
+        ]
     )
 
     market = await starknet.deploy(
         "contracts/Markets.cairo",
         constructor_calldata=[
-            adminAuth.contract_address,
-            asset.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
     liquidityFund = await starknet.deploy(
         "contracts/LiquidityFund.cairo",
         constructor_calldata=[
-            adminAuth.contract_address, registry.contract_address
-        ]
-    )
-
-    insuranceFund = await starknet.deploy(
-        "contracts/InsuranceFund.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address, registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
     trading = await starknet.deploy(
         "contracts/Trading.cairo",
         constructor_calldata=[
-            asset.contract_address,
-            fees.contract_address,
-            holding.contract_address,
-            feeBalance.contract_address,
-            market.contract_address,
-            liquidityFund.contract_address,
             registry.contract_address,
-            insuranceFund.contract_address
+            1
         ]
     )
 
@@ -170,18 +169,36 @@ async def adminAuth_factory():
         "contracts/Liquidate.cairo",
         constructor_calldata=[
             registry.contract_address,
-            asset.contract_address
+            1
+        ]
+    )
+
+    insuranceFund = await starknet.deploy(
+        "contracts/InsuranceFund.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1
         ]
     )
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
-
-    # Access 2 allows adding trusted contracts to the registry
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
-
-    # Access 3 allows adding trusted contracts to the registry
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
+    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
+    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 5, 1])
+
+    # Update contract addresses in registry
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [4, 1, fees.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [5, 1, trading.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [6, 1, feeBalance.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [7, 1, holding.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidityFund.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insuranceFund.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, liquidator.contract_address])
 
     # Add assets
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000])
@@ -189,19 +206,8 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [UST_ID, 0, str_to_felt("UST"), str_to_felt("UST"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
 
-    # Add markets
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, 0, 1])
-
-    # Add the deployed trading contract to the list of trusted contracts in the registry
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [asset.contract_address, 1, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [market.contract_address, 2, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [trading.contract_address, 3, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [holding.contract_address, 5, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [liquidityFund.contract_address, 6, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [insuranceFund.contract_address, 7, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [liquidate.contract_address, 11, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [liquidator.contract_address, 12, 1])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
@@ -949,6 +955,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     leveraged_amount_out1 = await fixed_math.mul_fp(adjusted_price1, size).call()
     value_to_be_returned1 = to64x61(7357.5) - leveraged_amount_out1.result.res
 
+
     res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
         size,
         execution_price1,
@@ -1010,6 +1017,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     assert from64x61(insurance_balance.result.amount) == from64x61(
         insurance_balance_before.result.amount - value_to_be_returned1)
     assert charlie_curr_balance.result.res == to64x61(0)
+
 
 
 @pytest.mark.asyncio

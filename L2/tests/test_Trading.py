@@ -38,12 +38,12 @@ async def adminAuth_factory():
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, 0]
+        constructor_calldata=[admin1_signer.public_key, 0, 1]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin2_signer.public_key, 0]
+        constructor_calldata=[admin2_signer.public_key, 0, 1]
     )
 
     adminAuth = await starknet.deploy(
@@ -51,6 +51,13 @@ async def adminAuth_factory():
         constructor_calldata=[
             admin1.contract_address,
             admin2.contract_address
+        ]
+    )
+
+    registry = await starknet.deploy(
+        "contracts/AuthorizedRegistry.cairo",
+        constructor_calldata=[
+            adminAuth.contract_address
         ]
     )
 
@@ -72,15 +79,8 @@ async def adminAuth_factory():
     asset = await starknet.deploy(
         "contracts/Asset.cairo",
         constructor_calldata=[
-            adminAuth.contract_address,
-            0
-        ]
-    )
-
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -88,7 +88,8 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             alice_signer.public_key,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -96,7 +97,8 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             bob_signer.public_key,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -104,7 +106,8 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             charlie_signer.public_key,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -112,7 +115,8 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             dave_signer.public_key,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
@@ -125,58 +129,56 @@ async def adminAuth_factory():
     holding = await starknet.deploy(
         "contracts/Holding.cairo",
         constructor_calldata=[
-            adminAuth.contract_address, registry.contract_address]
+            registry.contract_address,
+            1
+        ]
     )
 
     feeBalance = await starknet.deploy(
         "contracts/FeeBalance.cairo",
         constructor_calldata=[
-            adminAuth.contract_address, registry.contract_address]
+            registry.contract_address,
+            1
+        ]
     )
 
     market = await starknet.deploy(
         "contracts/Markets.cairo",
         constructor_calldata=[
-            adminAuth.contract_address,
-            asset.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
     liquidity = await starknet.deploy(
         "contracts/LiquidityFund.cairo",
         constructor_calldata=[
-            adminAuth.contract_address,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
     insurance = await starknet.deploy(
         "contracts/InsuranceFund.cairo",
         constructor_calldata=[
-            adminAuth.contract_address,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
     emergency = await starknet.deploy(
         "contracts/EmergencyFund.cairo",
         constructor_calldata=[
-            adminAuth.contract_address,
-            registry.contract_address
+            registry.contract_address,
+            1
         ]
     )
 
     trading = await starknet.deploy(
         "contracts/Trading.cairo",
         constructor_calldata=[
-            asset.contract_address,
-            fees.contract_address,
-            holding.contract_address,
-            feeBalance.contract_address,
-            market.contract_address,
-            liquidity.contract_address,
             registry.contract_address,
-            insurance.contract_address
+            1
         ]
     )
 
@@ -188,6 +190,19 @@ async def adminAuth_factory():
 
     # Access 3 allows adding trusted contracts to the registry
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
+    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
+    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 5, 1])
+
+    # Update contract addresses in registry
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [4, 1, fees.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [5, 1, trading.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [6, 1, feeBalance.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [7, 1, holding.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [8, 1, emergency.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidity.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insurance.contract_address])
 
     # Add assets
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
@@ -201,15 +216,6 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, 0, 1])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [TSLA_USD_ID, TSLA_ID, USDC_ID, 0, 0])
-
-    # Add the deployed trading contract to the list of trusted contracts in the registry
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [asset.contract_address, 1, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [market.contract_address, 2, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [trading.contract_address, 3, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [holding.contract_address, 5, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [liquidity.contract_address, 6, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [insurance.contract_address, 7, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_registry', [emergency.contract_address, 8, 1])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])

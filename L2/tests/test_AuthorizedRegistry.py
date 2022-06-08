@@ -21,17 +21,17 @@ async def adminAuth_factory():
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0]
+        constructor_calldata=[signer1.public_key, 0, 1]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0]
+        constructor_calldata=[signer2.public_key, 0, 1]
     )
 
     user1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, 0]
+        constructor_calldata=[signer3.public_key, 0, 1]
     )
 
     adminAuth = await starknet.deploy(
@@ -69,12 +69,12 @@ async def test_get_admin_mapping(adminAuth_factory):
 async def test_modify_registry_by_admin(adminAuth_factory):
     adminAuth, registry, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_registry', [1, 1, 1])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, 123])
 
-    execution_info = await registry.get_registry_value(1, 1).call()
-    result = execution_info.result.allowed
+    execution_info = await registry.get_contract_address(1, 1).call()
+    result = execution_info.result.address
 
-    assert result == 1
+    assert result == 123
 
 
 @pytest.mark.asyncio
@@ -82,8 +82,15 @@ async def test_modify_registry_by_unauthorized(adminAuth_factory):
     adminAuth, registry, admin1, admin2, user1 = adminAuth_factory
 
     assert_revert(lambda: signer3.send_transaction(
-        user1, registry.contract_address, 'update_registry', [1, 1, 1]))
-    assert_revert(lambda: signer3.send_transaction(
-        user1, registry.contract_address, 'update_registry', [1, 1, 0]))
-    assert_revert(lambda: signer3.send_transaction(
-        user1, registry.contract_address, 'update_registry', [2, 1, 1]))
+        user1, registry.contract_address, 'update_contract_registry', [2, 1, 123]))
+
+@pytest.mark.asyncio
+async def test_modify_registry_by_admin_already_updated(adminAuth_factory):
+    adminAuth, registry, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, 1234])
+
+    execution_info = await registry.get_contract_address(1, 1).call()
+    result = execution_info.result.address
+
+    assert result == 123

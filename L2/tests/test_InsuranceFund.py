@@ -25,17 +25,17 @@ async def holding_factory():
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0]
+        constructor_calldata=[signer1.public_key, 0, 1]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0]
+        constructor_calldata=[signer2.public_key, 0, 1]
     )
 
     pytest.user1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, 0]
+        constructor_calldata=[signer3.public_key, 0, 1]
     )
 
     adminAuth = await starknet.deploy(
@@ -56,11 +56,14 @@ async def holding_factory():
     insurance = await starknet.deploy(
         "contracts/InsuranceFund.cairo",
         constructor_calldata=[
-            adminAuth.contract_address, registry.contract_address]
+            registry.contract_address,
+            1
+        ]
     )
 
     # Access 2 allows adding trusted contracts to the registry
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 5, 1])
 
     return adminAuth, insurance, admin1, admin2
 
@@ -92,6 +95,12 @@ async def test_defund_admin(holding_factory):
     execution_info = await insurance.balance(str_to_felt("USDC")).call()
     assert execution_info.result.amount == 0
 
+@pytest.mark.asyncio
+async def test_defund_more_than_available(holding_factory):
+    _, insurance, _, _ = holding_factory
+
+    assert_revert(lambda: signer1.send_transaction(
+        admin1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 200]))
 
 @pytest.mark.asyncio
 async def test_defund_reject(holding_factory):
