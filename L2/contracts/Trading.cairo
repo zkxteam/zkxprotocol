@@ -35,10 +35,6 @@ func registry_address() -> (contract_address : felt):
 end
 
 @storage_var
-func asset_contract_address() -> (res : felt):
-end
-
-@storage_var
 func net_acc() -> (res : felt):
 end
 
