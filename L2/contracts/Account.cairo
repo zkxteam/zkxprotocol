@@ -938,16 +938,31 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (array_len) = collateral_array_len.read()
     let (balance_collateral) = balance.read(assetID=assetID_)
 
-    tempvar syscall_ptr = syscall_ptr
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-    tempvar range_check_ptr = range_check_ptr
     if balance_collateral == 0:
         add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
     end
-
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    if array_len == 0:
+        let (account_contract_address) = get_contract_address()
+        # Get Account Registry contract address
+        let (account_registry_address) = IAuthorizedRegistry.get_contract_address(contract_address=registry, index=14, version=version)
+        # Add the account address to the account registry
+        IAccountRegistry.add_to_account_registry(contract_address=account_registry_address, address = account_contract_address)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
     return ()
 end
 
@@ -1031,5 +1046,12 @@ end
 @contract_interface
 namespace IAccount:
     func get_public_key() -> (res : felt):
+    end
+end
+
+# @notice AccountRegistry interface
+@contract_interface
+namespace IAccountRegistry:
+    func add_to_account_registry(address : felt) -> (res : felt):
     end
 end
