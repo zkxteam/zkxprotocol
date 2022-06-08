@@ -11,7 +11,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of AuthorizedRegistry contract
+# @notice Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end

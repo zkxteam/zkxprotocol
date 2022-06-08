@@ -46,7 +46,7 @@ end
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of AdminAuth contract
+# @notice Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
