@@ -6,15 +6,16 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_nn
 from starkware.starknet.common.syscalls import get_caller_address
+from contracts.Math_64x61 import Math64x61_mul
 
-# @notice Stores the address of AdminAuth contract
+# @notice Stores the contract version
 @storage_var
-func auth_address() -> (contract_address : felt):
+func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of FeeDiscount contract
+# @notice Stores the address of Authorized Registry contract
 @storage_var
-func fee_discount_address() -> (contract_address : felt):
+func registry_address() -> (contract_address : felt):
 end
 
 # @notice Stores the maximum base fee tier
@@ -50,15 +51,15 @@ end
 func discount_tiers(tier : felt) -> (value : Discount):
 end
 
-# @notice Constructor for the smart-contract
-# @param auth_address_ - Address of the AdminAuth Contract
-# @param fee_discount_address_ - Address of the FeeDiscount Contract
+# @notice Constructor of the smart-contract
+# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    auth_address_ : felt, fee_discount_address_ : felt
+    registry_address_ : felt, version_ : felt
 ):
-    auth_address.write(value=auth_address_)
-    fee_discount_address.write(value=fee_discount_address_)
+    registry_address.write(value=registry_address_)
+    contract_version.write(value=version_)
     return ()
 end
 
@@ -72,9 +73,13 @@ func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=4
+        contract_address=auth_address, address=caller, action=4
     )
     assert_not_zero(access)
 
@@ -107,9 +112,13 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=4
+        contract_address=auth_address, address=caller, action=4
     )
     assert_not_zero(access)
 
@@ -141,9 +150,13 @@ func update_max_base_fee_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=4
+        contract_address=auth_address, address=caller, action=4
     )
     assert_not_zero(access)
 
@@ -160,9 +173,13 @@ func update_max_discount_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     alloc_locals
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = auth_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=0, version=version
+    )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=4
+        contract_address=auth_address, address=caller, action=4
     )
     assert_not_zero(access)
 
@@ -257,11 +274,15 @@ end
 @view
 func get_user_fee_and_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt, side_ : felt
-) -> (base_fee : felt, discount : felt):
+) -> (fee : felt):
     alloc_locals
-    let (fee_discount_addr) = fee_discount_address.read()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (fee_discount_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=3, version=version
+    )
     let (number_of_tokens) = IFeeDiscount.get_user_tokens(
-        contract_address=fee_discount_addr, address=address_
+        contract_address=fee_discount_address, address=address_
     )
 
     let (max_base_fee_level) = max_base_fee_tier.read()
@@ -274,10 +295,24 @@ func get_user_fee_and_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         number_of_tokens_=number_of_tokens, tier_=max_discount_level
     )
 
+    local base_fee
     if side_ == 0:
-        return (base_fee=base_fee_maker, discount=discount)
+        base_fee = base_fee_maker
     else:
-        return (base_fee=base_fee_taker, discount=discount)
+        base_fee = base_fee_taker
+    end
+
+    # Calculate fee after the discount
+    let non_discount = 2305843009213693952 - discount
+    let fee : felt = Math64x61_mul(base_fee, non_discount)
+
+    return (fee=fee)
+end
+
+# @notice AuthorizedRegistry interface
+@contract_interface
+namespace IAuthorizedRegistry:
+    func get_contract_address(index : felt, version : felt) -> (address : felt):
     end
 end
 
