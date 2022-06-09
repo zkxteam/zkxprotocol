@@ -118,7 +118,8 @@ func get_account_registry{
 }() -> (account_registry_len : felt, account_registry : felt*):
     alloc_locals
     let (account_registry_list : felt*) = alloc()
-    return populate_account_registry(0, account_registry_list)
+    let (account_registry_len_, account_registry_list_) =  populate_account_registry(0, account_registry_list)
+    return (account_registry_len = account_registry_len_, account_registry = account_registry_list_)
 end
 
 # @notice AuthorizedRegistry interface
