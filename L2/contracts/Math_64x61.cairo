@@ -91,6 +91,7 @@ func Math64x61_max{range_check_ptr}(x : felt, y : felt) -> (res : felt):
 end
 
 # Convenience addition method to assert no overflow before returning
+@view
 func Math64x61_add{range_check_ptr}(x : felt, y : felt) -> (res : felt):
     let res = x + y
     Math64x61_assert64x61(res)
@@ -98,6 +99,7 @@ func Math64x61_add{range_check_ptr}(x : felt, y : felt) -> (res : felt):
 end
 
 # Convenience subtraction method to assert no overflow before returning
+@view
 func Math64x61_sub{range_check_ptr}(x : felt, y : felt) -> (res : felt):
     let res = x - y
     Math64x61_assert64x61(res)
@@ -105,6 +107,7 @@ func Math64x61_sub{range_check_ptr}(x : felt, y : felt) -> (res : felt):
 end
 
 # Multiples two fixed point values and checks for overflow before returning
+@view
 func Math64x61_mul{range_check_ptr}(x : felt, y : felt) -> (res : felt):
     tempvar product = x * y
     let (res, _) = signed_div_rem(product, Math64x61_FRACT_PART, Math64x61_BOUND)
@@ -114,6 +117,7 @@ end
 
 # Divides two fixed point values and checks for overflow before returning
 # Both values may be signed (i.e. also allows for division by negative b)
+@view
 func Math64x61_div{range_check_ptr}(x : felt, y : felt) -> (res : felt):
     alloc_locals
     let (div) = abs_value(y)

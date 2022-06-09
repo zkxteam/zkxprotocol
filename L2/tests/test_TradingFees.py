@@ -60,6 +60,17 @@ async def adminAuth_factory():
         ]
     )
 
+    fixed_math = await starknet.deploy(
+        "contracts/Math_64x61.cairo",
+        constructor_calldata=[
+        ]
+    )
+
+    non_discount = 2305843009213693952 - to64x61(0.03)
+    fee = to64x61(0.0002)
+    val = await fixed_math.Math64x61_mul(non_discount, fee).call()
+    print(val.result)
+
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [3, 1, feeDiscount.contract_address])
@@ -156,6 +167,7 @@ async def test_update_discount(adminAuth_factory):
 async def test_get_fee1(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
+    # Commenting because of 64x61 bug
     # execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 0).call()
     # result = execution_info.result
     # assert result.fee == to64x61(0.0002 * 0.97)
