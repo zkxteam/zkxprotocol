@@ -611,7 +611,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     alice_acc_value = await liquidate.return_acc_value().call()
     print("Alice acc value:", from64x61(alice_acc_value.result.res))
 
-    assert from64x61(alice_acc_value.result.res) == 5738.4800000000005
+    assert from64x61(alice_acc_value.result.res) == 5819.754725000001
 
     ##############################################
     ######## Bob's liquidation result 2 ##########
@@ -651,7 +651,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
     print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
 
-    assert from64x61(bob_balance_usdc.result.res) == 776.4
+    assert from64x61(bob_balance_usdc.result.res) == 898.0018
 
     bob_balance_ust = await bob.get_balance(UST_ID).call()
     print("Bob ust balance is...", from64x61(bob_balance_ust.result.res))
@@ -667,398 +667,398 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     bob_acc_value = await liquidate.return_acc_value().call()
     print("bob acc value:", from64x61(bob_acc_value.result.res))
 
-    assert from64x61(bob_acc_value.result.res) == 6445.22
-
-
-# @pytest.mark.asyncio
-# async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
-#     ##############################################
-#     ######## Alice's liquidation result 3 ##########
-#     ##############################################
-
-#     liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
-#         alice.contract_address,
-#         # 2 Position + 2 Collaterals
-#         4,
-#         # Position 1 - BTC short
-#         BTC_ID,
-#         USDC_ID,
-#         to64x61(7357.5),
-#         to64x61(1.05),
-#         # Position 2 - ETH short
-#         ETH_ID,
-#         USDC_ID,
-#         to64x61(100),
-#         to64x61(1.05),
-#         # Collateral 1 - USDC
-#         0,
-#         USDC_ID,
-#         0,
-#         to64x61(1.05),
-#         # Collateral 2 - UST
-#         0,
-#         UST_ID,
-#         0,
-#         to64x61(0.05)
-#     ])
-#     print("liquidation result alice liquidated...", liquidate_result_alice.result.response[0], " ",
-#           liquidate_result_alice.result.response[1])
-
-#     assert liquidate_result_alice.result.response[1] == str_to_felt(
-#         "343uofdsjxz")
-#     assert liquidate_result_alice.result.response[0] == 1
-
-#     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
-#     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
-
-#     assert from64x61(alice_balance_usdc.result.res) == 317.6
-
-#     alice_balance_ust = await alice.get_balance(UST_ID).call()
-#     print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
-
-#     assert from64x61(alice_balance_ust.result.res) == 1000
-
-#     alice_maintenance = await liquidate.return_maintenance().call()
-#     print("Alice maintenance requirement:",
-#           from64x61(alice_maintenance.result.res))
-
-#     assert from64x61(alice_maintenance.result.res) == 811.125
-
-#     alice_acc_value = await liquidate.return_acc_value().call()
-#     print("Alice acc value:", from64x61(alice_acc_value.result.res))
-
-#     assert from64x61(alice_acc_value.result.res) == 787.73
-
-#     order_state = await alice.get_order_data(orderID_=liquidate_result_alice.result.response[1]).call()
-#     res4 = list(order_state.result.res)
-
-#     print(res4)
-
-
-# @pytest.mark.asyncio
-# async def test_liquidation_flow(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
-
-#     charlie_usdc = to64x61(8000)
-#     await admin2_signer.send_transaction(admin2, charlie.contract_address, 'set_balance', [USDC_ID, charlie_usdc])
-
-#     insurance_balance_before = await insuranceFund.balance(asset_id_=USDC_ID).call()
-#     print("insurance balance before:", from64x61(
-#         insurance_balance_before.result.amount))
-
-#     alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-#     print("alice balance before:", from64x61(
-#         alice_curr_balance_before.result.res))
-
-#     ####### Liquidation Order 1#######
-#     size = to64x61(2)
-#     marketID_1 = BTC_USD_ID
-
-#     order_id_1 = str_to_felt("0jfds78324sjxz")
-#     assetID_1 = BTC_ID
-#     collateralID_1 = USDC_ID
-#     price1 = to64x61(7357.5)
-#     orderType1 = 0
-#     position1 = to64x61(2)
-#     direction1 = 1
-#     closeOrder1 = 1
-#     parentOrder1 = str_to_felt("343uofdsjxz")
-#     leverage1 = to64x61(2)
-#     isLiquidation1 = 1
-#     liquidatorAddress1 = liquidator.contract_address
-
-#     order_id_2 = str_to_felt("sadfjkh2178")
-#     assetID_2 = BTC_ID
-#     collateralID_2 = USDC_ID
-#     price2 = to64x61(7357.5)
-#     orderType2 = 0
-#     position2 = to64x61(2)
-#     direction2 = 0
-#     closeOrder2 = 0
-#     parentOrder2 = 0
-#     leverage2 = to64x61(2)
-#     isLiquidation2 = 0
-#     liquidatorAddress2 = 0
-
-#     execution_price1 = to64x61(7357.5)
-
-#     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-#                                 price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
-#     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-#                                 price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
-
-#     signed_message1 = liquidator_signer.sign(hash_computed1)
-#     signed_message2 = charlie_signer.sign(hash_computed2)
-
-#     diff1 = to64x61(5000) - execution_price1
-
-#     pnl1 = await fixed_math.Math64x61_mul(diff1, size).call()
-#     net_acc_value = pnl1.result.res + to64x61(5000)
-
-#     res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
-#         size,
-#         execution_price1,
-#         marketID_1,
-#         2,
-#         alice.contract_address, signed_message1[0], signed_message1[
-#             1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1,
-#         charlie.contract_address, signed_message2[0], signed_message2[
-#             1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
-#     ])
-
-#     orderState1 = await alice.get_order_data(orderID_=parentOrder1).call()
-#     res1 = list(orderState1.result.res)
-#     print(res1)
-#     print(from64x61(res1[2]))
-
-#     assert res1 == [
-#         assetID_1,
-#         collateralID_1,
-#         to64x61(5000),
-#         to64x61(5000),
-#         0,
-#         orderType1,
-#         0,
-#         to64x61(0),
-#         6,
-#         to64x61(0),
-#         to64x61(0)
-#     ]
-
-#     orderState2 = await charlie.get_order_data(orderID_=order_id_2).call()
-#     res2 = list(orderState2.result.res)
-#     print(res2)
-
-#     assert res2 == [
-#         assetID_2,
-#         collateralID_2,
-#         price2,
-#         execution_price1,
-#         position2,
-#         orderType2,
-#         direction2,
-#         to64x61(2),
-#         2,
-#         to64x61(7357.5),
-#         to64x61(7357.5)
-#     ]
-
-#     insurance_balance = await insuranceFund.balance(asset_id_=USDC_ID).call()
-#     print("insurance balance after:", from64x61(
-#         insurance_balance.result.amount))
-
-#     alice_curr_balance = await alice.get_balance(USDC_ID).call()
-#     print("alice balance after", from64x61(alice_curr_balance.result.res))
-
-#     account_value = await trading.return_net_acc().call()
-#     print("account value:", from64x61(account_value.result.res))
-
-#     assert from64x61(insurance_balance.result.amount) == from64x61(
-#         net_acc_value)
-#     assert alice_curr_balance.result.res == alice_curr_balance_before.result.res
-
-
-# @pytest.mark.asyncio
-# async def test_liquidation_flow_underwater(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
-
-#     ##############################################
-#     ######## Charlie's liquidation result 1 ##########
-#     ##############################################
-
-#     liquidate_result_charlie = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
-#         charlie.contract_address,
-#         # 1 Position + 1 Collateral
-#         2,
-#         # Position 1 - BTC short
-#         BTC_ID,
-#         USDC_ID,
-#         to64x61(11500),
-#         to64x61(1.05),
-#         # Collateral 1 - USDC
-#         0,
-#         USDC_ID,
-#         0,
-#         to64x61(1.05),
-#     ])
-#     print("liquidation result of charlie...",
-#           liquidate_result_charlie.result.response[0], " ", liquidate_result_charlie.result.response[1])
-
-#     assert liquidate_result_charlie.result.response[0] == 1
-#     assert liquidate_result_charlie.result.response[1] == str_to_felt(
-#         "sadfjkh2178")
-
-#     charlie_balance_usdc = await charlie.get_balance(USDC_ID).call()
-#     print("Charlie usdc balance is...", from64x61(
-#         charlie_balance_usdc.result.res))
-
-#     assert from64x61(charlie_balance_usdc.result.res) == 524.78
-
-#     charlie_maintenance = await liquidate.return_maintenance().call()
-#     print("Charlie maintenance requirement:",
-#           from64x61(charlie_maintenance.result.res))
-
-#     assert from64x61(charlie_maintenance.result.res) == 1158.80625
-
-#     charlie_acc_value = await liquidate.return_acc_value().call()
-#     print("Charlie acc value:", from64x61(charlie_acc_value.result.res))
-
-#     assert from64x61(charlie_acc_value.result.res) == -422.856
-
-#     ###################
-
-#     alice_usdc = to64x61(13000)
-#     await admin2_signer.send_transaction(admin2, alice.contract_address, 'set_balance', [USDC_ID, alice_usdc])
-
-#     insurance_balance_before = await insuranceFund.balance(asset_id_=USDC_ID).call()
-#     print("insurance balance before:", from64x61(
-#         insurance_balance_before.result.amount))
-
-#     charlie_curr_balance_before = await charlie.get_balance(USDC_ID).call()
-#     print("charlie balance before:", from64x61(
-#         charlie_curr_balance_before.result.res))
-
-#     ####### Liquidation Order 2#######
-#     size = to64x61(2)
-#     marketID_1 = BTC_USD_ID
-
-#     order_id_1 = str_to_felt("3j432gsd8324sjxz")
-#     assetID_1 = BTC_ID
-#     collateralID_1 = USDC_ID
-#     price1 = to64x61(11500)
-#     orderType1 = 0
-#     position1 = to64x61(2)
-#     direction1 = 1
-#     closeOrder1 = 1
-#     parentOrder1 = str_to_felt("sadfjkh2178")
-#     leverage1 = to64x61(2)
-#     isLiquidation1 = 1
-#     liquidatorAddress1 = liquidator.contract_address
-
-#     order_id_2 = str_to_felt("5489sdksjkh2178")
-#     assetID_2 = BTC_ID
-#     collateralID_2 = USDC_ID
-#     price2 = to64x61(11500)
-#     orderType2 = 0
-#     position2 = to64x61(2)
-#     direction2 = 0
-#     closeOrder2 = 0
-#     parentOrder2 = 0
-#     leverage2 = to64x61(2)
-#     isLiquidation2 = 0
-#     liquidatorAddress2 = 0
-
-#     execution_price1 = to64x61(11500)
-
-#     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-#                                 price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
-#     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-#                                 price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
-
-#     signed_message1 = liquidator_signer.sign(hash_computed1)
-#     signed_message2 = alice_signer.sign(hash_computed2)
-
-#     diff1 = to64x61(7357.5) - execution_price1
-
-#     adjusted_price1 = to64x61(7357.5 + from64x61(diff1))
-#     leveraged_amount_out1 = await fixed_math.Math64x61_mul(adjusted_price1, size).call()
-#     value_to_be_returned1 = to64x61(7357.5) - leveraged_amount_out1.result.res
-
-
-#     res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
-#         size,
-#         execution_price1,
-#         marketID_1,
-#         2,
-#         charlie.contract_address, signed_message1[0], signed_message1[
-#             1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1, 
-#         alice.contract_address, signed_message2[0], signed_message2[
-#             1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
-#     ])
-
-#     orderState1 = await charlie.get_order_data(orderID_=parentOrder1).call()
-#     res1 = list(orderState1.result.res)
-#     print(res1)
-#     print(from64x61(res1[2]))
-
-#     assert res1 == [
-#         assetID_1,
-#         collateralID_1,
-#         to64x61(7357.5),
-#         to64x61(7357.5),
-#         0,
-#         orderType1,
-#         0,
-#         to64x61(0),
-#         6,
-#         to64x61(0),
-#         to64x61(0)
-#     ]
-
-#     orderState2 = await alice.get_order_data(orderID_=order_id_2).call()
-#     res2 = list(orderState2.result.res)
-#     print(res2)
-
-#     assert res2 == [
-#         assetID_2,
-#         collateralID_2,
-#         price2,
-#         execution_price1,
-#         position2,
-#         orderType2,
-#         direction2,
-#         to64x61(2),
-#         2,
-#         to64x61(11500),
-#         to64x61(11500)
-#     ]
-
-#     insurance_balance = await insuranceFund.balance(asset_id_=USDC_ID).call()
-#     print("insurance balance after:", from64x61(
-#         insurance_balance.result.amount))
-
-#     charlie_curr_balance = await charlie.get_balance(USDC_ID).call()
-#     print("charlie balance after", from64x61(charlie_curr_balance.result.res))
-
-#     account_value = await trading.return_net_acc().call()
-#     print("account value:", from64x61(account_value.result.res))
-
-#     assert from64x61(insurance_balance.result.amount) == from64x61(
-#         insurance_balance_before.result.amount - value_to_be_returned1)
-#     assert charlie_curr_balance.result.res == to64x61(0)
-
-
-
-# @pytest.mark.asyncio
-# async def test_should_not_allow_non_liquidators(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
-#     ##############################################
-#     ######## Bob's liquidation result 3 ##########
-#     ##############################################
-#     assert_revert(lambda: charlie_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
-#         bob.contract_address,
-#         # 2 Position + 2 Collaterals
-#         4,
-#         # Position 1 - BTC long
-#         BTC_ID,
-#         USDC_ID,
-#         to64x61(6000),
-#         to64x61(1.05),
-#         # Position 2 -
-#         #  ETH long
-#         ETH_ID,
-#         USDC_ID,
-#         to64x61(86),
-#         to64x61(1.05),
-#         # Collateral 1 - USDC
-#         0,
-#         USDC_ID,
-#         0,
-#         to64x61(1.05),
-#         # Collateral 2 - UST
-#         0,
-#         UST_ID,
-#         0,
-#         to64x61(0.05)
-#     ]))
+    assert from64x61(bob_acc_value.result.res) == 6572.90189
+
+
+@pytest.mark.asyncio
+async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    ##############################################
+    ######## Alice's liquidation result 3 ##########
+    ##############################################
+
+    liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+        alice.contract_address,
+        # 2 Position + 2 Collaterals
+        4,
+        # Position 1 - BTC short
+        BTC_ID,
+        USDC_ID,
+        to64x61(8000.5),
+        to64x61(1.05),
+        # Position 2 - ETH short
+        ETH_ID,
+        USDC_ID,
+        to64x61(100),
+        to64x61(1.05),
+        # Collateral 1 - USDC
+        0,
+        USDC_ID,
+        0,
+        to64x61(1.05),
+        # Collateral 2 - UST
+        0,
+        UST_ID,
+        0,
+        to64x61(0.05)
+    ])
+    print("liquidation result alice liquidated...", liquidate_result_alice.result.response[0], " ",
+          liquidate_result_alice.result.response[1])
+
+    assert liquidate_result_alice.result.response[1] == str_to_felt(
+        "343uofdsjxz")
+    assert liquidate_result_alice.result.response[0] == 1
+
+    alice_balance_usdc = await alice.get_balance(USDC_ID).call()
+    print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
+
+    assert from64x61(alice_balance_usdc.result.res) == 395.0045
+
+    alice_balance_ust = await alice.get_balance(UST_ID).call()
+    print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
+
+    assert from64x61(alice_balance_ust.result.res) == 1000
+
+    alice_maintenance = await liquidate.return_maintenance().call()
+    print("Alice maintenance requirement:",
+          from64x61(alice_maintenance.result.res))
+
+    assert from64x61(alice_maintenance.result.res) == 811.125
+
+    alice_acc_value = await liquidate.return_acc_value().call()
+    print("Alice acc value:", from64x61(alice_acc_value.result.res))
+
+    assert from64x61(alice_acc_value.result.res) == -481.295275
+
+    order_state = await alice.get_order_data(orderID_=liquidate_result_alice.result.response[1]).call()
+    res4 = list(order_state.result.res)
+
+    print(res4)
+
+
+@pytest.mark.asyncio
+async def test_liquidation_flow(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+
+    charlie_usdc = to64x61(8000)
+    await admin2_signer.send_transaction(admin2, charlie.contract_address, 'set_balance', [USDC_ID, charlie_usdc])
+
+    insurance_balance_before = await insuranceFund.balance(asset_id_=USDC_ID).call()
+    print("insurance balance before:", from64x61(
+        insurance_balance_before.result.amount))
+
+    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
+    print("alice balance before:", from64x61(
+        alice_curr_balance_before.result.res))
+
+    ####### Liquidation Order 1#######
+    size = to64x61(2)
+    marketID_1 = BTC_USD_ID
+
+    order_id_1 = str_to_felt("0jfds78324sjxz")
+    assetID_1 = BTC_ID
+    collateralID_1 = USDC_ID
+    price1 = to64x61(7357.5)
+    orderType1 = 0
+    position1 = to64x61(2)
+    direction1 = 1
+    closeOrder1 = 1
+    parentOrder1 = str_to_felt("343uofdsjxz")
+    leverage1 = to64x61(2)
+    isLiquidation1 = 1
+    liquidatorAddress1 = liquidator.contract_address
+
+    order_id_2 = str_to_felt("sadfjkh2178")
+    assetID_2 = BTC_ID
+    collateralID_2 = USDC_ID
+    price2 = to64x61(7357.5)
+    orderType2 = 0
+    position2 = to64x61(2)
+    direction2 = 0
+    closeOrder2 = 0
+    parentOrder2 = 0
+    leverage2 = to64x61(2)
+    isLiquidation2 = 0
+    liquidatorAddress2 = 0
+
+    execution_price1 = to64x61(7357.5)
+
+    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
+                                price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
+    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
+                                price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
+
+    signed_message1 = liquidator_signer.sign(hash_computed1)
+    signed_message2 = charlie_signer.sign(hash_computed2)
+
+    diff1 = to64x61(5000) - execution_price1
+
+    pnl1 = await fixed_math.Math64x61_mul(diff1, size).call()
+    net_acc_value = pnl1.result.res + to64x61(5000)
+
+    res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
+        size,
+        execution_price1,
+        marketID_1,
+        2,
+        alice.contract_address, signed_message1[0], signed_message1[
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1,
+        charlie.contract_address, signed_message2[0], signed_message2[
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
+    ])
+
+    orderState1 = await alice.get_order_data(orderID_=parentOrder1).call()
+    res1 = list(orderState1.result.res)
+    print(res1)
+    print(from64x61(res1[2]))
+
+    assert res1 == [
+        assetID_1,
+        collateralID_1,
+        to64x61(5000),
+        to64x61(5000),
+        0,
+        orderType1,
+        0,
+        to64x61(0),
+        6,
+        to64x61(0),
+        to64x61(0)
+    ]
+
+    orderState2 = await charlie.get_order_data(orderID_=order_id_2).call()
+    res2 = list(orderState2.result.res)
+    print(res2)
+
+    assert res2 == [
+        assetID_2,
+        collateralID_2,
+        price2,
+        execution_price1,
+        position2,
+        orderType2,
+        direction2,
+        to64x61(2),
+        2,
+        to64x61(7357.5),
+        to64x61(7357.5)
+    ]
+
+    insurance_balance = await insuranceFund.balance(asset_id_=USDC_ID).call()
+    print("insurance balance after:", from64x61(
+        insurance_balance.result.amount))
+
+    alice_curr_balance = await alice.get_balance(USDC_ID).call()
+    print("alice balance after", from64x61(alice_curr_balance.result.res))
+
+    account_value = await trading.return_net_acc().call()
+    print("account value:", from64x61(account_value.result.res))
+
+    assert from64x61(insurance_balance.result.amount) == from64x61(
+        net_acc_value)
+    assert alice_curr_balance.result.res == alice_curr_balance_before.result.res
+
+
+@pytest.mark.asyncio
+async def test_liquidation_flow_underwater(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+
+    ##############################################
+    ######## Charlie's liquidation result 1 ##########
+    ##############################################
+
+    liquidate_result_charlie = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+        charlie.contract_address,
+        # 1 Position + 1 Collateral
+        2,
+        # Position 1 - BTC short
+        BTC_ID,
+        USDC_ID,
+        to64x61(11500),
+        to64x61(1.05),
+        # Collateral 1 - USDC
+        0,
+        USDC_ID,
+        0,
+        to64x61(1.05),
+    ])
+    print("liquidation result of charlie...",
+          liquidate_result_charlie.result.response[0], " ", liquidate_result_charlie.result.response[1])
+
+    assert liquidate_result_charlie.result.response[0] == 1
+    assert liquidate_result_charlie.result.response[1] == str_to_felt(
+        "sadfjkh2178")
+
+    charlie_balance_usdc = await charlie.get_balance(USDC_ID).call()
+    print("Charlie usdc balance is...", from64x61(
+        charlie_balance_usdc.result.res))
+
+    assert from64x61(charlie_balance_usdc.result.res) == 639.64529
+
+    charlie_maintenance = await liquidate.return_maintenance().call()
+    print("Charlie maintenance requirement:",
+          from64x61(charlie_maintenance.result.res))
+
+    assert from64x61(charlie_maintenance.result.res) == 1158.80625
+
+    charlie_acc_value = await liquidate.return_acc_value().call()
+    print("Charlie acc value:", from64x61(charlie_acc_value.result.res))
+
+    assert from64x61(charlie_acc_value.result.res) == -302.2474455
+
+    ###################
+
+    alice_usdc = to64x61(13000)
+    await admin2_signer.send_transaction(admin2, alice.contract_address, 'set_balance', [USDC_ID, alice_usdc])
+
+    insurance_balance_before = await insuranceFund.balance(asset_id_=USDC_ID).call()
+    print("insurance balance before:", from64x61(
+        insurance_balance_before.result.amount))
+
+    charlie_curr_balance_before = await charlie.get_balance(USDC_ID).call()
+    print("charlie balance before:", from64x61(
+        charlie_curr_balance_before.result.res))
+
+    ####### Liquidation Order 2#######
+    size = to64x61(2)
+    marketID_1 = BTC_USD_ID
+
+    order_id_1 = str_to_felt("3j432gsd8324sjxz")
+    assetID_1 = BTC_ID
+    collateralID_1 = USDC_ID
+    price1 = to64x61(11500)
+    orderType1 = 0
+    position1 = to64x61(2)
+    direction1 = 1
+    closeOrder1 = 1
+    parentOrder1 = str_to_felt("sadfjkh2178")
+    leverage1 = to64x61(2)
+    isLiquidation1 = 1
+    liquidatorAddress1 = liquidator.contract_address
+
+    order_id_2 = str_to_felt("5489sdksjkh2178")
+    assetID_2 = BTC_ID
+    collateralID_2 = USDC_ID
+    price2 = to64x61(11500)
+    orderType2 = 0
+    position2 = to64x61(2)
+    direction2 = 0
+    closeOrder2 = 0
+    parentOrder2 = 0
+    leverage2 = to64x61(2)
+    isLiquidation2 = 0
+    liquidatorAddress2 = 0
+
+    execution_price1 = to64x61(11500)
+
+    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
+                                price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
+    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
+                                price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
+
+    signed_message1 = liquidator_signer.sign(hash_computed1)
+    signed_message2 = alice_signer.sign(hash_computed2)
+
+    diff1 = to64x61(7357.5) - execution_price1
+
+    adjusted_price1 = to64x61(7357.5 + from64x61(diff1))
+    leveraged_amount_out1 = await fixed_math.Math64x61_mul(adjusted_price1, size).call()
+    value_to_be_returned1 = to64x61(7357.5) - leveraged_amount_out1.result.res
+
+
+    res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
+        size,
+        execution_price1,
+        marketID_1,
+        2,
+        charlie.contract_address, signed_message1[0], signed_message1[
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1, 
+        alice.contract_address, signed_message2[0], signed_message2[
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
+    ])
+
+    orderState1 = await charlie.get_order_data(orderID_=parentOrder1).call()
+    res1 = list(orderState1.result.res)
+    print(res1)
+    print(from64x61(res1[2]))
+
+    assert res1 == [
+        assetID_1,
+        collateralID_1,
+        to64x61(7357.5),
+        to64x61(7357.5),
+        0,
+        orderType1,
+        0,
+        to64x61(0),
+        6,
+        to64x61(0),
+        to64x61(0)
+    ]
+
+    orderState2 = await alice.get_order_data(orderID_=order_id_2).call()
+    res2 = list(orderState2.result.res)
+    print(res2)
+
+    assert res2 == [
+        assetID_2,
+        collateralID_2,
+        price2,
+        execution_price1,
+        position2,
+        orderType2,
+        direction2,
+        to64x61(2),
+        2,
+        to64x61(11500),
+        to64x61(11500)
+    ]
+
+    insurance_balance = await insuranceFund.balance(asset_id_=USDC_ID).call()
+    print("insurance balance after:", from64x61(
+        insurance_balance.result.amount))
+
+    charlie_curr_balance = await charlie.get_balance(USDC_ID).call()
+    print("charlie balance after", from64x61(charlie_curr_balance.result.res))
+
+    account_value = await trading.return_net_acc().call()
+    print("account value:", from64x61(account_value.result.res))
+
+    assert from64x61(insurance_balance.result.amount) == from64x61(
+        insurance_balance_before.result.amount - value_to_be_returned1)
+    assert charlie_curr_balance.result.res == to64x61(0)
+
+
+
+@pytest.mark.asyncio
+async def test_should_not_allow_non_liquidators(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    ##############################################
+    ######## Bob's liquidation result 3 ##########
+    ##############################################
+    assert_revert(lambda: charlie_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+        bob.contract_address,
+        # 2 Position + 2 Collaterals
+        4,
+        # Position 1 - BTC long
+        BTC_ID,
+        USDC_ID,
+        to64x61(6000),
+        to64x61(1.05),
+        # Position 2 -
+        #  ETH long
+        ETH_ID,
+        USDC_ID,
+        to64x61(86),
+        to64x61(1.05),
+        # Collateral 1 - USDC
+        0,
+        USDC_ID,
+        0,
+        to64x61(1.05),
+        # Collateral 2 - UST
+        0,
+        UST_ID,
+        0,
+        to64x61(0.05)
+    ]))
