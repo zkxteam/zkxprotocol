@@ -4,7 +4,6 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
-# from starkware.cairo.common.bitwise import bitwise_or
 from starkware.starknet.common.syscalls import get_contract_address
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin, BitwiseBuiltin
