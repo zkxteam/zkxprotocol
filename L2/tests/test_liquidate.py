@@ -13,8 +13,8 @@ bob_signer = Signer(123456789987654324)
 charlie_signer = Signer(123456789987654325)
 liquidator_signer = Signer(123456789987654326)
 
-long_trading_fees = to64x61(0.012)
-short_trading_fees = to64x61(0.008)
+maker_trading_fees = to64x61(0.0002 * 0.97)
+taker_trading_fees = to64x61(0.0005 * 0.97)
 
 BTC_ID = str_to_felt("32f0406jz7qj8")
 ETH_ID = str_to_felt("65ksgn23nv")
@@ -53,25 +53,18 @@ async def adminAuth_factory():
         ]
     )
 
-    fees = await starknet.deploy(
-        "contracts/TradingFees.cairo",
-        constructor_calldata=[
-            long_trading_fees,
-            short_trading_fees,
-            adminAuth.contract_address,
-            0, 0, 1,
-            100, 100, 3,
-            500, 500, 4,
-            1, 0, 0,
-            1, 1, 0,
-            1, 1, 1
-        ]
-    )
-
     registry = await starknet.deploy(
         "contracts/AuthorizedRegistry.cairo",
         constructor_calldata=[
             adminAuth.contract_address
+        ]
+    )
+
+    fees = await starknet.deploy(
+        "contracts/TradingFees.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1
         ]
     )
 
@@ -181,6 +174,11 @@ async def adminAuth_factory():
         ]
     )
 
+    feeDiscount = await starknet.deploy(
+        "contracts/FeeDiscount.cairo",
+        constructor_calldata=[]
+    )
+
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
@@ -191,6 +189,7 @@ async def adminAuth_factory():
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [3, 1, feeDiscount.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [4, 1, fees.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [5, 1, trading.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [6, 1, feeBalance.contract_address])
@@ -199,6 +198,23 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insuranceFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, liquidator.contract_address])
+
+    # Add base fee and discount in Trading Fee contract
+    base_fee_maker1 = to64x61(0.0002)
+    base_fee_taker1 = to64x61(0.0005)
+    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1])
+    base_fee_maker2 = to64x61(0.00015)
+    base_fee_taker2 = to64x61(0.0004)
+    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 1000, base_fee_maker2, base_fee_taker2])
+    base_fee_maker3 = to64x61(0.0001)
+    base_fee_taker3 = to64x61(0.00035)
+    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_base_fees', [3, 5000, base_fee_maker3, base_fee_taker3])
+    discount1 = to64x61(0.03)
+    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [1, 0, discount1])
+    discount2 = to64x61(0.05)
+    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 1000, discount2])
+    discount3 = to64x61(0.1)
+    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000])
@@ -283,9 +299,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, parentOrder1, leverage1, isLiquidation1, liquidatorAddress1,
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, parentOrder2, leverage2, isLiquidation2, liquidatorAddress2,
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0,
     ])
 
     orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
@@ -376,7 +392,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
 
-    assert from64x61(alice_balance_usdc.result.res) == 420
+    assert from64x61(alice_balance_usdc.result.res) == 495.15
 
     alice_balance_ust = await alice.get_balance(UST_ID).call()
     print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
@@ -392,7 +408,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     alice_acc_value = await liquidate.return_acc_value().call()
     print("Alice acc value:", from64x61(alice_acc_value.result.res))
 
-    assert from64x61(alice_acc_value.result.res) == 5741
+    assert from64x61(alice_acc_value.result.res) == 5819.9075
 
     ##############################################
     ######## Bob's liquidation result 1 ##########
@@ -428,7 +444,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
     print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
 
-    assert from64x61(bob_balance_usdc.result.res) == 880
+    assert from64x61(bob_balance_usdc.result.res) == 998.0600000000001
 
     bob_balance_ust = await bob.get_balance(UST_ID).call()
     print("Bob ust balance is...", from64x61(bob_balance_ust.result.res))
@@ -444,7 +460,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     bob_acc_value = await liquidate.return_acc_value().call()
     print("bob acc value:", from64x61(bob_acc_value.result.res))
 
-    assert from64x61(bob_acc_value.result.res) == 6449
+    assert from64x61(bob_acc_value.result.res) == 6572.963000000001
 
     ###### Opening of Orders 2 #######
     size2 = to64x61(3)
@@ -492,9 +508,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, parentOrder3, leverage3, isLiquidation3, liquidatorAddress3,
+            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, leverage3, isLiquidation3, liquidatorAddress3, parentOrder3, 1, 
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, parentOrder4, leverage4, isLiquidation4, liquidatorAddress4,
+            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, leverage4, isLiquidation4, liquidatorAddress4, parentOrder4, 0,
     ])
 
     orderState3 = await alice.get_order_data(orderID_=order_id_3).call()
@@ -579,7 +595,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
 
-    assert from64x61(alice_balance_usdc.result.res) == 317.6
+    assert from64x61(alice_balance_usdc.result.res) == 395.0045
 
     alice_balance_ust = await alice.get_balance(UST_ID).call()
     print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
@@ -595,7 +611,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     alice_acc_value = await liquidate.return_acc_value().call()
     print("Alice acc value:", from64x61(alice_acc_value.result.res))
 
-    assert from64x61(alice_acc_value.result.res) == 5738.4800000000005
+    assert from64x61(alice_acc_value.result.res) == 5819.754725000001
 
     ##############################################
     ######## Bob's liquidation result 2 ##########
@@ -635,7 +651,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
     print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
 
-    assert from64x61(bob_balance_usdc.result.res) == 776.4
+    assert from64x61(bob_balance_usdc.result.res) == 898.0018
 
     bob_balance_ust = await bob.get_balance(UST_ID).call()
     print("Bob ust balance is...", from64x61(bob_balance_ust.result.res))
@@ -651,7 +667,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     bob_acc_value = await liquidate.return_acc_value().call()
     print("bob acc value:", from64x61(bob_acc_value.result.res))
 
-    assert from64x61(bob_acc_value.result.res) == 6445.22
+    assert from64x61(bob_acc_value.result.res) == 6572.90189
 
 
 @pytest.mark.asyncio
@@ -668,7 +684,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
         # Position 1 - BTC short
         BTC_ID,
         USDC_ID,
-        to64x61(7357.5),
+        to64x61(8000.5),
         to64x61(1.05),
         # Position 2 - ETH short
         ETH_ID,
@@ -696,7 +712,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
 
-    assert from64x61(alice_balance_usdc.result.res) == 317.6
+    assert from64x61(alice_balance_usdc.result.res) == 395.0045
 
     alice_balance_ust = await alice.get_balance(UST_ID).call()
     print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
@@ -712,7 +728,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
     alice_acc_value = await liquidate.return_acc_value().call()
     print("Alice acc value:", from64x61(alice_acc_value.result.res))
 
-    assert from64x61(alice_acc_value.result.res) == 787.73
+    assert from64x61(alice_acc_value.result.res) == -481.295275
 
     order_state = await alice.get_order_data(orderID_=liquidate_result_alice.result.response[1]).call()
     res4 = list(order_state.result.res)
@@ -777,14 +793,8 @@ async def test_liquidation_flow(adminAuth_factory):
 
     diff1 = to64x61(5000) - execution_price1
 
-    pnl1 = await fixed_math.mul_fp(diff1, size).call()
+    pnl1 = await fixed_math.Math64x61_mul(diff1, size).call()
     net_acc_value = pnl1.result.res + to64x61(5000)
-
-    size_without_leverage2 = await fixed_math.div_fp(size, leverage2).call()
-    amount2 = await fixed_math.mul_fp(execution_price1, size_without_leverage2.result.res).call()
-    amount_for_fee2 = await fixed_math.mul_fp(execution_price1, size).call()
-    fees2 = await fixed_math.mul_fp(amount_for_fee2.result.res, short_trading_fees).call()
-    total_amount2 = amount2.result.res + fees2.result.res
 
     res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
         size,
@@ -792,9 +802,9 @@ async def test_liquidation_flow(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, parentOrder1, leverage1, isLiquidation1, liquidatorAddress1,
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1,
         charlie.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, parentOrder2, leverage2, isLiquidation2, liquidatorAddress2,
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
     ])
 
     orderState1 = await alice.get_order_data(orderID_=parentOrder1).call()
@@ -883,7 +893,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     print("Charlie usdc balance is...", from64x61(
         charlie_balance_usdc.result.res))
 
-    assert from64x61(charlie_balance_usdc.result.res) == 524.78
+    assert from64x61(charlie_balance_usdc.result.res) == 639.64529
 
     charlie_maintenance = await liquidate.return_maintenance().call()
     print("Charlie maintenance requirement:",
@@ -894,7 +904,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     charlie_acc_value = await liquidate.return_acc_value().call()
     print("Charlie acc value:", from64x61(charlie_acc_value.result.res))
 
-    assert from64x61(charlie_acc_value.result.res) == -422.856
+    assert from64x61(charlie_acc_value.result.res) == -302.2474455
 
     ###################
 
@@ -952,7 +962,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     diff1 = to64x61(7357.5) - execution_price1
 
     adjusted_price1 = to64x61(7357.5 + from64x61(diff1))
-    leveraged_amount_out1 = await fixed_math.mul_fp(adjusted_price1, size).call()
+    leveraged_amount_out1 = await fixed_math.Math64x61_mul(adjusted_price1, size).call()
     value_to_be_returned1 = to64x61(7357.5) - leveraged_amount_out1.result.res
 
 
@@ -962,9 +972,9 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         marketID_1,
         2,
         charlie.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, parentOrder1, leverage1, isLiquidation1, liquidatorAddress1,
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1, 
         alice.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, parentOrder2, leverage2, isLiquidation2, liquidatorAddress2,
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
     ])
 
     orderState1 = await charlie.get_order_data(orderID_=parentOrder1).call()

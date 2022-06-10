@@ -17,7 +17,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.hash import hash2
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.hash_state import hash_init, hash_finalize, hash_update
-from contracts.Math_64x61 import mul_fp, div_fp
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
 # @notice struct for passing the order request to Account Contract
 # status 0: initialized
@@ -160,7 +160,7 @@ func find_collateral_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     end
 
     # Calculate the value of the current collateral
-    let (collateral_value_usd) = mul_fp(collateral_details.balance, price_details.collateralPrice)
+    let (collateral_value_usd) = Math64x61_mul(collateral_details.balance, price_details.collateralPrice)
 
     # Recurse over the next element
     return find_collateral_balance(
@@ -276,10 +276,10 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 
     # Calculate the required margin in usd
     local total_value = order_details.marginAmount + order_details.borrowedAmount
-    let (average_execution_price : felt) = div_fp(total_value, order_details.portionExecuted)
-    let (maintenance_position) = mul_fp(average_execution_price, order_details.portionExecuted)
-    let (maintenance_requirement) = mul_fp(req_margin, maintenance_position)
-    let (maintenance_requirement_usd) = mul_fp(
+    let (average_execution_price : felt) = Math64x61_div(total_value, order_details.portionExecuted)
+    let (maintenance_position) = Math64x61_mul(average_execution_price, order_details.portionExecuted)
+    let (maintenance_requirement) = Math64x61_mul(req_margin, maintenance_position)
+    let (maintenance_requirement_usd) = Math64x61_mul(
         maintenance_requirement, price_details.collateralPrice
     )
 
@@ -293,16 +293,16 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         price_diff_ = price_diff
     end
 
-    let (pnl) = mul_fp(price_diff_, order_details.portionExecuted)
+    let (pnl) = Math64x61_mul(price_diff_, order_details.portionExecuted)
 
     # Calculate the value of the current account margin in usd
     local position_value = maintenance_position - order_details.borrowedAmount + pnl
-    let (net_position_value_usd : felt) = mul_fp(position_value, price_details.collateralPrice)
+    let (net_position_value_usd : felt) = Math64x61_mul(position_value, price_details.collateralPrice)
 
     # Margin ratio calculation
     local numerator = order_details.marginAmount + pnl
-    let (denominator) = mul_fp(order_details.portionExecuted, price_details.assetPrice)
-    let (collateral_ratio_position) = div_fp(numerator, denominator)
+    let (denominator) = Math64x61_mul(order_details.portionExecuted, price_details.assetPrice)
+    let (collateral_ratio_position) = Math64x61_div(numerator, denominator)
 
     let (if_lesser) = is_le(collateral_ratio_position, least_collateral_ratio)
 

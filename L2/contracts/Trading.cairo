@@ -22,7 +22,7 @@ from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.hash import hash2
 from starkware.cairo.common.hash_state import hash_init, hash_finalize, hash_update
-from contracts.Math_64x61 import mul_fp, div_fp
+from contracts.Math_64x61 import Math64x61_add, Math64x61_sub, Math64x61_mul, Math64x61_div
 
 # @notice Stores the contract version
 @storage_var
@@ -41,7 +41,7 @@ end
 # @notice struct to store details of markets
 struct Market:
     member asset : felt
-    member asset_collateral : felt
+    member assetCollateral : felt
     member leverage : felt
     member tradable : felt
 end
@@ -59,10 +59,11 @@ struct MultipleOrder:
     member positionSize : felt
     member direction : felt
     member closeOrder : felt
-    member parentOrder : felt
     member leverage : felt
     member isLiquidation : felt
     member liquidatorAddress : felt
+    member parentOrder : felt
+    member side : felt
 end
 
 # Struct for passing the order request to Account Contract
@@ -166,8 +167,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     execution_price : felt,
     request_list_len : felt,
     request_list : MultipleOrder*,
-    long_fees : felt,
-    short_fees : felt,
     sum : felt,
 ) -> (res : felt):
     alloc_locals
@@ -196,10 +195,11 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         positionSize=[request_list].positionSize,
         direction=[request_list].direction,
         closeOrder=[request_list].closeOrder,
-        parentOrder=[request_list].parentOrder,
         leverage=[request_list].leverage,
         isLiquidation=[request_list].isLiquidation,
-        liquidatorAddress=[request_list].liquidatorAddress
+        liquidatorAddress=[request_list].liquidatorAddress,
+        parentOrder=[request_list].parentOrder,
+        side=[request_list].side
         )
 
     # Check if the execution_price is correct
@@ -223,7 +223,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         tempvar range_check_ptr = range_check_ptr
     else:
         # if it's a market order, it must be within 2% of the index price
-        let (two_percent) = mul_fp(temp_order.price, 46116860184273879)
+        let (two_percent) = Math64x61_mul(temp_order.price, 46116860184273879)
         tempvar lowerLimit = temp_order.price - two_percent
         tempvar upperLimit = temp_order.price + two_percent
 
@@ -246,7 +246,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assert order_size = temp_order.positionSize
     end
 
-    local fees_rate
     local sum_temp
 
     if temp_order.direction == 1:
@@ -257,12 +256,16 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # If the order is to be opened
     if temp_order.closeOrder == 0:
-        # Calculate the fees depending on whether the order is long or short
-        if temp_order.direction == 1:
-            assert fees_rate = long_fees
-        else:
-            assert fees_rate = short_fees
-        end
+        # Get the fees from Trading Fee contract
+        let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=4, version=version
+        )
+
+        let (fees_rate) = ITradingFees.get_user_fee_and_discount(
+            contract_address=trading_fees_address,
+            address_=temp_order.pub_key,
+            side_=temp_order.side,
+        )
 
         # Get order details
         let (order_details : OrderDetails) = IAccount.get_order_data(
@@ -271,8 +274,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
 
-        let (leveraged_position_value) = mul_fp(order_size, execution_price)
-        let (total_position_value) = div_fp(leveraged_position_value, temp_order.leverage)
+        let (leveraged_position_value) = Math64x61_mul(order_size, execution_price)
+        let (total_position_value) = Math64x61_div(leveraged_position_value, temp_order.leverage)
         tempvar amount_to_be_borrowed = leveraged_position_value - total_position_value
 
         # Calculate borrowed and margin amounts to be stored in account contract
@@ -307,7 +310,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
 
         # Calculate the fees for the order
-        let (fees) = mul_fp(fees_rate, leveraged_position_value)
+        let (fees) = Math64x61_mul(fees_rate, leveraged_position_value)
 
         # Update the fees to be paid by user in fee balance contract
         let (fees_balance_address) = IAuthorizedRegistry.get_contract_address(
@@ -369,8 +372,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let borrowed_amount = order_details.borrowedAmount
 
         # calculate avg execution price
-        let (total_value) = mul_fp(order_details.marginAmount, temp_order.leverage)
-        let (average_execution_price) = div_fp(total_value, order_details.portionExecuted)
+        let (total_value) = Math64x61_mul(order_details.marginAmount, temp_order.leverage)
+        let (average_execution_price) = Math64x61_div(total_value, order_details.portionExecuted)
 
         local diff
         local actual_execution_price
@@ -390,16 +393,16 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         end
 
         # Calculate pnl and net account value
-        let (pnl) = mul_fp(order_details.portionExecuted, diff)
+        let (pnl) = Math64x61_mul(order_details.portionExecuted, diff)
         tempvar net_acc_value = margin_amount + pnl
 
         # Total value of the asset at current price
-        let (leveraged_amount_out) = mul_fp(order_size, actual_execution_price)
+        let (leveraged_amount_out) = Math64x61_mul(order_size, actual_execution_price)
 
         # Calculate the amount that needs to be returned to liquidity fund
-        let (percent_of_order) = div_fp(order_size, order_details.portionExecuted)
-        let (value_to_be_returned) = mul_fp(borrowed_amount, percent_of_order)
-        let (margin_to_be_reduced) = mul_fp(margin_amount, percent_of_order)
+        let (percent_of_order) = Math64x61_div(order_size, order_details.portionExecuted)
+        let (value_to_be_returned) = Math64x61_mul(borrowed_amount, percent_of_order)
+        let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order)
 
         # Calculate new values for margin and borrowed amounts
         borrowed_amount_ = borrowed_amount - value_to_be_returned
@@ -649,8 +652,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             execution_price,
             request_list_len - 1,
             request_list + MultipleOrder.SIZE,
-            long_fees,
-            short_fees,
             sum_temp,
         )
     end
@@ -687,8 +688,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         execution_price,
         request_list_len - 1,
         request_list + MultipleOrder.SIZE,
-        long_fees,
-        short_fees,
         sum_temp,
     )
 end
@@ -711,39 +710,9 @@ func execute_batch{
 ) -> (res : felt):
     alloc_locals
 
-    # Fetch the base fees for long and short orders
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (fees_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=4, version=version
-    )
-    let (long, short) = ITradingFees.get_fees(contract_address=fees_address)
-
-    # Assert that these fees are not 0
-    with_attr error_message("long must not be zero. Got long={long}."):
-        assert_not_zero(long)
-    end
-
-    with_attr error_message("short must not be zero. Got short={short}."):
-        assert_not_zero(short)
-    end
-
-    # Store it in a local var to send it to check_and_execute
-    local long_fee = long
-    local short_fee = short
-
     # Recursively loop through the orders in the batch
     let (result) = check_and_execute(
-        size,
-        0,
-        0,
-        marketID,
-        execution_price,
-        request_list_len,
-        request_list,
-        long_fee,
-        short_fee,
-        0,
+        size, 0, 0, marketID, execution_price, request_list_len, request_list, 0
     )
 
     # Check if every order has a counter order
@@ -789,7 +758,7 @@ end
 # @notice TradingFees interface
 @contract_interface
 namespace ITradingFees:
-    func get_fees() -> (long_fees : felt, short_fees : felt):
+    func get_user_fee_and_discount(address_ : felt, side_ : felt) -> (fee : felt):
     end
 end
 

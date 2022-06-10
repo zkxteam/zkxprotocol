@@ -19,7 +19,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn
 from starkware.cairo.common.pow import pow
 
-from contracts.Math_64x61 import mul_fp, div_fp, to64x61, from64x61
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_fromFelt, Math64x61_toFelt
 
 const L1_CONTRACT_ADDRESS = (0x88d2EE8A225D281cAa435F532F51c9844F05a4d9)
 const MESSAGE_WITHDRAW = 0
@@ -700,7 +700,7 @@ func execute_order{
             # If it's an existing order
         else:
             # Return if the position size after the executing the current order is more than the order's positionSize
-            let (size_by_leverage) = div_fp(size, request.leverage)
+            let (size_by_leverage) = Math64x61_mul(size, request.leverage)
             with_attr error_message(
                     "Paritally executed + remaining should be less than position in account contract."):
                 assert_le(size + orderDetails.portionExecuted, request.positionSize)
@@ -875,10 +875,10 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     tempvar decimal = asset.token_decimal
 
     let (ten_power_decimal) = pow(10, decimal)
-    let (decimal_in_64x61_format) = to64x61(ten_power_decimal)
+    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
 
-    let (amount_times_ten_power_decimal) = mul_fp(amount, decimal_in_64x61_format)
-    let (amount_in_felt) = from64x61(amount_times_ten_power_decimal)
+    let (amount_times_ten_power_decimal) = Math64x61_mul(amount, decimal_in_64x61_format)
+    let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal)
 
     # Get the L1 Metamask address
     let (L2_account_address) = get_contract_address()
@@ -923,10 +923,10 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tempvar decimal = asset.token_decimal
 
     let (ten_power_decimal) = pow(10, decimal)
-    let (decimal_in_64x61_format) = to64x61(ten_power_decimal)
+    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
 
-    let (amount_in_64x61_format) = to64x61(amount)
-    let (amount_in_decimal_representation) = div_fp(amount_in_64x61_format, decimal_in_64x61_format)
+    let (amount_in_64x61_format) = Math64x61_fromFelt(amount)
+    let (amount_in_decimal_representation) = Math64x61_mul(amount_in_64x61_format, decimal_in_64x61_format)
 
     # Read the current balance.
     let (res) = balance.read(assetID=assetID_)
