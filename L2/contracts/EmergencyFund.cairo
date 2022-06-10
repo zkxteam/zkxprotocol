@@ -22,7 +22,7 @@ func balance_mapping(asset_id : felt) -> (amount : felt):
 end
 
 # @notice Constructor of the smart-contract
-# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -33,8 +33,9 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-# @notice Displays the amount of the balance for the asset_id (asset)
+# @notice gets the amount of the balance for the asset_id (asset)
 # @param asset_id - Target asset_id
+# @returns amount - Balance of the corresponding asset
 @view
 func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt
@@ -44,8 +45,8 @@ func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 end
 
 # @notice Manually add amount to asset_id's balance by admins only
-# @param amount - value to add to asset_id's balance
 # @param asset_id - target asset_id
+# @param amount - value to add to asset_id's balance
 @external
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt
@@ -71,8 +72,8 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 end
 
 # @notice Manually deduct amount from asset_id's balance by admins only
-# @param amount - value to add to asset_id's balance
 # @param asset_id_ - target asset_id
+# @param amount - value to add to asset_id's balance
 @external
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt
@@ -102,8 +103,8 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 end
 
 # @notice Fund holding contract by reducing funds from emergency contract
-# @param amount - value to add to asset_id's balance in holding
 # @param asset_id_ - target asset_id
+# @param amount - value to add to asset_id's balance in holding
 @external
 func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt
@@ -137,8 +138,8 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 end
 
 # @notice Fund Liquidity contract by reducing funds from emergency contract
-# @param amount - value to add to asset_id's balance in liquidity
 # @param asset_id_ - target asset_id
+# @param amount - value to add to asset_id's balance in liquidity
 @external
 func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt
@@ -172,8 +173,8 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 end
 
 # @notice Fund Insurance contract by reducing funds from emergency contract
-# @param amount - value to add to asset_id's balance in insurance
 # @param asset_id_ - target asset_id
+# @param amount - value to add to asset_id's balance in insurance
 @external
 func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt
@@ -207,8 +208,8 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 end
 
 # @notice Manually deduct amount from asset_id's balance from holding fund and transfer to emergency fund
-# @param amount - value to add to asset_id's balance
 # @param asset_id - target asset_id
+# @param amount - value to add to asset_id's balance
 @external
 func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id : felt, amount : felt
@@ -242,8 +243,8 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 end
 
 # @notice Manually deduct amount from asset_id's balance from insurance fund and transfer to emergency fund
-# @param amount - value to add to asset_id's balance
 # @param asset_id - target asset_id
+# @param amount - value to add to asset_id's balance
 @external
 func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id : felt, amount : felt
@@ -277,8 +278,8 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 end
 
 # @notice Manually deduct amount from asset_id's balance from liquidity fund and transfer to emergency fund
-# @param amount - value to add to asset_id's balance
 # @param asset_id - target asset_id
+# @param amount - value to add to asset_id's balance
 @external
 func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id : felt, amount : felt

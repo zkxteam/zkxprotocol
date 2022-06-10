@@ -4,7 +4,6 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.math import assert_not_zero
 
 # @notice Stores the contract version
 @storage_var
@@ -25,7 +24,7 @@ func total_fee_per_asset(assetID : felt) -> (accumulated_fee : felt):
 end
 
 # @notice Constructor of the smart-contract
-# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -38,6 +37,7 @@ end
 
 # @notice Function to update fee mapping which stores total fee for a user
 # @param address - address of the user for whom fee is to be updated
+# @param assetID_ - asset ID of the collateral
 # @param fee_to_add - fee value that is to be added
 @external
 func update_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -68,6 +68,7 @@ func update_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
 end
 
 # @notice Function to get the total fee accumulated in the system
+# @param assetID_ - asset ID of the collateral
 # @return fee - total fee in the system
 @view
 func get_total_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -79,6 +80,7 @@ end
 
 # @notice Function to get the total accumulated fee for a specific user
 # @param address - address of the user for whom total fee is to be obtained
+# @param assetID_ - asset ID of the collateral
 # @return fee - total accumulated fee for the user
 @view
 func get_user_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(

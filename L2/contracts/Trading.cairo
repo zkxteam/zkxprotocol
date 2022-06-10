@@ -3,26 +3,11 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.registers import get_fp_and_pc
-from starkware.starknet.common.syscalls import (
-    get_contract_address,
-    call_contract,
-    get_caller_address,
-    get_tx_signature,
-)
-from starkware.cairo.common.math import (
-    assert_not_zero,
-    assert_nn,
-    assert_le,
-    assert_in_range,
-    assert_lt,
-)
+from starkware.cairo.common.math import assert_not_zero, assert_le, assert_in_range
 from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.math_cmp import is_le
-from starkware.cairo.common.hash import hash2
-from starkware.cairo.common.hash_state import hash_init, hash_finalize, hash_update
-from contracts.Math_64x61 import Math64x61_add, Math64x61_sub, Math64x61_mul, Math64x61_div
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
 # @notice Stores the contract version
 @storage_var
@@ -202,6 +187,52 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         side=[request_list].side
         )
 
+    # Get asset and market addresses
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=1, version=version
+    )
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=2, version=version
+    )
+
+    # If it's the first order in the array
+    if assetID == 0:
+        # Check if the asset is tradable
+        let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order.assetID)
+        let (collateral : Asset) = IAsset.getAsset(
+            contract_address=asset_address, id=temp_order.collateralID
+        )
+        let (market : Market) = IMarket.getMarket(contract_address=market_address, id=marketID)
+
+        with_attr error_message("asset is non tradable in trading contract."):
+            assert_not_zero(asset.tradable)
+        end
+
+        with_attr error_message("asset is non collaterable in trading contract."):
+            assert_not_zero(collateral.collateral)
+        end
+
+        with_attr error_message("market is non tradable in trading contract."):
+            assert_not_zero(market.tradable)
+        end
+
+        with_attr error_message(
+                "leverage is not less than currently allowed leverage of the asset"):
+            assert_le(temp_order.leverage, asset.currently_allowed_leverage)
+        end
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
+
     # Check if the execution_price is correct
     if temp_order.orderType == 1:
         # if it's a limit order
@@ -242,7 +273,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         # If yes, make the order_size to be size
         assert order_size = size
     else:
-        # If no, make order_size to be the positionSize
+        # If no, make order_size to be the positionSize̦
         assert order_size = temp_order.positionSize
     end
 
@@ -253,6 +284,10 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     else:
         assert sum_temp = sum - order_size
     end
+
+    let (holding_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=7, version=version
+    )
 
     # If the order is to be opened
     if temp_order.closeOrder == 0:
@@ -282,6 +317,40 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         margin_amount_ = margin_amount + total_position_value
         borrowed_amount_ = borrowed_amount + amount_to_be_borrowed
 
+        let (user_balance) = IAccount.get_balance(
+            contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
+        )
+
+        # Calculate the fees for the order
+        let (fees) = Math64x61_mul(fees_rate, leveraged_position_value)
+
+        # Calculate the total amount by adding fees
+        tempvar total_amount = total_position_value + fees
+
+        # User must be able to pay the amount
+        with_attr error_message(
+                "User balance is less than value of the position in trading contract."):
+            assert_le(total_amount, user_balance)
+        end
+
+        # Deduct the amount from account contract
+        IAccount.transfer_from(
+            contract_address=temp_order.pub_key,
+            assetID_=temp_order.collateralID,
+            amount=total_amount,
+        )
+
+        # Update the fees to be paid by user in fee balance contract
+        let (fees_balance_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=6, version=version
+        )
+        IFeeBalance.update_fee_mapping(
+            contract_address=fees_balance_address,
+            address=temp_order.pub_key,
+            assetID=temp_order.collateralID,
+            fee_to_add=fees,
+        )
+
         # Deduct the amount from liquidity funds if order is leveraged
         let (is_non_leveraged) = is_le(temp_order.leverage, 2305843009213693952)
 
@@ -305,44 +374,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         end
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
 
-        let (user_balance) = IAccount.get_balance(
-            contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
-        )
-
-        # Calculate the fees for the order
-        let (fees) = Math64x61_mul(fees_rate, leveraged_position_value)
-
-        # Update the fees to be paid by user in fee balance contract
-        let (fees_balance_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=6, version=version
-        )
-        IFeeBalance.update_fee_mapping(
-            contract_address=fees_balance_address,
-            address=temp_order.pub_key,
-            assetID=temp_order.collateralID,
-            fee_to_add=fees,
-        )
-
-        # Calculate the total amount by adding fees
-        tempvar total_amount = total_position_value + fees
-
-        # User must be able to pay the amount
-        with_attr error_message(
-                "User balance is less than value of the position in trading contract."):
-            assert_le(total_amount, user_balance)
-        end
-
-        # Transfer the amount to Holding Contract
-        IAccount.transfer_from(
-            contract_address=temp_order.pub_key,
-            assetID_=temp_order.collateralID,
-            amount=total_amount,
-        )
-
-        # Deposit the funds taken from the user
-        let (holding_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=7, version=version
-        )
+        # Deposit the funds taken from the user and liquidity fund
         IHolding.deposit(
             contract_address=holding_address,
             assetID_=temp_order.collateralID,
@@ -383,13 +415,10 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             # Open order was a long order
             actual_execution_price = execution_price
             diff = execution_price - average_execution_price
-            # tempvar range_check_ptr = range_check_ptr
         else:
             # Open order was a short order
             diff = average_execution_price - execution_price
             actual_execution_price = average_execution_price + diff
-
-            # tempvar range_check_ptr = range_check_ptr
         end
 
         # Calculate pnl and net account value
@@ -413,8 +442,19 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         # If it's just a close order
         if not_liquidation == 1:
+            # Deduct funds from holding contract
+            IHolding.withdraw(
+                contract_address=holding_address,
+                assetID_=temp_order.collateralID,
+                amount=leveraged_amount_out,
+            )
+
             # If no leverage is used
             if temp_order.leverage == 2305843009213693952:
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
                 let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
                     contract_address=registry, index=9, version=version
                 )
@@ -427,27 +467,16 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
-            else:
-                tempvar syscall_ptr = syscall_ptr
-                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                tempvar range_check_ptr = range_check_ptr
             end
+            tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
 
-            let (holding_address) = IAuthorizedRegistry.get_contract_address(
-                contract_address=registry, index=7, version=version
-            )
-            IHolding.withdraw(
-                contract_address=holding_address,
-                assetID_=temp_order.collateralID,
-                amount=leveraged_amount_out,
-            )
-
-            # Check if the posiiton is underwater
+            # Check if the position is underwater
             let (is_loss) = is_le(net_acc_value, 0)
 
             if is_loss == 1:
-                # If yes, make the user balance negative
+                # If yes, deduct the difference from user's balance, can go negative
                 IAccount.transfer_from(
                     contract_address=temp_order.pub_key,
                     assetID_=temp_order.collateralID,
@@ -513,7 +542,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                         IInsuranceFund.withdraw(
                             contract_address=insurance_fund_address,
                             asset_id_=temp_order.collateralID,
-                            amount=deficit,
+                            amount=deficit - user_balance,
                             position_id_=temp_order.orderID,
                         )
 
@@ -539,9 +568,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
 
                 # Withdraw the position from holding fund
-                let (holding_address) = IAuthorizedRegistry.get_contract_address(
-                    contract_address=registry, index=7, version=version
-                )
                 IHolding.withdraw(
                     contract_address=holding_address,
                     assetID_=temp_order.collateralID,
@@ -617,32 +643,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # If it's the first order in the array
     if assetID == 0:
-        let (asset_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=1, version=version
-        )
-        let (market_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=2, version=version
-        )
-        # Check if the asset is tradable
-        let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order.assetID)
-        let (collateral : Asset) = IAsset.getAsset(
-            contract_address=asset_address, id=temp_order.collateralID
-        )
-        let (market : Market) = IMarket.getMarket(contract_address=market_address, id=marketID)
-
-        # tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        with_attr error_message("asset is non tradable in trading contract."):
-            assert_not_zero(asset.tradable)
-        end
-
-        with_attr error_message("asset is non collaterable in trading contract."):
-            assert_not_zero(collateral.collateral)
-        end
-
-        with_attr error_message("market is non tradable in trading contract."):
-            assert_not_zero(market.tradable)
-        end
-
         # Recursive call with the ticker and price to compare against
         return check_and_execute(
             size,
@@ -656,12 +656,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
     end
 
-    let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=1, version=version
-    )
-    let (market_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=2, version=version
-    )
     # Assert that the order has the same ticker and price as the first order
     with_attr error_message("assetID is not same as opposite order's assetID in trading contract."):
         assert assetID = temp_order.assetID
@@ -670,13 +664,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     with_attr error_message(
             "collateralID is not same as opposite order's collateralID in trading contract."):
         assert collateralID = temp_order.collateralID
-    end
-
-    # Check whether the leverage is less than currently allowed leverage of the asset
-    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order.assetID)
-
-    with_attr error_message("leverage is not less than currently allowed leverage of the asset"):
-        assert_le(temp_order.leverage, asset.currently_allowed_leverage)
     end
 
     # Recursive Call

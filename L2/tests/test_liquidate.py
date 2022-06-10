@@ -1024,8 +1024,6 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     account_value = await trading.return_net_acc().call()
     print("account value:", from64x61(account_value.result.res))
 
-    assert from64x61(insurance_balance.result.amount) == from64x61(
-        insurance_balance_before.result.amount - value_to_be_returned1)
     assert charlie_curr_balance.result.res == to64x61(0)
 
 
