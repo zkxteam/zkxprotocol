@@ -9,6 +9,28 @@ from starkware.cairo.common.hash import hash2
 from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
+# status 0: initialized
+# status 1: partial
+# status 2: executed
+# status 3: close partial
+# status 4: close
+# status 5: toBeDeleveraged
+# status 6: toBeLiquidated
+# status 7: fullyLiquidated
+struct OrderDetails:
+    member assetID : felt
+    member collateralID : felt
+    member price : felt
+    member executionPrice : felt
+    member positionSize : felt
+    member orderType : felt
+    member direction : felt
+    member portionExecuted : felt
+    member status : felt
+    member marginAmount : felt
+    member borrowedAmount : felt
+end
+
 # @notice struct for passing the order request to Account Contract
 # status 0: initialized
 # status 1: partial
@@ -163,6 +185,7 @@ func find_collateral_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         total_value=total_value + collateral_value_usd,
     )
 end
+
 # @notice Function that is called recursively by check_recurse
 # @param account_address - Account address of the user
 # @param positions_len - Length of the positions array
@@ -173,8 +196,12 @@ end
 # @param total_maintenance_requirement - maintenance ratio of the asset * value of the position when executed
 # @param least_collateral_ratio - The least collateral ratio among the positions
 # @param least_collateral_ratio_position - The positionID of the postion which is having the least collateral ratio
+# @param least_collateral_ratio_position_collateral_price - Collateral price of the collateral in the postion which is having the least collateral ratio
+# @param least_collateral_ratio_position_asset_price - Asset price of an asset in the postion which is having the least collateral ratio
 # @return is_liquidation - 1 if positions are marked to be liquidated
 # @return least_collateral_ratio_position - The positionID of the least collateralized position
+# @return least_collateral_ratio_position_collateral_price - Collateral price of the collateral in least_collateral_ratio_position
+# @return least_collateral_ratio_position_asset_price - Asset price of an asset in least_collateral_ratio_position
 func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address : felt,
     positions_len : felt,
@@ -185,7 +212,9 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     total_maintenance_requirement : felt,
     least_collateral_ratio : felt,
     least_collateral_ratio_position : felt,
-) -> (is_liquidation, least_collateral_ratio_position : felt):
+    least_collateral_ratio_position_collateral_price: felt,
+    least_collateral_ratio_position_asset_price: felt,
+) -> (is_liquidation, least_collateral_ratio_position : felt, least_collateral_ratio_position_collateral_price : felt, least_collateral_ratio_position_asset_price : felt):
     alloc_locals
 
     # Check if the list is empty, if yes return the result
@@ -217,7 +246,7 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         let (is_liquidation) = is_le(total_account_value_collateral, total_maintenance_requirement)
 
         # Return if the account should be liquidated or not and the orderId of the least colalteralized position
-        return (is_liquidation, least_collateral_ratio_position)
+        return (is_liquidation, least_collateral_ratio_position, least_collateral_ratio_position_collateral_price, least_collateral_ratio_position_asset_price)
     end
 
     # Create a temporary struct to read data from the array element of positions
@@ -305,12 +334,18 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     # If it is the lowest, update least_collateral_ratio and least_collateral_ratio_position
     local least_collateral_ratio_
     local least_collateral_ratio_position_
+    local least_collateral_ratio_position_collateral_price_
+    local least_collateral_ratio_position_asset_price_
     if if_lesser == 1:
         assert least_collateral_ratio_ = collateral_ratio_position
         assert least_collateral_ratio_position_ = order_details.orderID
+        assert least_collateral_ratio_position_collateral_price_ = price_details.collateralPrice
+        assert least_collateral_ratio_position_asset_price_ = price_details.assetPrice
     else:
         assert least_collateral_ratio_ = least_collateral_ratio
         assert least_collateral_ratio_position_ = least_collateral_ratio_position
+        assert least_collateral_ratio_position_collateral_price_ = least_collateral_ratio_position_collateral_price
+        assert least_collateral_ratio_position_asset_price_ = least_collateral_ratio_position_asset_price
     end
 
     # Recurse over to the next position
@@ -324,7 +359,73 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         total_maintenance_requirement=total_maintenance_requirement + maintenance_requirement_usd,
         least_collateral_ratio=least_collateral_ratio_,
         least_collateral_ratio_position=least_collateral_ratio_position_,
+        least_collateral_ratio_position_collateral_price = least_collateral_ratio_position_collateral_price_,
+        least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price_
     )
+end
+
+# @notice Function to calculate amount to be put on sale for deleveraging
+# @param account_address_ - account address of the user
+# @param position_ - position to be deleveraged
+# @param collateral_price_ - collateral price of the collateral in the position
+# @param asset_price_ - asset price of the asset in the position
+# @returns amount_to_sold - amount to be put on sale for deleveraging
+func check_deleveraging{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    account_address_ : felt, position_ : felt, collateral_price_ : felt, asset_price_ : felt
+) -> (amount_to_be_sold : felt):
+    alloc_locals
+
+    # Get order details
+    let (order_details : OrderDetails) = IAccount.get_order_data(
+        contract_address=account_address_, order_ID=position_
+    )
+
+    # Fetch the maintatanence margin requirement from asset contract
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=1, version=version
+    )
+    let (req_margin) = IAsset.get_maintenance_margin(
+        contract_address=asset_address, id=order_details.assetID
+    )
+
+    let margin_amount = order_details.marginAmount
+    let borrowed_amount = order_details.borrowedAmount
+    let position_size = order_details.positionSize
+
+    # Calculate the average execution price
+    local total_value = margin_amount + borrowed_amount
+    let (average_execution_price : felt) = Math64x61_div(total_value, order_details.portionExecuted)
+
+    local price_diff
+    if order_details.direction == 1:
+        price_diff = asset_price_ - average_execution_price
+    else:
+        price_diff = average_execution_price - asset_price_
+    end    
+
+    # Calcculate amount to be sold for deleveraging
+    let (margin_amount_in_usd) = Math64x61_mul(margin_amount , collateral_price_)
+    let (maintenance_requirement_in_usd) = Math64x61_mul(req_margin , asset_price_)
+    let price_diff_in_usd  = maintenance_requirement_in_usd - price_diff
+    let (amount_to_be_present) = Math64x61_div(margin_amount_in_usd, price_diff_in_usd)
+    let amount_to_be_sold = position_size - amount_to_be_present
+
+    # Calculate the leverage after deleveraging
+    let position_value = margin_amount + borrowed_amount
+    let (position_value_in_usd) = Math64x61_mul(position_value, collateral_price_)
+    let (amount_to_be_sold_value_in_usd) = Math64x61_mul(amount_to_be_sold, asset_price_)
+    let remaining_position_value_in_usd = position_value_in_usd - amount_to_be_sold_value_in_usd
+    let (leverage_after_deleveraging) = Math64x61_div(remaining_position_value_in_usd, margin_amount_in_usd)
+
+    # to64x61(2) == 4611686018427387904
+    let (can_be_deleveraged) = is_le(leverage_after_deleveraging, 4611686018427387904)
+    if can_be_deleveraged == 1:
+        return (0)
+    else:
+        return (amount_to_be_sold)
+    end
 end
 
 # @notice Function to check and mark the positions to be liquidated
@@ -359,7 +460,7 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     # Recurse through all positions to see if it needs to liquidated
-    let (liq_result, least_collateral_ratio_position) = check_liquidation_recurse(
+    let (liq_result, least_collateral_ratio_position, least_collateral_ratio_position_collateral_price, least_collateral_ratio_position_asset_price) = check_liquidation_recurse(
         account_address=account_address,
         positions_len=positions_len,
         positions=positions,
@@ -369,11 +470,17 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         total_maintenance_requirement=0,
         least_collateral_ratio=2305843009213693952,
         least_collateral_ratio_position=0,
+        least_collateral_ratio_position_collateral_price = 0,
+        least_collateral_ratio_position_asset_price = 0,
     )
 
     if liq_result == 1:
+        let (amount_to_be_sold) = check_deleveraging(account_address, least_collateral_ratio_position, 
+            least_collateral_ratio_position_collateral_price, 
+            least_collateral_ratio_position_asset_price
+        )
         IAccount.liquidate_position(
-            contract_address=account_address, id=least_collateral_ratio_position
+            contract_address=account_address, id=least_collateral_ratio_position, amount = amount_to_be_sold
         )
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -396,10 +503,12 @@ namespace IAccount:
     func return_array_collaterals() -> (array_list_len : felt, array_list : CollateralBalance*):
     end
 
-    func liquidate_position(id : felt) -> ():
+    func liquidate_position(id : felt, amount : felt) -> ():
     end
 
     func get_balance(assetID_ : felt) -> (res : felt):
+    end
+    func get_order_data(order_ID : felt) -> (res : OrderDetails):
     end
 end
 
