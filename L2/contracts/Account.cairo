@@ -65,8 +65,10 @@ end
 # status 2: executed
 # status 3: close partial
 # status 4: close
-# status 5: toBeLiquidated
-# status 6: fullyLiquidated
+# status 5: toBeDeleveraged
+# status 6: fullyDeleveraged
+# status 7: toBeLiquidated
+# status 8: fullyLiquidated
 struct OrderDetails:
     member assetID : felt
     member collateralID : felt
@@ -186,6 +188,12 @@ end
 @storage_var
 func collateral_array_len() -> (len : felt):
 end
+
+# Stores amount_to_be_sold in a position for delveraging
+@storage_var
+func amount_to_be_sold(order_id : felt) -> (amount : felt):
+end
+
 #
 # Guards
 #
@@ -246,6 +254,14 @@ func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     res : felt
 ):
     let (res) = L1_address.read()
+    return (res=res)
+end
+
+@view
+func get_amount_to_be_sold{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    order_id_ : felt
+) -> (res : felt):
+    let (res) = amount_to_be_sold.read(order_id=order_id_)
     return (res=res)
 end
 
@@ -985,15 +1001,16 @@ func add_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return add_collateral(new_asset_id=new_asset_id, iterator=iterator + 1, length=length)
 end
 
-# @notice Function called by liquidate contract to mark the position as liquidated
-# @param id - Order Id of the position to be marked
+# @notice Function called by liquidate contract to mark the position as liquidated/deleveraged
+# @param id_ - Order Id of the position to be marked
+# @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
 @external
 func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt
+    id_ : felt, amount_to_be_sold_ : felt
 ):
     alloc_locals
 
-    let (orderDetails : OrderDetails) = order_mapping.read(orderID=id)
+    let (orderDetails : OrderDetails) = order_mapping.read(orderID=id_)
 
     # Check if the caller is the liquidator contract
     let (caller) = get_caller_address()
@@ -1007,23 +1024,43 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         assert caller = liquidate_address
     end
 
-    # Create a new struct with the updated details
-    let updated_order = OrderDetails(
-        assetID=orderDetails.assetID,
-        collateralID=orderDetails.collateralID,
-        price=orderDetails.price,
-        executionPrice=orderDetails.executionPrice,
-        positionSize=orderDetails.positionSize,
-        orderType=orderDetails.orderType,
-        direction=orderDetails.direction,
-        portionExecuted=orderDetails.portionExecuted,
-        status=5,
-        marginAmount=orderDetails.marginAmount,
-        borrowedAmount=orderDetails.borrowedAmount,
-    )
-
-    # Write to the mapping
-    order_mapping.write(orderID=id, value=updated_order)
+    if amount_to_be_sold_ == 0:
+        # Create a new struct with the updated details by setting toBeLiquidated flag to true
+        let updated_order = OrderDetails(
+            assetID=orderDetails.assetID,
+            collateralID=orderDetails.collateralID,
+            price=orderDetails.price,
+            executionPrice=orderDetails.executionPrice,
+            positionSize=orderDetails.positionSize,
+            orderType=orderDetails.orderType,
+            direction=orderDetails.direction,
+            portionExecuted=orderDetails.portionExecuted,
+            status=7,
+            marginAmount=orderDetails.marginAmount,
+            borrowedAmount=orderDetails.borrowedAmount,
+        )
+        # Write to the mapping
+        order_mapping.write(orderID=id_, value=updated_order)
+    else:
+        # Create a new struct with the updated details by setting toBeDeleveraged flag to true
+        let updated_order = OrderDetails(
+            assetID=orderDetails.assetID,
+            collateralID=orderDetails.collateralID,
+            price=orderDetails.price,
+            executionPrice=orderDetails.executionPrice,
+            positionSize=orderDetails.positionSize,
+            orderType=orderDetails.orderType,
+            direction=orderDetails.direction,
+            portionExecuted=orderDetails.portionExecuted,
+            status=5,
+            marginAmount=orderDetails.marginAmount,
+            borrowedAmount=orderDetails.borrowedAmount,
+        )
+        # Write to the mapping
+        order_mapping.write(orderID=id_, value=updated_order)
+        # update amount_to_be_sold storage variable
+        amount_to_be_sold.write(order_id = id_, value = amount_to_be_sold_)
+    end
 
     return ()
 end
