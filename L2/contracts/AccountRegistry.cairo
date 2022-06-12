@@ -1,5 +1,5 @@
 %lang starknet
-%builtins pedersen range_check ecdsa 
+%builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
@@ -27,7 +27,7 @@ func account_registry_len() -> (len : felt):
 end
 
 # @notice Constructor for the smart-contract
-# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -55,11 +55,11 @@ end
 # @param id_ - Index of the element in the list
 # @returns 1 - If successfully removed
 @external
-func remove_from_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id_ : felt
-) -> (res : felt):
+func remove_from_account_registry{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(id_ : felt) -> (res : felt):
     alloc_locals
-    
+
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -94,9 +94,9 @@ end
 # @param account_registry_list_ - Registry of accounts filled up to the index
 # @returns account_registry_len_ - Length of the account registry
 # @returns account_registry_list_ - registry of account addresses
-func populate_account_registry{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(account_registry_len_ : felt, account_registry_list_ : felt*) -> (account_registry_len_ : felt, account_registry_list_ : felt*):
+func populate_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    account_registry_len_ : felt, account_registry_list_ : felt*
+) -> (account_registry_len_ : felt, account_registry_list_ : felt*):
     alloc_locals
     let (address) = account_registry.read(index=account_registry_len_)
 
@@ -108,18 +108,19 @@ func populate_account_registry{
     return populate_account_registry(account_registry_len_ + 1, account_registry_list_)
 end
 
-
 # @notice Function to get all user account addresses
 # @returns account_registry_len - Length of the account registry
 # @returns account_registry - registry of account addresses
 @view
-func get_account_registry{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}() -> (account_registry_len : felt, account_registry : felt*):
+func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    account_registry_len : felt, account_registry : felt*
+):
     alloc_locals
     let (account_registry_list : felt*) = alloc()
-    let (account_registry_len_, account_registry_list_) =  populate_account_registry(0, account_registry_list)
-    return (account_registry_len = account_registry_len_, account_registry = account_registry_list_)
+    let (account_registry_len_, account_registry_list_) = populate_account_registry(
+        0, account_registry_list
+    )
+    return (account_registry_len=account_registry_len_, account_registry=account_registry_list_)
 end
 
 # @notice AuthorizedRegistry interface

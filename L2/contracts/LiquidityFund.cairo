@@ -4,7 +4,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
+from starkware.cairo.common.math import assert_le
 
 # @notice Stores the contract version
 @storage_var
@@ -21,13 +21,13 @@ end
 func balance_mapping(asset_id : felt) -> (amount : felt):
 end
 
-# @notice Stores the mapping from asset to positions
+# @notice Stores the mapping from asset and position ID to value
 @storage_var
 func asset_liq_position(asset_id : felt, position_id : felt) -> (value : felt):
 end
 
 # @notice Constructor of the smart-contract
-# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(

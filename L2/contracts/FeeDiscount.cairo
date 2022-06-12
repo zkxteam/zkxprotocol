@@ -40,6 +40,7 @@ end
 
 # @notice Function to get user_tokens
 # @param address - Address of the user
+# @return value - number of tokens user holds
 @view
 func get_user_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address : felt

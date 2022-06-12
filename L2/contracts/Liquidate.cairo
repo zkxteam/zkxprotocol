@@ -2,21 +2,11 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.registers import get_fp_and_pc
-from starkware.starknet.common.syscalls import get_contract_address
-from starkware.cairo.common.bitwise import bitwise_and
-from starkware.cairo.common.math import (
-    assert_not_zero,
-    assert_nn,
-    assert_le,
-    assert_in_range,
-    assert_nn_le,
-)
+from starkware.cairo.common.math import assert_not_zero, assert_nn
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.hash import hash2
 from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.hash_state import hash_init, hash_finalize, hash_update
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
 # @notice struct for passing the order request to Account Contract
@@ -48,7 +38,7 @@ struct PriceData:
     member collateralPrice : felt
 end
 
-# @notice struct to balances of collaterals from account
+# @notice struct to pass balances of collaterals from account
 struct CollateralBalance:
     member assetID : felt
     member balance : felt
@@ -80,7 +70,7 @@ end
 #################
 
 # @notice Constructor of the smart-contract
-# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -123,7 +113,7 @@ end
 # @param collaterals_len - Length of the collateral array
 # @param collaterals - Array containing balance of each collateral of the user
 # @param total_value - Stores the total value in usd of all the collaterals recursed over
-# @returns usd_value - Value of the collaterals held by user in usd
+# @return usd_value - Value of the collaterals held by user in usd
 func find_collateral_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     prices_len : felt,
     prices : PriceData*,
@@ -160,7 +150,9 @@ func find_collateral_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     end
 
     # Calculate the value of the current collateral
-    let (collateral_value_usd) = Math64x61_mul(collateral_details.balance, price_details.collateralPrice)
+    let (collateral_value_usd) = Math64x61_mul(
+        collateral_details.balance, price_details.collateralPrice
+    )
 
     # Recurse over the next element
     return find_collateral_balance(
@@ -181,8 +173,8 @@ end
 # @param total_maintenance_requirement - maintenance ratio of the asset * value of the position when executed
 # @param least_collateral_ratio - The least collateral ratio among the positions
 # @param least_collateral_ratio_position - The positionID of the postion which is having the least collateral ratio
-# @returns is_liquidation - 1 if positions are marked to be liquidated
-# @returns least_collateral_ratio_position - The positionID of the least collateralized position
+# @return is_liquidation - 1 if positions are marked to be liquidated
+# @return least_collateral_ratio_position - The positionID of the least collateralized position
 func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address : felt,
     positions_len : felt,
@@ -277,7 +269,9 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     # Calculate the required margin in usd
     local total_value = order_details.marginAmount + order_details.borrowedAmount
     let (average_execution_price : felt) = Math64x61_div(total_value, order_details.portionExecuted)
-    let (maintenance_position) = Math64x61_mul(average_execution_price, order_details.portionExecuted)
+    let (maintenance_position) = Math64x61_mul(
+        average_execution_price, order_details.portionExecuted
+    )
     let (maintenance_requirement) = Math64x61_mul(req_margin, maintenance_position)
     let (maintenance_requirement_usd) = Math64x61_mul(
         maintenance_requirement, price_details.collateralPrice
@@ -297,7 +291,9 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 
     # Calculate the value of the current account margin in usd
     local position_value = maintenance_position - order_details.borrowedAmount + pnl
-    let (net_position_value_usd : felt) = Math64x61_mul(position_value, price_details.collateralPrice)
+    let (net_position_value_usd : felt) = Math64x61_mul(
+        position_value, price_details.collateralPrice
+    )
 
     # Margin ratio calculation
     local numerator = order_details.marginAmount + pnl
@@ -335,7 +331,7 @@ end
 # @param account_address - Account address of the user
 # @param prices_len - Length of the prices array
 # @param prices - Array with all the price details
-# @returns res - 1 if positions are marked to be liquidated
+# @return res - 1 if positions are marked to be liquidated
 @external
 func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address : felt, prices_len : felt, prices : PriceData*
@@ -344,6 +340,8 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Check if the caller is the liquidator contract
     let (caller) = get_caller_address()
+
+    # ###### Add the check here ########
 
     # Check if the list is empty
     with_attr error_message("Invalid Input"):

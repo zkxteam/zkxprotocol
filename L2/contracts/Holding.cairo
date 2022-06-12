@@ -22,7 +22,7 @@ func balance_mapping(asset_id : felt) -> (amount : felt):
 end
 
 # @notice Constructor of the smart-contract
-# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -34,7 +34,7 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 end
 
 # @notice Manually add amount to asset_id's balance
-# @param asset_id - target asset_id
+# @param asset_id_ - target asset_id
 # @param amount - value to add to asset_id's balance
 @external
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -79,7 +79,7 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 end
 
 # @notice Manually deduct amount from asset_id's balance
-# @param asset_id - target asset_id
+# @param asset_id_ - target asset_id
 # @param amount - value to deduct from asset_id's balance
 @external
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -128,7 +128,7 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 end
 
 # @notice Deposit amount for a asset_id by an order
-# @parama setID - target asset_id
+# @parama asset_id_ - target asset_id
 # @param amount - value to deduct from asset_id's balance
 @external
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -156,7 +156,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 end
 
 # @notice Withdraw amount for a asset_id by an order
-# @param asset_id - target asset_id
+# @param asset_id_ - target asset_id
 # @param amount - value to deduct from asset_id's balance
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -187,7 +187,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 end
 
 # @notice Displays the amount of the balance for the asset_id(asset)
-# @param asset_id - Target asset_id
+# @param asset_id_ - Target asset_id
 # @return amount - Balance amount corresponding to the asset_id
 @view
 func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(

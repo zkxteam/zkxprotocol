@@ -52,7 +52,7 @@ func discount_tiers(tier : felt) -> (value : Discount):
 end
 
 # @notice Constructor of the smart-contract
-# @param resgitry_address_ Address of the AuthorizedRegistry contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(

@@ -4,7 +4,6 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
-from starkware.cairo.common.bitwise import bitwise_or
 from starkware.starknet.common.syscalls import get_contract_address
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin, BitwiseBuiltin
@@ -86,6 +85,8 @@ end
 # status 2: executed
 # status 3: close partial
 # status 4: close
+# status 5: toBeLiquidated
+# status 6: fullyLiquidated
 struct OrderDetailsWithIDs:
     member orderID : felt
     member assetID : felt
@@ -123,6 +124,7 @@ struct Asset:
     member maximum_position_size : felt
 end
 
+# @notice struct to store collateral balances
 struct CollateralBalance:
     member assetID : felt
     member balance : felt
@@ -306,7 +308,8 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     return ()
 end
 
-# @notice External function called by the Trading Contract
+# @notice External function called by the Trading Contract to transfer funds from account contract
+# @param assetID_ - asset ID of the collateral that needs to be transferred
 # @param amount - Amount of funds to transfer to this contract
 @external
 func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -317,7 +320,6 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
 
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=5, version=version
@@ -445,7 +447,7 @@ func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size 
     end
 end
 
-# TODO: Remove; Only for testing purposes
+# #### TODO: Remove; Only for testing purposes #####
 @external
 func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     assetID_ : felt, amount : felt
@@ -844,6 +846,7 @@ func is_valid_signature_order{
 end
 
 # @notice Function to withdraw funds
+# @param assetID_ - asset ID of the collateral that needs to be withdrawn
 # @param amount - The Amount of funds that user wants to withdraw
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -880,7 +883,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (amount_times_ten_power_decimal) = Math64x61_mul(amount, decimal_in_64x61_format)
     let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal)
 
-    # Get the L1 Metamask address
+    # Get the L1 wallet address of the user
     let (L2_account_address) = get_contract_address()
     let (user) = L1_address.read()
 
@@ -899,6 +902,7 @@ end
 # @param from_address - The address from where deposit function is called from
 # @param user - User's Metamask account address
 # @param amount - The Amount of funds that user wants to withdraw
+# @param assetID_ - Asset ID of the collateral that needs to be deposited
 @l1_handler
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt, user : felt, amount : felt, assetID_ : felt
@@ -926,7 +930,9 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
 
     let (amount_in_64x61_format) = Math64x61_fromFelt(amount)
-    let (amount_in_decimal_representation) = Math64x61_mul(amount_in_64x61_format, decimal_in_64x61_format)
+    let (amount_in_decimal_representation) = Math64x61_mul(
+        amount_in_64x61_format, decimal_in_64x61_format
+    )
 
     # Read the current balance.
     let (res) = balance.read(assetID=assetID_)
@@ -952,9 +958,13 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     if array_len == 0:
         let (account_contract_address) = get_contract_address()
         # Get Account Registry contract address
-        let (account_registry_address) = IAuthorizedRegistry.get_contract_address(contract_address=registry, index=14, version=version)
+        let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=14, version=version
+        )
         # Add the account address to the account registry
-        IAccountRegistry.add_to_account_registry(contract_address=account_registry_address, address = account_contract_address)
+        IAccountRegistry.add_to_account_registry(
+            contract_address=account_registry_address, address=account_contract_address
+        )
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
