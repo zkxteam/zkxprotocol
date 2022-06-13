@@ -33,6 +33,7 @@ func Math64x61_toFelt{range_check_ptr}(x : felt) -> (res : felt):
 end
 
 # Converts a felt to a fixed point value ensuring it will not overflow
+@view
 func Math64x61_fromFelt{range_check_ptr}(x : felt) -> (res : felt):
     assert_le(x, Math64x61_INT_PART)
     assert_le(-Math64x61_INT_PART, x)
