@@ -33,7 +33,7 @@ from contracts.Math_64x61 import (
 const NUM_STD = 4611686018427387904
 const NUM_1 = 2305843009213693952
 
-#################
+# ################ To be removed ##############
 @storage_var
 func sum_total() -> (res : felt):
 end
@@ -57,7 +57,7 @@ func return_mean64{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (total) = mean_64.read()
     return (total)
 end
-################
+################################
 
 # @notice Function to calculate the difference between index and mark prices
 # @param index_prices_len - Size of the index prices array
@@ -381,13 +381,15 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     lower_array : felt*,
     ABRdyn_len : felt,
     ABRdyn : felt*,
+    ABRdyn_jump_len : felt,
+    ABRdyn_jump : felt*,
     iterator : felt,
-) -> (ABRdyn_len : felt, ABRdyn : felt*):
+) -> (ABRdyn_jump_len : felt, ABRdyn_jump : felt*):
     alloc_locals
 
     # If reached the end of the array, return
     if mark_prices_len == 0:
-        return (ABRdyn_len, ABRdyn)
+        return (iterator, ABRdyn_jump)
     end
 
     # Calculate the diffrence between bands and the mark prices
@@ -399,40 +401,50 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     let (is_lower) = is_le(lower_diff, 0)
 
     # If the upper_diff is non-negative
-    if is_upper == 0:
-        # Calculate jump
-        let (jump_) = Math64x61_div(upper_diff, [index_prices])
-        let (ln_jump_) = Math64x61_ln(jump_)
-
-        # Add the jump to the premium
-        assert ABRdyn[iterator] = [ABRdyn] + ln_jump_
-
+    if is_upper == 1:
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     else:
+        # Calculate jump
+        let (jump) = Math64x61_div(upper_diff, [index_prices])
+        let (ln_jump) = Math64x61_ln(jump)
+        let (loaded_jump) = Math64x61_add([ABRdyn], ln_jump)
+
+        # Add the jump to the premium
+        assert ABRdyn_jump[iterator] = loaded_jump
+
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     end
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
 
     # If the lower_diff is non-negative
-    if is_lower == 0:
-        # Calculate jump
-        let (jump_) = Math64x61_div(lower_diff, [index_prices])
-        let (ln_jump_) = Math64x61_ln(jump_)
-
-        # Add the jump to the premium
-        assert ABRdyn[iterator] = [ABRdyn] - ln_jump_
-
+    if is_lower == 1:
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     else:
+        # Calculate jump
+        let (jump) = Math64x61_div(lower_diff, [index_prices])
+        let (ln_jump) = Math64x61_ln(jump)
+        let (loaded_jump) = Math64x61_sub([ABRdyn], ln_jump)
+
+        # Add the jump to the premium
+        assert ABRdyn_jump[iterator] = loaded_jump
+
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     end
+
+    tempvar syscall_ptr = syscall_ptr
+    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+    tempvar range_check_ptr = range_check_ptr
 
     # Recursively call the next array element
     return calc_jump(
@@ -444,8 +456,10 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
         upper_array + 1,
         lower_array_len - 1,
         lower_array + 1,
-        ABRdyn_len,
-        ABRdyn,
+        ABRdyn_len - 1,
+        ABRdyn + 1,
+        ABRdyn_jump_len + 1,
+        ABRdyn_jump,
         iterator + 1,
     )
 end
@@ -459,28 +473,31 @@ end
 @external
 func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     index_prices_len : felt, index_prices : felt*, mark_prices_len : felt, mark_prices : felt*
-) -> (
-    upper_jump_len : felt,
-    upper_jump : felt*,
-    lower_jump_len : felt,
-    lower_jump : felt*,
-    ABRdyn_len : felt,
-    ABRdyn : felt*,
-):
+) -> (diff_len : felt, diff : felt*):
     alloc_locals
 
     # Calculate the middle band
     let (avg_array : felt*) = alloc()
     let (avg_array_len : felt, avg_array : felt*) = movavg(
-        mark_prices_len, mark_prices, mark_prices_len, mark_prices, 3, 0, avg_array, 0
+        mark_prices_len, mark_prices, mark_prices_len, mark_prices, 10, 0, avg_array, 0
     )
 
     # Calculate the upper & lower band
     let (upper_array : felt*) = alloc()
     let (lower_array : felt*) = alloc()
 
-    let (upper_array_len, upper_array, lower_array_len, lower_array) = calc_bollinger(
-        0, upper_array, 0, lower_array, mark_prices_len, mark_prices, avg_array_len, avg_array, 3, 0
+    let (upper_array_len : felt, upper_array : felt*, lower_array_len : felt,
+        lower_array : felt*) = calc_bollinger(
+        0,
+        upper_array,
+        0,
+        lower_array,
+        mark_prices_len,
+        mark_prices,
+        avg_array_len,
+        avg_array,
+        10,
+        0,
     )
 
     # Calculate the diff b/w index and mark
@@ -492,12 +509,12 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     # Calculate the premium
     let (ABRdyn : felt*) = alloc()
     let (ABRdyn_len : felt, ABRdyn : felt*) = movavg(
-        diff_len, diff, diff_len, diff, 3, 0, ABRdyn, 0
+        diff_len, diff, diff_len, diff, 60, 0, ABRdyn, 0
     )
 
-    # # Add the jump to the premium price
-    # let (upper_jump_len, upper_jump, lower_jump_len, lower_jump, ABRdyn_len, ABRdyn) =
-
+    # Add the jump to the premium price
+    let (ABRdyn_jump : felt*) = alloc()
+    # let (ABRdyn_len : felt, ABRdyn : felt*) =
     return calc_jump(
         mark_prices_len,
         mark_prices,
@@ -510,10 +527,12 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         ABRdyn_len,
         ABRdyn,
         0,
+        ABRdyn_jump,
+        0,
     )
 
     # # Find the effective ABR rate
     # let (rate_sum) = find_sum(ABRdyn_len, ABRdyn, 0)
     # let (rate) = Math64x61_div(rate_sum, ABRdyn_len)
-    # return (rate)
+    # return (ABRdyn_len, ABRdyn)
 end
