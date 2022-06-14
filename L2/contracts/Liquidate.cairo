@@ -29,6 +29,7 @@ struct OrderDetails:
     member status : felt
     member marginAmount : felt
     member borrowedAmount : felt
+    member leverage : felt
 end
 
 # @notice struct for passing the order request to Account Contract
@@ -37,6 +38,9 @@ end
 # status 2: executed
 # status 3: close partial
 # status 4: close
+# status 5: toBeDeleveraged
+# status 6: toBeLiquidated
+# status 7: fullyLiquidated
 struct OrderDetailsWithIDs:
     member orderID : felt
     member assetID : felt

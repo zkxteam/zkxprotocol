@@ -65,9 +65,8 @@ end
 # status 3: close partial
 # status 4: close
 # status 5: toBeDeleveraged
-# status 6: fullyDeleveraged
-# status 7: toBeLiquidated
-# status 8: fullyLiquidated
+# status 6: toBeLiquidated
+# status 7: fullyLiquidated
 struct OrderDetails:
     member assetID : felt
     member collateralID : felt
@@ -80,6 +79,7 @@ struct OrderDetails:
     member status : felt
     member marginAmount : felt
     member borrowedAmount : felt
+    member leverage : felt
 end
 
 # status 0: initialized
@@ -87,8 +87,9 @@ end
 # status 2: executed
 # status 3: close partial
 # status 4: close
-# status 5: toBeLiquidated
-# status 6: fullyLiquidated
+# status 5: toBeDeleveraged
+# status 6: toBeLiquidated
+# status 7: fullyLiquidated
 struct OrderDetailsWithIDs:
     member orderID : felt
     member assetID : felt
@@ -706,6 +707,7 @@ func execute_order{
                 status=status_,
                 marginAmount=margin_amount,
                 borrowedAmount=borrowed_amount,
+                leverage=request.leverage,
             )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=new_order)
@@ -747,6 +749,7 @@ func execute_order{
                 status=status_,
                 marginAmount=margin_amount,
                 borrowedAmount=borrowed_amount,
+                leverage=request.leverage,
             )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=updated_order)
@@ -769,21 +772,38 @@ func execute_order{
         # Assert that the order exists
         assert_not_zero(orderDetails.positionSize)
         assert_nn(orderDetails.portionExecuted - size)
+        
+        local new_leverage
+        if request.orderType == 4:
+            let total_value = margin_amount + borrowed_amount
+            let (leverage_) = Math64x61_div(total_value, margin_amount)
+            new_leverage = leverage_
+        else:
+            new_leverage = request.leverage
+        end
+        tempvar range_check_ptr = range_check_ptr
 
         # Check if the order is fully closed or not
         # status_ == 4, fully closed
         # status_ == 3, partially closed
+        # status_ == 5, toBeDeleveraged
+        # status_ == 6, toBeLiquidated
+        # status_ == 7, fullyLiquidated
         if orderDetails.portionExecuted - size == 0:
             if request.isLiquidation == 1:
-                assert status_ = 6
+                assert status_ = 7
             else:
                 assert status_ = 4
             end
         else:
-            if request.isLiquidation == 1:
+            if request.orderType == 4:
                 assert status_ = 5
             else:
-                assert status_ = 3
+                if request.isLiquidation == 1:
+                    assert status_ = 6
+                else:
+                    assert status_ = 3
+                end
             end
         end
 
@@ -800,6 +820,7 @@ func execute_order{
             status=status_,
             marginAmount=margin_amount,
             borrowedAmount=borrowed_amount,
+            leverage=new_leverage,
         )
 
         # Write to the mapping
@@ -1048,6 +1069,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
             status=7,
             marginAmount=orderDetails.marginAmount,
             borrowedAmount=orderDetails.borrowedAmount,
+            leverage = orderDetails.leverage,
         )
         # Write to the mapping
         order_mapping.write(orderID=id_, value=updated_order)
@@ -1065,6 +1087,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
             status=5,
             marginAmount=orderDetails.marginAmount,
             borrowedAmount=orderDetails.borrowedAmount,
+            leverage = orderDetails.leverage,
         )
         # Write to the mapping
         order_mapping.write(orderID=id_, value=updated_order)

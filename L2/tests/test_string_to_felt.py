@@ -7,10 +7,12 @@ from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61
 @pytest.mark.asyncio
 async def test_str_to_felt():
     asset_felt = str_to_felt("ETH")
-    asset_value = to64x61(.000194)
-    res = from64x61(209078143475155881079725)
-    res1 = from64x61(230584300921369395200000 - 21506157446213514129600)
+    price = from64x61(5858937464320249856000)
+    margin = from64x61(5858937464320249823232)
+    borrowed = from64x61(5858937464320249856000)
+    leverage = from64x61(2305843009213693952)
     print("\nasset_felt:", asset_felt)
-    print("asset_value", asset_value)
-    print("value", res)
-    print("value", res1)
+    print("\n price", price)
+    print("\n margin", margin)
+    print("\n borrowed", borrowed)
+    print("\n leverage", leverage)

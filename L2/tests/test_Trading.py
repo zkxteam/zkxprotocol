@@ -974,7 +974,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         size,
         2,
         to64x61(5000),
-        to64x61(0)
+        to64x61(0),
+        leverage1
     ]
 
     orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -991,7 +992,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         size,
         2,
         to64x61(5000),
-        to64x61(0)
+        to64x61(0),
+        leverage2
     ]
 
     alice_curr_balance = await alice.get_balance(USDC_ID).call()
@@ -1085,7 +1087,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         0,
         4,
         to64x61(0),
-        to64x61(0)
+        to64x61(0),
+        leverage3
     ]
 
     orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -1102,7 +1105,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         0,
         4,
         to64x61(0),
-        to64x61(0)
+        to64x61(0),
+        leverage4
     ]
 
     alice_curr_balance_after = await alice.get_balance(collateralID_3).call()
@@ -1239,7 +1243,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         size1,
         1,
         to64x61(37300),
-        to64x61(0)
+        to64x61(0),
+        leverage1
     ]
 
     orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -1256,7 +1261,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         position2,
         2,
         to64x61(27975),
-        to64x61(0)
+        to64x61(0),
+        leverage2
     ]
 
     orderState3 = await charlie.get_order_data(orderID_=order_id_3).call()
@@ -1273,7 +1279,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         position3,
         2,
         to64x61(9325),
-        to64x61(0)
+        to64x61(0),
+        leverage3
     ]
 
     alice_curr_balance = await alice.get_balance(assetID_=USDC_ID).call()
@@ -1385,7 +1392,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         0,
         4,
         to64x61(0),
-        to64x61(0)
+        to64x61(0),
+        leverage4
     ]
 
     orderState5 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -1401,7 +1409,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         0,
         4,
         to64x61(0),
-        to64x61(0)
+        to64x61(0),
+        leverage5
     ]
 
     orderState6 = await charlie.get_order_data(orderID_=order_id_3).call()
@@ -1417,7 +1426,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         0,
         4,
         to64x61(0),
-        to64x61(0)
+        to64x61(0),
+        leverage6
     ]
 
     alice_curr_balance_after = await alice.get_balance(assetID_=USDC_ID).call()
@@ -1537,7 +1547,8 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         to64x61(2),
         2,
         to64x61(5000),
-        to64x61(5000)
+        to64x61(5000),
+        leverage1
     ]
 
     orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -1554,7 +1565,8 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         to64x61(2),
         2,
         to64x61(5000),
-        to64x61(5000)
+        to64x61(5000),
+        leverage2
     ]
 
     alice_curr_balance = await alice.get_balance(USDC_ID).call()
@@ -1682,7 +1694,8 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         0,
         4,
         to64x61(0),
-        to64x61(0)
+        to64x61(0),
+        leverage3
     ]
 
     orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -1699,7 +1712,8 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         0,
         4,
         to64x61(0),
-        to64x61(0)
+        to64x61(0),
+        leverage4
     ]
 
     alice_curr_balance_after = await alice.get_balance(collateralID_3).call()
@@ -1834,7 +1848,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         to64x61(5),
         1,
         to64x61(2500),
-        to64x61(22500)
+        to64x61(22500),
+        leverage1
     ]
 
     orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -1851,7 +1866,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         to64x61(5),
         2,
         to64x61(25000),
-        to64x61(0)
+        to64x61(0),
+        leverage2
     ]
 
     alice_curr_balance = await alice.get_balance(USDC_ID).call()
@@ -1986,7 +2002,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         to64x61(2.5),
         3,
         to64x61(1250),
-        to64x61(11250)
+        to64x61(11250),
+        leverage3
     ]
 
     orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -2003,7 +2020,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         to64x61(2.5),
         3,
         to64x61(12500),
-        to64x61(0)
+        to64x61(0),
+        leverage4
     ]
 
     alice_curr_balance_after = await alice.get_balance(collateralID_3).call()
@@ -2120,7 +2138,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         to64x61(5),
         1,
         to64x61(2500),
-        to64x61(22500)
+        to64x61(22500),
+        leverage1
     ]
 
     orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
@@ -2137,7 +2156,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         to64x61(2.5),
         2,
         to64x61(12500),
-        to64x61(0)
+        to64x61(0),
+        leverage2
     ]
 
     alice_curr_balance = await alice.get_balance(USDC_ID).call()
