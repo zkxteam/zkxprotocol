@@ -8,9 +8,47 @@ struct Market:
     member tradable : felt
 end
 
+# @notice struct to store details of assets
+struct Asset:
+    member asset_version : felt
+    member ticker : felt
+    member short_name : felt
+    member tradable : felt
+    member collateral : felt
+    member token_decimal : felt
+    member metadata_id : felt
+    member tick_size : felt
+    member step_size : felt
+    member minimum_order_size : felt
+    member minimum_leverage : felt
+    member maximum_leverage : felt
+    member currently_allowed_leverage : felt
+    member maintenance_margin_fraction : felt
+    member initial_margin_fraction : felt
+    member incremental_initial_margin_fraction : felt
+    member incremental_position_size : felt
+    member baseline_position_size : felt
+    member maximum_position_size : felt
+end
 
-# Struct to pass the order
-struct OrderRequest:
+# @notice Struct to store base fee percentage for each tier for maker and taker
+struct BaseFee:
+    member numberOfTokens : felt
+    member makerFee : felt
+    member takerFee : felt
+end
+
+# @notice Struct to store discount percentage for each tier
+struct Discount:
+    member numberOfTokens : felt
+    member discount : felt
+end
+
+# Struct to pass orders+signatures in a batch in the execute_batch fn
+struct MultipleOrder:
+    member pub_key : felt
+    member sig_r : felt
+    member sig_s : felt
     member orderID : felt
     member assetID : felt
     member collateralID : felt
@@ -23,62 +61,13 @@ struct OrderRequest:
     member isLiquidation : felt
     member liquidatorAddress : felt
     member parentOrder : felt
+    member side : felt
 end
 
-
-
-# Struct to pass signatures to this contract
-struct Signature:
-    member r_value : felt
-    member s_value : felt
-end
-
-
-
-# status 0: initialized
-# status 1: partial
-# status 2: executed
-# status 3: close partial
-# status 4: close
-# status 5: toBeLiquidated
-# status 6: fullyLiquidated
-struct OrderDetails:
+# @notice struct to pass price data to the contract
+struct PriceData:
     member assetID : felt
     member collateralID : felt
-    member price : felt
-    member executionPrice : felt
-    member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
-end
-
-# status 0: initialized
-# status 1: partial
-# status 2: executed
-# status 3: close partial
-# status 4: close
-# status 5: toBeLiquidated
-# status 6: fullyLiquidated
-struct OrderDetailsWithIDs:
-    member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
-    member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
-end
-
-struct CollateralBalance:
-    member assetID : felt
-    member balance : felt
+    member assetPrice : felt
+    member collateralPrice : felt
 end

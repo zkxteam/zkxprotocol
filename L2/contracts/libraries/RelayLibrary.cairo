@@ -1,5 +1,5 @@
 %lang starknet
-%builtins pedersen range_check
+%builtins pedersen range_check ecdsa
 
 from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_info
 from starkware.cairo.common.cairo_builtins import HashBuiltin
@@ -29,11 +29,6 @@ end
 # @dev - this stores whether caller has been paid for hash -> 1 hash recorded but not paid, 2 means paid
 @storage_var
 func caller_hash_status(caller:felt,transaction_hash:felt) ->(res:felt):
-end
-
-# @dev - this stores whether transaction_hash has been recorded -> 0 not recorded, 1 recorded
-@storage_var
-func hash(transaction_hash:felt) -> (res:felt):
 end
 
 # @notice - to be set in the constructor
@@ -84,16 +79,6 @@ func increment_call_counter{
     return()
 end
 
-# @notice - records transaction_hash as seen
-func store_hash{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
-    range_check_ptr}():
-    
-    let (tx_info) = get_tx_info()
-    hash.write(tx_info.transaction_hash,1)
-    return()
-end
-
 # @notice - records <caller, transaction_hash> as seen (value 1)
 func set_caller_hash_status{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
@@ -126,13 +111,12 @@ func record_call_details{
     range_check_ptr}(function_name:felt):
 
     increment_call_counter(function_name)
-    store_hash()
     set_caller_hash_status()
     return()
 end
 
 @view
-func get_version{
+func get_current_version{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     range_check_ptr}() -> (res:felt):
 
@@ -140,14 +124,6 @@ func get_version{
     return(res)
 end
 
-@view
-func get_hash_seen{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
-    range_check_ptr}(transaction_hash) -> (is_seen:felt):
-
-    let (is_seen) = hash.read(transaction_hash)
-    return (is_seen)
-end
 
 @view 
 func get_caller_hash_status{
@@ -168,7 +144,7 @@ func get_call_counter{
 end
 
 @view
-func get_registry_address{
+func get_registry_address_at_relay{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     range_check_ptr}() -> (address:felt):
 
@@ -189,7 +165,7 @@ end
 # @dev - All the following functions require master admin access currently - action 0
 
 @external
-func set_version{
+func set_current_version{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     range_check_ptr}(val:felt)->():
 
@@ -205,7 +181,7 @@ func mark_caller_hash_paid{
     range_check_ptr}(caller:felt, transaction_hash:felt):
 
     verify_caller_authority(0)
-    let (is_seen) = get_hash_seen(transaction_hash)
+    let (is_seen) = caller_hash_status.read(caller,transaction_hash)
     assert is_seen = 1
     caller_hash_status.write(caller,transaction_hash,2)
     return()

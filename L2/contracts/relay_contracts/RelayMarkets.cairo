@@ -1,7 +1,5 @@
 %lang starknet
 
-
-
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.RelayLibrary import (
     record_call_details,
@@ -21,7 +19,7 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-# @notice - All the following are mirror functions for Markets.cairo, record call details and forward call
+# @notice - All the following are mirror functions for Markets.cairo - just record call details and forward call
 
 @external
 func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -70,7 +68,6 @@ func getMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     id : felt
 ) -> (currMarket : Market):
 
-    record_call_details('getMarket')
     let (inner_address)=get_inner_contract()
     let (currMarket)=IMarkets.getMarket(contract_address=inner_address,id=id)
     return(currMarket)
