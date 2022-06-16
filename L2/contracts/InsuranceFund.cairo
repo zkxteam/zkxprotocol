@@ -187,6 +187,9 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount, current_amount)
+    end
     balance_mapping.write(asset_id=asset_id_, value=current_amount - amount)
 
     let current_liq_amount : felt = asset_liq_position.read(

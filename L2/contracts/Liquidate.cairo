@@ -300,10 +300,8 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     )
 
     # Calculate the required margin in usd
-    local total_value = order_details.marginAmount + order_details.borrowedAmount
-    let (average_execution_price : felt) = Math64x61_div(total_value, order_details.portionExecuted)
     let (maintenance_position) = Math64x61_mul(
-        average_execution_price, order_details.portionExecuted
+        order_details.executionPrice, order_details.portionExecuted
     )
     let (maintenance_requirement) = Math64x61_mul(req_margin, maintenance_position)
     let (maintenance_requirement_usd) = Math64x61_mul(
@@ -313,10 +311,10 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     # Calculate pnl to check if it is the least collateralized position
     local price_diff_
     if order_details.direction == 1:
-        tempvar price_diff = price_details.assetPrice - average_execution_price
+        tempvar price_diff = price_details.assetPrice - order_details.executionPrice
         price_diff_ = price_diff
     else:
-        tempvar price_diff = average_execution_price - price_details.assetPrice
+        tempvar price_diff = order_details.executionPrice - price_details.assetPrice
         price_diff_ = price_diff
     end
 
@@ -373,7 +371,7 @@ end
 # @param position_ - position to be deleveraged
 # @param collateral_price_ - collateral price of the collateral in the position
 # @param asset_price_ - asset price of the asset in the position
-# @returns amount_to_sold - amount to be put on sale for deleveraging
+# @return amount_to_sold - amount to be put on sale for deleveraging
 func check_deleveraging{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address_ : felt, position_ : felt, collateral_price_ : felt, asset_price_ : felt
 ) -> (amount_to_be_sold : felt):
@@ -398,15 +396,11 @@ func check_deleveraging{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     let borrowed_amount = order_details.borrowedAmount
     let position_size = order_details.positionSize
 
-    # Calculate the average execution price
-    local total_value = margin_amount + borrowed_amount
-    let (average_execution_price : felt) = Math64x61_div(total_value, order_details.portionExecuted)
-
     local price_diff
     if order_details.direction == 1:
-        price_diff = asset_price_ - average_execution_price
+        price_diff = asset_price_ - order_details.executionPrice
     else:
-        price_diff = average_execution_price - asset_price_
+        price_diff = order_details.executionPrice - asset_price_
     end    
 
     # Calcculate amount to be sold for deleveraging

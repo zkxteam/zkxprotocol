@@ -197,6 +197,11 @@ end
 func amount_to_be_sold(order_id : felt) -> (amount : felt):
 end
 
+# Stores the position which is to be deleveraged or liquidated
+@storage_var
+func deleveraged_or_liquidatable_position() -> (order_id : felt):
+end
+
 #
 # Guards
 #
@@ -266,6 +271,28 @@ func get_amount_to_be_sold{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
 ) -> (res : felt):
     let (res) = amount_to_be_sold.read(order_id=order_id_)
     return (res=res)
+end
+
+@view
+func get_deleveraged_or_liquidatable_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+) -> (order_id: felt, amount_to_be_sold : felt):
+    alloc_locals
+    let (order_id_) = deleveraged_or_liquidatable_position.read()
+    let (order_details) = get_order_data(order_id_)
+    local amount_to_be_sold_
+    if order_details.status == 5:
+        let (amount) = amount_to_be_sold.read(order_id = order_id_)
+        assert amount_to_be_sold_ = amount
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        assert amount_to_be_sold_ = 0
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+    return (order_id=order_id_, amount_to_be_sold=amount_to_be_sold_)
 end
 
 #
@@ -562,7 +589,15 @@ func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
         borrowedAmount=pos_details.borrowedAmount,
     )
 
-    let (is_valid_state) = is_le(pos_details.status, 3)
+    local is_valid_state
+    if pos_details.status == 5:
+        assert is_valid_state = 1
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        let (state) = is_le(pos_details.status, 3)
+        assert is_valid_state = state
+        tempvar range_check_ptr = range_check_ptr
+    end
 
     if is_valid_state == 1:
         assert array_list[array_list_len] = order_details_w_id
@@ -726,8 +761,13 @@ func execute_order{
                 assert_le(size + orderDetails.portionExecuted, request.positionSize)
             end
 
-            # Check if the order is in the process of being closed
-            assert_le(orderDetails.status, 3)
+            # Check if the order is in the process of being closed or if it was deleveraged
+            if orderDetails.status == 5:
+                tempvar range_check_ptr = range_check_ptr
+            else:
+                assert_le(orderDetails.status, 3)
+                tempvar range_check_ptr = range_check_ptr
+            end
 
             # Check if the order is fully filled by executing the current one
             if request.positionSize == size + orderDetails.portionExecuted:
@@ -735,13 +775,13 @@ func execute_order{
             else:
                 status_ = 1
             end
-
+            
             # Create a new struct with the updated details
             let updated_order = OrderDetails(
                 assetID=orderDetails.assetID,
                 collateralID=orderDetails.collateralID,
                 price=orderDetails.price,
-                executionPrice=orderDetails.executionPrice,
+                executionPrice=execution_price,
                 positionSize=orderDetails.positionSize,
                 orderType=request.orderType,
                 direction=orderDetails.direction,
@@ -1066,13 +1106,17 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
             orderType=orderDetails.orderType,
             direction=orderDetails.direction,
             portionExecuted=orderDetails.portionExecuted,
-            status=7,
+            status=6,
             marginAmount=orderDetails.marginAmount,
             borrowedAmount=orderDetails.borrowedAmount,
             leverage = orderDetails.leverage,
         )
         # Write to the mapping
         order_mapping.write(orderID=id_, value=updated_order)
+        # Update deleveraged or liquidatable position
+        deleveraged_or_liquidatable_position.write(value = id_)
+        # Update amount_to_be_sold storage variable
+        amount_to_be_sold.write(order_id = id_, value = amount_to_be_sold_)
     else:
         # Create a new struct with the updated details by setting toBeDeleveraged flag to true
         let updated_order = OrderDetails(
@@ -1091,7 +1135,9 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         )
         # Write to the mapping
         order_mapping.write(orderID=id_, value=updated_order)
-        # update amount_to_be_sold storage variable
+        # Update deleveraged or liquidatable position
+        deleveraged_or_liquidatable_position.write(value = id_)
+        # Update amount_to_be_sold storage variable
         amount_to_be_sold.write(order_id = id_, value = amount_to_be_sold_)
     end
 
