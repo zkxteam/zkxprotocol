@@ -18,6 +18,8 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
+# @notice - All the following are mirror functions for FeeDiscount.cairo - just record call details and forward call
+
 @external
 func add_user_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address : felt, value : felt

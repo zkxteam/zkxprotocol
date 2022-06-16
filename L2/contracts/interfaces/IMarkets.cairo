@@ -5,6 +5,7 @@ from contracts.DataTypes import Market
 @contract_interface
 namespace IMarkets:
 
+    # external functions
     func addMarket(id : felt, newMarket : Market):
     end
 
@@ -17,6 +18,7 @@ namespace IMarkets:
     func modifyTradable(id : felt, tradable : felt):
     end
 
+    # view functions
     func getMarket(id : felt) -> (currMarket : Market):
     end
 end

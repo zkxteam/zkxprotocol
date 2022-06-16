@@ -11,7 +11,7 @@ from contracts.libraries.RelayLibrary import (
 from contracts.DataTypes import Asset
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
-# @notice - This will call initialize to set the registrey address, version and index of underlying contract
+# @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt, index_:felt):
@@ -19,6 +19,8 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     initialize(registry_address_,version_,index_)
     return ()
 end
+
+# @notice - All the following are mirror functions for Asset.cairo - just record call details and forward call
 
 @external
 func set_L1_zkx_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(

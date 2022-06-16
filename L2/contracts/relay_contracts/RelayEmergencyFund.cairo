@@ -10,7 +10,7 @@ from contracts.libraries.RelayLibrary import (
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 
-# @notice - This will call initialize to set the registrey address, version and index of underlying contract
+# @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt, index_:felt):
