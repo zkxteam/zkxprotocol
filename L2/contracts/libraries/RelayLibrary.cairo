@@ -3,9 +3,11 @@
 
 from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_info
 from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.cairo.common.alloc import alloc
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.Constants import (
-    AdminAuth_INDEX   
+    AdminAuth_INDEX,
+    MasterAdmin_ACTION
 )
 
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -37,6 +39,15 @@ end
 func self_index() -> (index:felt):
 end
 
+# stores caller hash count
+@storage_var
+func hash_count(caller:felt) -> (res:felt):
+end
+
+# stores list of hashes for a caller
+@storage_var
+func hash_list_for_caller(caller:felt, index:felt) -> (res:felt):
+end
 
 func initialize{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
@@ -68,6 +79,7 @@ func verify_caller_authority{
     return()    
 end
 
+
 # @notice - increments call counter for given function_name for current caller
 func increment_call_counter{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
@@ -77,6 +89,40 @@ func increment_call_counter{
     let (current_count) = call_counter.read(caller,function_name)
     call_counter.write(caller,function_name,current_count+1)
     return()
+end
+
+# stores hash in caller hash array after incrementing caller hash count
+func store_caller_hash{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
+    range_check_ptr}():
+
+    let (caller) = get_caller_address()
+    let (tx_info) = get_tx_info()
+    let (current_count)=hash_count.read(caller)
+    if current_count==0:
+        hash_count.write(caller,current_count+1)
+        hash_list_for_caller.write(caller,0,tx_info.transaction_hash)
+        return()
+    end
+    hash_count.write(caller,current_count+1)
+    hash_list_for_caller.write(caller,current_count,tx_info.transaction_hash)
+    return()
+end
+
+# recursively creates list of transaction hashes for a caller
+
+func create_list{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(caller:felt,total_length:felt, current_index:felt, hash_list:felt*):
+
+    if current_index==total_length:
+        return()
+    end
+    let (transaction_hash) = hash_list_for_caller.read(caller,current_index)
+    assert [hash_list+current_index]=transaction_hash
+    create_list(caller,total_length,current_index+1,hash_list)
+    return()
+    
 end
 
 # @notice - records <caller, transaction_hash> as seen (value 1)
@@ -109,7 +155,7 @@ end
 func record_call_details{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     range_check_ptr}(function_name:felt):
-
+    store_caller_hash()
     increment_call_counter(function_name)
     set_caller_hash_status()
     return()
@@ -161,6 +207,21 @@ func get_self_index{
     return (index)
 end
 
+@view
+func get_caller_hash_list{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
+    range_check_ptr}(caller:felt) -> (hash_list_len:felt,hash_list:felt*):
+
+    alloc_locals
+    let (local count)=hash_count.read(caller)
+    if count==0:
+        return(0,cast(0,felt*))
+    end
+    let (hash_list:felt*)=alloc()
+    create_list(caller,count,0,hash_list)
+    return(count,hash_list)
+end
+
 
 # @dev - All the following functions require master admin access currently - action 0
 
@@ -169,7 +230,7 @@ func set_current_version{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     range_check_ptr}(val:felt)->():
 
-    verify_caller_authority(0) # only master admin action allowed i.e. action 0
+    verify_caller_authority(MasterAdmin_ACTION) # only master admin action allowed i.e. action 0
     current_version.write(val)
     return()
 end
@@ -180,7 +241,7 @@ func mark_caller_hash_paid{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     range_check_ptr}(caller:felt, transaction_hash:felt):
 
-    verify_caller_authority(0)
+    verify_caller_authority(MasterAdmin_ACTION)
     let (is_seen) = caller_hash_status.read(caller,transaction_hash)
     assert is_seen = 1
     caller_hash_status.write(caller,transaction_hash,2)
@@ -194,7 +255,7 @@ func reset_call_counter{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     range_check_ptr}(caller:felt, function_name:felt):
 
-    verify_caller_authority(0)
+    verify_caller_authority(MasterAdmin_ACTION)
     call_counter.write(caller,function_name,0)
     return()
 end
@@ -205,7 +266,7 @@ func set_self_index{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     range_check_ptr}(index:felt):
 
-    verify_caller_authority(0)
+    verify_caller_authority(MasterAdmin_ACTION)
     self_index.write(index)
     return()
 end

@@ -5,7 +5,13 @@ from starkware.crypto.signature.signature import private_to_stark_key, sign
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.public.abi import get_selector_from_name
+from starkware.starknet.definitions.general_config import StarknetChainId
+from starkware.starknet.public.abi import get_selector_from_name
 from math import trunc
+from starkware.starknet.core.os.transaction_hash.transaction_hash import (
+    TransactionHashPrefix,
+    calculate_transaction_hash_common,
+)
 
 MAX_UINT256 = (2**128 - 1, 2**128 - 1)
 
@@ -75,6 +81,7 @@ class Signer():
     def __init__(self, private_key):
         self.private_key = private_key
         self.public_key = private_to_stark_key(private_key)
+        self.current_hash=0
 
     def sign(self, message_hash):
         return sign(msg_hash=message_hash, priv_key=self.private_key)
@@ -89,6 +96,18 @@ class Signer():
             account.contract_address, to, selector, calldata, nonce)
         sig_r, sig_s = self.sign(message_hash)
 
+        temp=account.execute(to, selector, calldata, nonce)
+        # storing hash of current transaction in current_hash which will be accessible through signer object
+        self.current_hash=calculate_transaction_hash_common(
+            TransactionHashPrefix.INVOKE,
+            0, # version
+            account.contract_address, # to
+            get_selector_from_name('execute'), #entry_point
+            temp.calldata, #calldata
+            0, #maxfee
+            1536727068981429685321, # chainid
+            [],
+        )
         return await account.execute(to, selector, calldata, nonce).invoke(signature=[sig_r, sig_s])
 
 
