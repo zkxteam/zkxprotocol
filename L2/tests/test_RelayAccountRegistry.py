@@ -7,7 +7,7 @@ from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 
 signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
-
+signer3 = Signer(12345)
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -33,6 +33,11 @@ async def adminAuth_factory():
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
         constructor_calldata=[signer2.public_key, 0, 1]
+    )
+
+    admin3 = await starknet.deploy(
+        "contracts/Account.cairo",
+        constructor_calldata=[signer3.public_key, 0, 1]
     )
 
     adminAuth = await starknet.deploy(
@@ -79,13 +84,16 @@ async def adminAuth_factory():
     adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address,0,1])
 
 
-    return adminAuth, account_registry, relay_account_registry, admin1, admin2, registry
+    return adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry
 
 
 @pytest.mark.asyncio
 async def test_add_address_to_account_registry(adminAuth_factory):
-    adminAuth, account_registry, relay_account_registry, admin1, admin2, registry = adminAuth_factory
+    adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry = adminAuth_factory
 
+    hash_list=await relay_account_registry.get_caller_hash_list(admin1.contract_address).call()
+    print(hash_list.result)
+    assert len(hash_list.result.hash_list) == 0
     await signer1.send_transaction(
         admin1, relay_account_registry.contract_address, 'add_to_account_registry', [str_to_felt("123")])
     #print(ex_info)
@@ -123,18 +131,22 @@ async def test_add_address_to_account_registry(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_remove_address_from_account_registry(adminAuth_factory):
-    adminAuth, account_registry, relay_account_registry, admin1, admin2, registry = adminAuth_factory
+    adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry = adminAuth_factory
 
     fetched_account_registry1 = await relay_account_registry.get_account_registry().call()
     call_counter = await relay_account_registry.get_call_counter(
         admin1.contract_address,str_to_felt('add_to_account_registry')).call()
-    print(fetched_account_registry1.result)
-    print(call_counter.result)
+    
     call_counter = await relay_account_registry.get_call_counter(
         admin1.contract_address,str_to_felt('remove_from_account_registry')).call()
     
+
     assert call_counter.result.count == 0
     await signer1.send_transaction(admin1, relay_account_registry.contract_address, 'remove_from_account_registry', [0])
+
+    hash_list=await relay_account_registry.get_caller_hash_list(admin1.contract_address).call()
+    print(hash_list.result)
+    assert len(hash_list.result.hash_list) == 3
 
     fetched_account_registry = await account_registry.get_account_registry().call()
     relay_fetched_account_registry = await relay_account_registry.get_account_registry().call()
@@ -145,7 +157,7 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_authorized_actions_in_relay(adminAuth_factory):
-    adminAuth, account_registry, relay_account_registry, admin1, admin2, registry = adminAuth_factory
+    adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry = adminAuth_factory
 
     await signer1.send_transaction(admin1, 
     relay_account_registry.contract_address, 'add_to_account_registry', [str_to_felt("789")])
@@ -153,6 +165,9 @@ async def test_authorized_actions_in_relay(adminAuth_factory):
     hash_status=await relay_account_registry.get_caller_hash_status(admin1.contract_address,signer1.current_hash).call()
 
     assert hash_status.result.res == 1
+
+    assert_revert(lambda: signer1.send_transaction(
+        admin1, relay_account_registry.contract_address, 'mark_caller_hash_paid', [admin1.contract_address,123]))
 
     await signer1.send_transaction(
         admin1, relay_account_registry.contract_address, 'mark_caller_hash_paid', [admin1.contract_address,add_hash])
@@ -182,6 +197,7 @@ async def test_authorized_actions_in_relay(adminAuth_factory):
     index = await relay_account_registry.get_self_index().call()
     assert index.result.index == AccountRegistry_INDEX
 
+    assert_revert(lambda: signer3.send_transaction(admin3, relay_account_registry.contract_address, 'set_self_index', [100]))
     await signer1.send_transaction(admin1, relay_account_registry.contract_address, 'set_self_index', [100])
 
     index = await relay_account_registry.get_self_index().call()
