@@ -1095,51 +1095,34 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         assert caller = liquidate_address
     end
 
+    local status_
     if amount_to_be_sold_ == 0:
-        # Create a new struct with the updated details by setting toBeLiquidated flag to true
-        let updated_order = OrderDetails(
-            assetID=orderDetails.assetID,
-            collateralID=orderDetails.collateralID,
-            price=orderDetails.price,
-            executionPrice=orderDetails.executionPrice,
-            positionSize=orderDetails.positionSize,
-            orderType=orderDetails.orderType,
-            direction=orderDetails.direction,
-            portionExecuted=orderDetails.portionExecuted,
-            status=6,
-            marginAmount=orderDetails.marginAmount,
-            borrowedAmount=orderDetails.borrowedAmount,
-            leverage = orderDetails.leverage,
-        )
-        # Write to the mapping
-        order_mapping.write(orderID=id_, value=updated_order)
-        # Update deleveraged or liquidatable position
-        deleveraged_or_liquidatable_position.write(value = id_)
-        # Update amount_to_be_sold storage variable
-        amount_to_be_sold.write(order_id = id_, value = amount_to_be_sold_)
+        status_ = 6
     else:
-        # Create a new struct with the updated details by setting toBeDeleveraged flag to true
-        let updated_order = OrderDetails(
-            assetID=orderDetails.assetID,
-            collateralID=orderDetails.collateralID,
-            price=orderDetails.price,
-            executionPrice=orderDetails.executionPrice,
-            positionSize=orderDetails.positionSize,
-            orderType=orderDetails.orderType,
-            direction=orderDetails.direction,
-            portionExecuted=orderDetails.portionExecuted,
-            status=5,
-            marginAmount=orderDetails.marginAmount,
-            borrowedAmount=orderDetails.borrowedAmount,
-            leverage = orderDetails.leverage,
-        )
-        # Write to the mapping
-        order_mapping.write(orderID=id_, value=updated_order)
-        # Update deleveraged or liquidatable position
-        deleveraged_or_liquidatable_position.write(value = id_)
-        # Update amount_to_be_sold storage variable
-        amount_to_be_sold.write(order_id = id_, value = amount_to_be_sold_)
+        status_ = 5
     end
+
+    # Create a new struct with the updated details by setting toBeLiquidated flag to true
+    let updated_order = OrderDetails(
+        assetID=orderDetails.assetID,
+        collateralID=orderDetails.collateralID,
+        price=orderDetails.price,
+        executionPrice=orderDetails.executionPrice,
+        positionSize=orderDetails.positionSize,
+        orderType=orderDetails.orderType,
+        direction=orderDetails.direction,
+        portionExecuted=orderDetails.portionExecuted,
+        status=status_,
+        marginAmount=orderDetails.marginAmount,
+        borrowedAmount=orderDetails.borrowedAmount,
+        leverage = orderDetails.leverage,
+    )
+    # Write to the mapping
+    order_mapping.write(orderID=id_, value=updated_order)
+    # Update deleveraged or liquidatable position
+    deleveraged_or_liquidatable_position.write(value = id_)
+    # Update amount_to_be_sold storage variable
+    amount_to_be_sold.write(order_id = id_, value = amount_to_be_sold_)
 
     return ()
 end
