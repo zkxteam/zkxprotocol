@@ -101,6 +101,9 @@ end
 # status 2: executed
 # status 3: close partial
 # status 4: close
+# status 5: toBeDeleveraged
+# status 6: toBeLiquidated
+# status 7: fullyLiquidated
 struct OrderDetails:
     member assetID : felt
     member collateralID : felt
@@ -113,6 +116,7 @@ struct OrderDetails:
     member status : felt
     member marginAmount : felt
     member borrowedAmount : felt
+    member leverage : felt
 end
 
 ###
@@ -166,6 +170,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     local margin_amount_
     local borrowed_amount_
+    local average_execution_price
 
     # Create a struct object for the order
     tempvar temp_order : MultipleOrder = MultipleOrder(
@@ -288,7 +293,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=7, version=version
     )
-
     # If the order is to be opened
     if temp_order.closeOrder == 0:
         # Get the fees from Trading Fee contract
@@ -308,6 +312,20 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
+
+        # calculate avg execution price
+        if order_details.executionPrice == 0:
+            assert average_execution_price = execution_price
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            let (portion_executed_value) = Math64x61_mul(order_details.portionExecuted , order_details.executionPrice)
+            let (current_order_value) = Math64x61_mul(order_size, execution_price)
+            let cumulative_order_value = portion_executed_value + current_order_value
+            let cumulative_order_size = order_details.portionExecuted + order_size
+            let (price) = Math64x61_div(cumulative_order_value, cumulative_order_size)  
+            assert average_execution_price = price 
+            tempvar range_check_ptr = range_check_ptr
+        end
 
         let (leveraged_position_value) = Math64x61_mul(order_size, execution_price)
         let (total_position_value) = Math64x61_div(leveraged_position_value, temp_order.leverage)
@@ -385,7 +403,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     else:
-        # If it's a close order or a liquidation order
+        # If it's a close order or a liquidation order or deleveraging order
         with_attr error_message(
                 "parentOrder field of closing order request is zero in trading contract."):
             assert_not_zero(temp_order.parentOrder)
@@ -402,10 +420,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
-
-        # calculate avg execution price
-        let (total_value) = Math64x61_mul(order_details.marginAmount, temp_order.leverage)
-        let (average_execution_price) = Math64x61_div(total_value, order_details.portionExecuted)
+        average_execution_price = order_details.executionPrice
 
         local diff
         local actual_execution_price
@@ -414,11 +429,11 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         if temp_order.direction == 0:
             # Open order was a long order
             actual_execution_price = execution_price
-            diff = execution_price - average_execution_price
+            diff = execution_price - order_details.executionPrice
         else:
             # Open order was a short order
-            diff = average_execution_price - execution_price
-            actual_execution_price = average_execution_price + diff
+            diff = order_details.executionPrice - execution_price
+            actual_execution_price = order_details.executionPrice + diff
         end
 
         # Calculate pnl and net account value
@@ -434,8 +449,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order)
 
         # Calculate new values for margin and borrowed amounts
-        borrowed_amount_ = borrowed_amount - value_to_be_returned
-        margin_amount_ = margin_amount - margin_to_be_reduced
+        if temp_order.orderType == 4:
+            borrowed_amount_ = borrowed_amount - leveraged_amount_out
+            margin_amount_ = margin_amount 
+        else:
+            borrowed_amount_ = borrowed_amount - value_to_be_returned
+            margin_amount_ = margin_amount - margin_to_be_reduced
+        end
 
         # Check if the position is to be liquidated
         let (not_liquidation) = is_le(order_details.status, 3)
@@ -450,6 +470,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             )
 
             # If no leverage is used
+            # to64x61(1) == 2305843009213693952
             if temp_order.leverage == 2305843009213693952:
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -496,18 +517,35 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
             end
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
         else:
             # Liquidation order
-            if order_details.status == 5:
-                # Check if the account value for the position is negative
-                let (is_negative) = is_le(net_acc_value, 0)
-
+            if order_details.status == 6:
                 let (insurance_fund_address) = IAuthorizedRegistry.get_contract_address(
                     contract_address=registry, index=10, version=version
                 )
+
+                # Withdraw the position from holding fund
+                IHolding.withdraw(
+                    contract_address=holding_address,
+                    assetID_=temp_order.collateralID,
+                    amount=leveraged_amount_out,
+                )
+
+                let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
+                    contract_address=registry, index=9, version=version
+                )
+
+                # Return the borrowed fund to the Liquidity fund
+                ILiquidityFund.deposit(
+                    contract_address=liquidity_fund_address,
+                    asset_id_=temp_order.collateralID,
+                    amount=value_to_be_returned,
+                    position_id_=temp_order.orderID,
+                )
+
+                # Check if the account value for the position is negative
+                let (is_negative) = is_le(net_acc_value, 0)
+
                 if is_negative == 1:
                     # Absolute value of the acc value
                     let (deficit) = abs_value(net_acc_value)
@@ -550,11 +588,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                         tempvar range_check_ptr = range_check_ptr
                     end
-                    tempvar syscall_ptr = syscall_ptr
-                    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                    tempvar range_check_ptr = range_check_ptr
                 else:
-                    # Deposit the user's remaining balance in Insurance Fund
+                    # Deposit the user's remaining margin in Insurance Fund
                     IInsuranceFund.deposit(
                         contract_address=insurance_fund_address,
                         asset_id_=temp_order.collateralID,
@@ -565,46 +600,46 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                     tempvar range_check_ptr = range_check_ptr
                 end
-                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-
-                # Withdraw the position from holding fund
-                IHolding.withdraw(
-                    contract_address=holding_address,
-                    assetID_=temp_order.collateralID,
-                    amount=leveraged_amount_out,
-                )
-
-                let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-                    contract_address=registry, index=9, version=version
-                )
-
-                # Return the borrowed fund to the Liquidity fund
-                ILiquidityFund.deposit(
-                    contract_address=liquidity_fund_address,
-                    asset_id_=temp_order.collateralID,
-                    amount=value_to_be_returned,
-                    position_id_=temp_order.orderID,
-                )
-
-                tempvar syscall_ptr = syscall_ptr
-                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                tempvar range_check_ptr = range_check_ptr
             else:
-                # The position is not marked as "to be liquidated" aka status 5
-                with_attr error_message("The position cannot be liqudiated w/o status 5"):
-                    assert 1 = 0
+                # Deleveraging order
+                if order_details.status == 5:
+                    # Withdraw the position from holding fund
+                    let (holding_address) = IAuthorizedRegistry.get_contract_address(
+                        contract_address=registry, index=7, version=version
+                    )
+                    
+                    IHolding.withdraw(
+                        contract_address=holding_address,
+                        assetID_=temp_order.collateralID,
+                        amount= leveraged_amount_out,
+                    )
+
+                    let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
+                        contract_address=registry, index=9, version=version
+                    )
+
+                    # Return the borrowed fund to the Liquidity fund
+                    ILiquidityFund.deposit(
+                        contract_address=liquidity_fund_address,
+                        asset_id_=temp_order.collateralID,
+                        amount=leveraged_amount_out,
+                        position_id_=temp_order.orderID,
+                    )
+
+                    tempvar syscall_ptr = syscall_ptr
+                    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                    tempvar range_check_ptr = range_check_ptr
+                else:
+                    # The position is not marked as "to be deleveraged" aka status 5 and "to be liquidated" aka status 6
+                    with_attr error_message("The position cannot be deleveraged or liqudiated w/o status 5 or 6"):
+                        assert 1 = 0
+                    end
+                    tempvar syscall_ptr = syscall_ptr
+                    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                    tempvar range_check_ptr = range_check_ptr
                 end
-                tempvar syscall_ptr = syscall_ptr
-                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                tempvar range_check_ptr = range_check_ptr
             end
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
         end
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
     end
 
     # Create a temporary order object
@@ -630,13 +665,14 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
     tempvar range_check_ptr = range_check_ptr
 
+
     # Call the account contract to initialize the order
     IAccount.execute_order(
         contract_address=temp_order.pub_key,
         request=temp_order_request,
         signature=temp_signature,
         size=order_size,
-        execution_price=execution_price,
+        execution_price=average_execution_price,
         margin_amount=margin_amount_,
         borrowed_amount=borrowed_amount_,
     )
