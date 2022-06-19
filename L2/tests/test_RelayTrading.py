@@ -180,7 +180,7 @@ async def adminAuth_factory():
         constructor_calldata=[]
     )
 
-    print("check1")
+    
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
 
@@ -241,7 +241,7 @@ async def adminAuth_factory():
     
     )
 
-    print("check2")
+    # give full permissions to all relays
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_trading.contract_address, 0, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_trading.contract_address, 1, 1])
 
@@ -287,7 +287,7 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_feeBalance.contract_address, 4, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_feeBalance.contract_address, 5, 1])
 
-    print("check3")
+    
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -330,6 +330,8 @@ async def adminAuth_factory():
     # Set the balance of admin1 and admin2
     await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
     await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+
+    # return relay versions of asset, trading, holding, feeBalance to test underlying contract logic
     return adminAuth, fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, dave, fixed_math, relay_holding, relay_feeBalance
 
 

@@ -28,7 +28,7 @@ end
 func call_counter(caller:felt, func_name:felt) -> (counter:felt):
 end
 
-# @dev - this stores whether caller has been paid for hash -> 1 hash recorded but not paid, 2 means paid
+# @dev - this stores whether caller has been paid for hash -> 1 => hash recorded but not paid, 2 => paid
 @storage_var
 func caller_hash_status(caller:felt,transaction_hash:felt) ->(res:felt):
 end
@@ -49,6 +49,8 @@ end
 func hash_list_for_caller(caller:felt, index:felt) -> (res:felt):
 end
 
+# index + version = address
+# this function is called by constructor of relay to setup registry address, index and version
 func initialize{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         range_check_ptr}(
@@ -61,6 +63,8 @@ func initialize{
 end
 
 # @notice - helper function to verify authority of caller for action
+# gets admin address from authorized registry
+# asks admin whether caller is authorized for action
 func verify_caller_authority{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         range_check_ptr}(action:felt) -> ():
@@ -207,6 +211,7 @@ func get_self_index{
     return (index)
 end
 
+# @notice - gets list of transaction hashes for a caller (length of this list = no. of calls done by this caller)
 @view
 func get_caller_hash_list{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,

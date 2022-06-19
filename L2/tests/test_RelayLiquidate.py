@@ -199,6 +199,7 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, liquidator.contract_address])
 
+    # create relay contracts with appropriate indexes
 
     relay_trading = await starknet.deploy(
         "contracts/relay_contracts/RelayTrading.cairo",
@@ -257,6 +258,7 @@ async def adminAuth_factory():
     
     )
 
+    # give full permissions to relays
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_trading.contract_address, 0, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_trading.contract_address, 1, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_trading.contract_address, 2, 1])
@@ -349,6 +351,8 @@ async def adminAuth_factory():
     # Set the balance of admin1 and admin2
     await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
     await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+
+    # return relay versions of fees, asset, trading, holding, feeBalance, liquidate
     return adminAuth, relay_fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, liquidator, fixed_math, relay_holding, relay_feeBalance, relay_liquidate, insuranceFund
 
 

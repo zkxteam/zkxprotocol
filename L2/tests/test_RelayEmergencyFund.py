@@ -100,6 +100,7 @@ async def emergencyFund_factory():
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [7, 1, holding.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [8, 1, emergencyFund.contract_address])
 
+    # create relay contract
 
     relay_emergencyFund = await starknet.deploy(
         "contracts/relay_contracts/RelayEmergencyFund.cairo",
@@ -111,6 +112,8 @@ async def emergencyFund_factory():
     )
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_emergencyFund.contract_address, 5, 1])
+
+    # return relay version of emergencyFund to verify underlying contract logic
     return relay_emergencyFund, holding, admin1, admin2, insurance, liquidity
 
 

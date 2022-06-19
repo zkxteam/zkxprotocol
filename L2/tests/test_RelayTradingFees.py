@@ -95,10 +95,13 @@ async def adminAuth_factory():
         ]
     )
 
+    # give appripritae permissions to relays
+
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_feeDiscount.contract_address, 4, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_fees.contract_address, 4, 1])
     await signer1.send_transaction(admin1, relay_feeDiscount.contract_address, 'add_user_tokens', [user1.contract_address, 100])
 
+    # passing relay versions of fees and feeDiscount to verify they dont break existing logic
     return adminAuth, relay_fees, admin1, admin2, user1, relay_feeDiscount
 
 

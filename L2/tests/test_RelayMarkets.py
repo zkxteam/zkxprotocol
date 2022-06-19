@@ -70,6 +70,7 @@ async def adminAuth_factory():
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
 
+    # create relay contracts with appropriate index as per entries in registry
 
     relay_asset = await starknet.deploy(
         "contracts/relay_contracts/RelayAsset.cairo",
@@ -89,6 +90,7 @@ async def adminAuth_factory():
         ]
     )
 
+    # give appropriate permissions to relays
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_asset.contract_address, 1, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_asset.contract_address, 2, 1])
 
@@ -101,7 +103,7 @@ async def adminAuth_factory():
 
 
     
-
+    # return relay versions of asset, market to test logic of underlying contracts
     return adminAuth, relay_asset, relay_market, admin1, admin2, user1
 
 

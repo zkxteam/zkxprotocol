@@ -60,6 +60,7 @@ async def adminAuth_factory():
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
 
+    # create relay contract
     relay_asset = await starknet.deploy(
         "contracts/relay_contracts/RelayAsset.cairo",
         constructor_calldata=[
@@ -71,6 +72,7 @@ async def adminAuth_factory():
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_asset.contract_address, 1, 1])
 
+    # return relay version of asset to verify underlying contract logic
     return adminAuth, relay_asset, admin1, admin2, user1
 
 
