@@ -48,8 +48,7 @@ contract L1ZKXContract is AccessControl{
         352040181584456735608515580760888541466059565068553383579463728554843487745;
 
     // Asset Contract address
-    uint256 zkxAssetContractAddress = 
-        0x0090423a5ed4af17a990770592812b2c5f002d76ae161238eea3c3a2bdd20613;
+    uint256 public zkxAssetContractAddress;
 
     uint256 constant FIELD_PRIME =
         0x800000000000011000000000000000000000000000000000000000000000001;
@@ -66,8 +65,9 @@ contract L1ZKXContract is AccessControl{
     /**
       Initializes the contract state.
     */
-    constructor(IStarknetCore starknetCore_) {
+    constructor(IStarknetCore starknetCore_, uint256 zkxAssetContractAddress_) {
         starknetCore = starknetCore_;
+        zkxAssetContractAddress = zkxAssetContractAddress_;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
