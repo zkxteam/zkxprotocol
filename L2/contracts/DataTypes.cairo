@@ -71,3 +71,41 @@ struct PriceData:
     member assetPrice : felt
     member collateralPrice : felt
 end
+
+# @notice struct for passing the order request to Account Contract
+struct OrderRequest:
+    member orderID : felt
+    member assetID : felt
+    member collateralID : felt
+    member price : felt
+    member orderType : felt
+    member positionSize : felt
+    member direction : felt
+    member closeOrder : felt
+    member leverage : felt
+    member isLiquidation : felt
+    member liquidatorAddress : felt
+    member parentOrder : felt
+end
+
+# @notice struct for storing the order data to Account Contract
+struct OrderDetails:
+    member assetID : felt
+    member collateralID : felt
+    member price : felt
+    member executionPrice : felt
+    member positionSize : felt
+    member orderType : felt
+    member direction : felt
+    member portionExecuted : felt
+    member status : felt
+    member marginAmount : felt
+    member borrowedAmount : felt
+    member leverage : felt
+end
+
+# Struct for passing signature to Account Contract
+struct Signature:
+    member r_value : felt
+    member s_value : felt
+end

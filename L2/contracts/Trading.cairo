@@ -2,6 +2,28 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.DataTypes import OrderRequest, OrderDetails, Signature, Market, MultipleOrder, Asset
+from contracts.Constants import (
+    Asset_INDEX,
+    Market_INDEX,
+    TradingFees_INDEX,
+    Holding_INDEX,
+    FeeBalance_INDEX,
+    LiquidityFund_INDEX,
+    InsuranceFund_INDEX,
+    AccountRegistry_INDEX,
+)
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.interfaces.ITradingFees import ITradingFees
+from contracts.interfaces.IAsset import IAsset
+from contracts.interfaces.IHolding import IHolding
+from contracts.interfaces.IFeeBalance import IFeeBalance
+from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.ILiquidityFund import ILiquidityFund
+from contracts.interfaces.IInsuranceFund import IInsuranceFund
+from contracts.Constants import AdminAuth_INDEX
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.math import assert_not_zero, assert_le, assert_in_range
 from starkware.cairo.common.math import abs_value
@@ -21,102 +43,6 @@ end
 
 @storage_var
 func net_acc() -> (res : felt):
-end
-
-# @notice struct to store details of markets
-struct Market:
-    member asset : felt
-    member assetCollateral : felt
-    member leverage : felt
-    member tradable : felt
-end
-
-# Struct to pass orders+signatures in a batch in the execute_batch fn
-struct MultipleOrder:
-    member pub_key : felt
-    member sig_r : felt
-    member sig_s : felt
-    member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member orderType : felt
-    member positionSize : felt
-    member direction : felt
-    member closeOrder : felt
-    member leverage : felt
-    member isLiquidation : felt
-    member liquidatorAddress : felt
-    member parentOrder : felt
-    member side : felt
-end
-
-# Struct for passing the order request to Account Contract
-struct OrderRequest:
-    member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member orderType : felt
-    member positionSize : felt
-    member direction : felt
-    member closeOrder : felt
-    member leverage : felt
-    member isLiquidation : felt
-    member liquidatorAddress : felt
-    member parentOrder : felt
-end
-
-# Struct for passing signature to Account Contract
-struct Signature:
-    member r_value : felt
-    member s_value : felt
-end
-
-# @notice struct to store details of assets
-struct Asset:
-    member asset_version : felt
-    member ticker : felt
-    member short_name : felt
-    member tradable : felt
-    member collateral : felt
-    member token_decimal : felt
-    member metadata_id : felt
-    member tick_size : felt
-    member step_size : felt
-    member minimum_order_size : felt
-    member minimum_leverage : felt
-    member maximum_leverage : felt
-    member currently_allowed_leverage : felt
-    member maintenance_margin_fraction : felt
-    member initial_margin_fraction : felt
-    member incremental_initial_margin_fraction : felt
-    member incremental_position_size : felt
-    member baseline_position_size : felt
-    member maximum_position_size : felt
-end
-
-# status 0: initialized
-# status 1: partial
-# status 2: executed
-# status 3: close partial
-# status 4: close
-# status 5: toBeDeleveraged
-# status 6: toBeLiquidated
-# status 7: fullyLiquidated
-struct OrderDetails:
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
-    member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
-    member leverage : felt
 end
 
 ###
@@ -194,10 +120,10 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Get asset and market addresses
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=1, version=version
+        contract_address=registry, index=Asset_INDEX, version=version
     )
     let (market_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=2, version=version
+        contract_address=registry, index=Market_INDEX, version=version
     )
 
     # If it's the first order in the array
@@ -207,7 +133,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let (collateral : Asset) = IAsset.getAsset(
             contract_address=asset_address, id=temp_order.collateralID
         )
-        let (market : Market) = IMarket.getMarket(contract_address=market_address, id=marketID)
+        let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
 
         with_attr error_message("asset is non tradable in trading contract."):
             assert_not_zero(asset.tradable)
@@ -291,13 +217,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=7, version=version
+        contract_address=registry, index=Holding_INDEX, version=version
     )
     # If the order is to be opened
     if temp_order.closeOrder == 0:
         # Get the fees from Trading Fee contract
         let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=4, version=version
+            contract_address=registry, index=TradingFees_INDEX, version=version
         )
 
         let (fees_rate) = ITradingFees.get_user_fee_and_discount(
@@ -313,17 +239,35 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
 
+        # Add user to account registry if user already not added
+        let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=AccountRegistry_INDEX, version=version
+        )
+        let (present) = IAccountRegistry.is_registered_user(
+            contract_address=account_registry_address, address_=temp_order.pub_key
+        )
+        if present == 0:
+            IAccountRegistry.add_to_account_registry(
+                contract_address=registry, address_=temp_order.pub_key
+            )
+        end
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+
         # calculate avg execution price
         if order_details.executionPrice == 0:
             assert average_execution_price = execution_price
             tempvar range_check_ptr = range_check_ptr
         else:
-            let (portion_executed_value) = Math64x61_mul(order_details.portionExecuted , order_details.executionPrice)
+            let (portion_executed_value) = Math64x61_mul(
+                order_details.portionExecuted, order_details.executionPrice
+            )
             let (current_order_value) = Math64x61_mul(order_size, execution_price)
             let cumulative_order_value = portion_executed_value + current_order_value
             let cumulative_order_size = order_details.portionExecuted + order_size
-            let (price) = Math64x61_div(cumulative_order_value, cumulative_order_size)  
-            assert average_execution_price = price 
+            let (price) = Math64x61_div(cumulative_order_value, cumulative_order_size)
+            assert average_execution_price = price
             tempvar range_check_ptr = range_check_ptr
         end
 
@@ -360,12 +304,12 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         # Update the fees to be paid by user in fee balance contract
         let (fees_balance_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=6, version=version
+            contract_address=registry, index=FeeBalance_INDEX, version=version
         )
         IFeeBalance.update_fee_mapping(
             contract_address=fees_balance_address,
             address=temp_order.pub_key,
-            assetID=temp_order.collateralID,
+            assetID_=temp_order.collateralID,
             fee_to_add=fees,
         )
 
@@ -374,7 +318,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         if is_non_leveraged == 0:
             let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-                contract_address=registry, index=9, version=version
+                contract_address=registry, index=LiquidityFund_INDEX, version=version
             )
             ILiquidityFund.withdraw(
                 contract_address=liquidity_fund_address,
@@ -395,7 +339,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         # Deposit the funds taken from the user and liquidity fund
         IHolding.deposit(
             contract_address=holding_address,
-            assetID_=temp_order.collateralID,
+            asset_id_=temp_order.collateralID,
             amount=leveraged_position_value,
         )
 
@@ -451,7 +395,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         # Calculate new values for margin and borrowed amounts
         if temp_order.orderType == 4:
             borrowed_amount_ = borrowed_amount - leveraged_amount_out
-            margin_amount_ = margin_amount 
+            margin_amount_ = margin_amount
         else:
             borrowed_amount_ = borrowed_amount - value_to_be_returned
             margin_amount_ = margin_amount - margin_to_be_reduced
@@ -465,7 +409,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             # Deduct funds from holding contract
             IHolding.withdraw(
                 contract_address=holding_address,
-                assetID_=temp_order.collateralID,
+                asset_id_=temp_order.collateralID,
                 amount=leveraged_amount_out,
             )
 
@@ -477,7 +421,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar range_check_ptr = range_check_ptr
             else:
                 let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-                    contract_address=registry, index=9, version=version
+                    contract_address=registry, index=LiquidityFund_INDEX, version=version
                 )
                 ILiquidityFund.deposit(
                     contract_address=liquidity_fund_address,
@@ -521,18 +465,18 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             # Liquidation order
             if order_details.status == 6:
                 let (insurance_fund_address) = IAuthorizedRegistry.get_contract_address(
-                    contract_address=registry, index=10, version=version
+                    contract_address=registry, index=InsuranceFund_INDEX, version=version
                 )
 
                 # Withdraw the position from holding fund
                 IHolding.withdraw(
                     contract_address=holding_address,
-                    assetID_=temp_order.collateralID,
+                    asset_id_=temp_order.collateralID,
                     amount=leveraged_amount_out,
                 )
 
                 let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-                    contract_address=registry, index=9, version=version
+                    contract_address=registry, index=LiquidityFund_INDEX, version=version
                 )
 
                 # Return the borrowed fund to the Liquidity fund
@@ -605,17 +549,17 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 if order_details.status == 5:
                     # Withdraw the position from holding fund
                     let (holding_address) = IAuthorizedRegistry.get_contract_address(
-                        contract_address=registry, index=7, version=version
+                        contract_address=registry, index=Holding_INDEX, version=version
                     )
-                    
+
                     IHolding.withdraw(
                         contract_address=holding_address,
-                        assetID_=temp_order.collateralID,
-                        amount= leveraged_amount_out,
+                        asset_id_=temp_order.collateralID,
+                        amount=leveraged_amount_out,
                     )
 
                     let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-                        contract_address=registry, index=9, version=version
+                        contract_address=registry, index=LiquidityFund_INDEX, version=version
                     )
 
                     # Return the borrowed fund to the Liquidity fund
@@ -631,7 +575,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     tempvar range_check_ptr = range_check_ptr
                 else:
                     # The position is not marked as "to be deleveraged" aka status 5 and "to be liquidated" aka status 6
-                    with_attr error_message("The position cannot be deleveraged or liqudiated w/o status 5 or 6"):
+                    with_attr error_message(
+                            "The position cannot be deleveraged or liqudiated w/o status 5 or 6"):
                         assert 1 = 0
                     end
                     tempvar syscall_ptr = syscall_ptr
@@ -664,7 +609,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     tempvar syscall_ptr = syscall_ptr
     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
     tempvar range_check_ptr = range_check_ptr
-
 
     # Call the account contract to initialize the order
     IAccount.execute_order(
@@ -743,94 +687,4 @@ func execute_batch{
         assert result = 0
     end
     return (1)
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_contract_address(index : felt, version : felt) -> (address : felt):
-    end
-end
-
-# @notice Account interface
-@contract_interface
-namespace IAccount:
-    func execute_order(
-        request : OrderRequest,
-        signature : Signature,
-        size : felt,
-        execution_price : felt,
-        margin_amount : felt,
-        borrowed_amount : felt,
-    ) -> (res : felt):
-    end
-
-    func transfer_from(assetID_ : felt, amount : felt) -> ():
-    end
-
-    func get_order_data(order_ID : felt) -> (res : OrderDetails):
-    end
-
-    func transfer(assetID_ : felt, amount : felt) -> ():
-    end
-
-    func get_balance(assetID_ : felt) -> (res : felt):
-    end
-end
-
-# @notice TradingFees interface
-@contract_interface
-namespace ITradingFees:
-    func get_user_fee_and_discount(address_ : felt, side_ : felt) -> (fee : felt):
-    end
-end
-
-# @notice Asset interface
-@contract_interface
-namespace IAsset:
-    func getAsset(id : felt) -> (currAsset : Asset):
-    end
-end
-
-# @notice Holding interface
-@contract_interface
-namespace IHolding:
-    func deposit(assetID_ : felt, amount : felt):
-    end
-
-    func withdraw(assetID_ : felt, amount : felt):
-    end
-end
-
-# @notice Fee Balance interface
-@contract_interface
-namespace IFeeBalance:
-    func update_fee_mapping(address : felt, assetID : felt, fee_to_add : felt):
-    end
-end
-
-# @notice Markets interface
-@contract_interface
-namespace IMarket:
-    func getMarket(id : felt) -> (currMarket : Market):
-    end
-end
-
-# @notice Liquidity fund interface
-@contract_interface
-namespace ILiquidityFund:
-    func deposit(asset_id_ : felt, amount : felt, position_id_):
-    end
-
-    func withdraw(asset_id_ : felt, amount : felt, position_id_):
-    end
-end
-
-@contract_interface
-namespace IInsuranceFund:
-    func deposit(asset_id_ : felt, amount : felt, position_id_ : felt):
-    end
-
-    func withdraw(asset_id_ : felt, amount : felt, position_id_ : felt):
-    end
 end

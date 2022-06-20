@@ -65,6 +65,11 @@ async def test_add_address_to_account_registry(adminAuth_factory):
     assert fetched_account_registry.result.account_registry[0] == str_to_felt("123")
     assert fetched_account_registry.result.account_registry[1] == str_to_felt("456")
 
+    isPresent = await account_registry.is_registered_user(str_to_felt("123")).call()
+    assert isPresent.result.present == 1
+    isPresent = await account_registry.is_registered_user(str_to_felt("456")).call()
+    assert isPresent.result.present == 1
+
 @pytest.mark.asyncio
 async def test_remove_address_from_account_registry(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
@@ -74,3 +79,6 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
     fetched_account_registry = await account_registry.get_account_registry().call()
     print(fetched_account_registry.result.account_registry)
     assert fetched_account_registry.result.account_registry[0] == str_to_felt("456")
+
+    isPresent = await account_registry.is_registered_user(str_to_felt("123")).call()
+    assert isPresent.result.present == 0
