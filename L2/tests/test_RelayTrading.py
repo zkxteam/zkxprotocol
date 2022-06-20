@@ -184,6 +184,14 @@ async def adminAuth_factory():
         constructor_calldata=[]
     )
 
+    accountRegistry = await starknet.deploy(
+        "contracts/AccountRegistry.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1
+        ]
+    )
+
     
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -207,6 +215,7 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [8, 1, emergency.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidity.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insurance.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, accountRegistry.contract_address])
 
     relay_trading = await starknet.deploy(
         "contracts/relay_contracts/RelayTrading.cairo",

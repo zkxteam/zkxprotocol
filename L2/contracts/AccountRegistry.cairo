@@ -64,10 +64,20 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         assert caller = trading_address
     end
 
-    let (reg_len) = account_registry_len.read()
-    account_registry.write(index=reg_len, value=address_)
-    account_registry_len.write(reg_len + 1)
-    account_present.write(address=address_, value=1)
+    let (is_present) = account_present.read(address=address_)
+    if is_present == 0:
+        let (reg_len) = account_registry_len.read()
+        account_registry.write(index=reg_len, value=address_)
+        account_registry_len.write(reg_len + 1)
+        account_present.write(address=address_, value=1)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
     return (1)
 end
 

@@ -248,7 +248,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
         if present == 0:
             IAccountRegistry.add_to_account_registry(
-                contract_address=registry, address_=temp_order.pub_key
+                contract_address=account_registry_address, address_=temp_order.pub_key
             )
         end
         tempvar syscall_ptr = syscall_ptr

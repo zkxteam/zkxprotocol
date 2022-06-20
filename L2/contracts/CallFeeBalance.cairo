@@ -11,16 +11,19 @@ from starkware.starknet.common.syscalls import get_caller_address
 func fee_address() -> (contract_address : felt):
 end
 
+# @notice Stores the address of AccountRegistry contract
+@storage_var
+func account_registry_address() -> (contract_address : felt):
+end
+
 # @notice Constructor of the smart-contract
 # @param _authAddress Address of the FeeBalance contract
 @constructor
-func constructor{
-    syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, 
-    range_check_ptr
-}(_authAddress : felt):
-
-    fee_address.write(value = _authAddress)
+func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    _authAddress : felt, _accountRegistryAddress : felt
+):
+    fee_address.write(value=_authAddress)
+    account_registry_address.write(value=_accountRegistryAddress)
     return ()
 end
 
@@ -28,20 +31,40 @@ end
 # @param _address - address of the user whose fee is to be updated
 # @param _fee_to_add - fee that is to be added
 @external
-func update{
-    syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*,
-    range_check_ptr
-}(_address: felt, _assetID: felt, _fee_to_add: felt) :
+func update{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    _address : felt, _assetID : felt, _fee_to_add : felt
+):
     alloc_locals
     let (fee_addr) = fee_address.read()
-    IFeeBalance.update_fee_mapping(contract_address = fee_addr, address = _address, assetID_ = _assetID, fee_to_add = _fee_to_add)
-    return()
+    IFeeBalance.update_fee_mapping(
+        contract_address=fee_addr, address=_address, assetID_=_assetID, fee_to_add=_fee_to_add
+    )
+    return ()
+end
+
+@external
+func add_to_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    _address : felt
+):
+    alloc_locals
+    let (account_registry_addr) = account_registry_address.read()
+    IAccountRegistry.add_to_account_registry(
+        contract_address=account_registry_addr, address_=_address
+    )
+    return ()
 end
 
 # @notice FeeBalance interface
 @contract_interface
 namespace IFeeBalance:
     func update_fee_mapping(address : felt, assetID_ : felt, fee_to_add : felt):
+    end
+end
+
+# @notice AccountRegistry interface
+@contract_interface
+namespace IAccountRegistry:
+    # external functions
+    func add_to_account_registry(address_ : felt) -> (res : felt):
     end
 end
