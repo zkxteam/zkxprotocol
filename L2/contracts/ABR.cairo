@@ -3,20 +3,6 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.registers import get_fp_and_pc
-from starkware.starknet.common.syscalls import (
-    get_contract_address,
-    call_contract,
-    get_caller_address,
-    get_tx_signature,
-)
-from starkware.cairo.common.math import (
-    assert_not_zero,
-    assert_nn,
-    assert_le,
-    assert_in_range,
-    assert_lt,
-)
 from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math_cmp import is_le
@@ -32,32 +18,8 @@ from contracts.Math_64x61 import (
 
 const NUM_STD = 4611686018427387904
 const NUM_1 = 2305843009213693952
-
-# ################ To be removed ##############
-@storage_var
-func sum_total() -> (res : felt):
-end
-
-@storage_var
-func mean_64() -> (res : felt):
-end
-
-@view
-func return_total{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
-):
-    let (total) = sum_total.read()
-    return (total)
-end
-
-@view
-func return_mean64{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
-):
-    let (total) = mean_64.read()
-    return (total)
-end
-################################
+const NUM_8 = 18446744073709551616
+const NUM_MIN = 28823037615171
 
 # @notice Function to calculate the difference between index and mark prices
 # @param index_prices_len - Size of the index prices array
@@ -108,7 +70,7 @@ end
 # @param array - Array for which to calculate the sum
 # @param sum - Sum of the array
 # @returns sum - Final sum of the array
-func find_sum{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+func find_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     array_len : felt, array : felt*, sum : felt
 ) -> (sum : felt):
     alloc_locals
@@ -119,10 +81,12 @@ func find_sum{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     end
 
     # Calculate the current sum
-    let (sum_temp) = Math64x61_add(sum, [array])
+    let (sum_div) = Math64x61_div([array], NUM_8)
+    let (sum_add) = Math64x61_add(sum_div, NUM_MIN)
+    let (curr_sum) = Math64x61_add(sum_add, sum)
 
     # Recursively call the next array element
-    return find_sum(array_len - 1, array + 1, sum_temp)
+    return find_abr(array_len - 1, array + 1, curr_sum)
 end
 
 # @notice Function to calculate the sum of a given array window
@@ -329,7 +293,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         let (curr_window_size) = Math64x61_fromFelt(window_size)
         let (std_deviation) = find_std(tail_window_len, tail_window, mean, window_size, 0)
 
-        let curr_size = curr_window_size - NUM_1
+        let (curr_size) = Math64x61_sub(curr_window_size, NUM_1)
 
         let (std_temp) = Math64x61_div(std_deviation, curr_size)
         let (movstd) = Math64x61_sqrt(std_temp)
@@ -338,11 +302,11 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         let (lower) = Math64x61_sub(mean, movstd_const)
         let (upper) = Math64x61_add(mean, movstd_const)
 
-        # Store the result in lower and upper band arrays
+        # # Store the result in lower and upper band arrays
         assert lower_array[iterator] = lower
         assert upper_array[iterator] = upper
 
-        # Recursively call the next array element
+        # # Recursively call the next array element
         return calc_bollinger(
             upper_array_len + 1,
             upper_array,
@@ -400,19 +364,23 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     let (is_upper) = is_le(upper_diff, 0)
     let (is_lower) = is_le(lower_diff, 0)
 
-    # If the upper_diff is non-negative
+    local jump_value_upper
+    local jump_value_lower
+
+    # If the upper_diff is zero
     if is_upper == 1:
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
+
+        jump_value_upper = 0
     else:
         # Calculate jump
         let (jump) = Math64x61_div(upper_diff, [index_prices])
         let (ln_jump) = Math64x61_ln(jump)
-        let (loaded_jump) = Math64x61_add([ABRdyn], ln_jump)
 
         # Add the jump to the premium
-        assert ABRdyn_jump[iterator] = loaded_jump
+        jump_value_upper = ln_jump
 
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -428,23 +396,24 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
+
+        jump_value_lower = 0
     else:
         # Calculate jump
         let (jump) = Math64x61_div(lower_diff, [index_prices])
         let (ln_jump) = Math64x61_ln(jump)
-        let (loaded_jump) = Math64x61_sub([ABRdyn], ln_jump)
 
         # Add the jump to the premium
-        assert ABRdyn_jump[iterator] = loaded_jump
+        jump_value_lower = ln_jump
 
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     end
 
-    tempvar syscall_ptr = syscall_ptr
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-    tempvar range_check_ptr = range_check_ptr
+    let (temp_jump) = Math64x61_add([ABRdyn], jump_value_upper)
+    let (total_jump) = Math64x61_sub(temp_jump, jump_value_lower)
+    assert ABRdyn_jump[iterator] = total_jump
 
     # Recursively call the next array element
     return calc_jump(
@@ -473,7 +442,7 @@ end
 @external
 func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     index_prices_len : felt, index_prices : felt*, mark_prices_len : felt, mark_prices : felt*
-) -> (diff_len : felt, diff : felt*):
+) -> (ABRdyn_jump_len : felt, ABRdyn_jump : felt*):
     alloc_locals
 
     # Calculate the middle band
@@ -482,7 +451,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         mark_prices_len, mark_prices, mark_prices_len, mark_prices, 10, 0, avg_array, 0
     )
 
-    # Calculate the upper & lower band
+    # # Calculate the upper & lower band
     let (upper_array : felt*) = alloc()
     let (lower_array : felt*) = alloc()
 
@@ -514,7 +483,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 
     # Add the jump to the premium price
     let (ABRdyn_jump : felt*) = alloc()
-    # let (ABRdyn_len : felt, ABRdyn : felt*) =
+    # let (ABRdyn_jump_len : felt, ABRdyn_jump : felt*) =
     return calc_jump(
         mark_prices_len,
         mark_prices,
@@ -531,8 +500,9 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         0,
     )
 
-    # # Find the effective ABR rate
-    # let (rate_sum) = find_sum(ABRdyn_len, ABRdyn, 0)
-    # let (rate) = Math64x61_div(rate_sum, ABRdyn_len)
-    # return (ABRdyn_len, ABRdyn)
+    # Find the effective ABR rate
+    # let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0)
+    # let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
+    # let (rate) = Math64x61_div(rate_sum, array_size)
+    # return (rate)
 end

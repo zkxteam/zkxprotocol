@@ -27,8 +27,8 @@ def calc_std(data, mean):
     sum = 0
     length = len(data)
     for i in range(length):
-        diff = data[i] - mean
-        sum += diff**2
+        diff = data[i] - mean*1.0
+        sum += diff**2.0
 
     if length > 1:
         length -= 1
@@ -92,39 +92,15 @@ def effective_abr(premium):
 
 
 def main():
-    avg_array = sliding_mean(perp[:100], 10)
-    (lower, upper) = bollinger(perp[:100], avg_array, 10)
+    avg_array = sliding_mean(perp[:200], 10)
+    (lower, upper) = bollinger(perp[:200], avg_array, 10)
 
-    diff = calc_premium(perp[:100], perp_spot[:100])
+    diff = calc_premium(perp[:200], perp_spot[:200])
+
     premium = sliding_mean(diff, 60)
-    # final_premium = find_jump(premium, perp, perp_spot, lower, upper)
-    print(premium)
-    # abr = effective_abr(final_premium)
-    # print(abr)
+    final_premium = find_jump(premium, perp, perp_spot, lower, upper)
+    abr = effective_abr(final_premium)
+    print(abr)
 
 
 main()
-
-# #  @notice Function to calculate the sum of a given array
-# # @param array_len - Length of the array
-# # @param array - Array for which to calculate the sum
-# # @param sum - Sum of the array
-# # @returns sum - Final sum of the array
-# func find_effective_ABR{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-#     array_len : felt, array : felt*, sum : felt
-# ) -> (sum : felt):
-#     alloc_locals
-
-#     # If reached the end of the array, return
-#     if array_len == 0:
-#         return (sum)
-#     end
-
-#     # Calculate the current sum
-#     let (sum_temp) = Math64x61_div([array], 18446744073709551616)
-#     let (sum_min) = Math64x61_add(sum_temp, 28823037615171)
-#     let (curr_sum) = Math64x61_add(sum, sum_min)
-
-#     # Recursively call the next array element
-#     return find_effective_ABR(array_len - 1, array + 1, curr_sum)
-# end

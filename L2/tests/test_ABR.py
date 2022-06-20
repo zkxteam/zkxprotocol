@@ -39,38 +39,29 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def abr_factory():
-    print(from64x61(373108932724242304685764782996848))
     starknet = await Starknet.empty()
-
-    abr = await starknet.deploy(
-        "contracts/ABR.cairo",
-        constructor_calldata=[]
-    )
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
         constructor_calldata=[admin1_signer.public_key, 0, 1]
     )
 
+    abr = await starknet.deploy(
+        "contracts/ABR.cairo",
+        constructor_calldata=[
+        ]
+    )
+
     return abr, admin1
 
 
-@ pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_should_calculate_correct_abr_ratio(abr_factory):
     abr, admin1 = abr_factory
 
-    mark_prices = convertTo64x61(perp)
-    index_prices = convertTo64x61(perp_spot)
+    arguments = [
+        400] + convertTo64x61(perp_spot[0:400]) + [400]+convertTo64x61(perp[0:400])
 
-    arguments = [100]+index_prices[:100]+[100]+mark_prices[:100]
-    # print(arguments)
-
-    avg_prices = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
-    print("result 64", convertFrom64x61(avg_prices.result.response))
-    # print("result", (avg_prices.result.response))
-
-    sum = await abr.return_total().call()
-    mean64 = await abr.return_mean64().call()
-
-    print("Sum is", sum.result.res)
-    print("mean in 64x61", mean64.result.res)
+    abr_prices = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
+    print("result 64", abr_prices.result.response)
+    # print("result 64", abr_prices.result.response)
