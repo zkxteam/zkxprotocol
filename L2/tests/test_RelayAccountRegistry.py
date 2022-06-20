@@ -27,17 +27,17 @@ async def adminAuth_factory():
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0, 1]
+        constructor_calldata=[signer1.public_key, 0, 1, 0]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0, 1]
+        constructor_calldata=[signer2.public_key, 0, 1, 0]
     )
 
     admin3 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, 0, 1]
+        constructor_calldata=[signer3.public_key, 0, 1, 0]
     )
 
     adminAuth = await starknet.deploy(

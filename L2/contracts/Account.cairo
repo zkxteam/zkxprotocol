@@ -20,7 +20,6 @@ from starkware.cairo.common.pow import pow
 
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_fromFelt, Math64x61_toFelt
 
-const L1_CONTRACT_ADDRESS = (0x88d2EE8A225D281cAa435F532F51c9844F05a4d9)
 const MESSAGE_WITHDRAW = 0
 
 #
@@ -172,6 +171,11 @@ end
 func L1_address() -> (res : felt):
 end
 
+# Stores L1 ZKX Contract address
+@storage_var
+func L1_ZKX_address() -> (res : felt):
+end
+
 # Store positions to facilitate liquidation request
 @storage_var
 func position_array(index : felt) -> (position_id : felt):
@@ -274,14 +278,15 @@ func get_amount_to_be_sold{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
 end
 
 @view
-func get_deleveraged_or_liquidatable_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-) -> (order_id: felt, amount_to_be_sold : felt):
+func get_deleveraged_or_liquidatable_position{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}() -> (order_id : felt, amount_to_be_sold : felt):
     alloc_locals
     let (order_id_) = deleveraged_or_liquidatable_position.read()
     let (order_details) = get_order_data(order_id_)
     local amount_to_be_sold_
     if order_details.status == 5:
-        let (amount) = amount_to_be_sold.read(order_id = order_id_)
+        let (amount) = amount_to_be_sold.read(order_id=order_id_)
         assert amount_to_be_sold_ = amount
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -314,11 +319,12 @@ end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    public_key_ : felt, registry_address_ : felt, version_ : felt
+    public_key_ : felt, registry_address_ : felt, version_ : felt, L1_ZKX_address_ : felt
 ):
     public_key.write(public_key_)
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
+    L1_ZKX_address.write(value=L1_ZKX_address_)
     return ()
 end
 
@@ -775,7 +781,7 @@ func execute_order{
             else:
                 status_ = 1
             end
-            
+
             # Create a new struct with the updated details
             let updated_order = OrderDetails(
                 assetID=orderDetails.assetID,
@@ -812,7 +818,7 @@ func execute_order{
         # Assert that the order exists
         assert_not_zero(orderDetails.positionSize)
         assert_nn(orderDetails.portionExecuted - size)
-        
+
         local new_leverage
         if request.orderType == 4:
             let total_value = margin_amount + borrowed_amount
@@ -964,13 +970,16 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (L2_account_address) = get_contract_address()
     let (user) = L1_address.read()
 
+    # Get L1 ZKX contract address
+    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
+
     # Send the withdrawal message.
     let (message_payload : felt*) = alloc()
     assert message_payload[0] = MESSAGE_WITHDRAW
     assert message_payload[1] = user
     assert message_payload[2] = amount_in_felt
     assert message_payload[3] = assetID_
-    send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=4, payload=message_payload)
+    send_message_to_l1(to_address=L1_ZKX_contract_address, payload_size=4, payload=message_payload)
 
     return ()
 end
@@ -986,7 +995,8 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 ):
     alloc_locals
     # Make sure the message was sent by the intended L1 contract.
-    assert from_address = L1_CONTRACT_ADDRESS
+    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
+    assert from_address = L1_ZKX_contract_address
 
     # Update the L1 address
     L1_address.write(user)
@@ -1115,14 +1125,14 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         status=status_,
         marginAmount=orderDetails.marginAmount,
         borrowedAmount=orderDetails.borrowedAmount,
-        leverage = orderDetails.leverage,
+        leverage=orderDetails.leverage,
     )
     # Write to the mapping
     order_mapping.write(orderID=id_, value=updated_order)
     # Update deleveraged or liquidatable position
-    deleveraged_or_liquidatable_position.write(value = id_)
+    deleveraged_or_liquidatable_position.write(value=id_)
     # Update amount_to_be_sold storage variable
-    amount_to_be_sold.write(order_id = id_, value = amount_to_be_sold_)
+    amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
 
     return ()
 end
