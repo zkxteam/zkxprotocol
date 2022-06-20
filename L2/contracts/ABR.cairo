@@ -442,7 +442,7 @@ end
 @external
 func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     index_prices_len : felt, index_prices : felt*, mark_prices_len : felt, mark_prices : felt*
-) -> (ABRdyn_jump_len : felt, ABRdyn_jump : felt*):
+) -> (res : felt):
     alloc_locals
 
     # Calculate the middle band
@@ -483,8 +483,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 
     # Add the jump to the premium price
     let (ABRdyn_jump : felt*) = alloc()
-    # let (ABRdyn_jump_len : felt, ABRdyn_jump : felt*) =
-    return calc_jump(
+    let (ABRdyn_jump_len : felt, ABRdyn_jump : felt*) = calc_jump(
         mark_prices_len,
         mark_prices,
         index_prices_len,
@@ -501,8 +500,8 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     )
 
     # Find the effective ABR rate
-    # let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0)
-    # let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
-    # let (rate) = Math64x61_div(rate_sum, array_size)
-    # return (rate)
+    let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0)
+    let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
+    let (rate) = Math64x61_div(rate_sum, array_size)
+    return (rate)
 end

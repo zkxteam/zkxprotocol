@@ -60,7 +60,7 @@ async def test_should_calculate_correct_abr_ratio(abr_factory):
     abr, admin1 = abr_factory
 
     arguments = [
-        400] + convertTo64x61(perp_spot[0:400]) + [400]+convertTo64x61(perp[0:400])
+        180] + convertTo64x61(perp_spot[0:180]) + [180]+convertTo64x61(perp[0:180])
 
     abr_prices = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
     print("result 64", abr_prices.result.response)
