@@ -280,36 +280,36 @@ async def test_registering_of_users(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_update_withdrawal_fee_mapping(feeBalance_factory):
+async def test_update_withdrawal_fee_mapping(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, dave, fixed_math, holding, feeBalance, accountRegistry, withdrawFeeBalance = adminAuth_factory
 
-    await alice_signer.send_transaction(alice, feeBalance.contract_address, 'update_withdrawal_fee_mapping', [alice.contract_address, USDC_ID, 10])
+    await alice_signer.send_transaction(alice, withdrawFeeBalance.contract_address, 'update_withdrawal_fee_mapping', [alice.contract_address, USDC_ID, 10])
 
-    execution_info = await feeBalance.get_total_withdrawal_fee(USDC_ID).call()
+    execution_info = await withdrawFeeBalance.get_total_withdrawal_fee(USDC_ID).call()
     assert execution_info.result.fee == 10
 
-    execution_info = await feeBalance.get_user_withdrawal_fee(alice.contract_address, USDC_ID).call()
+    execution_info = await withdrawFeeBalance.get_user_withdrawal_fee(alice.contract_address, USDC_ID).call()
     assert execution_info.result.fee == 10
 
 
 @pytest.mark.asyncio
-async def test_update_withdrawal_fee_mapping_different_user(feeBalance_factory):
+async def test_update_withdrawal_fee_mapping_different_user(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, dave, fixed_math, holding, feeBalance, accountRegistry, withdrawFeeBalance = adminAuth_factory
     await alice_signer.send_transaction(alice, withdrawFeeBalance.contract_address, 'update_withdrawal_fee_mapping', [alice.contract_address, USDC_ID, 10])
 
-    execution_info = await feeBalance.get_total_withdrawal_fee(USDC_ID).call()
+    execution_info = await withdrawFeeBalance.get_total_withdrawal_fee(USDC_ID).call()
     assert execution_info.result.fee == 20
 
-    execution_info = await feeBalance.get_user_withdrawal_fee(alice.contract_address, USDC_ID).call()
+    execution_info = await withdrawFeeBalance.get_user_withdrawal_fee(alice.contract_address, USDC_ID).call()
     assert execution_info.result.fee == 20
 
     await bob_signer.send_transaction(bob, withdrawFeeBalance.contract_address, 'update_withdrawal_fee_mapping', [bob.contract_address, USDC_ID, 10])
 
-    execution_info = await feeBalance.get_total_withdrawal_fee(USDC_ID).call()
+    execution_info = await withdrawFeeBalance.get_total_withdrawal_fee(USDC_ID).call()
     assert execution_info.result.fee == 30
 
-    execution_info = await feeBalance.get_user_withdrawal_fee(alice.contract_address, USDC_ID).call()
+    execution_info = await withdrawFeeBalance.get_user_withdrawal_fee(alice.contract_address, USDC_ID).call()
     assert execution_info.result.fee == 20
 
-    execution_info = await feeBalance.get_user_withdrawal_fee(bob.contract_address, USDC_ID).call()
+    execution_info = await withdrawFeeBalance.get_user_withdrawal_fee(bob.contract_address, USDC_ID).call()
     assert execution_info.result.fee == 10
