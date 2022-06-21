@@ -182,6 +182,7 @@ end
 
 # Calculates the square root of a fixed point value
 # x must be positive
+@view
 func Math64x61_sqrt{range_check_ptr}(x : felt) -> (res : felt):
     alloc_locals
     let (root) = sqrt(x)
@@ -310,6 +311,7 @@ end
 
 # Calculates the natural logarithm of x: ln(x)
 # x must be greater than zero
+@view
 func Math64x61_ln{range_check_ptr}(x : felt) -> (res : felt):
     const ln_2 = 1598288580650331957
     let (log2_x) = Math64x61_log2(x)
