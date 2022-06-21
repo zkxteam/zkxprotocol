@@ -81,7 +81,8 @@ async def adminAuth_factory():
         constructor_calldata=[
             alice_signer.public_key,
             registry.contract_address,
-            1
+            1,
+            0
         ]
     )
 
