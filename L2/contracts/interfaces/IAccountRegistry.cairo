@@ -2,7 +2,6 @@
 
 @contract_interface
 namespace IAccountRegistry:
-
     # external functions
     func add_to_account_registry(address_ : felt) -> (res : felt):
     end
@@ -14,4 +13,6 @@ namespace IAccountRegistry:
     func get_account_registry() -> (account_registry_len : felt, account_registry : felt*):
     end
 
+    func is_registered_user(address_ : felt) -> (present : felt):
+    end
 end
