@@ -60,33 +60,29 @@ async def test_add_to_withdrawal_request(adminAuth_factory):
     l2_account_address_1 = 0x1234
     collateral_id_1 = str_to_felt("fghj3am52qpzsib")
     amount_1 = to64x61(5000)
-    status_1 = 0
 
     l2_account_address_2 = 0x5678
     collateral_id_2 = str_to_felt("yjk45lvmasopq")
     amount_2 = to64x61(10000)
-    status_2 = 0
 
-    await signer1.send_transaction(admin1, withdrawal_request.contract_address, 'add_withdrawal_request', [l2_account_address_1, collateral_id_1, amount_1, status_1])
-    await signer1.send_transaction(admin1, withdrawal_request.contract_address, 'add_withdrawal_request', [l2_account_address_2, collateral_id_2, amount_2, status_2])
+    await signer1.send_transaction(admin1, withdrawal_request.contract_address, 'add_withdrawal_request', [l2_account_address_1, collateral_id_1, amount_1])
+    await signer1.send_transaction(admin1, withdrawal_request.contract_address, 'add_withdrawal_request', [l2_account_address_2, collateral_id_2, amount_2])
 
     fetched_withdrawal_request = await withdrawal_request.get_withdrawal_request_data().call()
     print(fetched_withdrawal_request.result.withdrawal_request_list)
 
     res1 = list(fetched_withdrawal_request.result.withdrawal_request_list[0])
+    print(res1)
 
-    assert res1 == [
-        l2_account_address_1,
-        collateral_id_1,
-        amount_1,
-        status_1
-    ]
+    assert res1[0] == l2_account_address_1
+    assert res1[1] == collateral_id_1
+    assert res1[2] == amount_1
+    assert res1[4] == 0
     
     res2 = list(fetched_withdrawal_request.result.withdrawal_request_list[1])
+    print(res2)
 
-    assert res2 == [
-        l2_account_address_2,
-        collateral_id_2,
-        amount_2,
-        status_2
-    ]
+    assert res2[0] == l2_account_address_2
+    assert res2[1] == collateral_id_2
+    assert res2[2] == amount_2
+    assert res2[4] == 0
