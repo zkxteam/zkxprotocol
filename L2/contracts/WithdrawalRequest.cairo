@@ -9,7 +9,7 @@ from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.starknet.common.syscalls import get_caller_address, get_block_timestamp
+from starkware.starknet.common.syscalls import get_caller_address, get_block_number
 from starkware.cairo.common.math import assert_not_zero
 
 #
@@ -159,13 +159,13 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     end
 
     let (arr_len) = withdrawal_request_array_len.read()
-    let (timestamp_) = get_block_timestamp()
+    let (block_number_) = get_block_number()
     # Create a struct with the withdrawal Request
     let new_request = WithdrawalRequest(
         l2_account_address = l2_account_address_,
         collateral_id = collateral_id_,
         amount=amount_,
-        timestamp = timestamp_,
+        block_number = block_number_,
         status=0,
     )
 
@@ -178,14 +178,14 @@ end
 # @param l2_account_address_ - User's Account contract address
 # @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user has withdrawn
-# @param timestamp_ - Time at which user submitted withdrawal request
+# @param block_number_ - Time at which user submitted withdrawal request
 # @param status_ - Status of the withdrawal request
 # @param arr_len_ - current index which is being checked to be updated
 func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     l2_account_address_ : felt, 
     collateral_id_ : felt, 
     amount_ : felt, 
-    timestamp_ : felt,
+    block_number_ : felt,
     status_ : felt, 
     arr_len_ : felt
 ) -> (index : felt):
@@ -196,7 +196,7 @@ func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBu
     if request.l2_account_address == l2_account_address_:
         if request.collateral_id == collateral_id_:
             if request.amount == amount_:
-                if request.timestamp == timestamp_:
+                if request.block_number == block_number_:
                     if request.status == 0:
                         return (arr_len_ - 1)
                     else:
@@ -227,7 +227,7 @@ func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBu
     tempvar syscall_ptr = syscall_ptr
     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
     tempvar range_check_ptr = range_check_ptr
-    return find_index_to_be_updated_recurse(l2_account_address_, collateral_id_, amount_, timestamp_, status_, arr_len_ - 1)
+    return find_index_to_be_updated_recurse(l2_account_address_, collateral_id_, amount_, block_number_, status_, arr_len_ - 1)
 end
 
 
@@ -236,7 +236,7 @@ end
 # @param l2_account_address_ - User's Account contract address
 # @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user has withdrawn
-# @param timestamp_ - Time at which user submitted withdrawal request
+# @param block_number_ - Time at which user submitted withdrawal request
 # @param status_ - Status of the withdrawal request
 @l1_handler
 func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -244,7 +244,7 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     l2_account_address_ : felt, 
     collateral_id_ : felt, 
     amount_ : felt, 
-    timestamp_ : felt,
+    block_number_ : felt,
     status_ : felt
 ):
 
@@ -253,14 +253,14 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     assert from_address = l1_zkx_address
 
     let (arr_len) = withdrawal_request_array_len.read()
-    let (index) = find_index_to_be_updated_recurse(l2_account_address_, collateral_id_, amount_, timestamp_, status_, arr_len)
+    let (index) = find_index_to_be_updated_recurse(l2_account_address_, collateral_id_, amount_, block_number_, status_, arr_len)
     if index != -1:
         # Create a struct with the withdrawal Request
         let updated_request = WithdrawalRequest(
             l2_account_address = l2_account_address_,
             collateral_id = collateral_id_,
             amount=amount_,
-            timestamp = timestamp_,
+            block_number = block_number_,
             status=1,
         )
         tempvar syscall_ptr = syscall_ptr

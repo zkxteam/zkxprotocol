@@ -117,6 +117,6 @@ struct WithdrawalRequest:
     member l2_account_address : felt
     member collateral_id : felt
     member amount : felt
-    member timestamp : felt
+    member block_number : felt
     member status : felt
 end
