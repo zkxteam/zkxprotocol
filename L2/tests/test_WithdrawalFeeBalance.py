@@ -313,3 +313,9 @@ async def test_update_withdrawal_fee_mapping_different_user(adminAuth_factory):
 
     execution_info = await withdrawFeeBalance.get_user_withdrawal_fee(bob.contract_address, USDC_ID).call()
     assert execution_info.result.fee == 10
+
+
+@pytest.mark.asyncio
+async def test_revert_Unauthorized_Tx(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, dave, fixed_math, holding, feeBalance, accountRegistry, withdrawFeeBalance = adminAuth_factory
+    assert_revert(lambda: dave_signer.send_transaction(dave, withdrawFeeBalance.contract_address, 'update_withdrawal_fee_mapping', [alice.contract_address, USDC_ID, 10]))
