@@ -2,19 +2,19 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.Constants import AccountRegistry_INDEX, AdminAuth_INDEX, MasterAdmin_ACTION
+from contracts.DataTypes import WithdrawalRequest
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.interfaces.IAdminAuth import IAdminAuth
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address, get_block_timestamp
+from starkware.cairo.common.math import assert_not_zero
 
-# status 0: initialized
-# status 1: consumed
-struct WithdrawalRequest:
-    member l2_account_address : felt
-    member collateral_id : felt
-    member amount : felt
-    member timestamp : felt
-    member status : felt
-end
+#
+# Storage
+#
 
 # @notice Stores the contract version
 @storage_var
@@ -36,6 +36,15 @@ end
 func withdrawal_request_array_len() -> (len : felt):
 end
 
+# @notice stores the address of L1 zkx contract
+@storage_var
+func L1_zkx_address() -> (res : felt):
+end
+
+#
+# Constructor
+#
+
 # @notice Constructor of the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
@@ -48,6 +57,38 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
+
+#
+# Setters
+#
+
+# @notice set L1 zkx contract address function
+# @param address - L1 zkx contract address as an argument
+@external
+func set_L1_zkx_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    l1_zkx_address : felt
+):
+    alloc_locals
+    # Auth Check
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AdminAuth_INDEX, version=version
+    )
+
+    let (access) = IAdminAuth.get_admin_mapping(
+        contract_address=auth_address, address=caller, action=MasterAdmin_ACTION
+    )
+    assert_not_zero(access)
+
+    L1_zkx_address.write(value=l1_zkx_address)
+    return ()
+end
+
+#
+# Getters
+#
 
 # @notice Internal Function called by get_withdrawal_request_data to recursively add requests to the array and return it
 # @param withdrawal_request_list_len_ - Stores the current length of the populated withdrawal request list
@@ -85,6 +126,10 @@ func get_withdrawal_request_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin
     return (withdrawal_request_list_len=withdrawal_request_list_len_, withdrawal_request_list=withdrawal_request_list_)
 end
 
+#
+# Business logic
+#
+
 # @notice function to add withdrawal request to the withdrawal request array
 # @param l2_account_address_ Address of L2 account contract
 # @param collateral_id_ Id of the collateral for the requested withdrawal
@@ -96,11 +141,24 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     collateral_id_ : felt, 
     amount_ : felt
 ):
-    # Add authorization
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
     let (caller) = get_caller_address()
 
-    let (arr_len) = withdrawal_request_array_len.read()
+    # fetch account registry contract address
+    let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AccountRegistry_INDEX, version=version
+    )
+    # check whether caller is registered user
+    let (present) = IAccountRegistry.is_registered_user(
+        contract_address=account_registry_address, address_=caller
+    )
 
+    with_attr error_message("Called account contract is not registered"):
+        assert_not_zero(present)
+    end
+
+    let (arr_len) = withdrawal_request_array_len.read()
     let (timestamp_) = get_block_timestamp()
     # Create a struct with the withdrawal Request
     let new_request = WithdrawalRequest(
@@ -191,7 +249,8 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 ):
 
     # Make sure the message was sent by the intended L1 contract.
-    # assert from_address = L1_CONTRACT_ADDRESS
+    let (l1_zkx_address) = L1_zkx_address.read()
+    assert from_address = l1_zkx_address
 
     let (arr_len) = withdrawal_request_array_len.read()
     let (index) = find_index_to_be_updated_recurse(l2_account_address_, collateral_id_, amount_, timestamp_, status_, arr_len)
