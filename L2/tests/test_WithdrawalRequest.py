@@ -283,16 +283,16 @@ async def test_registering_of_users(adminAuth_factory):
 async def test_add_to_withdrawal_request(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, dave, fixed_math, holding, feeBalance, accountRegistry, withdrawal_request = adminAuth_factory
 
-    l2_account_address_1 = alice.contract_address
+    l1_wallet_address_1 = alice.contract_address
     collateral_id_1 = str_to_felt("fghj3am52qpzsib")
     amount_1 = to64x61(10)
 
-    l2_account_address_2 = bob.contract_address
+    l1_wallet_address_2 = bob.contract_address
     collateral_id_2 = str_to_felt("yjk45lvmasopq")
     amount_2 = to64x61(20)
 
-    await alice_signer.send_transaction(alice, withdrawal_request.contract_address, 'add_withdrawal_request', [l2_account_address_1, collateral_id_1, amount_1])
-    await bob_signer.send_transaction(bob, withdrawal_request.contract_address, 'add_withdrawal_request', [l2_account_address_2, collateral_id_2, amount_2])
+    await alice_signer.send_transaction(alice, withdrawal_request.contract_address, 'add_withdrawal_request', [l1_wallet_address_1, collateral_id_1, amount_1])
+    await bob_signer.send_transaction(bob, withdrawal_request.contract_address, 'add_withdrawal_request', [l1_wallet_address_2, collateral_id_2, amount_2])
 
     fetched_withdrawal_request = await withdrawal_request.get_withdrawal_request_data().call()
     print(fetched_withdrawal_request.result.withdrawal_request_list)

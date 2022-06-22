@@ -114,7 +114,7 @@ end
 # status 0: initialized
 # status 1: consumed
 struct WithdrawalRequest:
-    member l2_account_address : felt
+    member l1_wallet_address : felt
     member collateral_id : felt
     member amount : felt
     member block_number : felt

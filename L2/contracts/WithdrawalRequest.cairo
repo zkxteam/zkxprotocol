@@ -102,7 +102,7 @@ func populate_withdrawals_request_array{syscall_ptr : felt*, pedersen_ptr : Hash
     alloc_locals
     let (request : WithdrawalRequest) = withdrawal_request_array.read(index=withdrawal_request_list_len_)
 
-    if request.l2_account_address == 0:
+    if request.l1_wallet_address == 0:
         return (withdrawal_request_list_len_, withdrawal_request_list_)
     end
 
@@ -131,13 +131,13 @@ end
 #
 
 # @notice function to add withdrawal request to the withdrawal request array
-# @param l2_account_address_ Address of L2 account contract
+# @param l1_wallet_address_ User's L1 wallet address
 # @param collateral_id_ Id of the collateral for the requested withdrawal
 # @param amount_ Amount to be withdrawn
 # @param status_ status of the withdrawal
 @external
 func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    l2_account_address_ : felt, 
+    l1_wallet_address_ : felt, 
     collateral_id_ : felt, 
     amount_ : felt
 ):
@@ -162,7 +162,7 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     let (block_number_) = get_block_number()
     # Create a struct with the withdrawal Request
     let new_request = WithdrawalRequest(
-        l2_account_address = l2_account_address_,
+        l1_wallet_address = l1_wallet_address_,
         collateral_id = collateral_id_,
         amount=amount_,
         block_number = block_number_,
@@ -175,65 +175,60 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
 end
 
 # @notice Internal function to recursively find the index of the withdrawal request to be updated
-# @param l2_account_address_ - User's Account contract address
+# @param l1_wallet_address_ - User's L1 wallet address
 # @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user has withdrawn
 # @param block_number_ - Time at which user submitted withdrawal request
 # @param status_ - Status of the withdrawal request
 # @param arr_len_ - current index which is being checked to be updated
 func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    l2_account_address_ : felt, 
+    l1_wallet_address_ : felt, 
     collateral_id_ : felt, 
     amount_ : felt, 
     block_number_ : felt,
     status_ : felt, 
     arr_len_ : felt
 ) -> (index : felt):
+    alloc_locals
+
     if arr_len_ == 0:
         return (-1)
     end
+
     let (request : WithdrawalRequest) = withdrawal_request_array.read(index=arr_len_ - 1)
-    if request.l2_account_address == l2_account_address_:
-        if request.collateral_id == collateral_id_:
-            if request.amount == amount_:
-                if request.block_number == block_number_:
-                    if request.status == 0:
-                        return (arr_len_ - 1)
-                    else:
-                        tempvar syscall_ptr = syscall_ptr
-                        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                        tempvar range_check_ptr = range_check_ptr
-                    end
-                else:
-                    tempvar syscall_ptr = syscall_ptr
-                    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                    tempvar range_check_ptr = range_check_ptr
-                end
-            else:
-                tempvar syscall_ptr = syscall_ptr
-                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-                tempvar range_check_ptr = range_check_ptr
-            end
-        else:
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        end
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
+
+    local first_check_counter
+    local second_check_counter
+    local third_check_counter
+    local fourth_check_counter
+    local fifth_check_counter
+    if request.l1_wallet_address == l1_wallet_address_:
+        first_check_counter = 1
     end
-    tempvar syscall_ptr = syscall_ptr
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-    tempvar range_check_ptr = range_check_ptr
-    return find_index_to_be_updated_recurse(l2_account_address_, collateral_id_, amount_, block_number_, status_, arr_len_ - 1)
+    if request.collateral_id == collateral_id_:
+        second_check_counter = 1
+    end
+    if request.amount == amount_:
+        third_check_counter = 1
+    end
+    if request.block_number == block_number_:
+        fourth_check_counter = 1
+    end
+    if request.status == 0:
+        fifth_check_counter = 1
+    end
+
+    let counter = first_check_counter + second_check_counter + third_check_counter + fourth_check_counter + fifth_check_counter
+    if counter == 5:
+        return (arr_len_ - 1)
+    end
+    return find_index_to_be_updated_recurse(l1_wallet_address_, collateral_id_, amount_, block_number_, status_, arr_len_ - 1)
 end
 
 
 # @notice Function to handle status updates on withdrawal requests
 # @param from_address - The address from where update withdrawal request function is called from
-# @param l2_account_address_ - User's Account contract address
+# @param l1_wallet_address_ - User's L1 wallet address
 # @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user has withdrawn
 # @param block_number_ - Time at which user submitted withdrawal request
@@ -241,7 +236,7 @@ end
 @l1_handler
 func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt,
-    l2_account_address_ : felt, 
+    l1_wallet_address_ : felt, 
     collateral_id_ : felt, 
     amount_ : felt, 
     block_number_ : felt,
@@ -253,24 +248,18 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     assert from_address = l1_zkx_address
 
     let (arr_len) = withdrawal_request_array_len.read()
-    let (index) = find_index_to_be_updated_recurse(l2_account_address_, collateral_id_, amount_, block_number_, status_, arr_len)
+    let (index) = find_index_to_be_updated_recurse(l1_wallet_address_, collateral_id_, amount_, block_number_, status_, arr_len)
     if index != -1:
         # Create a struct with the withdrawal Request
         let updated_request = WithdrawalRequest(
-            l2_account_address = l2_account_address_,
+            l1_wallet_address = l1_wallet_address_,
             collateral_id = collateral_id_,
             amount=amount_,
             block_number = block_number_,
             status=1,
         )
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
         withdrawal_request_array.write(index=index, value=updated_request)
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
+        return ()
     end
     return ()
 end
