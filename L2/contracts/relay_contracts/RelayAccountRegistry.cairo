@@ -53,4 +53,13 @@ func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     return(res_len, res)
 end
 
+@view
+func is_registered_user{syscall_ptr : felt*,
+ pedersen_ptr : HashBuiltin*, range_check_ptr}(address_ : felt) -> (present : felt):
+
+    let (inner_address)=get_inner_contract()
+    let (res) = IAccountRegistry.is_registered_user(inner_address, address_)
+    return (res)
+end
+
 
