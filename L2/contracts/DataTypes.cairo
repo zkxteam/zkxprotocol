@@ -109,3 +109,14 @@ struct Signature:
     member r_value : felt
     member s_value : felt
 end
+
+# Struct for Withdrawal Request
+# status 0: initialized
+# status 1: consumed
+struct WithdrawalRequest:
+    member l1_wallet_address : felt
+    member collateral_id : felt
+    member amount : felt
+    member block_number : felt
+    member status : felt
+end
