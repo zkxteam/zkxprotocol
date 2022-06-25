@@ -105,6 +105,7 @@ end
 
 # @notice struct to store details of assets
 struct Asset:
+    member asset_version : felt
     member ticker : felt
     member short_name : felt
     member tradable : felt
@@ -1033,7 +1034,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
 
     let (amount_in_64x61_format) = Math64x61_fromFelt(amount)
-    let (amount_in_decimal_representation) = Math64x61_mul(
+    let (amount_in_decimal_representation) = Math64x61_div(
         amount_in_64x61_format, decimal_in_64x61_format
     )
 
