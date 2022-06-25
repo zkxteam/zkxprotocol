@@ -58,7 +58,6 @@ struct MultipleOrder:
     member direction : felt
     member closeOrder : felt
     member leverage : felt
-    member isLiquidation : felt
     member liquidatorAddress : felt
     member parentOrder : felt
     member side : felt
@@ -83,7 +82,6 @@ struct OrderRequest:
     member direction : felt
     member closeOrder : felt
     member leverage : felt
-    member isLiquidation : felt
     member liquidatorAddress : felt
     member parentOrder : felt
 end

@@ -122,7 +122,7 @@ def hash_message(sender, to, selector, calldata, nonce):
     return compute_hash_on_elements(message)
 
 
-def hash_order(order_id, ticker, collateral, price, orderType, position, direction, closeOrder, leverage, isLiquidation):
+def hash_order(order_id, ticker, collateral, price, orderType, position, direction, closeOrder, leverage):
     order = [
         order_id,
         ticker,
@@ -132,8 +132,7 @@ def hash_order(order_id, ticker, collateral, price, orderType, position, directi
         position,
         direction,
         closeOrder,
-        leverage,
-        isLiquidation
+        leverage
     ]
     return compute_hash_on_elements(order)
 
