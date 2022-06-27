@@ -112,7 +112,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         direction=[request_list].direction,
         closeOrder=[request_list].closeOrder,
         leverage=[request_list].leverage,
-        isLiquidation=[request_list].isLiquidation,
         liquidatorAddress=[request_list].liquidatorAddress,
         parentOrder=[request_list].parentOrder,
         side=[request_list].side
@@ -598,7 +597,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         direction=temp_order.direction,
         closeOrder=temp_order.closeOrder,
         leverage=temp_order.leverage,
-        isLiquidation=temp_order.isLiquidation,
         liquidatorAddress=temp_order.liquidatorAddress,
         parentOrder=temp_order.parentOrder,
     )

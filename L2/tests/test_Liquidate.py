@@ -231,7 +231,6 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidityFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insuranceFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, liquidator.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, accountRegistry.contract_address])
 
     # Add base fee and discount in Trading Fee contract
@@ -302,7 +301,6 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     closeOrder1 = 0
     parentOrder1 = 0
     leverage1 = to64x61(2)
-    isLiquidation1 = 0
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljemn")
@@ -315,15 +313,14 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     closeOrder2 = 0
     parentOrder2 = 0
     leverage2 = to64x61(2)
-    isLiquidation2 = 0
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(5000)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
+                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
+                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
@@ -334,9 +331,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
     ])
 
     orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
@@ -513,7 +510,6 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     closeOrder3 = 0
     parentOrder3 = 0
     leverage3 = to64x61(3)
-    isLiquidation3 = 0
     liquidatorAddress3 = 0
 
     order_id_4 = str_to_felt("rfdgljemn")
@@ -526,15 +522,14 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     closeOrder4 = 0
     parentOrder4 = 0
     leverage4 = to64x61(3)
-    isLiquidation4 = 0
     liquidatorAddress4 = 0
 
     execution_price2 = to64x61(100)
 
     hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3,
-                                price3, orderType3, position3, direction3, closeOrder3, leverage3, isLiquidation3)
+                                price3, orderType3, position3, direction3, closeOrder3, leverage3)
     hash_computed4 = hash_order(order_id_4, assetID_4, collateralID_4,
-                                price4, orderType4, position4, direction4, closeOrder4, leverage4, isLiquidation4)
+                                price4, orderType4, position4, direction4, closeOrder4, leverage4)
 
     signed_message3 = alice_signer.sign(hash_computed3)
     signed_message4 = bob_signer.sign(hash_computed4)
@@ -545,9 +540,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, leverage3, isLiquidation3, liquidatorAddress3, parentOrder3, 1, 
+            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1, 
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, leverage4, isLiquidation4, liquidatorAddress4, parentOrder4, 0,
+            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
     ])
 
     orderState3 = await alice.get_order_data(orderID_=order_id_3).call()
@@ -796,13 +791,12 @@ async def test_liquidation_flow(adminAuth_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(7357.5)
-    orderType1 = 0
+    orderType1 = 3
     position1 = to64x61(2)
     direction1 = 1
     closeOrder1 = 1
     parentOrder1 = str_to_felt("343uofdsjxz")
     leverage1 = to64x61(2)
-    isLiquidation1 = 1
     liquidatorAddress1 = liquidator.contract_address
 
     order_id_2 = str_to_felt("sadfjkh2178")
@@ -815,15 +809,14 @@ async def test_liquidation_flow(adminAuth_factory):
     closeOrder2 = 0
     parentOrder2 = 0
     leverage2 = to64x61(2)
-    isLiquidation2 = 0
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(7357.5)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
+                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
+                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = liquidator_signer.sign(hash_computed1)
     signed_message2 = charlie_signer.sign(hash_computed2)
@@ -839,9 +832,9 @@ async def test_liquidation_flow(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
         charlie.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
     ])
 
     orderState1 = await alice.get_order_data(orderID_=parentOrder1).call()
@@ -855,7 +848,7 @@ async def test_liquidation_flow(adminAuth_factory):
         to64x61(5000),
         to64x61(5000),
         0,
-        orderType1,
+        0,
         0,
         to64x61(0),
         7,
@@ -968,13 +961,12 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(11500)
-    orderType1 = 0
+    orderType1 = 3
     position1 = to64x61(2)
     direction1 = 1
     closeOrder1 = 1
     parentOrder1 = str_to_felt("sadfjkh2178")
     leverage1 = to64x61(2)
-    isLiquidation1 = 1
     liquidatorAddress1 = liquidator.contract_address
 
     order_id_2 = str_to_felt("5489sdksjkh2178")
@@ -987,15 +979,14 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     closeOrder2 = 0
     parentOrder2 = 0
     leverage2 = to64x61(2)
-    isLiquidation2 = 0
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(11500)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
+                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
+                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = liquidator_signer.sign(hash_computed1)
     signed_message2 = alice_signer.sign(hash_computed2)
@@ -1013,9 +1004,9 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         marketID_1,
         2,
         charlie.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
         alice.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
     ])
 
     orderState1 = await charlie.get_order_data(orderID_=parentOrder1).call()
@@ -1029,7 +1020,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         to64x61(7357.5),
         to64x61(7357.5),
         0,
-        orderType1,
+        0,
         0,
         to64x61(0),
         7,
@@ -1135,7 +1126,6 @@ async def test_deleveraging_flow(adminAuth_factory):
     closeOrder1 = 0
     parentOrder1 = 0
     leverage1 = to64x61(5)
-    isLiquidation1 = 0
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljemn")
@@ -1148,15 +1138,14 @@ async def test_deleveraging_flow(adminAuth_factory):
     closeOrder2 = 0
     parentOrder2 = 0
     leverage2 = to64x61(1)
-    isLiquidation2 = 0
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(1000)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
+                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
+                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = eduard_signer.sign(hash_computed1)
     signed_message2 = daniel_signer.sign(hash_computed2)
@@ -1167,9 +1156,9 @@ async def test_deleveraging_flow(adminAuth_factory):
         marketID_1,
         2,
         eduard.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 0, 
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0, 
         daniel.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
     ])
 
     orderState1 = await eduard.get_order_data(orderID_=order_id_1).call()
@@ -1284,15 +1273,13 @@ async def test_deleveraging_flow(adminAuth_factory):
     print(eduard_amount_to_be_sold.result)
     print("eduard amount to be sold is...", from64x61(
         eduard_amount_to_be_sold.result.amount_to_be_sold))
+    print("eduard amount to be sold is...", eduard_amount_to_be_sold.result.amount_to_be_sold)
     assert from64x61(eduard_amount_to_be_sold.result.amount_to_be_sold) == 1.9454545454545453
 
     print("eduard Position to be deleveraged is...",
         eduard_amount_to_be_sold.result.order_id)
     assert eduard_amount_to_be_sold.result.order_id == str_to_felt(
         "343uofdsjxz")
-
-
-
 
     ####### Opening of Deleveraged Order #######
     size2 = to64x61(1.9454545454545453)
@@ -1308,8 +1295,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     closeOrder3 = 1
     parentOrder3 = order_id_1
     leverage3 = to64x61(5)
-    isLiquidation3 = 0
-    liquidatorAddress3 = 0
+    liquidatorAddress3 = liquidator.contract_address
 
     order_id_4 = str_to_felt("rfdgljthi")
     assetID_4 = BTC_ID
@@ -1321,17 +1307,16 @@ async def test_deleveraging_flow(adminAuth_factory):
     closeOrder4 = 1
     parentOrder4 = order_id_2
     leverage4 = to64x61(1)
-    isLiquidation4 = 0
     liquidatorAddress4 = 0
 
     execution_price2 = to64x61(1250)
 
     hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3,
-                                price3, orderType3, position3, direction3, closeOrder3, leverage3, isLiquidation3)
+                                price3, orderType3, position3, direction3, closeOrder3, leverage3)
     hash_computed4 = hash_order(order_id_4, assetID_4, collateralID_4,
-                                price4, orderType4, position4, direction4, closeOrder4, leverage4, isLiquidation4)
+                                price4, orderType4, position4, direction4, closeOrder4, leverage4)
 
-    signed_message3 = eduard_signer.sign(hash_computed3)
+    signed_message3 = liquidator_signer.sign(hash_computed3)
     signed_message4 = daniel_signer.sign(hash_computed4)
 
     res = await liquidator_signer.send_transaction(liquidator, trading.contract_address, "execute_batch", [
@@ -1340,9 +1325,9 @@ async def test_deleveraging_flow(adminAuth_factory):
         marketID_2,
         2,
         eduard.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, leverage3, isLiquidation3, liquidatorAddress3, parentOrder3, 1, 
+            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1, 
         daniel.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, leverage4, isLiquidation4, liquidatorAddress4, parentOrder4, 0,
+            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
     ])
 
     orderState3 = await eduard.get_order_data(orderID_=order_id_1).call()
@@ -1404,6 +1389,10 @@ async def test_deleveraging_flow(adminAuth_factory):
         daniel_balance_usdc.result.res))
 
     assert from64x61(daniel_balance_usdc.result.res) == 2929.393181818182
+
+    amount_to_be_sold = await eduard.get_amount_to_be_sold(order_id_=order_id_1).call()
+    print("Amount to be sold after deleveraging:", from64x61(amount_to_be_sold.result.res))
+    assert from64x61(amount_to_be_sold.result.res) == 0
 
 
 @pytest.mark.asyncio
@@ -1488,7 +1477,6 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
     closeOrder1 = 1
     parentOrder1 = str_to_felt("343uofdsjxz")
     leverage1 = to64x61(3.540909090909091)
-    isLiquidation1 = 1
     liquidatorAddress1 = liquidator.contract_address
 
     order_id_2 = str_to_felt("sadfjkh2178")
@@ -1501,15 +1489,14 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
     closeOrder2 = 1
     parentOrder2 = str_to_felt("wer4iljemn")
     leverage2 = to64x61(1)
-    isLiquidation2 = 0
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(1800)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1)
+                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2)
+                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = liquidator_signer.sign(hash_computed1)
     signed_message2 = daniel_signer.sign(hash_computed2)
@@ -1525,9 +1512,9 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
         marketID_1,
         2,
         eduard.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, isLiquidation1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
         daniel.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, isLiquidation2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
     ])
 
     orderState1 = await eduard.get_order_data(orderID_=parentOrder1).call()

@@ -15,10 +15,10 @@ from starkware.cairo.common.hash_state import (
     hash_update_single,
 )
 from starkware.cairo.common.math_cmp import is_le
-from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn
+from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn, abs_value
 from starkware.cairo.common.pow import pow
 
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_fromFelt, Math64x61_toFelt
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_fromFelt, Math64x61_toFelt, Math64x61_sub
 
 const MESSAGE_WITHDRAW = 0
 
@@ -47,7 +47,6 @@ struct OrderRequest:
     member direction : felt
     member closeOrder : felt
     member leverage : felt
-    member isLiquidation : felt
     member liquidatorAddress : felt
     member parentOrder : felt
 end
@@ -106,6 +105,7 @@ end
 
 # @notice struct to store details of assets
 struct Asset:
+    member asset_version : felt
     member ticker : felt
     member short_name : felt
     member tradable : felt
@@ -671,7 +671,7 @@ func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (r
     let hash_ptr = pedersen_ptr
     with hash_ptr:
         let (hash_state_ptr) = hash_init()
-        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 10)
+        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 9)
         let (res) = hash_finalize(hash_state_ptr)
         let pedersen_ptr = hash_ptr
         return (res=res)
@@ -716,7 +716,7 @@ func execute_order{
     let (hash) = hash_order(&request)
 
     # check if signed by the user/liquidator
-    is_valid_signature_order(hash, signature, request.isLiquidation, request.liquidatorAddress)
+    is_valid_signature_order(hash, signature, request.liquidatorAddress)
 
     local status_
     # closeOrder == 0 -> Open a new position
@@ -836,7 +836,7 @@ func execute_order{
         # status_ == 6, toBeLiquidated
         # status_ == 7, fullyLiquidated
         if orderDetails.portionExecuted - size == 0:
-            if request.isLiquidation == 1:
+            if request.orderType == 3:
                 assert status_ = 7
             else:
                 assert status_ = 4
@@ -845,12 +845,35 @@ func execute_order{
             if request.orderType == 4:
                 assert status_ = 5
             else:
-                if request.isLiquidation == 1:
+                if request.orderType == 3:
                     assert status_ = 6
                 else:
                     assert status_ = 3
                 end
             end
+        end
+
+        # Update the amount to be sold after deleveraging
+        if orderDetails.status == 5:
+            let (amount) = amount_to_be_sold.read(order_id = request.parentOrder)
+            let updated_amount = amount - size
+            let (positive_updated_amount) = abs_value(updated_amount)
+            # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
+            let (result) = is_le(updated_amount, 230584300)
+            local amount_to_be_updated
+            if result == 1:
+                amount_to_be_updated = 0
+            else:
+                amount_to_be_updated = updated_amount
+            end
+            amount_to_be_sold.write(order_id=request.parentOrder, value= amount_to_be_updated)
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
 
         # Create a new struct with the updated details
@@ -882,32 +905,26 @@ end
 # @notice view function which checks the signature passed is valid
 # @param hash - Hash of the order to check against
 # @param signature - Signature passed to the contract to check against
+# @param liquidator_address_ - Address of the liquidator
 # @returns reverts, if there is an error
 @view
 func is_valid_signature_order{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
-}(hash : felt, signature : Signature, is_liquidator, liquidator_address_ : felt) -> ():
+}(hash : felt, signature : Signature, liquidator_address_ : felt) -> ():
     alloc_locals
 
     let sig_r = signature.r_value
     let sig_s = signature.s_value
     local pub_key
 
-    if is_liquidator == 1:
+    if liquidator_address_ != 0:
         let (caller) = get_caller_address()
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
 
-        # Get liquidator's contract address
-        let (liquidator_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=13, version=version
-        )
+        # To-Do Verify whether call came from node operator
 
-        with_attr error_message("The signer is not a authorized liquidator"):
-            assert liquidator_address = liquidator_address_
-        end
-
-        let (_public_key) = IAccount.get_public_key(contract_address=liquidator_address)
+        let (_public_key) = IAccount.get_public_key(contract_address=liquidator_address_)
         pub_key = _public_key
 
         tempvar syscall_ptr = syscall_ptr
@@ -1017,7 +1034,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
 
     let (amount_in_64x61_format) = Math64x61_fromFelt(amount)
-    let (amount_in_decimal_representation) = Math64x61_mul(
+    let (amount_in_decimal_representation) = Math64x61_div(
         amount_in_64x61_format, decimal_in_64x61_format
     )
 
