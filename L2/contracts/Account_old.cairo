@@ -27,6 +27,7 @@ from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAdminAuth import IAdminAuth
+
 from contracts.Constants import (
     Asset_INDEX,
     Market_INDEX,
@@ -196,11 +197,6 @@ end
 
 @storage_var
 func order_mapping(orderID : felt) -> (res : OrderDetails):
-end
-
-# @notice Mapping of marketID to the timestamp of last updated value
-@storage_var
-func last_updated(market_id) -> (value : felt):
 end
 
 # L1 User associated with the account
@@ -1171,7 +1167,6 @@ func abr_payement_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     iterator : felt
 ) -> ():
     alloc_locals
-
     let (pos) = position_array.read(index=iterator)
 
     # If reached the end of the array, return
@@ -1217,21 +1212,6 @@ func abr_payement_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     let (abr : felt, price : felt, timestamp : felt) = IABR.get_abr_value(
         contract_address=abr_contract, market_id=market_id
     )
-
-    # Get the latest block
-    let (block_timestamp) = get_block_timestamp()
-
-    # Fetch the last updated time
-    let (last_call) = last_updated.read(market_id=market_id)
-
-    # Minimum time before the second call
-    let min_time = last_call + 28000
-    let (is_eight_hours) = is_le(block_timestamp, min_time)
-
-    # If 8 hours have not passed yet
-    if is_eight_hours == 1:
-        return abr_payement_recurse(iterator + 1)
-    end
 
     # Get the abr funding contract
     let (abr_funding) = IAuthorizedRegistry.get_contract_address(
@@ -1299,7 +1279,6 @@ func abr_payement_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
         tempvar range_check_ptr = range_check_ptr
     end
 
-    last_updated.write(market_id=market_id, value=block_timestamp)
     return abr_payement_recurse(iterator + 1)
 end
 
@@ -1309,8 +1288,8 @@ end
 # @param assetID_ - Asset ID of the collateral that needs to be deposited
 @external
 func abr_payment{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
-    alloc_locals
     # Get the caller address
+    alloc_locals
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
