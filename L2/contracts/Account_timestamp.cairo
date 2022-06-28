@@ -23,11 +23,6 @@ from starkware.cairo.common.math import (
     abs_value,
 )
 from starkware.cairo.common.pow import pow
-from contracts.interfaces.IMarkets import IMarkets
-from contracts.interfaces.IABR import IABR
-from contracts.interfaces.IABRFund import IABRFund
-from contracts.interfaces.IAdminAuth import IAdminAuth
-
 from contracts.Constants import (
     Asset_INDEX,
     Market_INDEX,
@@ -199,6 +194,11 @@ end
 func order_mapping(orderID : felt) -> (res : OrderDetails):
 end
 
+# @notice Mapping of marketID to the timestamp of last updated value
+@storage_var
+func last_updated(market_id) -> (value : felt):
+end
+
 # L1 User associated with the account
 @storage_var
 func L1_address() -> (res : felt):
@@ -237,11 +237,6 @@ end
 # Stores the position which is to be deleveraged or liquidated
 @storage_var
 func deleveraged_or_liquidatable_position() -> (order_id : felt):
-end
-
-# @notice Mapping of marketID to the timestamp of last updated abr value
-@storage_var
-func last_updated(market_id) -> (value : felt):
 end
 
 #
@@ -393,6 +388,87 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     end
 
     balance.write(assetID=assetID_, value=balance_ - amount)
+    return ()
+end
+
+@view
+func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt
+) -> (is_eight_hours : felt):
+    # Get the latest block
+    let (block_timestamp) = get_block_timestamp()
+
+    # Fetch the last updated time
+    let (last_call) = last_updated.read(market_id=market_id)
+
+    # Minimum time before the second call
+    let min_time = last_call + 28000
+    let (is_eight_hours) = is_le(block_timestamp, min_time)
+
+    return (is_eight_hours)
+end
+
+# @notice External function called by the ABR Payment contract
+# @param assetID_ - asset ID of the collateral that needs to be transferred
+# @param amount - Amount of funds to transfer from this contract
+@external
+func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt, amount : felt
+):
+    alloc_locals
+
+    # Check if the caller is trading contract
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=19, version=version
+    )
+
+    with_attr error_message("Caller is not authorized to do transferFrom in account contract."):
+        assert caller = abr_payment_address
+    end
+
+    # Reduce the amount from balance
+    let (balance_) = balance.read(assetID=assetID_)
+    balance.write(assetID=assetID_, value=balance_ - amount)
+
+    # Update the timestamp of last called
+    let (block_timestamp) = get_block_timestamp()
+    last_updated.write(market_id=market_id, value=block_timstamp)
+    return ()
+end
+
+# @notice External function called by the ABR Payment contract
+# @param assetID_ - asset ID of the collateral that needs to be transferred
+# @param amount - Amount of funds to transfer to this contract
+@external
+func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt, amount : felt
+):
+    alloc_locals
+
+    # Check if the caller is trading contract
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=19, version=version
+    )
+    with_attr error_message("Caller is not authorized to do transfer in account contract."):
+        assert caller = abr_payment_address
+    end
+
+    # Add amount to balance
+    let (balance_) = balance.read(assetID=assetID_)
+    balance.write(assetID=assetID_, value=balance_ + amount)
+
+    # Update the timestamp of last called
+    let (block_timestamp) = get_block_timestamp()
+    last_updated.write(market_id=market_id, value=block_timstamp)
+
     return ()
 end
 
@@ -633,21 +709,14 @@ func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
         borrowedAmount=pos_details.borrowedAmount,
     )
 
-    local is_valid_state
-    if pos_details.status == 5:
-        assert is_valid_state = 1
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        let (state) = is_le(pos_details.status, 3)
-        assert is_valid_state = state
-        tempvar range_check_ptr = range_check_ptr
-    end
-
-    if is_valid_state == 1:
-        assert array_list[array_list_len] = order_details_w_id
-        return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
-    else:
+    if pos_details.status == 4:
         return populate_array_positions(iterator + 1, array_list_len, array_list)
+    else:
+        if pos_details.status == 7:
+            return populate_array_positions(iterator + 1, array_list_len, array_list)
+        else:
+            return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
+        end
     end
 end
 
@@ -1155,156 +1224,6 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
 
     return ()
-end
-
-# @notice Internal Function called by return array to recursively add positions to the array and return it
-# @param iterator - Index of the position_array currently pointing to
-# @param array_list_len - Stores the current length of the populated array
-# @param array_list - Array of OrderRequests filled up to the index
-# @returns array_list_len - Length of the array_list
-# @returns array_list - Fully populated list of OrderDetails
-func abr_payement_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    iterator : felt
-) -> ():
-    alloc_locals
-    let (pos) = position_array.read(index=iterator)
-
-    # If reached the end of the array, return
-    if pos == 0:
-        return ()
-    end
-
-    # Fetch the position details
-    let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
-
-    # If the order is closed, go to next iteration
-    if pos_details.status == 4:
-        return abr_payement_recurse(iterator + 1)
-    end
-
-    # If the order is fully liquidated, go to next iteration
-    if pos_details.status == 7:
-        return abr_payement_recurse(iterator + 1)
-    end
-
-    # Read the registry address and version
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    # Get the market address
-    let (market_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Market_INDEX, version=version
-    )
-
-    # Get the market id from market contract
-    let (market_id) = IMarkets.getMarket_from_assets(
-        contract_address=market_contract,
-        asset_id=pos_details.assetID,
-        collateral_id=pos_details.collateralID,
-    )
-
-    # Get the abr contract address
-    let (abr_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_INDEX, version=version
-    )
-
-    # Get the abr value
-    let (abr : felt, price : felt, timestamp : felt) = IABR.get_abr_value(
-        contract_address=abr_contract, market_id=market_id
-    )
-
-    # Get the abr funding contract
-    let (abr_funding) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_FUNDS_INDEX, version=version
-    )
-
-    # Find if the abr_rate is +ve or -ve
-    let (is_negative) = is_le(abr, 0)
-    let (position_value) = Math64x61_mul(price, pos_details.portionExecuted)
-    let (payment_amount) = Math64x61_mul(abr, position_value)
-    let (abs_payment_amount) = abs_value(payment_amount)
-
-    # Get user balance for the collateral
-    let (balance_) = balance.read(assetID=pos_details.collateralID)
-
-    if is_negative == 1:
-        if pos_details.direction == 0:
-            # user pays
-            IABRFund.deposit(
-                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-            )
-
-            balance.write(assetID=pos_details.collateralID, value=balance_ - abs_payment_amount)
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        else:
-            # user receives
-            IABRFund.withdraw(
-                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-            )
-
-            balance.write(assetID=pos_details.collateralID, value=balance_ + abs_payment_amount)
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        end
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        if pos_details.direction == 0:
-            # user receives
-            IABRFund.withdraw(
-                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-            )
-
-            balance.write(assetID=pos_details.collateralID, value=balance_ + abs_payment_amount)
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        else:
-            # user pays
-            IABRFund.deposit(
-                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-            )
-
-            balance.write(assetID=pos_details.collateralID, value=balance_ - abs_payment_amount)
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        end
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    end
-
-    return abr_payement_recurse(iterator + 1)
-end
-
-# @param from_address - The address from where deposit function is called from
-# @param user - User's Metamask account address
-# @param amount - The Amount of funds that user wants to withdraw
-# @param assetID_ - Asset ID of the collateral that needs to be deposited
-@external
-func abr_payment{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
-    # Get the caller address
-    alloc_locals
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
-    )
-
-    # Check if it's admin
-    assert_not_zero(access)
-    return abr_payement_recurse(iterator=0)
 end
 
 # @notice AuthorizedRegistry interface

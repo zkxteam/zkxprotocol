@@ -22,9 +22,9 @@ from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from starkware.starknet.common.syscalls import get_caller_address
-
 const NUM_STD = 4611686018427387904
 const NUM_1 = 2305843009213693952
+const NUM_100 = 230584300921369395200
 const NUM_8 = 18446744073709551616
 const NUM_MIN = 28823037615171
 
@@ -613,7 +613,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 ) -> (res : felt):
     alloc_locals
 
-    # Get the caller address
+    # Get caller address
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -626,8 +626,23 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         contract_address=auth_address, address=caller, action=0
     )
 
-    # Check if it's admin
+    # Not an admin
     assert_not_zero(access)
+
+    # Get the latest block
+    let (block_timestamp) = get_block_timestamp()
+
+    # Fetch the last updated time
+    let (last_call) = last_updated.read(market_id=market_id)
+
+    # Minimum time before the second call
+    let min_time = last_call + 28000
+    let (is_eight_hours) = is_le(block_timestamp, min_time)
+
+    # If 8 hours have not passed yet
+    if is_eight_hours == 1:
+        assert 1 = 0
+    end
 
     # Reduce the array size by factor of 8
     let (index_prices : felt*) = alloc()
@@ -699,7 +714,8 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     # Find the effective ABR rate
     let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0)
     let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
-    let (rate) = Math64x61_div(rate_sum, array_size)
+    let (rate_percentage) = Math64x61_div(rate_sum, array_size)
+    let (rate) = Math64x61_div(rate_percentage, NUM_100)
 
     # Store the result and the timestamp in their storage vars
     let (block_timestamp) = get_block_timestamp()

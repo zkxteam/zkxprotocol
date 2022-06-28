@@ -53,6 +53,11 @@ end
 func market(id : felt) -> (res : Market):
 end
 
+# @notice Mapping between assetID, collateralID and MarketID
+@storage_var
+func market_mapping(asset_id : felt, collateral_id : felt) -> (res : felt):
+end
+
 # @notice Constructor of the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
@@ -107,11 +112,18 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
             id=id,
             value=Market(asset=newMarket.asset, assetCollateral=newMarket.assetCollateral, leverage=newMarket.leverage, tradable=asset1.tradable),
         )
+        market_mapping.write(
+            asset_id=newMarket.asset, collateral_id=newMarket.assetCollateral, value=id
+        )
     else:
         if newMarket.tradable == 1:
             assert_not_zero(asset1.tradable)
         end
+
         market.write(id=id, value=newMarket)
+        market_mapping.write(
+            asset_id=newMarket.asset, collateral_id=newMarket.assetCollateral, value=id
+        )
     end
 
     return ()
@@ -227,6 +239,18 @@ func getMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     currMarket : Market
 ):
     let (currMarket) = market.read(id=id)
+    return (currMarket)
+end
+
+# @notice Getter function for Markets from assetID and collateralID
+# @param assetID - Id of the asset
+# @param collateralID - Id of the collateral
+# @return currMarket - Returns the requested market
+@view
+func getMarket_from_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    asset_id : felt, collateral_id : felt
+) -> (market_id : felt):
+    let (currMarket) = market_mapping.read(asset_id=asset_id, collateral_id=collateral_id)
     return (currMarket)
 end
 

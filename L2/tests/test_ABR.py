@@ -28,12 +28,12 @@ async def abr_factory():
     starknet = await Starknet.empty()
 
     admin1 = await starknet.deploy(
-        "contracts/Account_old.cairo",
+        "contracts/Account.cairo",
         constructor_calldata=[admin1_signer.public_key, 0, 1, 0]
     )
 
     admin2 = await starknet.deploy(
-        "contracts/Account_old.cairo",
+        "contracts/Account.cairo",
         constructor_calldata=[admin2_signer.public_key, 0, 1, 0]
     )
 
@@ -53,7 +53,7 @@ async def abr_factory():
     )
 
     abr = await starknet.deploy(
-        "contracts/ABR_old.cairo",
+        "contracts/ABR.cairo",
         constructor_calldata=[
             registry.contract_address,
             1

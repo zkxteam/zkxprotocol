@@ -8,6 +8,8 @@ from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.Constants import ABR_PAYMENT_INDEX
+
 # @notice Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
@@ -141,16 +143,13 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-    let (account_registry) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=14, version=version
+
+    let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
     )
 
-    let (access) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry, address_=caller
-    )
-
-    with_attr error_message("Caller is not authorized to do perform deposit"):
-        assert access = 1
+    with_attr error_message("Caller is not authorized to do deposit"):
+        assert caller = abr_payment_address
     end
 
     let current_amount : felt = balance_mapping.read(market_id=market_id_)
@@ -168,20 +167,16 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     market_id_ : felt, amount : felt
 ):
     alloc_locals
-
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-    let (account_registry) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=14, version=version
+
+    let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
     )
 
-    let (access) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry, address_=caller
-    )
-
-    with_attr error_message("Caller is not authorized to do perform deposit"):
-        assert access = 1
+    with_attr error_message("Caller is not authorized to do withdraw"):
+        assert caller = abr_payment_address
     end
 
     let current_amount : felt = balance_mapping.read(market_id=market_id_)

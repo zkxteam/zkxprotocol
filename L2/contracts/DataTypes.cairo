@@ -120,3 +120,19 @@ struct WithdrawalRequest:
     member block_number : felt
     member status : felt
 end
+
+# Struct for storing order_details with the order_id
+struct OrderDetailsWithIDs:
+    member orderID : felt
+    member assetID : felt
+    member collateralID : felt
+    member price : felt
+    member executionPrice : felt
+    member positionSize : felt
+    member orderType : felt
+    member direction : felt
+    member portionExecuted : felt
+    member status : felt
+    member marginAmount : felt
+    member borrowedAmount : felt
+end

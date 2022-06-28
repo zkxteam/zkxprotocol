@@ -38,7 +38,7 @@ async def adminAuth_factory():
     starknet = await Starknet.empty()
 
     admin1 = await starknet.deploy(
-        "contracts/Account_old.cairo",
+        "contracts/Account.cairo",
         constructor_calldata=[admin1_signer.public_key, 0, 1, 0]
     )
 
@@ -74,7 +74,7 @@ async def adminAuth_factory():
     )
 
     alice = await starknet.deploy(
-        "contracts/Account_old.cairo",
+        "contracts/Account.cairo",
         constructor_calldata=[
             alice_signer.public_key,
             registry.contract_address,
@@ -84,7 +84,7 @@ async def adminAuth_factory():
     )
 
     bob = await starknet.deploy(
-        "contracts/Account_old.cairo",
+        "contracts/Account.cairo",
         constructor_calldata=[
             bob_signer.public_key,
             registry.contract_address,
@@ -169,7 +169,7 @@ async def adminAuth_factory():
     )
 
     abr = await starknet.deploy(
-        "contracts/ABR_old.cairo",
+        "contracts/ABR.cairo",
         constructor_calldata=[
             registry.contract_address,
             1
@@ -178,6 +178,14 @@ async def adminAuth_factory():
 
     abr_fund = await starknet.deploy(
         "contracts/ABRFund.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1
+        ]
+    )
+
+    abr_payment = await starknet.deploy(
+        "contracts/ABRPayment.cairo",
         constructor_calldata=[
             registry.contract_address,
             1
@@ -209,6 +217,7 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, accountRegistry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [17, 1, abr.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [18, 1, abr_fund.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [19, 1, abr_payment.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -253,15 +262,15 @@ async def adminAuth_factory():
 
     # Set the balance of admin1 and admin2
     await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
-    return adminAuth, fees, admin1, asset, trading, alice, bob, fixed_math, holding, feeBalance, accountRegistry, abr, abr_fund
+    return adminAuth, fees, admin1, asset, trading, alice, bob, fixed_math, holding, feeBalance, accountRegistry, abr, abr_fund, abr_payment
 
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders(adminAuth_factory):
-    adminAuth, fees, admin1, asset, trading, alice, bob, fixed_math, holding, feeBalance, accountRegistry, abr, abr_fund = adminAuth_factory
+    adminAuth, fees, admin1, asset, trading, alice, bob, fixed_math, holding, feeBalance, accountRegistry, abr, abr_fund, abr_payment = adminAuth_factory
 
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(100000)
+    alice_balance = to64x61(50000)
+    bob_balance = to64x61(50000)
 
     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
     await admin1_signer.send_transaction(admin1, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
@@ -334,8 +343,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     print("ABR rate:", from64x61(abr_result.result.abr))
     print("last price ", from64x61(abr_result.result.price))
 
-    await admin1_signer.send_transaction(admin1, alice.contract_address, "abr_payment", [])
-    await admin1_signer.send_transaction(admin1, bob.contract_address, "abr_payment", [])
+    await admin1_signer.send_transaction(admin1, abr_payment.contract_address, "pay_abr", [2, alice.contract_address, bob.contract_address])
 
     alice_balance_after = await alice.get_balance(USDC_ID).call()
     bob_balance_after = await bob.get_balance(USDC_ID).call()
@@ -345,4 +353,4 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     print("abr fund balance after: ", from64x61(
         abr_fund_balance_after.result.amount))
 
-    # assert abr_fund_balance.result.amount == abr_fund_balance_after.result.amount
+    assert abr_fund_balance.result.amount == abr_fund_balance_after.result.amount
