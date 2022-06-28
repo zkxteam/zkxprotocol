@@ -112,9 +112,62 @@ end
 # status 0: initialized
 # status 1: consumed
 struct WithdrawalRequest:
-    member l1_wallet_address : felt
+    member user_l1_address : felt
+    member user_l2_address : felt
     member collateral_id : felt
     member amount : felt
-    member block_number : felt
+    member timestamp : felt
     member status : felt
+end
+
+# Struct to pass the transactions to the contract
+struct Message:
+    member sender : felt
+    member to : felt
+    member selector : felt
+    member calldata : felt*
+    member calldata_size : felt
+    member nonce : felt
+end
+
+# status 0: initialized
+# status 1: partial
+# status 2: executed
+# status 3: close partial
+# status 4: close
+# status 5: toBeDeleveraged
+# status 6: toBeLiquidated
+# status 7: fullyLiquidated
+struct OrderDetailsWithIDs:
+    member orderID : felt
+    member assetID : felt
+    member collateralID : felt
+    member price : felt
+    member executionPrice : felt
+    member positionSize : felt
+    member orderType : felt
+    member direction : felt
+    member portionExecuted : felt
+    member status : felt
+    member marginAmount : felt
+    member borrowedAmount : felt
+end
+
+# Struct to store collateral balances
+struct CollateralBalance:
+    member assetID : felt
+    member balance : felt
+end
+
+# Struct to store withdrawal details
+struct WithdrawalHistory:
+    member collateral_id : felt
+    member amount : felt
+    member timestamp : felt
+    member node_operator_L1_address : felt
+    member node_operator_L2_address : felt
+    member L1_fee_amount : felt
+    member L1_fee_collateral_id : felt
+    member L2_fee_amount : felt
+    member L2_fee_collateral_id : felt
 end
