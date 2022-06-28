@@ -58,23 +58,7 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         contract_address=auth_address, address=caller, action=5
     )
 
-    if access == 0:
-        let (emergency_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=8, version=version
-        )
-
-        with_attr error_message("Caller is not authorized to do the transfer"):
-            assert caller = emergency_address
-        end
-
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    end
+    assert_not_zero(access)
 
     let current_amount : felt = balance_mapping.read(market_id=market_id_)
     balance_mapping.write(market_id=market_id_, value=current_amount + amount)
@@ -103,23 +87,7 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         contract_address=auth_address, address=caller, action=5
     )
 
-    if access == 0:
-        let (emergency_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=8, version=version
-        )
-
-        with_attr error_message("Caller is not authorized to do the transfer"):
-            assert caller = emergency_address
-        end
-
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    end
+    assert_not_zero(access)
 
     let current_amount : felt = balance_mapping.read(market_id=market_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):

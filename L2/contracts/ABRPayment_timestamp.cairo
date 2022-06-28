@@ -22,7 +22,7 @@ from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountTimestamp import IAccountTimestamp
 from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import Market_INDEX, ABR_INDEX, ABR_FUNDS_INDEX, AccountRegistry_INDEX
 
@@ -88,7 +88,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     )
 
     # Check if abr already collected
-    let (is_called) = IAccount.timestamp_check(
+    let (is_called) = IAccountTimestamp.timestamp_check(
         contract_address=account_address, market_id=market_id
     )
 
@@ -118,9 +118,10 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     if is_negative == 1:
         if [positions].direction == 0:
             # user pays
-            IAccount.transfer_from_abr(
+            IAccountTimestamp.transfer_from_abr(
                 contract_address=account_address,
                 assetID_=[positions].collateralID,
+                marketID_=market_id,
                 amount=abs_payment_amount,
             )
             IABRFund.deposit(
@@ -135,9 +136,10 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
                 contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
             )
 
-            IAccount.transfer_abr(
+            IAccountTimestamp.transfer_abr(
                 contract_address=account_address,
                 assetID_=[positions].collateralID,
+                marketID_=market_id,
                 amount=abs_payment_amount,
             )
             tempvar syscall_ptr = syscall_ptr
@@ -155,9 +157,10 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
                 contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
             )
 
-            IAccount.transfer_abr(
+            IAccountTimestamp.transfer_abr(
                 contract_address=account_address,
                 assetID_=[positions].collateralID,
+                marketID_=market_id,
                 amount=abs_payment_amount,
             )
             tempvar syscall_ptr = syscall_ptr
@@ -165,9 +168,10 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
             tempvar range_check_ptr = range_check_ptr
         else:
             # user pays
-            IAccount.transfer_from_abr(
+            IAccountTimestamp.transfer_from_abr(
                 contract_address=account_address,
                 assetID_=[positions].collateralID,
+                marketID_=market_id,
                 amount=abs_payment_amount,
             )
 
@@ -230,9 +234,9 @@ func pay_abr_users{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     end
 
     # Get all the open positions of the user
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
-        contract_address=[account_addresses]
-    )
+    let (
+        positions_len : felt, positions : OrderDetailsWithIDs*
+    ) = IAccountTimestamp.return_array_positions(contract_address=[account_addresses])
 
     # Do abr payments for each position
     pay_abr_users_positions(

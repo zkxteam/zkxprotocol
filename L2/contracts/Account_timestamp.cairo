@@ -2,6 +2,7 @@
 %builtins pedersen range_check ecdsa bitwise
 
 from starkware.cairo.common.alloc import alloc
+from starkware.starknet.common.syscalls import get_block_timestamp
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_contract_address
@@ -395,6 +396,7 @@ end
 func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt
 ) -> (is_eight_hours : felt):
+    alloc_locals
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
 
@@ -413,7 +415,7 @@ end
 # @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    assetID_ : felt, amount : felt
+    assetID_ : felt, marketID_ : felt, amount : felt
 ):
     alloc_locals
 
@@ -436,7 +438,7 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(market_id=market_id, value=block_timstamp)
+    last_updated.write(market_id=marketID_, value=block_timestamp)
     return ()
 end
 
@@ -445,7 +447,7 @@ end
 # @param amount - Amount of funds to transfer to this contract
 @external
 func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    assetID_ : felt, amount : felt
+    assetID_ : felt, marketID_ : felt, amount : felt
 ):
     alloc_locals
 
@@ -467,7 +469,7 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(market_id=market_id, value=block_timstamp)
+    last_updated.write(market_id=marketID_, value=block_timestamp)
 
     return ()
 end
