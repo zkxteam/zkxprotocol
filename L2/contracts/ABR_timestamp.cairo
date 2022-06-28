@@ -613,21 +613,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 ) -> (res : felt):
     alloc_locals
 
-    # Get caller address
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=0
-    )
-
-    # Not an admin
-    assert_not_zero(access)
+    # # The nodes signatures check goes here##
 
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
