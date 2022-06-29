@@ -418,8 +418,8 @@ func check_deleveraging{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     let (leverage_after_deleveraging) = Math64x61_div(remaining_position_value_in_usd, margin_amount_in_usd)
 
     # to64x61(2) == 4611686018427387904
-    let (can_be_deleveraged) = is_le(leverage_after_deleveraging, 4611686018427387904)
-    if can_be_deleveraged == 1:
+    let (can_be_liquidated) = is_le(leverage_after_deleveraging, 4611686018427387904)
+    if can_be_liquidated == 1:
         return (0)
     else:
         return (amount_to_be_sold)
