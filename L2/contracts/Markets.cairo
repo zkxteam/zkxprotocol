@@ -2,6 +2,7 @@
 
 %builtins pedersen range_check ecdsa
 
+from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
@@ -17,8 +18,27 @@ end
 func registry_address() -> (contract_address : felt):
 end
 
+# Store markets in an array to enable retrieval from node
+@storage_var
+func markets_array(index : felt) -> (market_id : felt):
+end
+
+# Length of the markets array
+@storage_var
+func markets_array_len() -> (len : felt):
+end
+
 # @notice struct to store details of markets
 struct Market:
+    member asset : felt
+    member assetCollateral : felt
+    member leverage : felt
+    member tradable : felt
+end
+
+# @notice struct to store details of markets with IDs
+struct MarketWID:
+    member id : felt
     member asset : felt
     member assetCollateral : felt
     member leverage : felt
@@ -114,6 +134,10 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
         market.write(id=id, value=newMarket)
     end
 
+    let (curr_len) = markets_array_len.read()
+    markets_array.write(index=curr_len, value=id)
+    markets_array_len.write(value=curr_len + 1)
+
     return ()
 end
 
@@ -167,6 +191,47 @@ func modifyLeverage{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=leverage, tradable=_market.tradable),
     )
     return ()
+end
+
+# @notice Internal Function called by returnAllMarkets to recursively add assets to the array and return it
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of MarketWID filled up to the index
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of MarketWID
+func populate_markets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    array_list_len : felt, array_list : MarketWID*
+) -> (array_list_len : felt, array_list : MarketWID*):
+    alloc_locals
+    let (market_id) = markets_array.read(index=array_list_len)
+
+    if market_id == 0:
+        return (array_list_len, array_list)
+    end
+
+    let (market_details : Market) = market.read(id=market_id)
+    let market_details_w_id = MarketWID(
+        id=market_id,
+        asset=market_details.asset,
+        assetCollateral=market_details.assetCollateral,
+        leverage=market_details.leverage,
+        tradable=market_details.tradable,
+    )
+    assert array_list[array_list_len] = market_details_w_id
+
+    return populate_markets(array_list_len + 1, array_list)
+end
+
+# @notice View function to return all the markets with ids in an array
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of MarketWID
+@view
+func returnAllMarkets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    array_list_len : felt, array_list : MarketWID*
+):
+    alloc_locals
+
+    let (array_list : MarketWID*) = alloc()
+    return populate_markets(array_list_len=0, array_list=array_list)
 end
 
 # @notice Modify tradable flag for market
