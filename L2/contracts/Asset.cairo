@@ -37,6 +37,30 @@ struct Asset:
     member maximum_position_size : felt
 end
 
+# @notice struct to store details of assets with IDs
+struct AssetWID:
+    member id : felt
+    member asset_version : felt
+    member ticker : felt
+    member short_name : felt
+    member tradable : felt
+    member collateral : felt
+    member token_decimal : felt
+    member metadata_id : felt
+    member tick_size : felt
+    member step_size : felt
+    member minimum_order_size : felt
+    member minimum_leverage : felt
+    member maximum_leverage : felt
+    member currently_allowed_leverage : felt
+    member maintenance_margin_fraction : felt
+    member initial_margin_fraction : felt
+    member incremental_initial_margin_fraction : felt
+    member incremental_position_size : felt
+    member baseline_position_size : felt
+    member maximum_position_size : felt
+end
+
 #
 # Storage
 #
@@ -64,6 +88,16 @@ end
 # @notice Mapping between asset ID and Asset data
 @storage_var
 func asset(id : felt) -> (res : Asset):
+end
+
+# Store assets in an array to enable retrieval from node
+@storage_var
+func assets_array(index : felt) -> (asset_id : felt):
+end
+
+# Length of the assets array
+@storage_var
+func assets_array_len() -> (len : felt):
 end
 
 #
@@ -184,6 +218,9 @@ func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 
     updateAssetListInL1(assetId=id, ticker=newAsset.ticker, action=ADD_ASSET)
 
+    let (curr_len) = assets_array_len.read()
+    assets_array.write(index=curr_len, value=id)
+    assets_array_len.write(value=curr_len + 1)
     return ()
 end
 
@@ -362,6 +399,62 @@ func updateAssetListInL1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=3, payload=message_payload)
 
     return ()
+end
+
+# @notice Internal Function called by returnAllAssets to recursively add assets to the array and return it
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of AssetWID filled up to the index
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of AssetWID
+func populate_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    array_list_len : felt, array_list : AssetWID*
+) -> (array_list_len : felt, array_list : AssetWID*):
+    alloc_locals
+    let (asset_id) = assets_array.read(index=array_list_len)
+
+    if asset_id == 0:
+        return (array_list_len, array_list)
+    end
+
+    let (asset_details : Asset) = asset.read(id=asset_id)
+    let assets_details_w_id = AssetWID(
+        id=asset_id,
+        asset_version=asset_details.asset_version,
+        ticker=asset_details.ticker,
+        short_name=asset_details.short_name,
+        tradable=asset_details.tradable,
+        collateral=asset_details.collateral,
+        token_decimal=asset_details.token_decimal,
+        metadata_id=asset_details.metadata_id,
+        tick_size=asset_details.tick_size,
+        step_size=asset_details.step_size,
+        minimum_order_size=asset_details.minimum_order_size,
+        minimum_leverage=asset_details.minimum_leverage,
+        maximum_leverage=asset_details.maximum_leverage,
+        currently_allowed_leverage=asset_details.currently_allowed_leverage,
+        maintenance_margin_fraction=asset_details.maintenance_margin_fraction,
+        initial_margin_fraction=asset_details.initial_margin_fraction,
+        incremental_initial_margin_fraction=asset_details.incremental_initial_margin_fraction,
+        incremental_position_size=asset_details.incremental_position_size,
+        baseline_position_size=asset_details.baseline_position_size,
+        maximum_position_size=asset_details.maximum_position_size,
+    )
+    assert array_list[array_list_len] = assets_details_w_id
+
+    return populate_assets(array_list_len + 1, array_list)
+end
+
+# @notice View function to return all the assets with ids in an array
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of AssetWID
+@view
+func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    array_list_len : felt, array_list : AssetWID*
+):
+    alloc_locals
+
+    let (array_list : AssetWID*) = alloc()
+    return populate_assets(array_list_len=0, array_list=array_list)
 end
 
 # @notice AuthorizedRegistry interface
