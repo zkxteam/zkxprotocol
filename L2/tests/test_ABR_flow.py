@@ -332,33 +332,20 @@ async def test_opening_and_closing_full_orders(abr_factory):
     alice_balance = await alice.get_balance(USDC_ID).call()
     bob_balance = await bob.get_balance(USDC_ID).call()
     abr_fund_balance = await abr_fund.balance(BTC_USD_ID).call()
-    print("alice balance: ", from64x61(alice_balance.result.res))
-    print("bob balance: ", from64x61(bob_balance.result.res))
-    print("abr fund balance: ", from64x61(abr_fund_balance.result.amount))
 
     arguments = [BTC_USD_ID, 480] + btc_spot + [480]+btc_perp
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
-    print("cairo rate", from64x61(abr_cairo.result.response[0]))
 
     abr_result = await abr.get_abr_value(BTC_USD_ID).call()
-    print("ABR rate:", from64x61(abr_result.result.abr))
-    print("last price ", from64x61(abr_result.result.price))
 
     abr_to_pay = await fixed_math.Math64x61_mul(abr_result.result.price, abr_result.result.abr).call()
-    print("Abr to pay", abr_to_pay.result.res)
 
     await admin1_signer.send_transaction(admin1, abr_payment.contract_address, "pay_abr", [2, alice.contract_address, bob.contract_address])
 
     alice_balance_after = await alice.get_balance(USDC_ID).call()
     bob_balance_after = await bob.get_balance(USDC_ID).call()
     abr_fund_balance_after = await abr_fund.balance(BTC_USD_ID).call()
-    print("alice balance after: ", from64x61(alice_balance_after.result.res) -
-          from64x61(abr_to_pay.result.res), from64x61(alice_balance.result.res))
-    print("bob balance after: ", from64x61(bob_balance_after.result.res) +
-          from64x61(abr_to_pay.result.res), from64x61(bob_balance.result.res))
-    print("abr fund balance after: ", from64x61(
-        abr_fund_balance_after.result.amount))
 
     assert alice_balance.result.res == alice_balance_after.result.res - abr_to_pay.result.res
     assert bob_balance.result.res == bob_balance_after.result.res + abr_to_pay.result.res
