@@ -81,7 +81,7 @@ class Signer():
     def __init__(self, private_key):
         self.private_key = private_key
         self.public_key = private_to_stark_key(private_key)
-        self.current_hash=0
+        self.current_hash = 0
 
     def sign(self, message_hash):
         return sign(msg_hash=message_hash, priv_key=self.private_key)
@@ -96,16 +96,16 @@ class Signer():
             account.contract_address, to, selector, calldata, nonce)
         sig_r, sig_s = self.sign(message_hash)
 
-        temp=account.execute(to, selector, calldata, nonce)
+        temp = account.execute(to, selector, calldata, nonce)
         # storing hash of current transaction in current_hash which will be accessible through signer object
-        self.current_hash=calculate_transaction_hash_common(
+        self.current_hash = calculate_transaction_hash_common(
             TransactionHashPrefix.INVOKE,
-            0, # version
-            account.contract_address, # to
-            get_selector_from_name('execute'), #entry_point
-            temp.calldata, #calldata
-            0, #maxfee
-            1536727068981429685321, # chainid
+            0,  # version
+            account.contract_address,  # to
+            get_selector_from_name('execute'),  # entry_point
+            temp.calldata,  # calldata
+            0,  # maxfee
+            1536727068981429685321,  # chainid
             [],
         )
         return await account.execute(to, selector, calldata, nonce).invoke(signature=[sig_r, sig_s])
@@ -143,3 +143,13 @@ def convertList(res_list):
     conv_list.append(res_list[7])
 
     return conv_list
+
+
+async def assert_revert(fun, reverted_with=None):
+    try:
+        await fun
+        assert False
+    except StarkException as err:
+        _, error = err.args
+        if reverted_with is not None:
+            assert reverted_with in error['message']

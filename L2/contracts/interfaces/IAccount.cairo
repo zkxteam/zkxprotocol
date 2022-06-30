@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.DataTypes import OrderRequest, OrderDetails, Signature
+from contracts.DataTypes import OrderRequest, OrderDetails, Signature, OrderDetailsWithIDs
 
 @contract_interface
 namespace IAccount:
@@ -35,6 +35,17 @@ namespace IAccount:
 
     func get_balance(assetID_ : felt) -> (res : felt):
     end
+
+    func return_array_positions() -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    end
+
+    func transfer_from_abr(assetID_ : felt, marketID_ : felt, amount : felt):
+    end
+
+    func transfer_abr(assetID_ : felt, marketID_ : felt, amount : felt):
+    end
+
+    func timestamp_check(market_id : felt) -> (is_eight_hours : felt):
 
     func get_public_key() -> (res : felt):
     end

@@ -120,6 +120,7 @@ struct WithdrawalRequest:
     member status : felt
 end
 
+
 # Struct to pass the transactions to the contract
 struct Message:
     member sender : felt

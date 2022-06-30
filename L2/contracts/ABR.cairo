@@ -3,7 +3,7 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.math import abs_value
+from starkware.cairo.common.math import abs_value, assert_not_zero
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from contracts.Math_64x61 import (
@@ -15,11 +15,65 @@ from contracts.Math_64x61 import (
     Math64x61_sqrt,
     Math64x61_ln,
 )
-
+from starkware.starknet.common.syscalls import get_block_timestamp
+from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.IABR import IABR
+from contracts.interfaces.IABRFund import IABRFund
+from contracts.interfaces.IAdminAuth import IAdminAuth
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from starkware.starknet.common.syscalls import get_caller_address
 const NUM_STD = 4611686018427387904
 const NUM_1 = 2305843009213693952
+const NUM_100 = 230584300921369395200
 const NUM_8 = 18446744073709551616
 const NUM_MIN = 28823037615171
+
+# @notice Stores the contract version
+@storage_var
+func contract_version() -> (version : felt):
+end
+
+# @notice Stores the address of Authorized Registry contract
+@storage_var
+func registry_address() -> (contract_address : felt):
+end
+
+# @notice Constructor of the smart-contract
+# @param registry_address_ Address of the AuthorizedRegistry contract
+# @param version_ Version of this contract
+@constructor
+func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    registry_address_ : felt, version_ : felt
+):
+    registry_address.write(value=registry_address_)
+    contract_version.write(value=version_)
+    return ()
+end
+
+# @notice Mapping of marketID to abr value
+@storage_var
+func abr_value(market_id) -> (abr : felt):
+end
+
+# @notice Mapping of marketID to the timestamp of last updated value
+@storage_var
+func last_updated(market_id) -> (value : felt):
+end
+
+# @notice Stores the last mark price of an asset
+@storage_var
+func last_mark_price(market_id) -> (price : felt):
+end
+
+@view
+func get_abr_value{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt
+) -> (abr : felt, price : felt, timestamp : felt):
+    let (abr : felt) = abr_value.read(market_id=market_id)
+    let (price : felt) = last_mark_price.read(market_id=market_id)
+    let (timestamp) = last_updated.read(market_id=market_id)
+    return (abr, price, timestamp)
+end
 
 # @notice Function to calculate the difference between index and mark prices
 # @param index_prices_len - Size of the index prices array
@@ -454,6 +508,7 @@ end
 # @returns mark_prices_len - Size of the populated mark prices array
 # @returns mark_prices -  Populated mark prices array
 func reduce_values{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt,
     perp_index_len : felt,
     perp_index : felt*,
     perp_mark_len : felt,
@@ -469,9 +524,24 @@ func reduce_values{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 ) -> (index_prices_len : felt, index_prices : felt*, mark_prices_len : felt, mark_prices : felt*):
     alloc_locals
 
+    if perp_index_len == 1:
+        last_mark_price.write(market_id=market_id, value=[perp_mark])
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
     # If reached the end of the array, return
     if perp_index_len == 0:
         return (index_prices_len, index_prices, mark_prices_len, mark_prices)
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
     end
 
     # Add the index and mark prices to their respective sums
@@ -493,6 +563,7 @@ func reduce_values{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 
         # Recursively call the next array element
         return reduce_values(
+            market_id,
             perp_index_len - 1,
             perp_index + 1,
             perp_mark_len - 1,
@@ -509,6 +580,7 @@ func reduce_values{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     else:
         # Recursively call the next array element
         return reduce_values(
+            market_id,
             perp_index_len - 1,
             perp_index + 1,
             perp_mark_len - 1,
@@ -533,15 +605,45 @@ end
 # @returns res - ABR of the mark & index prices
 @external
 func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    perp_index_len : felt, perp_index : felt*, perp_mark_len : felt, perp_mark : felt*
+    market_id : felt,
+    perp_index_len : felt,
+    perp_index : felt*,
+    perp_mark_len : felt,
+    perp_mark : felt*,
 ) -> (res : felt):
     alloc_locals
+
+    # # The nodes signatures check goes here##
+
+    # Get the latest block
+    let (block_timestamp) = get_block_timestamp()
+
+    # Fetch the last updated time
+    let (last_call) = last_updated.read(market_id=market_id)
+
+    # Minimum time before the second call
+    let min_time = last_call + 28000
+    let (is_eight_hours) = is_le(block_timestamp, min_time)
+
+    # If 8 hours have not passed yet
+    if is_eight_hours == 1:
+        assert 1 = 0
+    end
+
+    if perp_mark_len == perp_index_len:
+    else:
+        with_attr error_message("Pass same number of data points for mark and index"):
+            assert 1 = 0
+        end
+    end
 
     # Reduce the array size by factor of 8
     let (index_prices : felt*) = alloc()
     let (mark_prices : felt*) = alloc()
-    let (index_prices_len : felt, index_prices : felt*, mark_prices_len : felt,
-        mark_prices : felt*) = reduce_values(
+    let (
+        index_prices_len : felt, index_prices : felt*, mark_prices_len : felt, mark_prices : felt*
+    ) = reduce_values(
+        market_id,
         perp_index_len,
         perp_index,
         perp_mark_len,
@@ -566,8 +668,9 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (upper_array : felt*) = alloc()
     let (lower_array : felt*) = alloc()
 
-    let (upper_array_len : felt, upper_array : felt*, lower_array_len : felt,
-        lower_array : felt*) = calc_bollinger(
+    let (
+        upper_array_len : felt, upper_array : felt*, lower_array_len : felt, lower_array : felt*
+    ) = calc_bollinger(
         0, upper_array, 0, lower_array, mark_prices_len, mark_prices, avg_array_len, avg_array, 8, 0
     )
 
@@ -604,6 +707,13 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     # Find the effective ABR rate
     let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0)
     let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
-    let (rate) = Math64x61_div(rate_sum, array_size)
+    let (rate_percentage) = Math64x61_div(rate_sum, array_size)
+    let (rate) = Math64x61_div(rate_percentage, NUM_100)
+
+    # Store the result and the timestamp in their storage vars
+    let (block_timestamp) = get_block_timestamp()
+    abr_value.write(market_id=market_id, value=rate)
+    last_updated.write(market_id=market_id, value=block_timestamp)
+
     return (rate)
 end

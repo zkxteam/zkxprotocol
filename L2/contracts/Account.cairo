@@ -26,6 +26,7 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
 from starkware.cairo.common.alloc import alloc
+from starkware.starknet.common.syscalls import get_block_timestamp
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_contract_address, get_block_timestamp
@@ -39,8 +40,27 @@ from starkware.cairo.common.hash_state import (
     hash_update_single,
 )
 from starkware.cairo.common.math_cmp import is_le
+from starkware.cairo.common.math import (
+    assert_le,
+    assert_not_equal,
+    assert_not_zero,
+    assert_nn,
+    abs_value,
+)
 from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn, abs_value
 from starkware.cairo.common.pow import pow
+from contracts.Constants import (
+    Asset_INDEX,
+    Market_INDEX,
+    TradingFees_INDEX,
+    Holding_INDEX,
+    FeeBalance_INDEX,
+    LiquidityFund_INDEX,
+    InsuranceFund_INDEX,
+    AccountRegistry_INDEX,
+    ABR_INDEX,
+    ABR_FUNDS_INDEX,
+)
 
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_fromFelt, Math64x61_toFelt, Math64x61_sub
 
@@ -58,6 +78,16 @@ end
 # @notice Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
+end
+
+# @notice Stores the address of Market contract
+@storage_var
+func market_address() -> (contract_address : felt):
+end
+
+# @notice Stores the address of Market contract
+@storage_var
+func abr_address() -> (contract_address : felt):
 end
 
 @storage_var
@@ -78,6 +108,11 @@ end
 
 @storage_var
 func order_mapping(orderID : felt) -> (res : OrderDetails):
+end
+
+# @notice Mapping of marketID to the timestamp of last updated value
+@storage_var
+func last_updated(market_id) -> (value : felt):
 end
 
 # L1 User associated with the account
@@ -477,6 +512,88 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     return ()
 end
 
+@view
+func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt
+) -> (is_eight_hours : felt):
+    alloc_locals
+    # Get the latest block
+    let (block_timestamp) = get_block_timestamp()
+
+    # Fetch the last updated time
+    let (last_call) = last_updated.read(market_id=market_id)
+
+    # Minimum time before the second call
+    let min_time = last_call + 28000
+    let (is_eight_hours) = is_le(block_timestamp, min_time)
+
+    return (is_eight_hours)
+end
+
+# @notice External function called by the ABR Payment contract
+# @param assetID_ - asset ID of the collateral that needs to be transferred
+# @param amount - Amount of funds to transfer from this contract
+@external
+func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt, marketID_ : felt, amount : felt
+):
+    alloc_locals
+
+    # Check if the caller is trading contract
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=19, version=version
+    )
+
+    with_attr error_message("Caller is not authorized to do transferFrom in account contract."):
+        assert caller = abr_payment_address
+    end
+
+    # Reduce the amount from balance
+    let (balance_) = balance.read(assetID=assetID_)
+    balance.write(assetID=assetID_, value=balance_ - amount)
+
+    # Update the timestamp of last called
+    let (block_timestamp) = get_block_timestamp()
+    last_updated.write(market_id=marketID_, value=block_timestamp)
+    return ()
+end
+
+# @notice External function called by the ABR Payment contract
+# @param assetID_ - asset ID of the collateral that needs to be transferred
+# @param amount - Amount of funds to transfer to this contract
+@external
+func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt, marketID_ : felt, amount : felt
+):
+    alloc_locals
+
+    # Check if the caller is trading contract
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=19, version=version
+    )
+    with_attr error_message("Caller is not authorized to do transfer in account contract."):
+        assert caller = abr_payment_address
+    end
+
+    # Add amount to balance
+    let (balance_) = balance.read(assetID=assetID_)
+    balance.write(assetID=assetID_, value=balance_ + amount)
+
+    # Update the timestamp of last called
+    let (block_timestamp) = get_block_timestamp()
+    last_updated.write(market_id=marketID_, value=block_timestamp)
+
+    return ()
+end
+
 # @notice External function called by the Trading Contract to transfer funds from account contract
 # @param assetID_ - asset ID of the collateral that needs to be transferred
 # @param amount - Amount of funds to transfer to this contract
@@ -658,6 +775,73 @@ func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     position_array_len.write(arr_len - 1)
     return (1)
 end
+
+
+# @notice Internal Function called by return array to recursively add positions to the array and return it
+# @param iterator - Index of the position_array currently pointing to
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of OrderRequests filled up to the index
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of OrderDetails
+func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
+) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    alloc_locals
+    let (pos) = position_array.read(index=iterator)
+
+    if pos == 0:
+        return (array_list_len, array_list)
+    end
+
+    let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
+    let order_details_w_id = OrderDetailsWithIDs(
+        orderID=pos,
+        assetID=pos_details.assetID,
+        collateralID=pos_details.collateralID,
+        price=pos_details.price,
+        executionPrice=pos_details.executionPrice,
+        positionSize=pos_details.positionSize,
+        orderType=pos_details.orderType,
+        direction=pos_details.direction,
+        portionExecuted=pos_details.portionExecuted,
+        status=pos_details.status,
+        marginAmount=pos_details.marginAmount,
+        borrowedAmount=pos_details.borrowedAmount,
+    )
+
+    if pos_details.status == 4:
+        return populate_array_positions(iterator + 1, array_list_len, array_list)
+    else:
+        if pos_details.status == 7:
+            return populate_array_positions(iterator + 1, array_list_len, array_list)
+        else:
+            assert array_list[array_list_len] = order_details_w_id
+            return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
+        end
+    end
+end
+
+# @notice Function to get all the open positions
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of OrderDetails
+@view
+func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    alloc_locals
+
+    let (array_list : OrderDetailsWithIDs*) = alloc()
+    return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
+end
+
+# @notice Internal Function called by return_array_collaterals to recursively add collateralBalance to the array and return it
+# @param iterator - Index of the position_array currently pointing to
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of CollateralBalance filled up to the index
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of CollateralBalance
+func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    array_list_len : felt, array_list : CollateralBalance*
+) -> (array_list_len : felt, array_list : CollateralBalance*):
 
 # @notice Function to hash the order parameters
 # @param message - Struct of order details to hash
