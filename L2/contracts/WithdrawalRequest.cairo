@@ -133,15 +133,19 @@ end
 
 # @notice function to add withdrawal request to the withdrawal request array
 # @param user_l1_address_ User's L1 wallet address
-# @param collateral_id_ Id of the collateral for the requested withdrawal
+# @param ticker_ collateral for the requested withdrawal
 # @param amount_ Amount to be withdrawn
 # @param timestamp_ - Time at which user submitted withdrawal request
+# @param L1_fee_amount_ - Gas fee in L1
+# @param L1_fee_ticker_ - Collateral used to pay L1 gas fee
 @external
 func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     user_l1_address_ : felt, 
-    collateral_id_ : felt, 
+    ticker_ : felt, 
     amount_ : felt,
-    timestamp_ : felt
+    timestamp_ : felt,
+    L1_fee_amount_ : felt,
+    L1_fee_ticker_ : felt
 ):
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -165,10 +169,12 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     let new_request = WithdrawalRequest(
         user_l1_address = user_l1_address_,
         user_l2_address = caller,
-        collateral_id = collateral_id_,
+        ticker = ticker_,
         amount=amount_,
         timestamp = timestamp_,
         status=0,
+        L1_fee_amount=L1_fee_amount_,
+        L1_fee_ticker=L1_fee_ticker_
     )
 
     withdrawal_request_array.write(index=arr_len, value=new_request)
@@ -178,14 +184,14 @@ end
 
 # @notice Internal function to recursively find the index of the withdrawal request to be updated
 # @param user_l1_address_ - User's L1 wallet address
-# @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
+# @param ticker_ - collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user has withdrawn
 # @param timestamp_ - Time at which user submitted withdrawal request
 # @param status_ - Status of the withdrawal request
 # @param arr_len_ - current index which is being checked to be updated
 func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     user_l1_address_ : felt, 
-    collateral_id_ : felt, 
+    ticker_ : felt, 
     amount_ : felt, 
     timestamp_ : felt,
     status_ : felt, 
@@ -207,7 +213,7 @@ func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBu
     if request.user_l1_address == user_l1_address_:
         first_check_counter = 1
     end
-    if request.collateral_id == collateral_id_:
+    if request.ticker == ticker_:
         second_check_counter = 1
     end
     if request.amount == amount_:
@@ -224,7 +230,7 @@ func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBu
     if counter == 5:
         return (arr_len_ - 1)
     end
-    return find_index_to_be_updated_recurse(user_l1_address_, collateral_id_, amount_, timestamp_, status_, arr_len_ - 1)
+    return find_index_to_be_updated_recurse(user_l1_address_, ticker_, amount_, timestamp_, status_, arr_len_ - 1)
 end
 
 
@@ -232,22 +238,23 @@ end
 # @param from_address - The address from where update withdrawal request function is called from
 # @param user_l1_address_ - User's L1 wallet address
 # @param user_l2_address_ - Uers's L2 account contract address
-# @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
+# @param ticker_ - Collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user has withdrawn
 # @param timestamp_ - Time at which user submitted withdrawal request
-# @param status_ - Status of the withdrawal request
+# @param node_operator_L1_address_ - Node operators L1 address
+# @param L1_fee_amount_ - Gas fee in L1
+# @param L1_fee_ticker_ - Collateral used to pay L1 gas fee
 @l1_handler
 func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt,
     user_l1_address_ : felt, 
     user_l2_address_ : felt,
-    collateral_id_ : felt, 
+    ticker_ : felt, 
     amount_ : felt, 
     timestamp_ : felt,
-    status_ : felt,
     node_operator_L1_address_ : felt,
     L1_fee_amount_ : felt,
-    L1_fee_collateral_id_ : felt
+    L1_fee_ticker_ : felt
 ):
 
     # Make sure the message was sent by the intended L1 contract.
@@ -255,28 +262,31 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     assert from_address = l1_zkx_address
 
     let (arr_len) = withdrawal_request_array_len.read()
-    let (index) = find_index_to_be_updated_recurse(user_l1_address_, collateral_id_, amount_, timestamp_, status_, arr_len)
+    let (index) = find_index_to_be_updated_recurse(user_l1_address_, ticker_, amount_, timestamp_, 0, arr_len)
     if index != -1:
         # Create a struct with the withdrawal Request
         let updated_request = WithdrawalRequest(
             user_l1_address = user_l1_address_,
             user_l2_address = user_l2_address_,
-            collateral_id = collateral_id_,
+            ticker = ticker_,
             amount=amount_,
             timestamp = timestamp_,
             status=1,
+            L1_fee_amount=L1_fee_amount_,
+            L1_fee_ticker=L1_fee_ticker_
+
         )
         withdrawal_request_array.write(index=index, value=updated_request)
 
         # update L1 fee and node operators L1 wallet address in withdrawal history
         IAccount.update_withdrawal_history(
             contract_address=user_l2_address_,
-            collateral_id_=collateral_id_,
+            ticker_=ticker_,
             amount_=amount_,
             timestamp_=timestamp_,
             node_operator_L1_address_=node_operator_L1_address_,
             L1_fee_amount_=L1_fee_amount_,
-            L1_fee_collateral_id_=L1_fee_collateral_id_
+            L1_fee_ticker_=L1_fee_ticker_
         )
         return ()
     end

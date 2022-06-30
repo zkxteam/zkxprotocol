@@ -149,10 +149,12 @@ end
 struct WithdrawalRequest:
     member user_l1_address : felt
     member user_l2_address : felt
-    member collateral_id : felt
+    member ticker : felt
     member amount : felt
     member timestamp : felt
     member status : felt
+    member L1_fee_amount : felt
+    member L1_fee_ticker : felt
 end
 
 
@@ -203,7 +205,7 @@ struct WithdrawalHistory:
     member node_operator_L1_address : felt
     member node_operator_L2_address : felt
     member L1_fee_amount : felt
-    member L1_fee_collateral_id : felt
+    member L1_fee_ticker : felt
     member L2_fee_amount : felt
-    member L2_fee_collateral_id : felt
+    member L2_fee_ticker : felt
 end

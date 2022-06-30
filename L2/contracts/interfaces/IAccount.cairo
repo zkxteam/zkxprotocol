@@ -15,12 +15,12 @@ namespace IAccount:
     end
 
     func update_withdrawal_history(
-        collateral_id_ : felt,
+        ticker_ : felt,
         amount_ : felt,
         timestamp_ : felt,
         node_operator_L1_address_ : felt,
         L1_fee_amount_ : felt,
-        L1_fee_collateral_id_ : felt,
+        L1_fee_ticker_ : felt,
     ):
     end
 

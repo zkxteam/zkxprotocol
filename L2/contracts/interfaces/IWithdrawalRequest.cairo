@@ -6,7 +6,8 @@ from contracts.DataTypes import WithdrawalRequest
 namespace IWithdrawalRequest:
     
     # external functions
-    func add_withdrawal_request(user_l1_address_ : felt, collateral_id_ : felt, amount_ : felt, timestamp_ : felt):
+    func add_withdrawal_request(user_l1_address_ : felt, ticker_ : felt, amount_ : felt, 
+                                timestamp_ : felt, L1_fee_amount_ : felt, L1_fee_ticker_ : felt):
     end
 
     # view functions

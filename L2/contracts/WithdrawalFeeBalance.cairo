@@ -25,12 +25,12 @@ end
 
 # @notice Stores the withdrawal fee charged per asset of each user
 @storage_var
-func withdrawal_fee_mapping(user_l2_address : felt, collateral_id : felt) -> (fee : felt):
+func withdrawal_fee_mapping(user_l2_address : felt, ticker : felt) -> (fee : felt):
 end
 
 # @notice Stores the total withdrawal fee per asset
 @storage_var
-func total_withdrawal_fee_per_asset(collateral_id : felt) -> (accumulated_fee : felt):
+func total_withdrawal_fee_per_asset(ticker : felt) -> (accumulated_fee : felt):
 end
 
 #
@@ -55,24 +55,24 @@ end
 
 # @notice Function to get the total accumulated withdrawal fee for a specific user
 # @param user_l2_address_ - address of the user for whom total withdrawal fee is to be obtained
-# @param collateral_id_ - ID of the collateral
+# @param ticker_ - collateral to be withdrawn
 # @return fee - total accumulated withdrawal fee for the user
 @view
 func get_user_withdrawal_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    user_l2_address_ : felt, collateral_id_ : felt
+    user_l2_address_ : felt, ticker_ : felt
 ) -> (fee : felt):
-    let (fee) = withdrawal_fee_mapping.read(user_l2_address=user_l2_address_, collateral_id=collateral_id_)
+    let (fee) = withdrawal_fee_mapping.read(user_l2_address=user_l2_address_, ticker=ticker_)
     return (fee)
 end
 
 # @notice Function to get the total withdrawal fee accumulated in the system
-# @param collateral_id_ - ID of the collateral
+# @param ticker_ - collateral to be withdrawn
 # @return fee - total withdrawal fee in the system
 @view
 func get_total_withdrawal_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    collateral_id_ : felt
+    ticker_ : felt
 ) -> (fee : felt):
-    let (fee) = total_withdrawal_fee_per_asset.read(collateral_id=collateral_id_)
+    let (fee) = total_withdrawal_fee_per_asset.read(ticker=ticker_)
     return (fee)
 end
 
@@ -82,11 +82,11 @@ end
 
 # @notice Function to update withdrawal fee mapping which stores total fee for a user
 # @param user_l2_address_ - address of the user for whom withdrawal fee is to be updated
-# @param collateral_id__ - ID of the collateral
+# @param ticker_ - collateral to be withdrawn
 # @param fee_to_add_ - withdrawal fee value that is to be added
 @external
 func update_withdrawal_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    user_l2_address_ : felt, collateral_id_ : felt, fee_to_add_ : felt
+    user_l2_address_ : felt, ticker_ : felt, fee_to_add_ : felt
 ):
     alloc_locals
 
@@ -109,14 +109,14 @@ func update_withdrawal_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuilt
     end
     
     # Update withdrawal fee mapping of an user
-    let current_fee : felt = withdrawal_fee_mapping.read(user_l2_address=user_l2_address_, collateral_id=collateral_id_)
+    let current_fee : felt = withdrawal_fee_mapping.read(user_l2_address=user_l2_address_, ticker=ticker_)
     let new_fee : felt = current_fee + fee_to_add_
-    withdrawal_fee_mapping.write(user_l2_address=user_l2_address_, collateral_id=collateral_id_, value=new_fee)
+    withdrawal_fee_mapping.write(user_l2_address=user_l2_address_, ticker=ticker_, value=new_fee)
 
     # Update Total withdrawal fee per asset
-    let current_total_fee_per_asset : felt = total_withdrawal_fee_per_asset.read(collateral_id=collateral_id_)
+    let current_total_fee_per_asset : felt = total_withdrawal_fee_per_asset.read(ticker=ticker_)
     let new_total_fee_per_asset : felt = current_total_fee_per_asset + fee_to_add_
-    total_withdrawal_fee_per_asset.write(collateral_id=collateral_id_, value=new_total_fee_per_asset)
+    total_withdrawal_fee_per_asset.write(ticker=ticker_, value=new_total_fee_per_asset)
 
     return ()
 end
