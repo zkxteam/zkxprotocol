@@ -2,6 +2,7 @@
 %builtins pedersen range_check ecdsa bitwise
 
 from starkware.cairo.common.alloc import alloc
+from starkware.starknet.common.syscalls import get_block_timestamp
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_contract_address
@@ -23,10 +24,6 @@ from starkware.cairo.common.math import (
     abs_value,
 )
 from starkware.cairo.common.pow import pow
-from contracts.interfaces.IMarkets import IMarkets
-from contracts.interfaces.IABR import IABR
-from contracts.interfaces.IABRFund import IABRFund
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.Constants import (
     Asset_INDEX,
     Market_INDEX,
@@ -395,21 +392,37 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     return ()
 end
 
+@view
+func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt
+) -> (is_eight_hours : felt):
+    alloc_locals
+    # Get the latest block
+    let (block_timestamp) = get_block_timestamp()
+
+    # Fetch the last updated time
+    let (last_call) = last_updated.read(market_id=market_id)
+
+    # Minimum time before the second call
+    let min_time = last_call + 28000
+    let (is_eight_hours) = is_le(block_timestamp, min_time)
+
+    return (is_eight_hours)
+end
+
 # @notice External function called by the ABR Payment contract
+# @param assetID_ - asset ID of the collateral that needs to be transferred
 # @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    assetID_ : felt, amount : felt
-) -> ():
+    assetID_ : felt, marketID_ : felt, amount : felt
+):
     alloc_locals
 
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-
-    # Check if already made a abr payment for this epoch ##
-    #######################################################
 
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=19, version=version
@@ -419,29 +432,29 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assert caller = abr_payment_address
     end
 
+    # Reduce the amount from balance
     let (balance_) = balance.read(assetID=assetID_)
     balance.write(assetID=assetID_, value=balance_ - amount)
 
-    # ## Store timestamp of last payment ###
-    ######################################
+    # Update the timestamp of last called
+    let (block_timestamp) = get_block_timestamp()
+    last_updated.write(market_id=marketID_, value=block_timestamp)
     return ()
 end
 
-# @notice External function called by the Trading Contract to transfer funds from account contract
+# @notice External function called by the ABR Payment contract
 # @param assetID_ - asset ID of the collateral that needs to be transferred
 # @param amount - Amount of funds to transfer to this contract
 @external
 func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    assetID_ : felt, amount : felt
-) -> ():
+    assetID_ : felt, marketID_ : felt, amount : felt
+):
     alloc_locals
 
+    # Check if the caller is trading contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-
-    # Check if already made a abr payment for this epoch ##
-    ######################################################
 
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=19, version=version
@@ -450,11 +463,13 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
         assert caller = abr_payment_address
     end
 
+    # Add amount to balance
     let (balance_) = balance.read(assetID=assetID_)
     balance.write(assetID=assetID_, value=balance_ + amount)
 
-    # ## Store timestamp of last payment ###
-    #######################################
+    # Update the timestamp of last called
+    let (block_timestamp) = get_block_timestamp()
+    last_updated.write(market_id=marketID_, value=block_timestamp)
 
     return ()
 end

@@ -1,11 +1,11 @@
 from copyreg import constructor
 import pytest
 import ABR_data
+import time
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
-from starkware.starkware_utils.error_handling import StarkException
-from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
+from starkware.starknet.business_logic.state.state import BlockInfo
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, assert_revert
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -34,7 +34,7 @@ def convertTo64x61(nums):
 
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory():
+async def abr_factory():
     starknet = await Starknet.empty()
 
     admin1 = await starknet.deploy(
@@ -192,6 +192,13 @@ async def adminAuth_factory():
         ]
     )
 
+    timestamp = int(time.time())
+
+    starknet.state.state.block_info = BlockInfo(
+        block_number=1, block_timestamp=timestamp, gas_price=starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet.state.state.block_info.sequencer_address
+    )
+
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
 
@@ -238,36 +245,32 @@ async def adminAuth_factory():
 
     # Add assets
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    # await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [ETH_ID, 0, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    # await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [UST_ID, 0, str_to_felt("UST"), str_to_felt("UST"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    # await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [DOGE_ID, 0, str_to_felt("DOGE"), str_to_felt("DOGECOIN"), 0, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    # await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [TSLA_ID, 0, str_to_felt("TESLA"), str_to_felt("TESLA MOTORS"), 1, 0, 0, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Add markets
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1])
-    # await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, 0, 1])
-    # await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [TSLA_USD_ID, TSLA_ID, USDC_ID, 0, 0])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
-    # await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
     # Fund the Liquidity fund contract
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
-    # await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
     # Fund ABR fund contract
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_USD_ID, to64x61(1000000)])
 
     # Set the balance of admin1 and admin2
     await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
-    return adminAuth, fees, admin1, asset, trading, alice, bob, fixed_math, holding, feeBalance, accountRegistry, abr, abr_fund, abr_payment
+
+    btc_perp_spot_64x61 = convertTo64x61(ABR_data.btc_perp_spot)
+    btc_perp_64x61 = convertTo64x61(ABR_data.btc_perp)
+
+    return admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_perp_spot_64x61, btc_perp_64x61
 
 
 @pytest.mark.asyncio
-async def test_opening_and_closing_full_orders(adminAuth_factory):
-    adminAuth, fees, admin1, asset, trading, alice, bob, fixed_math, holding, feeBalance, accountRegistry, abr, abr_fund, abr_payment = adminAuth_factory
+async def test_opening_and_closing_full_orders(abr_factory):
+    admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp = abr_factory
 
     alice_balance = to64x61(50000)
     bob_balance = to64x61(50000)
@@ -315,7 +318,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    res = await admin1_signer.send_transaction(admin1, trading.contract_address, "execute_batch", [
+    await admin1_signer.send_transaction(admin1, trading.contract_address, "execute_batch", [
         size,
         execution_price1,
         marketID_1,
@@ -333,8 +336,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     print("bob balance: ", from64x61(bob_balance.result.res))
     print("abr fund balance: ", from64x61(abr_fund_balance.result.amount))
 
-    arguments = [BTC_USD_ID, 480] + convertTo64x61(ABR_data.btc_perp_spot) + [
-        480]+convertTo64x61(ABR_data.btc_perp)
+    arguments = [BTC_USD_ID, 480] + btc_spot + [480]+btc_perp
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
     print("cairo rate", from64x61(abr_cairo.result.response[0]))
@@ -343,14 +345,37 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     print("ABR rate:", from64x61(abr_result.result.abr))
     print("last price ", from64x61(abr_result.result.price))
 
+    abr_to_pay = await fixed_math.Math64x61_mul(abr_result.result.price, abr_result.result.abr).call()
+    print("Abr to pay", abr_to_pay.result.res)
+
     await admin1_signer.send_transaction(admin1, abr_payment.contract_address, "pay_abr", [2, alice.contract_address, bob.contract_address])
 
     alice_balance_after = await alice.get_balance(USDC_ID).call()
     bob_balance_after = await bob.get_balance(USDC_ID).call()
     abr_fund_balance_after = await abr_fund.balance(BTC_USD_ID).call()
-    print("alice balance after: ", from64x61(alice_balance_after.result.res))
-    print("bob balance after: ", from64x61(bob_balance_after.result.res))
+    print("alice balance after: ", from64x61(alice_balance_after.result.res) -
+          from64x61(abr_to_pay.result.res), from64x61(alice_balance.result.res))
+    print("bob balance after: ", from64x61(bob_balance_after.result.res) +
+          from64x61(abr_to_pay.result.res), from64x61(bob_balance.result.res))
     print("abr fund balance after: ", from64x61(
         abr_fund_balance_after.result.amount))
 
+    assert alice_balance.result.res == alice_balance_after.result.res - abr_to_pay.result.res
+    assert bob_balance.result.res == bob_balance_after.result.res + abr_to_pay.result.res
     assert abr_fund_balance.result.amount == abr_fund_balance_after.result.amount
+
+
+@pytest.mark.asyncio
+async def test_will_not_charge_abr_twice_under_8_hours(abr_factory):
+    admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp = abr_factory
+
+    alice_balance_before = await alice.get_balance(USDC_ID).call()
+    bob_balance_before = await bob.get_balance(USDC_ID).call()
+
+    await admin1_signer.send_transaction(admin1, abr_payment.contract_address, "pay_abr", [2, alice.contract_address, bob.contract_address])
+
+    alice_balance_after = await alice.get_balance(USDC_ID).call()
+    bob_balance_after = await bob.get_balance(USDC_ID).call()
+
+    assert alice_balance_before.result.res == alice_balance_after.result.res
+    assert bob_balance_before.result.res == bob_balance_after.result.res
