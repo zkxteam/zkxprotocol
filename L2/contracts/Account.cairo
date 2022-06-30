@@ -12,13 +12,6 @@ from contracts.DataTypes import (
     Signature,   
     WithdrawalHistory,
 )
-from contracts.Constants import (
-    Asset_INDEX,
-    Liquidate_INDEX,
-    Trading_INDEX,
-    WithdrawalFeeBalance_INDEX,
-    WithdrawalRequest_INDEX
-)
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
@@ -26,7 +19,6 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
 from starkware.cairo.common.alloc import alloc
-from starkware.starknet.common.syscalls import get_block_timestamp
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_contract_address, get_block_timestamp
@@ -47,7 +39,6 @@ from starkware.cairo.common.math import (
     assert_nn,
     abs_value,
 )
-from starkware.cairo.common.math import assert_le, assert_not_equal, assert_not_zero, assert_nn, abs_value
 from starkware.cairo.common.pow import pow
 from contracts.Constants import (
     Asset_INDEX,
@@ -60,6 +51,10 @@ from contracts.Constants import (
     AccountRegistry_INDEX,
     ABR_INDEX,
     ABR_FUNDS_INDEX,
+    Liquidate_INDEX,
+    Trading_INDEX,
+    WithdrawalFeeBalance_INDEX,
+    WithdrawalRequest_INDEX
 )
 
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_fromFelt, Math64x61_toFelt, Math64x61_sub
@@ -775,73 +770,6 @@ func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     position_array_len.write(arr_len - 1)
     return (1)
 end
-
-
-# @notice Internal Function called by return array to recursively add positions to the array and return it
-# @param iterator - Index of the position_array currently pointing to
-# @param array_list_len - Stores the current length of the populated array
-# @param array_list - Array of OrderRequests filled up to the index
-# @returns array_list_len - Length of the array_list
-# @returns array_list - Fully populated list of OrderDetails
-func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
-) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-    alloc_locals
-    let (pos) = position_array.read(index=iterator)
-
-    if pos == 0:
-        return (array_list_len, array_list)
-    end
-
-    let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
-    let order_details_w_id = OrderDetailsWithIDs(
-        orderID=pos,
-        assetID=pos_details.assetID,
-        collateralID=pos_details.collateralID,
-        price=pos_details.price,
-        executionPrice=pos_details.executionPrice,
-        positionSize=pos_details.positionSize,
-        orderType=pos_details.orderType,
-        direction=pos_details.direction,
-        portionExecuted=pos_details.portionExecuted,
-        status=pos_details.status,
-        marginAmount=pos_details.marginAmount,
-        borrowedAmount=pos_details.borrowedAmount,
-    )
-
-    if pos_details.status == 4:
-        return populate_array_positions(iterator + 1, array_list_len, array_list)
-    else:
-        if pos_details.status == 7:
-            return populate_array_positions(iterator + 1, array_list_len, array_list)
-        else:
-            assert array_list[array_list_len] = order_details_w_id
-            return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
-        end
-    end
-end
-
-# @notice Function to get all the open positions
-# @returns array_list_len - Length of the array_list
-# @returns array_list - Fully populated list of OrderDetails
-@view
-func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-    alloc_locals
-
-    let (array_list : OrderDetailsWithIDs*) = alloc()
-    return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
-end
-
-# @notice Internal Function called by return_array_collaterals to recursively add collateralBalance to the array and return it
-# @param iterator - Index of the position_array currently pointing to
-# @param array_list_len - Stores the current length of the populated array
-# @param array_list - Array of CollateralBalance filled up to the index
-# @returns array_list_len - Length of the array_list
-# @returns array_list - Fully populated list of CollateralBalance
-func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    array_list_len : felt, array_list : CollateralBalance*
-) -> (array_list_len : felt, array_list : CollateralBalance*):
 
 # @notice Function to hash the order parameters
 # @param message - Struct of order details to hash

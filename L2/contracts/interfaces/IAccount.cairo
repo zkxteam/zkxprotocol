@@ -46,6 +46,7 @@ namespace IAccount:
     end
 
     func timestamp_check(market_id : felt) -> (is_eight_hours : felt):
+    end
 
     func get_public_key() -> (res : felt):
     end
