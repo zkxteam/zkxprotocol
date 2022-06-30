@@ -72,6 +72,7 @@ async def adminAuth_factory():
     await signer1.send_transaction(admin1, 
                                 registry.contract_address,
                                  'update_contract_registry', [AccountRegistry_INDEX,1, account_registry.contract_address])
+    
 
     relay_account_registry = await starknet.deploy(
         "contracts/relay_contracts/RelayAccountRegistry.cairo",
@@ -81,6 +82,12 @@ async def adminAuth_factory():
             AccountRegistry_INDEX
         ]
     )
+
+    # spoof trading contract since add_to_account_registry only accepts calls from trading contract
+
+    await signer1.send_transaction(admin1, 
+                                registry.contract_address,
+                                 'update_contract_registry', [5,1, relay_account_registry.contract_address])
 
     # give relay master admin access for priviledged access
     await signer1.send_transaction(admin1, 
@@ -135,6 +142,16 @@ async def test_add_address_to_account_registry(adminAuth_factory):
     assert fetched_account_registry.result.account_registry[0] == str_to_felt("123")
     assert fetched_account_registry.result.account_registry[1] == str_to_felt("456")
 
+    isPresent = await account_registry.is_registered_user(str_to_felt("123")).call()
+    assert isPresent.result.present == 1
+    isPresent = await account_registry.is_registered_user(str_to_felt("456")).call()
+    assert isPresent.result.present == 1
+
+    isPresent = await relay_account_registry.is_registered_user(str_to_felt("123")).call()
+    assert isPresent.result.present == 1
+    isPresent = await relay_account_registry.is_registered_user(str_to_felt("456")).call()
+    assert isPresent.result.present == 1
+
 @pytest.mark.asyncio
 async def test_remove_address_from_account_registry(adminAuth_factory):
     adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry = adminAuth_factory
@@ -162,6 +179,9 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
 
     assert fetched_account_registry.result.account_registry[0] == str_to_felt("456")
     assert relay_fetched_account_registry.result.account_registry[0] == str_to_felt("456")
+
+    isPresent = await relay_account_registry.is_registered_user(str_to_felt("123")).call()
+    assert isPresent.result.present == 0
 
 
 @pytest.mark.asyncio

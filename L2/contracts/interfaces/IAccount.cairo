@@ -14,6 +14,16 @@ namespace IAccount:
     ) -> (res : felt):
     end
 
+    func update_withdrawal_history(
+        collateral_id_ : felt,
+        amount_ : felt,
+        timestamp_ : felt,
+        node_operator_L1_address_ : felt,
+        L1_fee_amount_ : felt,
+        L1_fee_collateral_id_ : felt,
+    ):
+    end
+
     func transfer_from(assetID_ : felt, amount : felt) -> ():
     end
 
@@ -36,5 +46,7 @@ namespace IAccount:
     end
 
     func timestamp_check(market_id : felt) -> (is_eight_hours : felt):
+
+    func get_public_key() -> (res : felt):
     end
 end
