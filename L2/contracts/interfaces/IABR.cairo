@@ -4,6 +4,7 @@
 namespace IABR:
     func get_abr_value(market_id : felt) -> (abr : felt, price : felt, timestamp : felt):
     end
+    
     func calculate_abr(
     market_id : felt,
     perp_index_len : felt,
