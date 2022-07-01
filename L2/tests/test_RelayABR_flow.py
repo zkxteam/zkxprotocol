@@ -192,6 +192,24 @@ async def abr_factory():
         ]
     )
 
+    relay_abr = await starknet.deploy(
+        "contracts/relay_contracts/RelayABR.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1,
+            17 # abr index
+        ]
+    )
+
+    relay_abr_payment = await starknet.deploy(
+        "contracts/relay_contracts/RelayABRPayment.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1,
+            19 # abr_payment index
+        ]
+    )
+
     timestamp = int(time.time())
 
     starknet.state.state.block_info = BlockInfo(
@@ -265,7 +283,7 @@ async def abr_factory():
     btc_perp_spot_64x61 = convertTo64x61(ABR_data.btc_perp_spot)
     btc_perp_64x61 = convertTo64x61(ABR_data.btc_perp)
 
-    return admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_perp_spot_64x61, btc_perp_64x61
+    return admin1, trading, fixed_math, alice, bob, relay_abr, abr_fund, relay_abr_payment, btc_perp_spot_64x61, btc_perp_64x61
 
 
 @pytest.mark.asyncio
