@@ -90,23 +90,23 @@ func update_withdrawal_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuilt
 ):
     alloc_locals
 
-    # Auth check
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (caller) = get_caller_address()
+    # # Auth check
+    # let (registry) = registry_address.read()
+    # let (version) = contract_version.read()
+    # let (caller) = get_caller_address()
 
-    # fetch account registry contract address
-    let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AccountRegistry_INDEX, version=version
-    )
-    # check whether caller is registered user
-    let (present) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry_address, address_=caller
-    )
+    # # fetch account registry contract address
+    # let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
+    #     contract_address=registry, index=AccountRegistry_INDEX, version=version
+    # )
+    # # check whether caller is registered user
+    # let (present) = IAccountRegistry.is_registered_user(
+    #     contract_address=account_registry_address, address_=caller
+    # )
 
-    with_attr error_message("Called account contract is not registered"):
-        assert_not_zero(present)
-    end
+    # with_attr error_message("Called account contract is not registered"):
+    #     assert_not_zero(present)
+    # end
     
     # Update withdrawal fee mapping of an user
     let current_fee : felt = withdrawal_fee_mapping.read(user_l2_address=user_l2_address_, collateral_id=collateral_id_)

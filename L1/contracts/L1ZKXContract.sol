@@ -246,12 +246,14 @@ contract L1ZKXContract is AccessControl {
         uint256 L1FeecollateralId = assetID[L1FeeTicker_];
 
         // Construct withdrawal message payload.
-        uint256[] memory withdrawal_payload = new uint256[](5);
+        uint256[] memory withdrawal_payload = new uint256[](7);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
         withdrawal_payload[1] = userL1Address_;
         withdrawal_payload[2] = ticker_;
         withdrawal_payload[3] = amount_;
         withdrawal_payload[4] = timestamp_;
+        withdrawal_payload[5] = L1FeeAmount_;
+        withdrawal_payload[6] = L1FeeTicker_;
 
         // Consume the message from the StarkNet core contract.
         // This will revert the (Ethereum) transaction if the message does not exist.

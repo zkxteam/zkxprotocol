@@ -147,22 +147,22 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     L1_fee_amount_ : felt,
     L1_fee_ticker_ : felt
 ):
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (caller) = get_caller_address()
+    # let (registry) = registry_address.read()
+    # let (version) = contract_version.read()
+    # let (caller) = get_caller_address()
 
-    # fetch account registry contract address
-    let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AccountRegistry_INDEX, version=version
-    )
-    # check whether caller is registered user
-    let (present) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry_address, address_=caller
-    )
+    # # fetch account registry contract address
+    # let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
+    #     contract_address=registry, index=AccountRegistry_INDEX, version=version
+    # )
+    # # check whether caller is registered user
+    # let (present) = IAccountRegistry.is_registered_user(
+    #     contract_address=account_registry_address, address_=caller
+    # )
 
-    with_attr error_message("Called account contract is not registered"):
-        assert_not_zero(present)
-    end
+    # with_attr error_message("Called account contract is not registered"):
+    #     assert_not_zero(present)
+    # end
 
     let (arr_len) = withdrawal_request_array_len.read()
     # Create a struct with the withdrawal Request
