@@ -239,22 +239,26 @@ end
 # @param user_l1_address_ - User's L1 wallet address
 # @param user_l2_address_ - Uers's L2 account contract address
 # @param ticker_ - Collateral on which user submitted withdrawal request
+# @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user has withdrawn
 # @param timestamp_ - Time at which user submitted withdrawal request
 # @param node_operator_L1_address_ - Node operators L1 address
 # @param L1_fee_amount_ - Gas fee in L1
-# @param L1_fee_ticker_ - Collateral used to pay L1 gas fee
+# @param L1_fee_ticker_ - ticker used to pay L1 gas fee
+# @param L1_fee_collateral_id_ - Collateral ID used to pay L1 gas fee
 @l1_handler
 func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt,
     user_l1_address_ : felt, 
     user_l2_address_ : felt,
     ticker_ : felt, 
+    collateral_id_ : felt,
     amount_ : felt, 
     timestamp_ : felt,
     node_operator_L1_address_ : felt,
     L1_fee_amount_ : felt,
-    L1_fee_ticker_ : felt
+    L1_fee_ticker_ : felt,
+    L1_fee_collateral_id_ : felt
 ):
 
     # Make sure the message was sent by the intended L1 contract.
@@ -281,12 +285,12 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         # update L1 fee and node operators L1 wallet address in withdrawal history
         IAccount.update_withdrawal_history(
             contract_address=user_l2_address_,
-            ticker_=ticker_,
+            collateral_id_=collateral_id_,
             amount_=amount_,
             timestamp_=timestamp_,
             node_operator_L1_address_=node_operator_L1_address_,
             L1_fee_amount_=L1_fee_amount_,
-            L1_fee_ticker_=L1_fee_ticker_
+            L1_fee_collateral_id_=L1_fee_collateral_id_
         )
         return ()
     end

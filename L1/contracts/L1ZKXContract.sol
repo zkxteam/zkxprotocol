@@ -242,6 +242,8 @@ contract L1ZKXContract is AccessControl {
         estimatedL1FeeInUsd = L1FeeAmount_ * usdcInUsd;
 
         uint256 userL2Address = l2ContractAddress[userL1Address_];
+        uint256 collateralId = assetID[ticker_];
+        uint256 L1FeecollateralId = assetID[L1FeeTicker_];
 
         // Construct withdrawal message payload.
         uint256[] memory withdrawal_payload = new uint256[](5);
@@ -272,17 +274,18 @@ contract L1ZKXContract is AccessControl {
         IERC20(tokenContract).transfer(msg.sender, nodeOperatorsfee);
 
         // Construct update withdrawal request message payload.
-        uint256[] memory updateWithdrawalRequestPayload = new uint256[](8);
+        uint256[] memory updateWithdrawalRequestPayload = new uint256[](9);
         updateWithdrawalRequestPayload[0] = userL1Address_;
         updateWithdrawalRequestPayload[1] = userL2Address;
         updateWithdrawalRequestPayload[2] = ticker_;
-        updateWithdrawalRequestPayload[3] = amount_;
-        updateWithdrawalRequestPayload[4] = timestamp_;
-        updateWithdrawalRequestPayload[5] = uint256(
+        updateWithdrawalRequestPayload[3] = collateralId;
+        updateWithdrawalRequestPayload[4] = amount_;
+        updateWithdrawalRequestPayload[5] = timestamp_;
+        updateWithdrawalRequestPayload[6] = uint256(
             uint160(address(msg.sender))
         );
-        updateWithdrawalRequestPayload[6] = 0;
         updateWithdrawalRequestPayload[7] = 0;
+        updateWithdrawalRequestPayload[8] = L1FeecollateralId;
 
         // Send the message to the StarkNet core contract.
         starknetCore.sendMessageToL2(
