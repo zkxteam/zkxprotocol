@@ -286,7 +286,7 @@ contract L1ZKXContract is AccessControl {
         updateWithdrawalRequestPayload[6] = uint256(
             uint160(address(msg.sender))
         );
-        updateWithdrawalRequestPayload[7] = 0;
+        updateWithdrawalRequestPayload[7] = nodeOperatorsfee;
         updateWithdrawalRequestPayload[8] = L1FeeTicker_;
         updateWithdrawalRequestPayload[9] = L1FeecollateralId;
 
