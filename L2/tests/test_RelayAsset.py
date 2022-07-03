@@ -108,6 +108,29 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     assert fetched_asset.metadata_id == 0
     assert fetched_asset.asset_version == 0
 
+    assets = await asset.returnAllAssets().call()
+    parsed_list = list(assets.result.array_list)[0]
+
+    assert parsed_list.id == str_to_felt("32f0406jz7qj8")
+    assert parsed_list.asset_version == 0
+    assert parsed_list.ticker == str_to_felt("ETH")
+    assert parsed_list.short_name == str_to_felt("Ethereum")
+    assert parsed_list.tradable == 0
+    assert parsed_list.collateral == 0
+    assert parsed_list.token_decimal == 18
+    assert parsed_list.metadata_id == 0
+    assert parsed_list.tick_size == 1
+    assert parsed_list.step_size == 1
+    assert parsed_list.minimum_order_size == 10
+    assert parsed_list.minimum_leverage == 1
+    assert parsed_list.maximum_leverage == 5
+    assert parsed_list.currently_allowed_leverage == 3
+    assert parsed_list.maintenance_margin_fraction == 1
+    assert parsed_list.initial_margin_fraction == 1
+    assert parsed_list.incremental_initial_margin_fraction == 1
+    assert parsed_list.incremental_position_size == 100
+    assert parsed_list.baseline_position_size == 1000
+    assert parsed_list.maximum_position_size == 10000
 
 @pytest.mark.asyncio
 async def test_adding_asset_by_unauthorized_user(adminAuth_factory):
@@ -271,3 +294,20 @@ async def test_modifying_trade_settings_by_admin_twice(adminAuth_factory):
     execution_info1 = await asset.get_version().call()
     version = execution_info1.result.version
     assert version == 3
+
+
+@pytest.mark.asyncio
+async def test_retrieve_assets(adminAuth_factory):
+    adminAuth, asset, admin1, admin2, user1 = adminAuth_factory
+
+    assets = await asset.returnAllAssets().call()
+
+    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qk90"), 0, str_to_felt("TSLA"), str_to_felt("Tesla"), 0, 0, 18, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+
+    assets_new = await asset.returnAllAssets().call()
+
+    assert len(list(assets_new.result.array_list)) == len(
+        list(assets.result.array_list)) + 1
+
+    hash_list=await asset.get_caller_hash_list(admin1.contract_address).call()
+    print(hash_list.result)

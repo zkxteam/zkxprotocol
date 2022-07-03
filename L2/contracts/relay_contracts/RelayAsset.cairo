@@ -1,14 +1,13 @@
 %lang starknet
 
 
-
 from contracts.interfaces.IAsset import IAsset
 from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
     initialize
 )
-from contracts.DataTypes import Asset
+from contracts.DataTypes import Asset, AssetWID
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 # @notice - This will call initialize to set the registry address, version and index of underlying contract
@@ -155,4 +154,15 @@ func get_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     let (inner_address)=get_inner_contract()
     let (res)=IAsset.get_version(inner_address)
     return(res)
+end
+
+@view
+func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    array_list_len : felt, array_list : AssetWID*
+):
+
+    let (inner_address)=get_inner_contract()
+    let (array_list_len, array_list:AssetWID*)=IAsset.returnAllAssets(inner_address)
+    return(array_list_len,array_list)
+
 end

@@ -31,6 +31,30 @@ struct Asset:
     member maximum_position_size : felt
 end
 
+# @notice struct to store details of assets with IDs
+struct AssetWID:
+    member id : felt
+    member asset_version : felt
+    member ticker : felt
+    member short_name : felt
+    member tradable : felt
+    member collateral : felt
+    member token_decimal : felt
+    member metadata_id : felt
+    member tick_size : felt
+    member step_size : felt
+    member minimum_order_size : felt
+    member minimum_leverage : felt
+    member maximum_leverage : felt
+    member currently_allowed_leverage : felt
+    member maintenance_margin_fraction : felt
+    member initial_margin_fraction : felt
+    member incremental_initial_margin_fraction : felt
+    member incremental_position_size : felt
+    member baseline_position_size : felt
+    member maximum_position_size : felt
+end
+
 # @notice Struct to store base fee percentage for each tier for maker and taker
 struct BaseFee:
     member numberOfTokens : felt
