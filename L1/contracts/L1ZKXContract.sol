@@ -67,6 +67,9 @@ contract L1ZKXContract is AccessControl {
     // Withdrawal Request Contract Address
     uint256 public withdrawalRequestContractAddress;
 
+    // Account Registry Contract Address
+    uint256 public accountRegistryContractAddress;
+
     uint256 startGas;
     uint256 ethInUsd;
     uint256 usdcInUsd;
@@ -91,13 +94,13 @@ contract L1ZKXContract is AccessControl {
     constructor(
         IStarknetCore starknetCore_,
         uint256 zkxAssetContractAddress_,
-        uint256 withdrawalRequestContractAddress_
+        uint256 withdrawalRequestContractAddress_,
+        uint256 accountRegistryContractAddress_
     ) {
         starknetCore = starknetCore_;
         zkxAssetContractAddress = zkxAssetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
-        usdcPriceFeed = AggregatorV3Interface(usdcPriceFeedAddress);
-        ethPriceFeed = AggregatorV3Interface(ethPriceFeedAddress);
+        accountRegistryContractAddress = accountRegistryContractAddress_;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
@@ -236,6 +239,10 @@ contract L1ZKXContract is AccessControl {
         uint256 L1FeeTicker_
     ) public {
         startGas = gasleft();
+        address usdcPriceFeedAddress = dataFeedContractAddress[ticker_];
+        address ethPriceFeedAddress = dataFeedContractAddress[4543560];
+        usdcPriceFeed = AggregatorV3Interface(usdcPriceFeedAddress);
+        ethPriceFeed = AggregatorV3Interface(ethPriceFeedAddress);
         ethInUsd = uint256(getLatestPrice(ethPriceFeed));
         usdcInUsd = uint256(getLatestPrice(usdcPriceFeed));
         amountInUsd = amount_ * usdcInUsd;
@@ -326,7 +333,7 @@ contract L1ZKXContract is AccessControl {
             userL1Address_
         ][collateralId_].sub(amount_);
 
-        uint256 l2Recipient = l2ContractAddress[userL1Address_];
+        uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct the deposit message's payload.
         uint256[] memory payload = new uint256[](3);
@@ -335,12 +342,24 @@ contract L1ZKXContract is AccessControl {
         payload[2] = collateralId_;
 
         // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(l2Recipient, DEPOSIT_SELECTOR, payload);
+        starknetCore.sendMessageToL2(userL2Address, DEPOSIT_SELECTOR, payload);
+
+        // Construct Add to account registry payload.
+        uint256[] memory addToAccountRegistryPayload = new uint256[](1);
+        payload[0] = userL2Address;
+
+        // Send the message to the StarkNet core contract.
+        starknetCore.sendMessageToL2(
+            accountRegistryContractAddress,
+            ADD_TO_ACCOUNT_REGISTRY_SELECTOR,
+            addToAccountRegistryPayload
+        );
+
         emit LogDeposit(
             address(uint160(userL1Address_)),
             amount_,
             collateralId_,
-            l2Recipient
+            userL2Address
         );
     }
 

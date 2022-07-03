@@ -34,6 +34,15 @@ end
 func account_present(address : felt) -> (present : felt):
 end
 
+# @notice stores the address of L1 zkx contract
+@storage_var
+func L1_zkx_address() -> (res : felt):
+end
+
+#
+# Constructor
+#
+
 # @notice Constructor for the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
@@ -46,9 +55,13 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-# @notice function to add account contract address to registry, when user deposits funds to L2 for the first time
-# @param address_ - Account address to be added
-# @returns 1 - If successfully added
+
+#
+# Setters
+#
+
+# @notice set L1 zkx contract address function
+# @param address - L1 zkx contract address as an argument
 @external
 func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt
@@ -65,7 +78,6 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         assert caller = account_deployer_address
     end
 
-
     let (is_present) = account_present.read(address=address_)
     if is_present == 0:
         let (reg_len) = account_registry_len.read()
@@ -80,7 +92,7 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     end
-    return (1)
+    return ()
 end
 
 # @notice External function called to remove account address from registry
