@@ -6,7 +6,7 @@ from contracts.libraries.RelayLibrary import (
     get_inner_contract,
     initialize
 )
-from contracts.DataTypes import Market
+from contracts.DataTypes import Market, MarketWID
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 
@@ -71,4 +71,27 @@ func getMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     let (inner_address)=get_inner_contract()
     let (currMarket)=IMarkets.getMarket(contract_address=inner_address,id=id)
     return(currMarket)
+end
+
+@view
+func getMarket_from_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    asset_id : felt, collateral_id : felt
+) -> (market_id : felt):
+    
+    let (inner_address)=get_inner_contract()
+    let (market_id)=IMarkets.getMarket_from_assets(
+        contract_address=inner_address,asset_id=asset_id, collateral_id=collateral_id)
+    return(market_id)
+
+end
+
+@view
+func returnAllMarkets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    array_list_len : felt, array_list : MarketWID*
+):
+
+    let (inner_address)=get_inner_contract()
+    let (array_list_len, array_list:MarketWID*)=IMarkets.returnAllMarkets(contract_address=inner_address)
+    return(array_list_len, array_list)
+
 end

@@ -8,6 +8,15 @@ struct Market:
     member tradable : felt
 end
 
+# @notice struct to store details of markets with IDs
+struct MarketWID:
+    member id : felt
+    member asset : felt
+    member assetCollateral : felt
+    member leverage : felt
+    member tradable : felt
+end
+
 # @notice struct to store details of assets
 struct Asset:
     member asset_version : felt
