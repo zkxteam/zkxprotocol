@@ -336,17 +336,21 @@ contract L1ZKXContract is AccessControl {
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct the deposit message's payload.
-        uint256[] memory payload = new uint256[](3);
-        payload[0] = userL1Address_;
-        payload[1] = amount_;
-        payload[2] = collateralId_;
+        uint256[] memory depositPayload = new uint256[](3);
+        depositPayload[0] = userL1Address_;
+        depositPayload[1] = amount_;
+        depositPayload[2] = collateralId_;
 
         // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(userL2Address, DEPOSIT_SELECTOR, payload);
+        starknetCore.sendMessageToL2(
+            userL2Address,
+            DEPOSIT_SELECTOR,
+            depositPayload
+        );
 
         // Construct Add to account registry payload.
         uint256[] memory addToAccountRegistryPayload = new uint256[](1);
-        payload[0] = userL2Address;
+        addToAccountRegistryPayload[0] = userL2Address;
 
         // Send the message to the StarkNet core contract.
         starknetCore.sendMessageToL2(
