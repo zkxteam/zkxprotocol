@@ -195,8 +195,8 @@ async def test_authorized_actions_in_relay(adminAuth_factory):
 
     assert hash_status.result.res == 1
 
-    # tyring to mark unseen transaction hash as paid will revert
-    assert_revert(lambda: signer1.send_transaction(
+    # trying to mark unseen transaction hash as paid will revert
+    await assert_revert(signer1.send_transaction(
         admin1, relay_account_registry.contract_address, 'mark_caller_hash_paid', [admin1.contract_address,123]))
 
     await signer1.send_transaction(
@@ -228,7 +228,7 @@ async def test_authorized_actions_in_relay(adminAuth_factory):
     assert index.result.index == AccountRegistry_INDEX
 
     # user with master admin access only can do priviledged actions - signer3 is not authorized
-    assert_revert(lambda: signer3.send_transaction(admin3, relay_account_registry.contract_address, 'set_self_index', [100]))
+    await assert_revert(signer3.send_transaction(admin3, relay_account_registry.contract_address, 'set_self_index', [100]))
 
     # change and verify index
     await signer1.send_transaction(admin1, relay_account_registry.contract_address, 'set_self_index', [100])

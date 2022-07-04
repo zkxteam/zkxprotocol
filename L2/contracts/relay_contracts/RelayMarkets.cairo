@@ -4,11 +4,12 @@ from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
-    initialize
+    initialize,
+    verify_caller_authority
 )
 from contracts.DataTypes import Market, MarketWID
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-
+from contracts.Constants import ManageMarkets_ACTION
 
 # @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
@@ -25,6 +26,7 @@ end
 func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
             id : felt, newMarket : Market
 ):
+    verify_caller_authority(ManageMarkets_ACTION)
     record_call_details('addMarket')
     let (inner_address)=get_inner_contract()
     IMarkets.addMarket(contract_address=inner_address,id=id,newMarket=newMarket)
@@ -35,6 +37,7 @@ end
 func removeMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt
 ):
+    verify_caller_authority(ManageMarkets_ACTION)
     record_call_details('removeMarket')
     let (inner_address)=get_inner_contract()
     IMarkets.removeMarket(contract_address=inner_address,id=id)
@@ -45,6 +48,7 @@ end
 func modifyLeverage{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt, leverage : felt
 ):
+    verify_caller_authority(ManageMarkets_ACTION)
     record_call_details('modifyLeverage')
     let (inner_address)=get_inner_contract()
     IMarkets.modifyLeverage(contract_address=inner_address,id=id,leverage=leverage)
@@ -56,6 +60,7 @@ end
 func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt, tradable : felt
 ):
+    verify_caller_authority(ManageMarkets_ACTION)
     record_call_details('modifyTradable')
     let (inner_address)=get_inner_contract()
     IMarkets.modifyTradable(contract_address=inner_address,id=id,tradable=tradable)

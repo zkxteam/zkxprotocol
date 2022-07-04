@@ -4,11 +4,12 @@ from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
-    initialize
+    initialize,
+    verify_caller_authority
 )
 from contracts.DataTypes import BaseFee, Discount
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-
+from contracts.Constants import ManageFeeDetails_ACTION
 
 # @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
@@ -26,6 +27,7 @@ func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     tier_ : felt, fee_details : BaseFee
 ):
 
+    verify_caller_authority(ManageFeeDetails_ACTION)
     record_call_details('update_base_fees')
     let (inner_address)=get_inner_contract()
     ITradingFees.update_base_fees(inner_address, tier_, fee_details)
@@ -36,6 +38,7 @@ end
 func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tier_ : felt, discount_details : Discount
 ):
+    verify_caller_authority(ManageFeeDetails_ACTION)
     record_call_details('update_discount')
     let (inner_address)=get_inner_contract()
     ITradingFees.update_discount(inner_address, tier_, discount_details)
@@ -46,6 +49,7 @@ end
 func update_max_base_fee_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tier_ : felt
 ):
+    verify_caller_authority(ManageFeeDetails_ACTION)
     record_call_details('update_max_base_fee_tier')
     let (inner_address)=get_inner_contract()
     ITradingFees.update_max_base_fee_tier(inner_address, tier_)
@@ -57,6 +61,7 @@ end
 func update_max_discount_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tier_ : felt
 ):
+    verify_caller_authority(ManageFeeDetails_ACTION)
     record_call_details('update_max_discount_tier')
     let (inner_address)=get_inner_contract()
     ITradingFees.update_max_discount_tier(inner_address, tier_)
