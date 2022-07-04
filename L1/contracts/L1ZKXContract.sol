@@ -239,6 +239,7 @@ contract L1ZKXContract is AccessControl {
         uint256 L1FeeTicker_
     ) public {
         startGas = gasleft();
+        uint256 amountToBeWithdrawn = amount_;
         address usdcPriceFeedAddress = dataFeedContractAddress[ticker_];
         address ethPriceFeedAddress = dataFeedContractAddress[4543560];
         usdcPriceFeed = AggregatorV3Interface(usdcPriceFeedAddress);
@@ -257,7 +258,7 @@ contract L1ZKXContract is AccessControl {
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
         withdrawal_payload[1] = userL1Address_;
         withdrawal_payload[2] = ticker_;
-        withdrawal_payload[3] = amount_;
+        withdrawal_payload[3] = amountToBeWithdrawn;
         withdrawal_payload[4] = timestamp_;
         withdrawal_payload[5] = L1FeeAmount_;
         withdrawal_payload[6] = L1FeeTicker_;
@@ -288,7 +289,7 @@ contract L1ZKXContract is AccessControl {
         updateWithdrawalRequestPayload[1] = userL2Address;
         updateWithdrawalRequestPayload[2] = ticker_;
         updateWithdrawalRequestPayload[3] = collateralId;
-        updateWithdrawalRequestPayload[4] = amount_;
+        updateWithdrawalRequestPayload[4] = amountToBeWithdrawn;
         updateWithdrawalRequestPayload[5] = timestamp_;
         updateWithdrawalRequestPayload[6] = uint256(
             uint160(address(msg.sender))

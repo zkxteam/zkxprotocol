@@ -144,7 +144,7 @@ struct Signature:
 end
 
 # Struct for Withdrawal Request
-# status 0: initialized
+# status 0: initiated
 # status 1: consumed
 struct WithdrawalRequest:
     member user_l1_address : felt
@@ -168,7 +168,7 @@ struct Message:
     member nonce : felt
 end
 
-# status 0: initialized
+# status 0: initiated
 # status 1: partial
 # status 2: executed
 # status 3: close partial
@@ -198,6 +198,8 @@ struct CollateralBalance:
 end
 
 # Struct to store withdrawal details
+# status 0: initiated
+# status 1: withdrawal succcessful
 struct WithdrawalHistory:
     member collateral_id : felt
     member amount : felt
@@ -208,4 +210,5 @@ struct WithdrawalHistory:
     member L1_fee_collateral_id : felt
     member L2_fee_amount : felt
     member L2_fee_collateral_id : felt
+    member status : felt
 end

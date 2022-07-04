@@ -1049,6 +1049,7 @@ func find_index_to_be_updated_recurse{
     local first_check_counter
     local second_check_counter
     local third_check_counter
+    local fourth_check_counter
     if request.collateral_id == collateral_id_:
         first_check_counter = 1
     end
@@ -1058,9 +1059,12 @@ func find_index_to_be_updated_recurse{
     if request.timestamp == timestamp_:
         third_check_counter = 1
     end
+    if request.status == 0:
+        fourth_check_counter = 1
+    end
 
-    let counter = first_check_counter + second_check_counter + third_check_counter
-    if counter == 3:
+    let counter = first_check_counter + second_check_counter + third_check_counter + fourth_check_counter
+    if counter == 4:
         return (arr_len_ - 1)
     end
     return find_index_to_be_updated_recurse(collateral_id_, amount_, timestamp_, arr_len_ - 1)
@@ -1084,6 +1088,7 @@ func update_withdrawal_history{
     L1_fee_amount_ : felt,
     L1_fee_collateral_id_ : felt,
 ):
+    alloc_locals
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -1099,20 +1104,39 @@ func update_withdrawal_history{
 
     let (arr_len) = withdrawal_history_array_len.read()
     let (index) = find_index_to_be_updated_recurse(collateral_id_, amount_, timestamp_, arr_len)
-    if index != -1:
-        let (history) = withdrawal_history_array.read(index=index)
+    local index_to_be_updated = index
+    if index_to_be_updated != -1:
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        # Get asset contract address
+        let (asset_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=Asset_INDEX, version=version
+        )
+        let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
+        tempvar decimal = asset.token_decimal
+
+        let (ten_power_decimal) = pow(10, decimal)
+        let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
+
+        let (temp_amount_in_64x61_format) = Math64x61_fromFelt(amount_)
+        let (amount_in_64x61_format) = Math64x61_div(
+            temp_amount_in_64x61_format, decimal_in_64x61_format
+        )
+        
+        let (history) = withdrawal_history_array.read(index=index_to_be_updated)
         let updated_history = WithdrawalHistory(
             collateral_id=collateral_id_,
-            amount=amount_,
+            amount=amount_in_64x61_format,
             timestamp=timestamp_,
             node_operator_L1_address=node_operator_L1_address_,
             node_operator_L2_address=history.node_operator_L2_address,
             L1_fee_amount=L1_fee_amount_,
             L1_fee_collateral_id=L1_fee_collateral_id_,
             L2_fee_amount=history.L2_fee_amount,
-            L2_fee_collateral_id=history.L2_fee_collateral_id
+            L2_fee_collateral_id=history.L2_fee_collateral_id,
+            status=1
         )
-        withdrawal_history_array.write(index=index, value=updated_history)
+        withdrawal_history_array.write(index=index_to_be_updated, value=updated_history)
         return ()
     end
     return ()
@@ -1153,17 +1177,35 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
     # Calculate the timestamp
     let (timestamp_) = get_block_timestamp()
 
+    # Get asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    )
+    # Reading token decimal field of an asset
+    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
+    tempvar decimal = asset.token_decimal
+    tempvar ticker = asset.ticker
+
+    let (L1_fee_asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=L1_fee_collateral_id_)
+    tempvar L1_fee_ticker = L1_fee_asset.ticker
+
+    let (ten_power_decimal) = pow(10, decimal)
+    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
+
+    let (amount_times_ten_power_decimal) = Math64x61_mul(amount_, decimal_in_64x61_format)
+    let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal)
     # Create a withdrawal history object
     local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
         collateral_id=collateral_id_,
-        amount=amount_,
+        amount=amount_in_felt,
         timestamp=timestamp_,
         node_operator_L1_address=0,
         node_operator_L2_address=node_operator_L2_address_,
         L1_fee_amount=L1_fee_amount_,
         L1_fee_collateral_id=L1_fee_collateral_id_,
         L2_fee_amount=L2_fee_amount_,
-        L2_fee_collateral_id=L2_fee_collateral_id_
+        L2_fee_collateral_id=L2_fee_collateral_id_,
+        status=0
     )
 
     # hash the parameters
@@ -1208,20 +1250,6 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
     # get L2 Account contract address
     let (user_l2_address) = get_contract_address()
 
-    let (caller) = get_caller_address()
-
-    # Get asset contract address
-    let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Asset_INDEX, version=version
-    )
-    # Reading token decimal field of an asset
-    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
-    tempvar decimal = asset.token_decimal
-    tempvar ticker = asset.ticker
-
-    let (L1_fee_asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=L1_fee_collateral_id_)
-    tempvar L1_fee_ticker = L1_fee_asset.ticker
-
     # Update the fees to be paid by user in withdrawal fee balance contract
     let (withdrawal_fee_balance_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=WithdrawalFeeBalance_INDEX, version=version
@@ -1232,12 +1260,6 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
         collateral_id_=collateral_id_,
         fee_to_add_=L2_fee_amount_,
     )
-
-    let (ten_power_decimal) = pow(10, decimal)
-    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
-
-    let (amount_times_ten_power_decimal) = Math64x61_mul(amount_, decimal_in_64x61_format)
-    let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal)
 
     # Get the L1 wallet address of the user
     let (user_l1_address) = L1_address.read()
@@ -1250,7 +1272,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
         contract_address=withdrawal_request_address,
         user_l1_address_=user_l1_address,
         ticker_=ticker,
-        amount_=amount_,
+        amount_=amount_in_felt,
         timestamp_=timestamp_,
         L1_fee_amount_=L1_fee_amount_,
         L1_fee_ticker_=L1_fee_ticker
