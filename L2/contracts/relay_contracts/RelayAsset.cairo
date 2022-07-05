@@ -1,16 +1,16 @@
 %lang starknet
 
 
-
 from contracts.interfaces.IAsset import IAsset
 from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
-    initialize
+    initialize,
+    verify_caller_authority
 )
-from contracts.DataTypes import Asset
+from contracts.DataTypes import Asset, AssetWID
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-
+from contracts.Constants import ManageAssets_ACTION
 # @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -26,7 +26,7 @@ end
 func set_L1_zkx_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     l1_zkx_address : felt
 ):
-
+    verify_caller_authority(ManageAssets_ACTION)
     record_call_details('set_L1_zkx_address')
     let (inner_address)=get_inner_contract()
     IAsset.set_L1_zkx_address(inner_address,l1_zkx_address)
@@ -37,6 +37,7 @@ end
 func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt, newAsset : Asset
 ):
+    verify_caller_authority(ManageAssets_ACTION)
     record_call_details('addAsset')
     let (inner_address)=get_inner_contract()
     IAsset.addAsset(inner_address,id,newAsset)
@@ -46,6 +47,7 @@ end
 
 @external
 func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt):
+    verify_caller_authority(ManageAssets_ACTION)
     record_call_details('removeAsset')
     let (inner_address)=get_inner_contract()
     IAsset.removeAsset(inner_address,id)
@@ -61,6 +63,7 @@ func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     token_decimal : felt,
     metadata_id : felt,
 ):
+    verify_caller_authority(ManageAssets_ACTION)
     record_call_details('modify_core_settings')
     let (inner_address)=get_inner_contract()
     IAsset.modify_core_settings(
@@ -93,6 +96,7 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     baseline_position_size : felt,
     maximum_position_size : felt,
 ):
+    verify_caller_authority(ManageAssets_ACTION)
     record_call_details('modify_trade_settings')
     let (inner_address)=get_inner_contract()
     IAsset.modify_trade_settings(
@@ -155,4 +159,15 @@ func get_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     let (inner_address)=get_inner_contract()
     let (res)=IAsset.get_version(inner_address)
     return(res)
+end
+
+@view
+func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    array_list_len : felt, array_list : AssetWID*
+):
+
+    let (inner_address)=get_inner_contract()
+    let (array_list_len, array_list:AssetWID*)=IAsset.returnAllAssets(inner_address)
+    return(array_list_len,array_list)
+
 end

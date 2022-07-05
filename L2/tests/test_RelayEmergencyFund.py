@@ -120,7 +120,7 @@ async def emergencyFund_factory():
 @pytest.mark.asyncio
 async def test_fund_invalid(emergencyFund_factory):
     emergencyFund, _, admin1, admin2, insurance, liquidity = emergencyFund_factory
-    assert_revert(lambda: signer3.send_transaction(
+    await assert_revert(signer3.send_transaction(
         pytest.user1, emergencyFund.contract_address, 'fund', [str_to_felt("TSLA"), 0]))
 
 
@@ -152,19 +152,19 @@ async def test_fund_holding_through_funding_contract(emergencyFund_factory):
 async def test_fund_holding_unauthorized(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    assert_revert(lambda: signer2.send_transaction(admin2, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10]))
+    await assert_revert(signer2.send_transaction(admin2, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10]))
 
 @pytest.mark.asyncio
 async def test_defund_holding_more_than_balance(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    assert_revert(lambda: signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 10]))
+    await assert_revert(signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 10]))
 
 @pytest.mark.asyncio
 async def test_fund_holding_more_than_balance(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    assert_revert(lambda: signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 20]))
+    await assert_revert(signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 20]))
 
 @pytest.mark.asyncio
 async def test_fund_insurance_through_funding_contract(emergencyFund_factory):
