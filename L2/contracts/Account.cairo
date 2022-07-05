@@ -2,14 +2,14 @@
 %builtins pedersen range_check ecdsa bitwise
 
 from contracts.DataTypes import (
-    Asset, 
+    Asset,
     CollateralBalance,
-    Message, 
-    MultipleOrder, 
-    OrderDetails, 
-    OrderDetailsWithIDs, 
+    Message,
+    MultipleOrder,
+    OrderDetails,
+    OrderDetailsWithIDs,
     OrderRequest,
-    Signature,   
+    Signature,
     WithdrawalHistory,
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -54,10 +54,16 @@ from contracts.Constants import (
     Liquidate_INDEX,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
-    WithdrawalRequest_INDEX
+    WithdrawalRequest_INDEX,
 )
 
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_fromFelt, Math64x61_toFelt, Math64x61_sub
+from contracts.Math_64x61 import (
+    Math64x61_mul,
+    Math64x61_div,
+    Math64x61_fromFelt,
+    Math64x61_toFelt,
+    Math64x61_sub,
+)
 
 const MESSAGE_WITHDRAW = 0
 
@@ -367,21 +373,15 @@ func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
         borrowedAmount=pos_details.borrowedAmount,
     )
 
-    local is_valid_state
-    if pos_details.status == 5:
-        assert is_valid_state = 1
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        let (state) = is_le(pos_details.status, 3)
-        assert is_valid_state = state
-        tempvar range_check_ptr = range_check_ptr
-    end
-
-    if is_valid_state == 1:
-        assert array_list[array_list_len] = order_details_w_id
-        return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
-    else:
+    if pos_details.status == 4:
         return populate_array_positions(iterator + 1, array_list_len, array_list)
+    else:
+        if pos_details.status == 7:
+            return populate_array_positions(iterator + 1, array_list_len, array_list)
+        else:
+            assert array_list[array_list_len] = order_details_w_id
+            return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
+        end
     end
 end
 
@@ -790,7 +790,9 @@ end
 # @notice Function to hash the withdrawal request parameters
 # @param message - Struct of order details to hash
 # @param res - Hash of the details
-func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(withdrawal_request_ : WithdrawalHistory*) -> (res : felt):
+func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(
+    withdrawal_request_ : WithdrawalHistory*
+) -> (res : felt):
     alloc_locals
 
     let hash_ptr = pedersen_ptr
@@ -980,7 +982,7 @@ func execute_order{
 
         # Update the amount to be sold after deleveraging
         if orderDetails.status == 5:
-            let (amount) = amount_to_be_sold.read(order_id = request.parentOrder)
+            let (amount) = amount_to_be_sold.read(order_id=request.parentOrder)
             let updated_amount = amount - size
             let (positive_updated_amount) = abs_value(updated_amount)
             # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
@@ -991,7 +993,7 @@ func execute_order{
             else:
                 amount_to_be_updated = updated_amount
             end
-            amount_to_be_sold.write(order_id=request.parentOrder, value= amount_to_be_updated)
+            amount_to_be_sold.write(order_id=request.parentOrder, value=amount_to_be_updated)
             tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
@@ -1033,12 +1035,9 @@ end
 # @param timestamp_ - Time at which user submitted withdrawal request
 # @param arr_len_ - current index which is being checked to be updated
 # @return index - returns the index which needs to be updated
-func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    collateral_id_ : felt, 
-    amount_ : felt, 
-    timestamp_ : felt,
-    arr_len_ : felt
-) -> (index : felt):
+func find_index_to_be_updated_recurse{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(collateral_id_ : felt, amount_ : felt, timestamp_ : felt, arr_len_ : felt) -> (index : felt):
     alloc_locals
 
     if arr_len_ == 0:
@@ -1060,7 +1059,7 @@ func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBu
         third_check_counter = 1
     end
 
-    let counter = first_check_counter + second_check_counter + third_check_counter 
+    let counter = first_check_counter + second_check_counter + third_check_counter
     if counter == 3:
         return (arr_len_ - 1)
     end
@@ -1075,7 +1074,9 @@ end
 # @param L1_fee_amount_ - Gas fee in L1
 # @param L1_fee_collateral_id_ - Collateral used to pay L1 gas fee
 @external
-func update_withdrawal_history{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*}(
+func update_withdrawal_history{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
+}(
     collateral_id_ : felt,
     amount_ : felt,
     timestamp_ : felt,
@@ -1109,14 +1110,13 @@ func update_withdrawal_history{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
             L1_fee_amount=L1_fee_amount_,
             L1_fee_collateral_id=L1_fee_collateral_id_,
             L2_fee_amount=history.L2_fee_amount,
-            L2_fee_collateral_id=history.L2_fee_collateral_id
+            L2_fee_collateral_id=history.L2_fee_collateral_id,
         )
         withdrawal_history_array.write(index=index, value=updated_history)
         return ()
     end
     return ()
 end
-
 
 # @notice Function to withdraw funds
 # @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
@@ -1129,7 +1129,9 @@ end
 # @param L2_fee_amount_ - Gas fee in L2
 # @param L2_fee_collateral_id_ - Collateral used to pay L2 gas fee
 @external
-func withdrawal{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*}(
+func withdrawal{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
+}(
     collateral_id_ : felt,
     amount_ : felt,
     sig_r_ : felt,
@@ -1138,7 +1140,7 @@ func withdrawal{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_pt
     L1_fee_amount_ : felt,
     L1_fee_collateral_id_ : felt,
     L2_fee_amount_ : felt,
-    L2_fee_collateral_id_ : felt
+    L2_fee_collateral_id_ : felt,
 ):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
@@ -1152,7 +1154,7 @@ func withdrawal{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_pt
 
     # Calculate the timestamp
     let (timestamp_) = get_block_timestamp()
-    
+
     # Create a withdrawal history object
     local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
         collateral_id=collateral_id_,
@@ -1164,7 +1166,7 @@ func withdrawal{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_pt
         L1_fee_collateral_id=L1_fee_collateral_id_,
         L2_fee_amount=L2_fee_amount_,
         L2_fee_collateral_id=L2_fee_collateral_id_
-    )
+        )
 
     # hash the parameters
     let (hash) = hash_withdrawal_request(&withdrawal_history_)
@@ -1249,7 +1251,7 @@ func withdrawal{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_pt
         user_l1_address_=user_l1_address,
         collateral_id_=collateral_id_,
         amount_=amount_,
-        timestamp_=timestamp_
+        timestamp_=timestamp_,
     )
 
     # Update Withdrawal history
@@ -1371,7 +1373,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     with_attr error_message("Amount to be sold should be less than portion executed"):
         assert_le(amount_to_be_sold_, order_details.portionExecuted)
     end
-    
+
     # Check if the caller is the liquidator contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -1384,7 +1386,6 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         assert caller = liquidate_address
     end
 
-    
     local status_
     if amount_to_be_sold_ == 0:
         status_ = 6
