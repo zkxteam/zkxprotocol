@@ -11,11 +11,9 @@ from contracts.Constants import (
     FeeBalance_INDEX,
     LiquidityFund_INDEX,
     InsuranceFund_INDEX,
-    AccountRegistry_INDEX,
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IHolding import IHolding
@@ -237,22 +235,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
-
-        # Add user to account registry if user already not added
-        let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=AccountRegistry_INDEX, version=version
-        )
-        let (present) = IAccountRegistry.is_registered_user(
-            contract_address=account_registry_address, address_=temp_order.pub_key
-        )
-        if present == 0:
-            IAccountRegistry.add_to_account_registry(
-                contract_address=account_registry_address, address_=temp_order.pub_key
-            )
-        end
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
 
         # calculate avg execution price
         if order_details.executionPrice == 0:
