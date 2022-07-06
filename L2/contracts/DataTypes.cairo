@@ -26,6 +26,7 @@ struct Asset:
     member collateral : felt
     member token_decimal : felt
     member metadata_id : felt
+    member ttl : felt
     member tick_size : felt
     member step_size : felt
     member minimum_order_size : felt
@@ -50,6 +51,7 @@ struct AssetWID:
     member collateral : felt
     member token_decimal : felt
     member metadata_id : felt
+    member ttl : felt
     member tick_size : felt
     member step_size : felt
     member minimum_order_size : felt

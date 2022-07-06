@@ -25,6 +25,7 @@ from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAccount import IAccount
 from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import Market_INDEX, ABR_INDEX, ABR_FUNDS_INDEX, AccountRegistry_INDEX
+from contracts.DataTypes import OrderDetailsWithIDs
 
 @storage_var
 func registry_address() -> (contract_address : felt):
@@ -32,21 +33,6 @@ end
 
 @storage_var
 func contract_version() -> (version : felt):
-end
-
-struct OrderDetailsWithIDs:
-    member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
-    member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
 end
 
 @constructor

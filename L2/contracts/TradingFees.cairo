@@ -2,6 +2,14 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.Constants import (
+    AdminAuth_INDEX,
+    FeeDiscount_INDEX,
+    ManageFeeDetails_ACTION
+)
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAdminAuth import IAdminAuth
+from contracts.interfaces.IFeeDiscount import IFeeDiscount
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_nn
@@ -76,10 +84,10 @@ func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=4
+        contract_address=auth_address, address=caller, action=ManageFeeDetails_ACTION
     )
     assert_not_zero(access)
 
@@ -115,10 +123,10 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=4
+        contract_address=auth_address, address=caller, action=ManageFeeDetails_ACTION
     )
     assert_not_zero(access)
 
@@ -153,10 +161,10 @@ func update_max_base_fee_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=4
+        contract_address=auth_address, address=caller, action=ManageFeeDetails_ACTION
     )
     assert_not_zero(access)
 
@@ -176,10 +184,10 @@ func update_max_discount_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=4
+        contract_address=auth_address, address=caller, action=ManageFeeDetails_ACTION
     )
     assert_not_zero(access)
 
@@ -279,7 +287,7 @@ func get_user_fee_and_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (fee_discount_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=3, version=version
+        contract_address=registry, index=FeeDiscount_INDEX, version=version
     )
     let (number_of_tokens) = IFeeDiscount.get_user_tokens(
         contract_address=fee_discount_address, address=address_
@@ -307,25 +315,4 @@ func get_user_fee_and_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     let fee : felt = Math64x61_mul(base_fee, non_discount)
 
     return (fee=fee)
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_contract_address(index : felt, version : felt) -> (address : felt):
-    end
-end
-
-# @notice AdminAuth interface
-@contract_interface
-namespace IAdminAuth:
-    func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
-    end
-end
-
-# @notice FeeDiscount interface
-@contract_interface
-namespace IFeeDiscount:
-    func get_user_tokens(address : felt) -> (value : felt):
-    end
 end
