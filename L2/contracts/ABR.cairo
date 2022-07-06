@@ -22,11 +22,12 @@ from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from starkware.starknet.common.syscalls import get_caller_address
-const NUM_STD = 4611686018427387904
+from contracts.Constants import AdminAuth_INDEX
+
 const NUM_1 = 2305843009213693952
 const NUM_100 = 230584300921369395200
 const NUM_8 = 18446744073709551616
-const NUM_MIN = 28823037615171
+const NUM_STD = 4611686018427387904
 
 # @notice Stores the contract version
 @storage_var
@@ -47,6 +48,7 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 ):
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
+    base_abr.write(28823037615171)
     return ()
 end
 
@@ -60,9 +62,35 @@ end
 func last_updated(market_id) -> (value : felt):
 end
 
+@storage_var
+func base_abr() -> (value : felt):
+end
+
 # @notice Stores the last mark price of an asset
 @storage_var
 func last_mark_price(market_id) -> (price : felt):
+end
+
+@external
+func modify_base_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    new_base_abr : felt
+):
+    let (caller) = get_caller_address()
+    let (version) = contract_version.read()
+    let (registry) = registry_address.read()
+    let (admin_auth) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AdminAuth_INDEX, version=version
+    )
+    let (access) = IAdminAuth.get_admin_mapping(
+        contract_address=admin_auth, address=caller, action=0
+    )
+    with_attr error_message("Caller does not have permission to update base abr value"):
+        assert_not_zero(access)
+    end
+
+    base_abr.write(new_base_abr)
+
+    return ()
 end
 
 @view
@@ -126,7 +154,7 @@ end
 # @param sum - Current sum of the array
 # @returns sum - Final sum of the array
 func find_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    array_len : felt, array : felt*, sum : felt
+    array_len : felt, array : felt*, sum : felt, base_abr : felt
 ) -> (sum : felt):
     alloc_locals
 
@@ -137,11 +165,11 @@ func find_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 
     # Calculate the current sum
     let (sum_div) = Math64x61_div([array], NUM_8)
-    let (sum_add) = Math64x61_add(sum_div, NUM_MIN)
+    let (sum_add) = Math64x61_add(sum_div, base_abr)
     let (curr_sum) = Math64x61_add(sum_add, sum)
 
     # Recursively call the next array element
-    return find_abr(array_len - 1, array + 1, curr_sum)
+    return find_abr(array_len - 1, array + 1, curr_sum, base_abr)
 end
 
 # @notice Function to calculate the sum of a given array window
@@ -705,7 +733,8 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     )
 
     # Find the effective ABR rate
-    let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0)
+    let (base_abr_) = base_abr.read()
+    let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0, base_abr_)
     let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
     let (rate_percentage) = Math64x61_div(rate_sum, array_size)
     let (rate) = Math64x61_div(rate_percentage, NUM_100)
