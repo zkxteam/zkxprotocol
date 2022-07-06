@@ -142,6 +142,9 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     )
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount, current_amount)
+    end
     balance_mapping.write(asset_id=asset_id_, value=current_amount - amount)
 
     IHolding.fund(contract_address=holding_address, asset_id_=asset_id_, amount=amount)
@@ -177,9 +180,12 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount, current_amount)
+    end
     balance_mapping.write(asset_id=asset_id_, value=current_amount - amount)
 
-    IHolding.fund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount)
+    ILiquidityFund.fund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount)
 
     return ()
 end
@@ -212,9 +218,12 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount, current_amount)
+    end
     balance_mapping.write(asset_id=asset_id_, value=current_amount - amount)
 
-    IHolding.fund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount)
+    IInsuranceFund.fund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount)
 
     return ()
 end
