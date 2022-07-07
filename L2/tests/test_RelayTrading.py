@@ -183,15 +183,6 @@ async def adminAuth_factory():
         "contracts/FeeDiscount.cairo",
         constructor_calldata=[]
     )
-
-    accountRegistry = await starknet.deploy(
-        "contracts/AccountRegistry.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
     
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -215,7 +206,6 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [8, 1, emergency.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidity.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insurance.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, accountRegistry.contract_address])
 
     relay_trading = await starknet.deploy(
         "contracts/relay_contracts/RelayTrading.cairo",
@@ -333,13 +323,13 @@ async def adminAuth_factory():
     await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
 
     # return relay versions of asset, trading, holding, feeBalance to test underlying contract logic
-    return adminAuth, fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, dave, fixed_math, relay_holding, relay_feeBalance, accountRegistry
+    return adminAuth, fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, dave, fixed_math, relay_holding, relay_feeBalance
 
 
 
 @pytest.mark.asyncio
 async def test_set_balance_for_testing(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
@@ -355,7 +345,7 @@ async def test_set_balance_for_testing(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_balance_low(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100)
     bob_balance = to64x61(100)
@@ -414,7 +404,7 @@ async def test_revert_balance_low(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(1000000)
@@ -474,7 +464,7 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_if_bad_limit_order_long(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(1000000)
@@ -534,7 +524,7 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_if_bad_limit_order_short(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(1000000)
@@ -594,7 +584,7 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_if_order_mismatch(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(1000000)
@@ -654,7 +644,7 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_if_asset_not_tradable(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(1000000)
@@ -714,7 +704,7 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_if_collateral_mismatch(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(1000000)
@@ -775,7 +765,7 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_if_asset_mismatch(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(1000000)
@@ -835,7 +825,7 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_wrong_signature(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(1000000)
     bob_balance = to64x61(1000000)
@@ -895,7 +885,7 @@ async def test_revert_wrong_signature(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
@@ -955,7 +945,7 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
@@ -1084,13 +1074,6 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
 
-    account_registry_array = await accountRegistry.get_account_registry().call()
-    print("Account Registry array: ", account_registry_array.result)
-    isPresent = await accountRegistry.is_registered_user(address_=alice.contract_address).call()
-    assert isPresent.result.present == 1
-    isPresent = await accountRegistry.is_registered_user(address_=bob.contract_address).call()
-    assert isPresent.result.present == 1
-
     #### Closing Of Orders ########
     size2 = to64x61(1)
     marketID_2 = BTC_USD_ID
@@ -1201,7 +1184,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_three_orders_in_a_batch(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
@@ -1521,7 +1504,7 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
@@ -1807,7 +1790,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_removing_closed_orders_from_position_array(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_position_array = await alice.return_array_positions().call()
     alice_parsed = list(alice_position_array.result.array_list)
@@ -1815,7 +1798,7 @@ async def test_removing_closed_orders_from_position_array(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, accountRegistry = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)

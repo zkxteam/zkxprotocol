@@ -11,19 +11,13 @@ from starkware.starknet.common.syscalls import get_caller_address
 func fee_address() -> (contract_address : felt):
 end
 
-# @notice Stores the address of AccountRegistry contract
-@storage_var
-func account_registry_address() -> (contract_address : felt):
-end
-
 # @notice Constructor of the smart-contract
 # @param _authAddress Address of the FeeBalance contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _authAddress : felt, _accountRegistryAddress : felt
+    _authAddress : felt
 ):
     fee_address.write(value=_authAddress)
-    account_registry_address.write(value=_accountRegistryAddress)
     return ()
 end
 
@@ -42,29 +36,9 @@ func update{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     return ()
 end
 
-@external
-func add_to_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    _address : felt
-):
-    alloc_locals
-    let (account_registry_addr) = account_registry_address.read()
-    IAccountRegistry.add_to_account_registry(
-        contract_address=account_registry_addr, address_=_address
-    )
-    return ()
-end
-
 # @notice FeeBalance interface
 @contract_interface
 namespace IFeeBalance:
     func update_fee_mapping(address : felt, assetID_ : felt, fee_to_add : felt):
-    end
-end
-
-# @notice AccountRegistry interface
-@contract_interface
-namespace IAccountRegistry:
-    # external functions
-    func add_to_account_registry(address_ : felt) -> (res : felt):
     end
 end
