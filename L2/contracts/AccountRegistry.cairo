@@ -3,7 +3,7 @@
 
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.Constants import AdminAuth_INDEX, Trading_INDEX, MasterAdmin_ACTION
+from contracts.Constants import AdminAuth_INDEX, Trading_INDEX, MasterAdmin_ACTION, AccountDeployer_INDEX
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
@@ -57,11 +57,11 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
+    let (account_deployer_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AccountDeployer_INDEX, version=version
     )
     with_attr error_message("Caller is not authorized to add account to registry"):
-        assert caller = trading_address
+        assert caller = account_deployer_address
     end
 
     let (is_present) = account_present.read(address=address_)

@@ -20,6 +20,7 @@ const WithdrawalRequest_INDEX = 16
 const ABR_INDEX = 17
 const ABR_FUNDS_INDEX = 18
 const ABR_PAYMENT_INDEX = 19
+const AccountDeployer_INDEX = 20
 
 # Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
@@ -35,6 +36,8 @@ const RelayLiquidityFund_INDEX = 900
 const RelayInsuranceFund_INDEX = 1000
 const RelayLiquidate_INDEX = 1100
 const RelayAccountRegistry_INDEX = 1400
+const RelayABR_INDEX = 1700
+const RelayABRpayment_INDEX = 1900
 
 const MasterAdmin_ACTION = 0
 const ManageAssets_ACTION = 1
