@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.DataTypes import OrderRequest, OrderDetails, Signature, OrderDetailsWithIDs
+from contracts.DataTypes import OrderRequest, OrderDetails, Signature, OrderDetailsWithIDs, CollateralBalance
 
 @contract_interface
 namespace IAccount:
@@ -49,5 +49,11 @@ namespace IAccount:
     end
 
     func get_public_key() -> (res : felt):
+    end
+
+    func return_array_collaterals() -> (array_list_len : felt, array_list : CollateralBalance*):
+    end
+
+    func liquidate_position(id : felt, amount : felt) -> ():
     end
 end

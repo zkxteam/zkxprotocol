@@ -2,6 +2,14 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.Constants import (
+    AdminAuth_INDEX,
+    EmergencyFund_INDEX,
+    Trading_INDEX,
+    ManageFunds_ACTION
+)
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAdminAuth import IAdminAuth
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
@@ -51,17 +59,17 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     # Auth Check
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
 
     if access == 0:
         let (emergency_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=8, version=version
+            contract_address=registry, index=EmergencyFund_INDEX, version=version
         )
 
         with_attr error_message("Caller is not authorized to do the transfer"):
@@ -96,17 +104,17 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     # Auth Check
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
 
     if access == 0:
         let (emergency_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=8, version=version
+            contract_address=registry, index=EmergencyFund_INDEX, version=version
         )
 
         with_attr error_message("Caller is not authorized to do the transfer"):
@@ -145,7 +153,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=5, version=version
+        contract_address=registry, index=Trading_INDEX, version=version
     )
 
     with_attr error_message("Caller is not authorized to do perform deposit"):
@@ -179,7 +187,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=5, version=version
+        contract_address=registry, index=Trading_INDEX, version=version
     )
 
     with_attr error_message("Caller is not authorized to do perform deposit"):
@@ -223,18 +231,4 @@ func liq_amount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_pt
 ) -> (amount : felt):
     let (amount) = asset_liq_position.read(asset_id=asset_id_, position_id=position_id_)
     return (amount)
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_contract_address(index : felt, version : felt) -> (address : felt):
-    end
-end
-
-# @notice AdminAuth interface
-@contract_interface
-namespace IAdminAuth:
-    func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
-    end
 end

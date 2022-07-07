@@ -1,6 +1,11 @@
 %lang starknet
 %builtins pedersen range_check ecdsa
 
+from contracts.DataTypes import OrderDetails, OrderDetailsWithIDs, PriceData, CollateralBalance
+from contracts.Constants import Asset_INDEX
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAsset import IAsset
+from contracts.interfaces.IAccount import IAccount
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.math import assert_not_zero, assert_nn
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
@@ -9,66 +14,6 @@ from starkware.cairo.common.hash import hash2
 from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
-# status 0: initialized
-# status 1: partial
-# status 2: executed
-# status 3: close partial
-# status 4: close
-# status 5: toBeDeleveraged
-# status 6: toBeLiquidated
-# status 7: fullyLiquidated
-struct OrderDetails:
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
-    member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
-    member leverage : felt
-end
-
-# @notice struct for passing the order request to Account Contract
-# status 0: initialized
-# status 1: partial
-# status 2: executed
-# status 3: close partial
-# status 4: close
-# status 5: toBeDeleveraged
-# status 6: toBeLiquidated
-# status 7: fullyLiquidated
-struct OrderDetailsWithIDs:
-    member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
-    member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
-end
-
-# @notice struct to pass price data to the contract
-struct PriceData:
-    member assetID : felt
-    member collateralID : felt
-    member assetPrice : felt
-    member collateralPrice : felt
-end
-
-# @notice struct to pass balances of collaterals from account
-struct CollateralBalance:
-    member assetID : felt
-    member balance : felt
-end
 
 # @notice Stores the contract version
 @storage_var
@@ -386,7 +331,7 @@ func check_deleveraging{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=1, version=version
+        contract_address=registry, index=Asset_INDEX, version=version
     )
     let (req_margin) = IAsset.get_maintenance_margin(
         contract_address=asset_address, id=order_details.assetID
@@ -490,36 +435,4 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     return (liq_result, least_collateral_ratio_position)
-end
-
-# @notice Account interface
-@contract_interface
-namespace IAccount:
-    func return_array_positions() -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-    end
-
-    func return_array_collaterals() -> (array_list_len : felt, array_list : CollateralBalance*):
-    end
-
-    func liquidate_position(id : felt, amount : felt) -> ():
-    end
-
-    func get_balance(assetID_ : felt) -> (res : felt):
-    end
-    func get_order_data(order_ID : felt) -> (res : OrderDetails):
-    end
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_contract_address(index : felt, version : felt) -> (address : felt):
-    end
-end
-
-# @notice Asset interface
-@contract_interface
-namespace IAsset:
-    func get_maintenance_margin(id : felt) -> (maintenance_margin : felt):
-    end
 end
