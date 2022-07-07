@@ -33,10 +33,6 @@ end
 func version() -> (res:felt):
 end
 
-@storage_var
-func salt() -> (res:felt):
-end
-
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
@@ -55,11 +51,13 @@ func deploy_account{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     public_key:felt):
 
     let (hash) = account_class_hash.read()
-    let (current_salt)= salt.read()
     let (current_L1_ZKX_address)= L1_ZKX_address.read()
     let (current_registry_address) = registry_address.read()
     let (current_version) = version.read()
 
+    assert_not_zero(hash)
+
+    # prepare constructor calldata for deploy call
     let calldata:felt* = alloc()
 
     assert calldata[0] = public_key
@@ -67,21 +65,22 @@ func deploy_account{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     assert calldata[2] = current_version
     assert calldata[3] = current_L1_ZKX_address
 
-    let (deployed_address) = deploy(hash, current_salt, 4, calldata)
+    # using a constant value for salt means redeploying with same public_key would not override the account address
+    let (deployed_address) = deploy(hash, 0, 4, calldata) 
 
     pubkey_to_address.write(public_key, deployed_address)
 
+    # update account registry with new deployed contract address
     let (account_registry) = IAuthorizedRegistry.get_contract_address(
         contract_address=current_registry_address, index=AccountRegistry_INDEX, version=current_version)
 
     let (res) = IAccountRegistry.add_to_account_registry(account_registry, deployed_address)
     assert res = 1
 
-    salt.write(current_salt+1)
-
     return()
 end
 
+# set class hash of the account contract - class hash can be obtained on making a declare transaction
 @external
 func set_account_class_hash{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     class_hash:felt):
@@ -131,6 +130,7 @@ func get_account_class_hash{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     return (class_hash)
 end
 
+# get address of contract that was deployed with public_key
 @view
 func get_pubkey_to_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     public_key:felt) -> (address:felt):

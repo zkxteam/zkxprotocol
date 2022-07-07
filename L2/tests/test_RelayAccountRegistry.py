@@ -83,11 +83,11 @@ async def adminAuth_factory():
         ]
     )
 
-    # spoof trading contract since add_to_account_registry only accepts calls from trading contract
+    # spoof account deployer contract since add_to_account_registry only accepts calls from account deployer contract
 
     await signer1.send_transaction(admin1, 
                                 registry.contract_address,
-                                 'update_contract_registry', [5,1, relay_account_registry.contract_address])
+                                 'update_contract_registry', [20,1, relay_account_registry.contract_address])
 
     # give relay master admin access for priviledged access
     await signer1.send_transaction(admin1, 

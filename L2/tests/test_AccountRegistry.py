@@ -57,7 +57,7 @@ async def adminAuth_factory():
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [5, 1, callFeeBalance.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, callFeeBalance.contract_address])
 
     return adminAuth, account_registry, admin1, admin2, callFeeBalance
 
