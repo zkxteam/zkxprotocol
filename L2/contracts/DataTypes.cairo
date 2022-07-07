@@ -202,6 +202,7 @@ end
 struct WithdrawalHistory:
     member collateral_id : felt
     member amount : felt
+    member node_timestamp : felt
     member timestamp : felt
     member node_operator_L1_address : felt
     member node_operator_L2_address : felt
@@ -220,4 +221,11 @@ struct QuoteL1Message:
     member timestamp : felt
     member L1_fee_amount : felt
     member L1_fee_ticker : felt
+end
+
+# Struct for hashing withdrawal request
+struct WithdrawalRequestForHashing:
+    member collateral_id : felt
+    member amount : felt
+    member node_timestamp : felt
 end

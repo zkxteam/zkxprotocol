@@ -11,6 +11,7 @@ from contracts.DataTypes import (
     OrderRequest,
     Signature,
     WithdrawalHistory,
+    WithdrawalRequestForHashing
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
@@ -792,14 +793,14 @@ end
 # @param message - Struct of order details to hash
 # @param res - Hash of the details
 func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(
-    withdrawal_request_ : WithdrawalHistory*
+    withdrawal_request_ : WithdrawalRequestForHashing*
 ) -> (res : felt):
     alloc_locals
 
     let hash_ptr = pedersen_ptr
     with hash_ptr:
         let (hash_state_ptr) = hash_init()
-        let (hash_state_ptr) = hash_update(hash_state_ptr, withdrawal_request_, 2)
+        let (hash_state_ptr) = hash_update(hash_state_ptr, withdrawal_request_, 3)
         let (res) = hash_finalize(hash_state_ptr)
         let pedersen_ptr = hash_ptr
         return (res=res)
@@ -1128,6 +1129,7 @@ func update_withdrawal_history{
         let updated_history = WithdrawalHistory(
             collateral_id=collateral_id_,
             amount=amount_in_64x61_format,
+            node_timestamp=history.node_timestamp,
             timestamp=timestamp_,
             node_operator_L1_address=node_operator_L1_address_,
             node_operator_L2_address=history.node_operator_L2_address,
@@ -1143,9 +1145,47 @@ func update_withdrawal_history{
     return ()
 end
 
+# @notice Internal function to recursively check for withdrawal replays
+# @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
+# @param amount_ - Amount of funds that user has withdrawn
+# @param node_timestamp_ - node timestamp
+# @param arr_len_ - current index which is being checked to be updated
+# @return - -1 if same withdrawal request already exists, else 1
+func check_for_withdrawal_replay{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(collateral_id_ : felt, amount_ : felt, node_timestamp_ : felt, arr_len_ : felt) -> (index : felt):
+    alloc_locals
+
+    if arr_len_ == 0:
+        return (1)
+    end
+
+    let (request : WithdrawalHistory) = withdrawal_history_array.read(index=arr_len_ - 1)
+
+    local first_check_counter
+    local second_check_counter
+    local third_check_counter
+    if request.collateral_id == collateral_id_:
+        first_check_counter = 1
+    end
+    if request.amount == amount_:
+        second_check_counter = 1
+    end
+    if request.node_timestamp == node_timestamp_:
+        third_check_counter = 1
+    end
+
+    let counter = first_check_counter + second_check_counter + third_check_counter 
+    if counter == 3:
+        return (-1)
+    end
+    return check_for_withdrawal_replay(collateral_id_, amount_, node_timestamp_, arr_len_ - 1)
+end
+
 # @notice Function to withdraw funds
 # @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user wants to withdraw
+# @param node_timestamp_ - Timestamp supplied by node
 # @param sig_r_ - R part of signature
 # @param sig_s_ - S part of signature
 # @param node_operator_L2_address_ - Node operators L2 address
@@ -1159,6 +1199,7 @@ func withdraw{
 }(
     collateral_id_ : felt,
     amount_ : felt,
+    node_timestamp_ : felt,
     sig_r_ : felt,
     sig_s_ : felt,
     node_operator_L2_address_ : felt,
@@ -1177,48 +1218,24 @@ func withdraw{
     assert signature_[0] = sig_r_
     assert signature_[1] = sig_s_
 
-    # Calculate the timestamp
-    let (timestamp_) = get_block_timestamp()
-
-    # Get asset contract address
-    let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Asset_INDEX, version=version
-    )
-    # Reading token decimal field of an asset
-    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
-    tempvar decimal = asset.token_decimal
-    tempvar ticker = asset.ticker
-
-    let (L1_fee_asset : Asset) = IAsset.getAsset(
-        contract_address=asset_address, id=L1_fee_collateral_id_
-    )
-    tempvar L1_fee_ticker = L1_fee_asset.ticker
-
-    let (ten_power_decimal) = pow(10, decimal)
-    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
-
-    let (amount_times_ten_power_decimal) = Math64x61_mul(amount_, decimal_in_64x61_format)
-    let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal)
-
-    # Create a withdrawal history object
-    local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
+    # Create withdrawal request for hashing
+    local hash_withdrawal_request_ : WithdrawalRequestForHashing = WithdrawalRequestForHashing(
         collateral_id=collateral_id_,
-        amount=amount_in_felt,
-        timestamp=timestamp_,
-        node_operator_L1_address=0,
-        node_operator_L2_address=node_operator_L2_address_,
-        L1_fee_amount=L1_fee_amount_,
-        L1_fee_collateral_id=L1_fee_collateral_id_,
-        L2_fee_amount=L2_fee_amount_,
-        L2_fee_collateral_id=L2_fee_collateral_id_,
-        status=0
-        )
+        amount=amount_,
+        node_timestamp=node_timestamp_,
+    )
 
     # hash the parameters
-    let (hash) = hash_withdrawal_request(&withdrawal_history_)
+    let (hash) = hash_withdrawal_request(&hash_withdrawal_request_)
 
     # check if Tx is signed by the user
     is_valid_signature(hash, 2, signature_)
+
+    let (arr_len) = withdrawal_history_array_len.read()
+    let (result) = check_for_withdrawal_replay(collateral_id_, amount_, node_timestamp_, arr_len)
+    with_attr error_message("Same withdrawal request exists"):
+        assert_nn(result)
+    end
 
     # Make sure 'amount' is positive.
     assert_nn(amount_)
@@ -1255,6 +1272,29 @@ func withdraw{
 
     # get L2 Account contract address
     let (user_l2_address) = get_contract_address()
+
+    # Calculate the timestamp
+    let (timestamp_) = get_block_timestamp()
+
+    # Get asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    )
+    # Reading token decimal field of an asset
+    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
+    tempvar decimal = asset.token_decimal
+    tempvar ticker = asset.ticker
+
+    let (L1_fee_asset : Asset) = IAsset.getAsset(
+        contract_address=asset_address, id=L1_fee_collateral_id_
+    )
+    tempvar L1_fee_ticker = L1_fee_asset.ticker
+
+    let (ten_power_decimal) = pow(10, decimal)
+    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
+
+    let (amount_times_ten_power_decimal) = Math64x61_mul(amount_, decimal_in_64x61_format)
+    let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal)
 
     # Update the fees to be paid by user in withdrawal fee balance contract
     let (withdrawal_fee_balance_address) = IAuthorizedRegistry.get_contract_address(
@@ -1322,6 +1362,21 @@ func withdraw{
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     end
+
+    # Create a withdrawal history object
+    local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
+        collateral_id=collateral_id_,
+        amount=amount_in_felt,
+        node_timestamp=node_timestamp_,
+        timestamp=timestamp_,
+        node_operator_L1_address=0,
+        node_operator_L2_address=node_operator_L2_address_,
+        L1_fee_amount=L1_fee_amount_,
+        L1_fee_collateral_id=L1_fee_collateral_id_,
+        L2_fee_amount=L2_fee_amount_,
+        L2_fee_collateral_id=L2_fee_collateral_id_,
+        status=0
+    )
 
     # Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read()
