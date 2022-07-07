@@ -186,6 +186,12 @@ contract L1ZKXContract is AccessControl {
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
     }
 
+    function setWithdrawalRequestAddress(
+        uint256 withdrawalRequestAddress_
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        withdrawalRequestContractAddress = withdrawalRequestAddress_;
+    }
+
     /**
      * @dev function to set data feed contract address
      * @param ticker_ - felt representation of the ticker

@@ -18,6 +18,7 @@ from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
+from contracts.interfaces.IQuoteL1Fee import IQuoteL1Fee
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
@@ -1122,7 +1123,7 @@ func update_withdrawal_history{
         let (amount_in_64x61_format) = Math64x61_div(
             temp_amount_in_64x61_format, decimal_in_64x61_format
         )
-        
+
         let (history) = withdrawal_history_array.read(index=index_to_be_updated)
         let updated_history = WithdrawalHistory(
             collateral_id=collateral_id_,
@@ -1134,7 +1135,7 @@ func update_withdrawal_history{
             L1_fee_collateral_id=L1_fee_collateral_id_,
             L2_fee_amount=history.L2_fee_amount,
             L2_fee_collateral_id=history.L2_fee_collateral_id,
-            status=1
+            status=1,
         )
         withdrawal_history_array.write(index=index_to_be_updated, value=updated_history)
         return ()
@@ -1153,7 +1154,9 @@ end
 # @param L2_fee_amount_ - Gas fee in L2
 # @param L2_fee_collateral_id_ - Collateral used to pay L2 gas fee
 @external
-func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*}(
+func withdraw{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
+}(
     collateral_id_ : felt,
     amount_ : felt,
     sig_r_ : felt,
@@ -1162,7 +1165,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
     L1_fee_amount_ : felt,
     L1_fee_collateral_id_ : felt,
     L2_fee_amount_ : felt,
-    L2_fee_collateral_id_ : felt
+    L2_fee_collateral_id_ : felt,
 ):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
@@ -1186,7 +1189,9 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
     tempvar decimal = asset.token_decimal
     tempvar ticker = asset.ticker
 
-    let (L1_fee_asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=L1_fee_collateral_id_)
+    let (L1_fee_asset : Asset) = IAsset.getAsset(
+        contract_address=asset_address, id=L1_fee_collateral_id_
+    )
     tempvar L1_fee_ticker = L1_fee_asset.ticker
 
     let (ten_power_decimal) = pow(10, decimal)
@@ -1194,6 +1199,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
 
     let (amount_times_ten_power_decimal) = Math64x61_mul(amount_, decimal_in_64x61_format)
     let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal)
+
     # Create a withdrawal history object
     local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
         collateral_id=collateral_id_,
@@ -1206,7 +1212,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
         L2_fee_amount=L2_fee_amount_,
         L2_fee_collateral_id=L2_fee_collateral_id_,
         status=0
-    )
+        )
 
     # hash the parameters
     let (hash) = hash_withdrawal_request(&withdrawal_history_)
@@ -1275,16 +1281,52 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr,
         amount_=amount_in_felt,
         timestamp_=timestamp_,
         L1_fee_amount_=L1_fee_amount_,
-        L1_fee_ticker_=L1_fee_ticker
+        L1_fee_ticker_=L1_fee_ticker,
     )
+
+    # Get L1 ZKX contract address
+    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
+
+    # Add message
+    let (quote_l1_fee_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=QuoteL1Fee_INDEX, version=version
+    )
+    let (result) = IQuoteL1Fee.check_and_add_message(
+        contract_address=quote_l1_fee_address,
+        user_l1_address_=user_l1_address,
+        ticker_=ticker,
+        amount_=0,
+        timestamp_=timestamp_,
+        L1_fee_amount_=0,
+        L1_fee_ticker_=L1_fee_ticker,
+    )
+    if result == 1:
+        let (message_fee_payload : felt*) = alloc()
+        assert message_fee_payload[0] = MESSAGE_WITHDRAW
+        assert message_fee_payload[1] = user_l1_address
+        assert message_fee_payload[2] = ticker
+        assert message_fee_payload[3] = 0
+        assert message_fee_payload[4] = timestamp_
+        assert message_fee_payload[5] = 0
+        assert message_fee_payload[6] = L1_fee_ticker
+
+        # Send Message to L1
+        send_message_to_l1(
+            to_address=L1_ZKX_contract_address, payload_size=7, payload=message_fee_payload
+        )
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
 
     # Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read()
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_)
     withdrawal_history_array_len.write(array_len + 1)
-
-    # Get L1 ZKX contract address
-    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
 
     # Send the withdrawal message.
     let (message_payload : felt*) = alloc()

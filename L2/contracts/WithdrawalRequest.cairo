@@ -58,7 +58,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-
 #
 # Setters
 #
@@ -96,35 +95,41 @@ end
 # @param withdrawal_request_list_ - list of requests filled up to the index
 # @returns withdrawal_request_list_len_ - Length of withdrawal request list length
 # @returns withdrawal_request_list_ - withdrawal request list
-func populate_withdrawals_request_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    withdrawal_request_list_len_ : felt, 
-    withdrawal_request_list_ : WithdrawalRequest*
-) -> (withdrawal_request_list_len_ : felt, withdrawal_request_list_ : WithdrawalRequest*):
+func populate_withdrawals_request_array{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(withdrawal_request_list_len_ : felt, withdrawal_request_list_ : WithdrawalRequest*) -> (
+    withdrawal_request_list_len_ : felt, withdrawal_request_list_ : WithdrawalRequest*
+):
     alloc_locals
-    let (request : WithdrawalRequest) = withdrawal_request_array.read(index=withdrawal_request_list_len_)
+    let (request : WithdrawalRequest) = withdrawal_request_array.read(
+        index=withdrawal_request_list_len_
+    )
 
     if request.user_l1_address == 0:
         return (withdrawal_request_list_len_, withdrawal_request_list_)
     end
 
     assert withdrawal_request_list_[withdrawal_request_list_len_] = request
-    return populate_withdrawals_request_array(withdrawal_request_list_len_ + 1, withdrawal_request_list_)
+    return populate_withdrawals_request_array(
+        withdrawal_request_list_len_ + 1, withdrawal_request_list_
+    )
 end
 
 # @notice Function to get all withdrawal requests
 # @return withdrawal_request_list_len - Length of the withdrawal request array
 # @return withdrawal_request_list - withdrawal request array
 @view
-func get_withdrawal_request_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    withdrawal_request_list_len : felt, 
-    withdrawal_request_list : WithdrawalRequest*
-):
+func get_withdrawal_request_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (withdrawal_request_list_len : felt, withdrawal_request_list : WithdrawalRequest*):
     alloc_locals
     let (withdrawal_request_list : WithdrawalRequest*) = alloc()
-    let (withdrawal_request_list_len_, withdrawal_request_list_) = populate_withdrawals_request_array(
-        0, withdrawal_request_list
+    let (
+        withdrawal_request_list_len_, withdrawal_request_list_
+    ) = populate_withdrawals_request_array(0, withdrawal_request_list)
+    return (
+        withdrawal_request_list_len=withdrawal_request_list_len_,
+        withdrawal_request_list=withdrawal_request_list_,
     )
-    return (withdrawal_request_list_len=withdrawal_request_list_len_, withdrawal_request_list=withdrawal_request_list_)
 end
 
 #
@@ -140,12 +145,12 @@ end
 # @param L1_fee_ticker_ - Collateral used to pay L1 gas fee
 @external
 func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    user_l1_address_ : felt, 
-    ticker_ : felt, 
+    user_l1_address_ : felt,
+    ticker_ : felt,
     amount_ : felt,
     timestamp_ : felt,
     L1_fee_amount_ : felt,
-    L1_fee_ticker_ : felt
+    L1_fee_ticker_ : felt,
 ):
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -167,14 +172,14 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     let (arr_len) = withdrawal_request_array_len.read()
     # Create a struct with the withdrawal Request
     let new_request = WithdrawalRequest(
-        user_l1_address = user_l1_address_,
-        user_l2_address = caller,
-        ticker = ticker_,
+        user_l1_address=user_l1_address_,
+        user_l2_address=caller,
+        ticker=ticker_,
         amount=amount_,
-        timestamp = timestamp_,
+        timestamp=timestamp_,
         status=0,
         L1_fee_amount=L1_fee_amount_,
-        L1_fee_ticker=L1_fee_ticker_
+        L1_fee_ticker=L1_fee_ticker_,
     )
 
     withdrawal_request_array.write(index=arr_len, value=new_request)
@@ -189,13 +194,15 @@ end
 # @param timestamp_ - Time at which user submitted withdrawal request
 # @param status_ - Status of the withdrawal request
 # @param arr_len_ - current index which is being checked to be updated
-func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    user_l1_address_ : felt, 
-    ticker_ : felt, 
-    amount_ : felt, 
+func find_index_to_be_updated_recurse{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(
+    user_l1_address_ : felt,
+    ticker_ : felt,
+    amount_ : felt,
     timestamp_ : felt,
-    status_ : felt, 
-    arr_len_ : felt
+    status_ : felt,
+    arr_len_ : felt,
 ) -> (index : felt):
     alloc_locals
 
@@ -230,9 +237,10 @@ func find_index_to_be_updated_recurse{syscall_ptr : felt*, pedersen_ptr : HashBu
     if counter == 5:
         return (arr_len_ - 1)
     end
-    return find_index_to_be_updated_recurse(user_l1_address_, ticker_, amount_, timestamp_, status_, arr_len_ - 1)
+    return find_index_to_be_updated_recurse(
+        user_l1_address_, ticker_, amount_, timestamp_, status_, arr_len_ - 1
+    )
 end
-
 
 # @notice Function to handle status updates on withdrawal requests
 # @param from_address - The address from where update withdrawal request function is called from
@@ -249,36 +257,38 @@ end
 @l1_handler
 func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt,
-    user_l1_address_ : felt, 
+    user_l1_address_ : felt,
     user_l2_address_ : felt,
-    ticker_ : felt, 
+    ticker_ : felt,
     collateral_id_ : felt,
-    amount_ : felt, 
+    amount_ : felt,
     timestamp_ : felt,
     node_operator_L1_address_ : felt,
     L1_fee_amount_ : felt,
     L1_fee_ticker_ : felt,
-    L1_fee_collateral_id_ : felt
+    L1_fee_collateral_id_ : felt,
 ):
-
     # Make sure the message was sent by the intended L1 contract.
     let (l1_zkx_address) = L1_zkx_address.read()
-    assert from_address = l1_zkx_address
+    with_attr error_message("from address is not matching"):
+        assert from_address = l1_zkx_address
+    end
 
     let (arr_len) = withdrawal_request_array_len.read()
-    let (index) = find_index_to_be_updated_recurse(user_l1_address_, ticker_, amount_, timestamp_, 0, arr_len)
+    let (index) = find_index_to_be_updated_recurse(
+        user_l1_address_, ticker_, amount_, timestamp_, 0, arr_len
+    )
     if index != -1:
         # Create a struct with the withdrawal Request
         let updated_request = WithdrawalRequest(
-            user_l1_address = user_l1_address_,
-            user_l2_address = user_l2_address_,
-            ticker = ticker_,
+            user_l1_address=user_l1_address_,
+            user_l2_address=user_l2_address_,
+            ticker=ticker_,
             amount=amount_,
-            timestamp = timestamp_,
+            timestamp=timestamp_,
             status=1,
             L1_fee_amount=L1_fee_amount_,
-            L1_fee_ticker=L1_fee_ticker_
-
+            L1_fee_ticker=L1_fee_ticker_,
         )
         withdrawal_request_array.write(index=index, value=updated_request)
 
@@ -290,7 +300,7 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
             timestamp_=timestamp_,
             node_operator_L1_address_=node_operator_L1_address_,
             L1_fee_amount_=L1_fee_amount_,
-            L1_fee_collateral_id_=L1_fee_collateral_id_
+            L1_fee_collateral_id_=L1_fee_collateral_id_,
         )
         return ()
     end
