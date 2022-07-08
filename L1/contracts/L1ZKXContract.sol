@@ -4,7 +4,6 @@ pragma solidity ^0.8.7;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "./IStarknetCore.sol";
 import "./Constants.sol";
 
@@ -23,7 +22,7 @@ contract L1ZKXContract is AccessControl {
         address recipient,
         uint256 ticker_,
         uint256 amount_,
-        uint256 timestamp_
+        uint256 requestId_
     );
     event LogAssetListUpdated(uint256 ticker_, uint256 collateralId_);
     event LogAssetRemovedFromList(uint256 ticker_, uint256 collateralId_);
@@ -31,17 +30,11 @@ contract L1ZKXContract is AccessControl {
         uint256 ticker_,
         address tokenContractAddresses_
     );
-    event LogDataFeedContractAddressUpdated(
-        uint256 ticker_,
-        address dataFeedContractAddress_
-    );
 
     using SafeMath for uint256;
 
     // The StarkNet core contract.
     IStarknetCore starknetCore;
-    AggregatorV3Interface internal usdcPriceFeed;
-    AggregatorV3Interface internal ethPriceFeed;
 
     // Maps ticker to the token contract addresses
     mapping(uint256 => address) public tokenContractAddress;
@@ -55,9 +48,6 @@ contract L1ZKXContract is AccessControl {
     // Maps L1 metamask account address to the l2 account contract address
     mapping(uint256 => uint256) public l2ContractAddress;
 
-    // Maps ticker to the asset data feed contract address
-    mapping(uint256 => address) public dataFeedContractAddress;
-
     // List of assets
     uint256[] public assetList;
 
@@ -66,9 +56,6 @@ contract L1ZKXContract is AccessControl {
 
     // Withdrawal Request Contract Address
     uint256 public withdrawalRequestContractAddress;
-
-    // Account Registry Contract Address
-    uint256 public accountRegistryContractAddress;
 
     /**
       Modifier to verify valid L2 address.
@@ -85,13 +72,11 @@ contract L1ZKXContract is AccessControl {
     constructor(
         IStarknetCore starknetCore_,
         uint256 assetContractAddress_,
-        uint256 withdrawalRequestContractAddress_,
-        uint256 accountRegistryContractAddress_
+        uint256 withdrawalRequestContractAddress_
     ) {
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
-        accountRegistryContractAddress = accountRegistryContractAddress_;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
@@ -177,6 +162,10 @@ contract L1ZKXContract is AccessControl {
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
     }
 
+    /**
+     * @dev function to set asset contract address
+     * @param assetContractAddress_ - address of the asset contract
+     **/
     function setAssetContractAddress(uint256 assetContractAddress_)
         public
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -184,6 +173,10 @@ contract L1ZKXContract is AccessControl {
         assetContractAddress = assetContractAddress_;
     }
 
+    /**
+     * @dev function to set withdrawal request contract address
+     * @param withdrawalRequestAddress_ - address of withdrawal request contract
+     **/
     function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
         public
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -270,17 +263,6 @@ contract L1ZKXContract is AccessControl {
             userL2Address,
             DEPOSIT_SELECTOR,
             depositPayload
-        );
-
-        // Construct Add to account registry payload.
-        uint256[] memory addToAccountRegistryPayload = new uint256[](1);
-        addToAccountRegistryPayload[0] = userL2Address;
-
-        // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(
-            accountRegistryContractAddress,
-            ADD_TO_ACCOUNT_REGISTRY_SELECTOR,
-            addToAccountRegistryPayload
         );
 
         emit LogDeposit(
