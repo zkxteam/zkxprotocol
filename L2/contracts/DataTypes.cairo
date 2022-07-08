@@ -144,17 +144,11 @@ struct Signature:
 end
 
 # Struct for Withdrawal Request
-# status 0: initiated
-# status 1: consumed
 struct WithdrawalRequest:
     member user_l1_address : felt
     member user_l2_address : felt
     member ticker : felt
     member amount : felt
-    member timestamp : felt
-    member status : felt
-    member L1_fee_amount : felt
-    member L1_fee_ticker : felt
 end
 
 # Struct to pass the transactions to the contract
@@ -200,16 +194,11 @@ end
 # status 0: initiated
 # status 1: withdrawal succcessful
 struct WithdrawalHistory:
+    member request_id : felt
     member collateral_id : felt
     member amount : felt
-    member node_timestamp : felt
     member timestamp : felt
-    member node_operator_L1_address : felt
     member node_operator_L2_address : felt
-    member L1_fee_amount : felt
-    member L1_fee_collateral_id : felt
-    member L2_fee_amount : felt
-    member L2_fee_collateral_id : felt
     member status : felt
 end
 
@@ -225,7 +214,7 @@ end
 
 # Struct for hashing withdrawal request
 struct WithdrawalRequestForHashing:
+    member request_id : felt
     member collateral_id : felt
     member amount : felt
-    member node_timestamp : felt
 end

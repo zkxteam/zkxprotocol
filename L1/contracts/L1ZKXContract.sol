@@ -67,18 +67,6 @@ contract L1ZKXContract is AccessControl {
     // Withdrawal Request Contract Address
     uint256 public withdrawalRequestContractAddress;
 
-    // Account Registry Contract Address
-    uint256 public accountRegistryContractAddress;
-
-    uint256 startGas;
-    uint256 ethInUsd;
-    uint256 usdcInUsd;
-    uint256 amountInUsd;
-    uint256 estimatedL1FeeInUsd;
-    uint256 gasUsed;
-    uint256 gasUsedInUsd;
-    uint256 nodeOperatorsfee;
-
     /**
       Modifier to verify valid L2 address.
     */
@@ -94,13 +82,11 @@ contract L1ZKXContract is AccessControl {
     constructor(
         IStarknetCore starknetCore_,
         uint256 zkxAssetContractAddress_,
-        uint256 withdrawalRequestContractAddress_,
-        uint256 accountRegistryContractAddress_
+        uint256 withdrawalRequestContractAddress_
     ) {
         starknetCore = starknetCore_;
         zkxAssetContractAddress = zkxAssetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
-        accountRegistryContractAddress = accountRegistryContractAddress_;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
@@ -186,45 +172,11 @@ contract L1ZKXContract is AccessControl {
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
     }
 
-    function setWithdrawalRequestAddress(
-        uint256 withdrawalRequestAddress_
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        withdrawalRequestContractAddress = withdrawalRequestAddress_;
-    }
-
-    /**
-     * @dev function to set data feed contract address
-     * @param ticker_ - felt representation of the ticker
-     * @param dataFeedContractAddress_ - address of the data feed contract
-     **/
-    function setDataFeedContractAddress(
-        uint256 ticker_,
-        address dataFeedContractAddress_
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        // Update data feed contract address
-        dataFeedContractAddress[ticker_] = dataFeedContractAddress_;
-        emit LogDataFeedContractAddressUpdated(
-            ticker_,
-            dataFeedContractAddress_
-        );
-    }
-
-    /**
-     * Returns the latest price
-     */
-    function getLatestPrice(AggregatorV3Interface priceFeed)
+    function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
         public
-        view
-        returns (int256)
+        onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        (
-            uint80 roundId,
-            int256 price,
-            uint256 startedAt,
-            uint256 timeStamp,
-            uint80 answeredInRound
-        ) = priceFeed.latestRoundData();
-        return price;
+        withdrawalRequestContractAddress = withdrawalRequestAddress_;
     }
 
     /**
@@ -232,77 +184,36 @@ contract L1ZKXContract is AccessControl {
      * @param userL1Address_ - Users L1 wallet address
      * @param ticker_ - felt representation of the ticker
      * @param amount_ - The amount of tokens to be withdrawn
-     * @param timestamp_ - The time at which withdrawal initiated
-     * @param L1FeeAmount_ - Estimated Gas fee in L1
-     * @param L1FeeTicker_ - Collateral used to pay L1 gas fee
+     * @param requestId_ - ID of the withdrawal request
      **/
     function withdraw(
         uint256 userL1Address_,
         uint256 ticker_,
         uint256 amount_,
-        uint256 timestamp_,
-        uint256 L1FeeAmount_,
-        uint256 L1FeeTicker_
+        uint256 requestId_
     ) public {
-        startGas = gasleft();
-        uint256 amountToBeWithdrawn = amount_;
-        address usdcPriceFeedAddress = dataFeedContractAddress[ticker_];
-        address ethPriceFeedAddress = dataFeedContractAddress[4543560];
-        usdcPriceFeed = AggregatorV3Interface(usdcPriceFeedAddress);
-        ethPriceFeed = AggregatorV3Interface(ethPriceFeedAddress);
-        ethInUsd = uint256(getLatestPrice(ethPriceFeed));
-        usdcInUsd = uint256(getLatestPrice(usdcPriceFeed));
-        amountInUsd = amount_ * usdcInUsd;
-        estimatedL1FeeInUsd = L1FeeAmount_ * usdcInUsd;
-
         uint256 userL2Address = l2ContractAddress[userL1Address_];
         uint256 collateralId = assetID[ticker_];
-        uint256 L1FeecollateralId = assetID[L1FeeTicker_];
 
         // Construct withdrawal message payload.
         uint256[] memory withdrawal_payload = new uint256[](7);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
         withdrawal_payload[1] = userL1Address_;
         withdrawal_payload[2] = ticker_;
-        withdrawal_payload[3] = amountToBeWithdrawn;
-        withdrawal_payload[4] = timestamp_;
-        withdrawal_payload[5] = L1FeeAmount_;
-        withdrawal_payload[6] = L1FeeTicker_;
+        withdrawal_payload[3] = amount_;
+        withdrawal_payload[4] = requestId_;
 
         // Consume the message from the StarkNet core contract.
         // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
 
         address tokenContract = tokenContractAddress[ticker_];
-        gasUsed = startGas - gasleft();
-        gasUsedInUsd = gasUsed * ethInUsd;
-        if (gasUsedInUsd < estimatedL1FeeInUsd) {
-            amountInUsd += (estimatedL1FeeInUsd - gasUsedInUsd);
-        } else {
-            amountInUsd -= (gasUsedInUsd - estimatedL1FeeInUsd);
-        }
-        amount_ = amountInUsd / usdcInUsd;
-        nodeOperatorsfee = gasUsedInUsd / usdcInUsd;
-        IERC20(tokenContract).transfer(
-            address(uint160(userL1Address_)),
-            amount_
-        );
-        IERC20(tokenContract).transfer(msg.sender, nodeOperatorsfee);
+        IERC20(tokenContract).transfer(msg.sender, amount_);
 
         // Construct update withdrawal request message payload.
-        uint256[] memory updateWithdrawalRequestPayload = new uint256[](10);
-        updateWithdrawalRequestPayload[0] = userL1Address_;
-        updateWithdrawalRequestPayload[1] = userL2Address;
-        updateWithdrawalRequestPayload[2] = ticker_;
-        updateWithdrawalRequestPayload[3] = collateralId;
-        updateWithdrawalRequestPayload[4] = amountToBeWithdrawn;
-        updateWithdrawalRequestPayload[5] = timestamp_;
-        updateWithdrawalRequestPayload[6] = uint256(
-            uint160(address(msg.sender))
-        );
-        updateWithdrawalRequestPayload[7] = nodeOperatorsfee;
-        updateWithdrawalRequestPayload[8] = L1FeeTicker_;
-        updateWithdrawalRequestPayload[9] = L1FeecollateralId;
+        uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
+        updateWithdrawalRequestPayload[0] = userL2Address;
+        updateWithdrawalRequestPayload[1] = requestId_;
 
         // Send the message to the StarkNet core contract.
         starknetCore.sendMessageToL2(
@@ -311,12 +222,7 @@ contract L1ZKXContract is AccessControl {
             updateWithdrawalRequestPayload
         );
 
-        emit LogWithdrawal(
-            address(uint160(userL1Address_)),
-            ticker_,
-            amount_,
-            timestamp_
-        );
+        emit LogWithdrawal(msg.sender, ticker_, amount_, requestId_);
     }
 
     /**
@@ -353,17 +259,6 @@ contract L1ZKXContract is AccessControl {
             userL2Address,
             DEPOSIT_SELECTOR,
             depositPayload
-        );
-
-        // Construct Add to account registry payload.
-        uint256[] memory addToAccountRegistryPayload = new uint256[](1);
-        addToAccountRegistryPayload[0] = userL2Address;
-
-        // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(
-            accountRegistryContractAddress,
-            ADD_TO_ACCOUNT_REGISTRY_SELECTOR,
-            addToAccountRegistryPayload
         );
 
         emit LogDeposit(

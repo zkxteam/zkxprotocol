@@ -2,7 +2,8 @@
 
 %builtins pedersen range_check ecdsa
 
-from contracts.Constants import AccountRegistry_INDEX
+from contracts.Constants import AccountRegistry_INDEX, AdminAuth_INDEX, MasterAdmin_ACTION
+from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from starkware.cairo.common.cairo_builtins import HashBuiltin
@@ -21,6 +22,16 @@ end
 # @notice Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
+end
+
+# @notice Stores the standard withdraw fee
+@storage_var
+func standard_withdraw_fee() -> (fee : felt):
+end
+
+# @notice Stores the standard withdraw fee collateral id
+@storage_var
+func standard_withdraw_fee_collateral_id() -> (collateral_id : felt):
 end
 
 # @notice Stores the withdrawal fee charged per asset of each user
@@ -50,6 +61,35 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 end
 
 #
+# Setters
+#
+
+# @notice set standard withdraw fee
+# @param fee_ - 0.02 USDC is the standard withdraw fee
+@external
+func set_standard_withdraw_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    fee_ : felt, collateral_id_ : felt
+):
+    alloc_locals
+    # Auth Check
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AdminAuth_INDEX, version=version
+    )
+
+    let (access) = IAdminAuth.get_admin_mapping(
+        contract_address=auth_address, address=caller, action=MasterAdmin_ACTION
+    )
+    assert_not_zero(access)
+
+    standard_withdraw_fee.write(value=fee_)
+    standard_withdraw_fee_collateral_id.write(value=collateral_id_)
+    return ()
+end
+
+#
 # Getters
 #
 
@@ -74,6 +114,16 @@ func get_total_withdrawal_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
 ) -> (fee : felt):
     let (fee) = total_withdrawal_fee_per_asset.read(collateral_id=collateral_id_)
     return (fee)
+end
+
+# @notice Function to get standard withdraw fee
+# @return fee, collateral_id - standard withdraw fee and fee represented in collateral_id
+@view
+func get_standard_withdraw_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+) -> (fee : felt, collateral_id : felt):
+    let (fee) = standard_withdraw_fee.read()
+    let (collateral_id) = standard_withdraw_fee_collateral_id.read()
+    return (fee, collateral_id)
 end
 
 #
