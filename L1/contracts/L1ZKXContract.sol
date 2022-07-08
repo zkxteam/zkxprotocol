@@ -207,7 +207,7 @@ contract L1ZKXContract is AccessControl {
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
-        uint256[] memory withdrawal_payload = new uint256[](7);
+        uint256[] memory withdrawal_payload = new uint256[](5);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
         withdrawal_payload[1] = userL1Address_;
         withdrawal_payload[2] = ticker_;
