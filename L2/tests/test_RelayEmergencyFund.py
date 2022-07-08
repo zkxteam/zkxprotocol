@@ -128,13 +128,13 @@ async def test_fund_invalid(emergencyFund_factory):
 async def test_funding_flow(emergencyFund_factory):
     emergencyFund, _, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund', [str_to_felt("TSLA"), 10])
+    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund', [str_to_felt("TSLA"), 20])
     execution_info = await emergencyFund.balance(str_to_felt("TSLA")).call()
-    assert execution_info.result.amount == 10
+    assert execution_info.result.amount == 20
 
     await signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund', [str_to_felt("TSLA"), 3])
     execution_info = await emergencyFund.balance(str_to_felt("TSLA")).call()
-    assert execution_info.result.amount == 7
+    assert execution_info.result.amount == 17
 
 @pytest.mark.asyncio
 async def test_fund_holding_through_funding_contract(emergencyFund_factory):
@@ -182,10 +182,10 @@ async def test_fund_insurance_through_funding_contract(emergencyFund_factory):
 async def test_fund_liquidity_through_funding_contract(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_liquidity', [str_to_felt("TSLA"), 10])
+    await signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_liquidity', [str_to_felt("TSLA"), 3])
     execution_info = await liquidity.balance(str_to_felt("TSLA")).call()
-    assert execution_info.result.amount == 10
+    assert execution_info.result.amount == 3
 
     await signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_liquidity', [str_to_felt("TSLA"), 3])
     execution_info = await liquidity.balance(str_to_felt("TSLA")).call()
-    assert execution_info.result.amount == 7
+    assert execution_info.result.amount == 0

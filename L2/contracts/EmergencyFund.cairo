@@ -2,6 +2,18 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.Constants import (
+    AdminAuth_INDEX,
+    Holding_INDEX,
+    LiquidityFund_INDEX,
+    InsuranceFund_INDEX,
+    ManageFunds_ACTION
+)
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAdminAuth import IAdminAuth
+from contracts.interfaces.IHolding import IHolding
+from contracts.interfaces.ILiquidityFund import ILiquidityFund
+from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.math import assert_not_zero, assert_le
@@ -58,11 +70,11 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     assert_not_zero(access)
 
@@ -85,11 +97,11 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     assert_not_zero(access)
 
@@ -116,23 +128,26 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     assert_not_zero(access)
 
     # Get holding contract address
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=7, version=version
+        contract_address=registry, index=Holding_INDEX, version=version
     )
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount, current_amount)
+    end
     balance_mapping.write(asset_id=asset_id_, value=current_amount - amount)
 
-    IHolding.fund(contract_address=holding_address, asset_id=asset_id_, amount=amount)
+    IHolding.fund(contract_address=holding_address, asset_id_=asset_id_, amount=amount)
 
     return ()
 end
@@ -151,23 +166,26 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     assert_not_zero(access)
 
     # Get liquidity fund contract address
     let (liquidity_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=9, version=version
+        contract_address=registry, index=LiquidityFund_INDEX, version=version
     )
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount, current_amount)
+    end
     balance_mapping.write(asset_id=asset_id_, value=current_amount - amount)
 
-    IHolding.fund(contract_address=liquidity_address, asset_id=asset_id_, amount=amount)
+    ILiquidityFund.fund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount)
 
     return ()
 end
@@ -186,23 +204,26 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     assert_not_zero(access)
 
-    # Get liquidity fund contract address
+    # Get insurance fund contract address
     let (insurance_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=10, version=version
+        contract_address=registry, index=InsuranceFund_INDEX, version=version
     )
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount, current_amount)
+    end
     balance_mapping.write(asset_id=asset_id_, value=current_amount - amount)
 
-    IHolding.fund(contract_address=insurance_address, asset_id=asset_id_, amount=amount)
+    IInsuranceFund.fund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount)
 
     return ()
 end
@@ -221,20 +242,20 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     assert_not_zero(access)
 
     # Get holding contract address
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=7, version=version
+        contract_address=registry, index=Holding_INDEX, version=version
     )
 
-    IHolding.defund(contract_address=holding_address, asset_id=asset_id, amount=amount)
+    IHolding.defund(contract_address=holding_address, asset_id_=asset_id, amount=amount)
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id)
     balance_mapping.write(asset_id=asset_id, value=current_amount + amount)
@@ -256,20 +277,20 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     assert_not_zero(access)
 
-    # Get holding contract address
+    # Get insurance fund contract address
     let (insurance_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=10, version=version
+        contract_address=registry, index=InsuranceFund_INDEX, version=version
     )
 
-    IInsurance.defund(contract_address=insurance_address, asset_id=asset_id, amount=amount)
+    IInsuranceFund.defund(contract_address=insurance_address, asset_id_=asset_id, amount=amount)
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id)
     balance_mapping.write(asset_id=asset_id, value=current_amount + amount)
@@ -291,67 +312,23 @@ func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     let (version) = contract_version.read()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=5
+        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     assert_not_zero(access)
 
-    # Get holding contract address
+    # Get liquidity contract address
     let (liquidity_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=9, version=version
+        contract_address=registry, index=LiquidityFund_INDEX, version=version
     )
 
-    ILiquidity.defund(contract_address=liquidity_address, asset_id=asset_id, amount=amount)
+    ILiquidityFund.defund(contract_address=liquidity_address, asset_id_=asset_id, amount=amount)
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id)
     balance_mapping.write(asset_id=asset_id, value=current_amount + amount)
 
     return ()
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_contract_address(index : felt, version : felt) -> (address : felt):
-    end
-end
-
-# @notice AdminAuth interface
-@contract_interface
-namespace IAdminAuth:
-    func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
-    end
-end
-
-# @notice Holding interface
-@contract_interface
-namespace IHolding:
-    func fund(asset_id : felt, amount : felt):
-    end
-
-    func defund(asset_id : felt, amount : felt):
-    end
-end
-
-# @notice Insurance interface
-@contract_interface
-namespace IInsurance:
-    func fund(asset_id : felt, amount : felt):
-    end
-
-    func defund(asset_id : felt, amount : felt):
-    end
-end
-
-# @notice Liquidity interface
-@contract_interface
-namespace ILiquidity:
-    func fund(asset_id : felt, amount : felt):
-    end
-
-    func defund(asset_id : felt, amount : felt):
-    end
 end

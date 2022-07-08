@@ -53,7 +53,8 @@ end
 func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt
 ) -> (res : felt):
-    # Check whether the call is from trading contract
+
+    # Check whether the call is from account deployer contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -63,6 +64,7 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     with_attr error_message("Caller is not authorized to add account to registry"):
         assert caller = account_deployer_address
     end
+
 
     let (is_present) = account_present.read(address=address_)
     if is_present == 0:

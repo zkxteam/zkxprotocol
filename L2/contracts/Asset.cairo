@@ -1,6 +1,14 @@
 %lang starknet
 %builtins pedersen range_check ecdsa
 
+from contracts.DataTypes import Asset, AssetWID
+from contracts.Constants import (
+    AdminAuth_INDEX,
+    RiskManagement_INDEX,
+    ManageAssets_ACTION,
+)
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAdminAuth import IAdminAuth
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.cairo_builtins import HashBuiltin
@@ -9,57 +17,6 @@ from starkware.starknet.common.syscalls import get_caller_address
 
 const ADD_ASSET = 1
 const REMOVE_ASSET = 2
-
-#
-# Structs
-#
-
-# @notice struct to store details of assets
-struct Asset:
-    member asset_version : felt
-    member ticker : felt
-    member short_name : felt
-    member tradable : felt
-    member collateral : felt
-    member token_decimal : felt
-    member metadata_id : felt
-    member tick_size : felt
-    member step_size : felt
-    member minimum_order_size : felt
-    member minimum_leverage : felt
-    member maximum_leverage : felt
-    member currently_allowed_leverage : felt
-    member maintenance_margin_fraction : felt
-    member initial_margin_fraction : felt
-    member incremental_initial_margin_fraction : felt
-    member incremental_position_size : felt
-    member baseline_position_size : felt
-    member maximum_position_size : felt
-end
-
-# @notice struct to store details of assets with IDs
-struct AssetWID:
-    member id : felt
-    member asset_version : felt
-    member ticker : felt
-    member short_name : felt
-    member tradable : felt
-    member collateral : felt
-    member token_decimal : felt
-    member metadata_id : felt
-    member tick_size : felt
-    member step_size : felt
-    member minimum_order_size : felt
-    member minimum_leverage : felt
-    member maximum_leverage : felt
-    member currently_allowed_leverage : felt
-    member maintenance_margin_fraction : felt
-    member initial_margin_fraction : felt
-    member incremental_initial_margin_fraction : felt
-    member incremental_position_size : felt
-    member baseline_position_size : felt
-    member maximum_position_size : felt
-end
 
 #
 # Storage
@@ -132,11 +89,11 @@ func set_L1_zkx_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=1
+        contract_address=auth_address, address=caller, action=ManageAssets_ACTION
     )
     assert_not_zero(access)
 
@@ -206,11 +163,11 @@ func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=1
+        contract_address=auth_address, address=caller, action=ManageAssets_ACTION
     )
     assert_not_zero(access)
 
@@ -234,11 +191,11 @@ func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=1
+        contract_address=auth_address, address=caller, action=ManageAssets_ACTION
     )
     assert_not_zero(access)
 
@@ -247,7 +204,7 @@ func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     asset.write(
         id=id,
         value=Asset(asset_version=0, ticker=0, short_name=0, tradable=0, collateral=0, token_decimal=0,
-        metadata_id=0, tick_size=0, step_size=0, minimum_order_size=0, minimum_leverage=0, maximum_leverage=0,
+        metadata_id=0, ttl=0, tick_size=0, step_size=0, minimum_order_size=0, minimum_leverage=0, maximum_leverage=0,
         currently_allowed_leverage=0, maintenance_margin_fraction=0, initial_margin_fraction=0, incremental_initial_margin_fraction=0,
         incremental_position_size=0, baseline_position_size=0, maximum_position_size=0),
     )
@@ -264,6 +221,7 @@ end
 # @param collateral - new collateral falg value for the asset
 # @param token_decimal - It represents decimal point value of the token
 # @param metadata_id -ID generated by asset metadata collection in zkx node
+# @param ttl -TTL for the price
 @external
 func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt,
@@ -272,6 +230,7 @@ func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     collateral : felt,
     token_decimal : felt,
     metadata_id : felt,
+    ttl : felt
 ):
     alloc_locals
     # Auth Check
@@ -279,11 +238,11 @@ func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=1
+        contract_address=auth_address, address=caller, action=ManageAssets_ACTION
     )
     assert_not_zero(access)
 
@@ -292,7 +251,7 @@ func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     asset.write(
         id=id,
         value=Asset(asset_version=_asset.asset_version, ticker=_asset.ticker, short_name=short_name, tradable=tradable,
-        collateral=collateral, token_decimal=token_decimal, metadata_id=metadata_id, tick_size=_asset.tick_size, step_size=_asset.step_size,
+        collateral=collateral, token_decimal=token_decimal, metadata_id=metadata_id, ttl=ttl, tick_size=_asset.tick_size, step_size=_asset.step_size,
         minimum_order_size=_asset.minimum_order_size, minimum_leverage=_asset.minimum_leverage, maximum_leverage=_asset.maximum_leverage,
         currently_allowed_leverage=_asset.currently_allowed_leverage, maintenance_margin_fraction=_asset.maintenance_margin_fraction,
         initial_margin_fraction=_asset.initial_margin_fraction, incremental_initial_margin_fraction=_asset.incremental_initial_margin_fraction,
@@ -338,14 +297,14 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     let (registry) = registry_address.read()
     let (ver) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=ver
+        contract_address=registry, index=AdminAuth_INDEX, version=ver
     )
     let (risk_management_addr) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=2, version=ver
+        contract_address=registry, index=RiskManagement_INDEX, version=ver
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=1
+        contract_address=auth_address, address=caller, action=ManageAssets_ACTION
     )
     if access == 0:
         assert caller = risk_management_addr
@@ -359,7 +318,7 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     asset.write(
         id=id,
         value=Asset(asset_version=_asset.asset_version + 1, ticker=_asset.ticker, short_name=_asset.short_name, tradable=_asset.tradable,
-        collateral=_asset.collateral, token_decimal=_asset.token_decimal, metadata_id=_asset.metadata_id, tick_size=tick_size, step_size=step_size,
+        collateral=_asset.collateral, token_decimal=_asset.token_decimal, metadata_id=_asset.metadata_id, ttl=_asset.ttl, tick_size=tick_size, step_size=step_size,
         minimum_order_size=minimum_order_size, minimum_leverage=minimum_leverage, maximum_leverage=maximum_leverage,
         currently_allowed_leverage=currently_allowed_leverage, maintenance_margin_fraction=maintenance_margin_fraction,
         initial_margin_fraction=initial_margin_fraction, incremental_initial_margin_fraction=incremental_initial_margin_fraction,
@@ -380,11 +339,11 @@ func updateAssetListInL1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=1
+        contract_address=auth_address, address=caller, action=ManageAssets_ACTION
     )
     assert_not_zero(access)
 
@@ -426,6 +385,7 @@ func populate_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
         collateral=asset_details.collateral,
         token_decimal=asset_details.token_decimal,
         metadata_id=asset_details.metadata_id,
+        ttl=asset_details.ttl,
         tick_size=asset_details.tick_size,
         step_size=asset_details.step_size,
         minimum_order_size=asset_details.minimum_order_size,
@@ -455,18 +415,4 @@ func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
 
     let (array_list : AssetWID*) = alloc()
     return populate_assets(array_list_len=0, array_list=array_list)
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_contract_address(index : felt, version : felt) -> (address : felt):
-    end
-end
-
-# @notice AdminAuth interface
-@contract_interface
-namespace IAdminAuth:
-    func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
-    end
 end

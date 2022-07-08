@@ -2,6 +2,9 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.Constants import Trading_INDEX
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAdminAuth import IAdminAuth
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
 
@@ -49,7 +52,7 @@ func update_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=5, version=version
+        contract_address=registry, index=Trading_INDEX, version=version
     )
 
     with_attr error_message("Access is denied since caller is not trading contract"):
@@ -88,18 +91,4 @@ func get_user_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 ) -> (fee : felt):
     let (fee) = fee_mapping.read(address=address, assetID=assetID_)
     return (fee)
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_contract_address(index : felt, version : felt) -> (address : felt):
-    end
-end
-
-# @notice AdminAuth interface
-@contract_interface
-namespace IAdminAuth:
-    func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
-    end
 end

@@ -2,6 +2,15 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.DataTypes import Asset, Market, MarketWID
+from contracts.Constants import (
+    AdminAuth_INDEX,
+    Asset_INDEX,
+    ManageMarkets_ACTION,
+)
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IAdminAuth import IAdminAuth
+from contracts.interfaces.IAsset import IAsset
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
@@ -26,46 +35,6 @@ end
 # Length of the markets array
 @storage_var
 func markets_array_len() -> (len : felt):
-end
-
-# @notice struct to store details of markets
-struct Market:
-    member asset : felt
-    member assetCollateral : felt
-    member leverage : felt
-    member tradable : felt
-end
-
-# @notice struct to store details of markets with IDs
-struct MarketWID:
-    member id : felt
-    member asset : felt
-    member assetCollateral : felt
-    member leverage : felt
-    member tradable : felt
-end
-
-# @notice struct to store details of assets
-struct Asset:
-    member assetVersion : felt
-    member ticker : felt
-    member shortName : felt
-    member tradable : felt
-    member collateral : felt
-    member tokenDecimal : felt
-    member metadataID : felt
-    member tickSize : felt
-    member stepSize : felt
-    member minimumOrderSize : felt
-    member minimum_leverage : felt
-    member maximum_leverage : felt
-    member currently_allowed_leverage : felt
-    member maintenance_margin_fraction : felt
-    member initial_margin_fraction : felt
-    member incremental_initial_margin_fraction : felt
-    member incremental_position_size : felt
-    member baseline_position_size : felt
-    member maximum_position_size : felt
 end
 
 # @notice Mapping between market ID and Market data
@@ -104,10 +73,10 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=2
+        contract_address=auth_address, address=caller, action=ManageMarkets_ACTION
     )
     assert_not_zero(access)
 
@@ -163,11 +132,11 @@ func removeMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=2
+        contract_address=auth_address, address=caller, action=ManageMarkets_ACTION
     )
     assert_not_zero(access)
 
@@ -188,11 +157,11 @@ func modifyLeverage{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=2
+        contract_address=auth_address, address=caller, action=ManageMarkets_ACTION
     )
     assert_not_zero(access)
 
@@ -259,11 +228,11 @@ func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=0, version=version
+        contract_address=registry, index=AdminAuth_INDEX, version=version
     )
 
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=2
+        contract_address=auth_address, address=caller, action=ManageMarkets_ACTION
     )
     assert_not_zero(access)
 
@@ -274,7 +243,7 @@ func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (_market : Market) = market.read(id=id)
 
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=1, version=version
+        contract_address=registry, index=Asset_INDEX, version=version
     )
     let (asset1 : Asset) = IAsset.getAsset(contract_address=asset_address, id=_market.asset)
 
@@ -317,25 +286,4 @@ func getMarket_from_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
 ) -> (market_id : felt):
     let (currMarket) = market_mapping.read(asset_id=asset_id, collateral_id=collateral_id)
     return (currMarket)
-end
-
-# @notice AuthorizedRegistry interface
-@contract_interface
-namespace IAuthorizedRegistry:
-    func get_contract_address(index : felt, version : felt) -> (address : felt):
-    end
-end
-
-# @notice AdminAuth interface
-@contract_interface
-namespace IAdminAuth:
-    func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
-    end
-end
-
-# @notice Asset interface
-@contract_interface
-namespace IAsset:
-    func getAsset(id : felt) -> (currAsset : Asset):
-    end
 end
