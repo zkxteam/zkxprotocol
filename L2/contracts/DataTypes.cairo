@@ -202,16 +202,6 @@ struct WithdrawalHistory:
     member status : felt
 end
 
-# Struct for message to consume for quoting fee in L1
-struct QuoteL1Message:
-    member user_l1_address : felt
-    member ticker : felt
-    member amount : felt
-    member timestamp : felt
-    member L1_fee_amount : felt
-    member L1_fee_ticker : felt
-end
-
 # Struct for hashing withdrawal request
 struct WithdrawalRequestForHashing:
     member request_id : felt

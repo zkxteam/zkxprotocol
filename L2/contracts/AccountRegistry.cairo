@@ -34,11 +34,6 @@ end
 func account_present(address : felt) -> (present : felt):
 end
 
-# @notice stores the address of L1 zkx contract
-@storage_var
-func L1_zkx_address() -> (res : felt):
-end
-
 #
 # Constructor
 #
@@ -55,13 +50,9 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-
-#
-# Setters
-#
-
-# @notice set L1 zkx contract address function
-# @param address - L1 zkx contract address as an argument
+# @notice add to account registry
+# @param address_ - L2 account contract address of the user
+# @return 1 - If successfully added
 @external
 func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt
