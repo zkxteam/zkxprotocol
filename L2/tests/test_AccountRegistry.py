@@ -53,6 +53,9 @@ async def adminAuth_factory():
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
 
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
+
+
     return adminAuth, account_registry, admin1, admin2
 
 
@@ -88,7 +91,7 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
 async def test__unauthorized_add_address_to_account_registry(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
-    assert_revert(lambda: signer1.send_transaction(admin1, admin1.contract_address, 'add_to_account_registry', [str_to_felt("1234")]))
+    assert_revert(lambda: signer2.send_transaction(admin2, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("1234")]))
 
 @pytest.mark.asyncio
 async def test_add_address_to_account_registry_duplicate(adminAuth_factory):
