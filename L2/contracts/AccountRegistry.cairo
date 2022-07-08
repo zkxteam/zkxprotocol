@@ -92,7 +92,7 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     end
-    return ()
+    return (1)
 end
 
 # @notice External function called to remove account address from registry
