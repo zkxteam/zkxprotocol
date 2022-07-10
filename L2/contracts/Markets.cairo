@@ -99,7 +99,7 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     if newMarket.tradable == 2:
         market.write(
             id=id,
-            value=Market(asset=newMarket.asset, assetCollateral=newMarket.assetCollateral, leverage=newMarket.leverage, tradable=asset1.tradable),
+            value=Market(asset=newMarket.asset, assetCollateral=newMarket.assetCollateral, leverage=newMarket.leverage, tradable=asset1.tradable, ttl=newMarket.ttl),
         )
         market_mapping.write(
             asset_id=newMarket.asset, collateral_id=newMarket.assetCollateral, value=id
@@ -140,7 +140,7 @@ func removeMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     )
     assert_not_zero(access)
 
-    market.write(id=id, value=Market(asset=0, assetCollateral=0, leverage=0, tradable=0))
+    market.write(id=id, value=Market(asset=0, assetCollateral=0, leverage=0, tradable=0, ttl=0))
     return ()
 end
 
@@ -169,7 +169,7 @@ func modifyLeverage{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 
     market.write(
         id=id,
-        value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=leverage, tradable=_market.tradable),
+        value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=leverage, tradable=_market.tradable, ttl=_market.ttl),
     )
     return ()
 end
@@ -196,6 +196,7 @@ func populate_markets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         assetCollateral=market_details.assetCollateral,
         leverage=market_details.leverage,
         tradable=market_details.tradable,
+        ttl=market_details.ttl
     )
     assert array_list[array_list_len] = market_details_w_id
 
@@ -250,7 +251,7 @@ func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     if _market.tradable == 2:
         market.write(
             id=id,
-            value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=_market.leverage, tradable=asset1.tradable),
+            value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=_market.leverage, tradable=asset1.tradable, ttl=_market.ttl),
         )
     else:
         if tradable == 1:
@@ -258,7 +259,7 @@ func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         end
         market.write(
             id=id,
-            value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=_market.leverage, tradable=tradable),
+            value=Market(asset=_market.asset, assetCollateral=_market.assetCollateral, leverage=_market.leverage, tradable=tradable, ttl=_market.ttl),
         )
     end
 
