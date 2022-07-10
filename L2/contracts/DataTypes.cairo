@@ -208,3 +208,21 @@ struct WithdrawalRequestForHashing:
     member collateral_id : felt
     member amount : felt
 end
+
+# Struct to store Market prices
+struct MarketPrices:
+  member asset_id : felt
+  member collateral_id : felt
+  member timestamp : felt
+  member price : felt
+end
+
+# Struct for message to consume for quoting fee in L1
+struct QuoteL1Message:
+    member user_l1_address : felt
+    member ticker : felt
+    member amount : felt
+    member timestamp : felt
+    member L1_fee_amount : felt
+    member L1_fee_ticker : felt
+end
