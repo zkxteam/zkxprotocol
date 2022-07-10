@@ -34,6 +34,10 @@ end
 func account_present(address : felt) -> (present : felt):
 end
 
+#
+# Constructor
+#
+
 # @notice Constructor for the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
 # @param version_ Version of this contract
@@ -46,9 +50,9 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-# @notice function to add account contract address to registry, when user deposits funds to L2 for the first time
-# @param address_ - Account address to be added
-# @returns 1 - If successfully added
+# @notice add to account registry
+# @param address_ - L2 account contract address of the user
+# @return 1 - If successfully added
 @external
 func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt
@@ -64,7 +68,6 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     with_attr error_message("Caller is not authorized to add account to registry"):
         assert caller = account_deployer_address
     end
-
 
     let (is_present) = account_present.read(address=address_)
     if is_present == 0:

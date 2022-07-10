@@ -15,4 +15,7 @@ namespace IWithdrawalFeeBalance:
     func get_user_withdrawal_fee(user_l2_address_ : felt, collateral_id_ : felt) -> (fee : felt):
     end
 
+    func get_standard_withdraw_fee() -> (fee : felt, collateral_id : felt):
+    end
+
 end

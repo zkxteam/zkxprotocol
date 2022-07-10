@@ -1,6 +1,5 @@
 require("@nomiclabs/hardhat-waffle");
-require('dotenv').config({path: './.env'});
-
+require("dotenv").config({ path: "./.env" });
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -19,14 +18,14 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  solidity: "0.8.4",
+  solidity: "0.8.7",
   networks: {
     myNetwork: {
-      url: "http://localhost:5000"
+      url: "http://localhost:5000",
     },
     goerli: {
-        url: process.env.alchemy_url,
-        accounts: [`0x${process.env.PRIVATE_KEY}`],
-      }
-  }
+      url: process.env.ALCHEMY_URL,
+      accounts: [`0x${process.env.PRIVATE_KEY}`],
+    },
+  },
 };

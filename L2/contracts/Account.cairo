@@ -11,6 +11,7 @@ from contracts.DataTypes import (
     OrderRequest,
     Signature,
     WithdrawalHistory,
+    WithdrawalRequestForHashing
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
@@ -18,6 +19,7 @@ from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
+from contracts.interfaces.IQuoteL1Fee import IQuoteL1Fee
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.cairo.common.registers import get_fp_and_pc
@@ -791,14 +793,14 @@ end
 # @param message - Struct of order details to hash
 # @param res - Hash of the details
 func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(
-    withdrawal_request_ : WithdrawalHistory*
+    withdrawal_request_ : WithdrawalRequestForHashing*
 ) -> (res : felt):
     alloc_locals
 
     let hash_ptr = pedersen_ptr
     with hash_ptr:
         let (hash_state_ptr) = hash_init()
-        let (hash_state_ptr) = hash_update(hash_state_ptr, withdrawal_request_, 2)
+        let (hash_state_ptr) = hash_update(hash_state_ptr, withdrawal_request_, 3)
         let (res) = hash_finalize(hash_state_ptr)
         let pedersen_ptr = hash_ptr
         return (res=res)
@@ -1030,14 +1032,12 @@ func execute_order{
 end
 
 # @notice Internal function to recursively find the index of the withdrawal history to be updated
-# @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
-# @param amount_ - Amount of funds that user has withdrawn
-# @param timestamp_ - Time at which user submitted withdrawal request
+# @param request_id_ - Id of the withdrawal request
 # @param arr_len_ - current index which is being checked to be updated
 # @return index - returns the index which needs to be updated
 func find_index_to_be_updated_recurse{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(collateral_id_ : felt, amount_ : felt, timestamp_ : felt, arr_len_ : felt) -> (index : felt):
+}(request_id_ : felt, arr_len_ : felt) -> (index : felt):
     alloc_locals
 
     if arr_len_ == 0:
@@ -1045,45 +1045,22 @@ func find_index_to_be_updated_recurse{
     end
 
     let (request : WithdrawalHistory) = withdrawal_history_array.read(index=arr_len_ - 1)
-
-    local first_check_counter
-    local second_check_counter
-    local third_check_counter
-    if request.collateral_id == collateral_id_:
-        first_check_counter = 1
-    end
-    if request.amount == amount_:
-        second_check_counter = 1
-    end
-    if request.timestamp == timestamp_:
-        third_check_counter = 1
-    end
-
-    let counter = first_check_counter + second_check_counter + third_check_counter
-    if counter == 3:
+    if request.request_id == request_id_:
         return (arr_len_ - 1)
     end
-    return find_index_to_be_updated_recurse(collateral_id_, amount_, timestamp_, arr_len_ - 1)
+
+    return find_index_to_be_updated_recurse(request_id_, arr_len_ - 1)
 end
 
 # @notice function to update l1 fee and node operators l1 wallet address
-# @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
-# @param amount_ - Amount of funds that user has withdrawn
-# @param timestamp_ - Time at which user submitted withdrawal request
-# @param node_operator_L1_address_ - Node operators L1 address
-# @param L1_fee_amount_ - Gas fee in L1
-# @param L1_fee_collateral_id_ - Collateral used to pay L1 gas fee
+# @param request_id_ - Id of the withdrawal request
 @external
 func update_withdrawal_history{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
 }(
-    collateral_id_ : felt,
-    amount_ : felt,
-    timestamp_ : felt,
-    node_operator_L1_address_ : felt,
-    L1_fee_amount_ : felt,
-    L1_fee_collateral_id_ : felt,
+    request_id_ : felt,
 ):
+    alloc_locals
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -1098,49 +1075,79 @@ func update_withdrawal_history{
     end
 
     let (arr_len) = withdrawal_history_array_len.read()
-    let (index) = find_index_to_be_updated_recurse(collateral_id_, amount_, timestamp_, arr_len)
-    if index != -1:
-        let (history) = withdrawal_history_array.read(index=index)
-        let updated_history = WithdrawalHistory(
-            collateral_id=collateral_id_,
-            amount=amount_,
-            timestamp=timestamp_,
-            node_operator_L1_address=node_operator_L1_address_,
-            node_operator_L2_address=history.node_operator_L2_address,
-            L1_fee_amount=L1_fee_amount_,
-            L1_fee_collateral_id=L1_fee_collateral_id_,
-            L2_fee_amount=history.L2_fee_amount,
-            L2_fee_collateral_id=history.L2_fee_collateral_id,
+    let (index) = find_index_to_be_updated_recurse(request_id_, arr_len)
+    local index_to_be_updated = index
+    if index_to_be_updated != -1:
+        let (history) = withdrawal_history_array.read(index=index_to_be_updated)
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        # Get asset contract address
+        let (asset_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=Asset_INDEX, version=version
         )
-        withdrawal_history_array.write(index=index, value=updated_history)
+        let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=history.collateral_id)
+        tempvar decimal = asset.token_decimal
+
+        let (ten_power_decimal) = pow(10, decimal)
+        let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
+
+        let (temp_amount_in_64x61_format) = Math64x61_fromFelt(history.amount)
+        let (amount_in_64x61_format) = Math64x61_div(
+            temp_amount_in_64x61_format, decimal_in_64x61_format
+        )
+
+        let updated_history = WithdrawalHistory(
+            request_id=history.request_id,
+            collateral_id=history.collateral_id,
+            amount=amount_in_64x61_format,
+            timestamp=history.timestamp,
+            node_operator_L2_address=history.node_operator_L2_address,
+            status=1,
+        )
+        withdrawal_history_array.write(index=index_to_be_updated, value=updated_history)
         return ()
     end
     return ()
 end
 
+# @notice Internal function to recursively check for withdrawal replays
+# @param request_id_ - Id of the withdrawal request
+# @param arr_len_ - current index which is being checked to be updated
+# @return - -1 if same withdrawal request already exists, else 1
+func check_for_withdrawal_replay{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(request_id_ : felt, arr_len_ : felt) -> (index : felt):
+    alloc_locals
+
+    if arr_len_ == 0:
+        return (1)
+    end
+
+    let (request : WithdrawalHistory) = withdrawal_history_array.read(index=arr_len_ - 1)
+    if request.request_id == request_id_:
+        return (-1)
+    end
+
+    return check_for_withdrawal_replay(request_id_, arr_len_ - 1)
+end
+
 # @notice Function to withdraw funds
+# @param request_id_ - Id of the withdrawal request
 # @param collateral_id_ - Id of the collateral on which user submitted withdrawal request
 # @param amount_ - Amount of funds that user wants to withdraw
 # @param sig_r_ - R part of signature
 # @param sig_s_ - S part of signature
 # @param node_operator_L2_address_ - Node operators L2 address
-# @param L1_fee_amount_ - Gas fee in L1
-# @param L1_fee_collateral_id_ - Collateral used to pay L1 gas fee
-# @param L2_fee_amount_ - Gas fee in L2
-# @param L2_fee_collateral_id_ - Collateral used to pay L2 gas fee
 @external
-func withdrawal{
+func withdraw{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
 }(
+    request_id_ : felt,
     collateral_id_ : felt,
     amount_ : felt,
     sig_r_ : felt,
     sig_s_ : felt,
     node_operator_L2_address_ : felt,
-    L1_fee_amount_ : felt,
-    L1_fee_collateral_id_ : felt,
-    L2_fee_amount_ : felt,
-    L2_fee_collateral_id_ : felt,
 ):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
@@ -1152,50 +1159,53 @@ func withdrawal{
     assert signature_[0] = sig_r_
     assert signature_[1] = sig_s_
 
-    # Calculate the timestamp
-    let (timestamp_) = get_block_timestamp()
-
-    # Create a withdrawal history object
-    local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
+    # Create withdrawal request for hashing
+    local hash_withdrawal_request_ : WithdrawalRequestForHashing = WithdrawalRequestForHashing(
+        request_id=request_id_,
         collateral_id=collateral_id_,
         amount=amount_,
-        timestamp=timestamp_,
-        node_operator_L1_address=0,
-        node_operator_L2_address=node_operator_L2_address_,
-        L1_fee_amount=L1_fee_amount_,
-        L1_fee_collateral_id=L1_fee_collateral_id_,
-        L2_fee_amount=L2_fee_amount_,
-        L2_fee_collateral_id=L2_fee_collateral_id_
-        )
+    )
 
     # hash the parameters
-    let (hash) = hash_withdrawal_request(&withdrawal_history_)
+    let (hash) = hash_withdrawal_request(&hash_withdrawal_request_)
 
     # check if Tx is signed by the user
     is_valid_signature(hash, 2, signature_)
 
+    let (arr_len) = withdrawal_history_array_len.read()
+    let (result) = check_for_withdrawal_replay(request_id_, arr_len)
+    with_attr error_message("Same withdrawal request exists"):
+        assert_nn(result)
+    end
+
     # Make sure 'amount' is positive.
     assert_nn(amount_)
 
-    # Compute current L1 fee collateral balance
-    let (L1_fee_collateral_balance) = balance.read(assetID=L1_fee_collateral_id_)
-    with_attr error_message("L1 fee collateral balance should be more than L1 fee"):
-        assert_le(L1_fee_amount_, L1_fee_collateral_balance)
+     # get L2 Account contract address
+    let (user_l2_address) = get_contract_address()
+
+    # Update the fees to be paid by user in withdrawal fee balance contract
+    let (withdrawal_fee_balance_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=WithdrawalFeeBalance_INDEX, version=version
+    )
+    let (standard_fee, fee_collateral_id) = IWithdrawalFeeBalance.get_standard_withdraw_fee(contract_address=withdrawal_fee_balance_address)
+
+    # Compute current balance
+    let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id)
+    with_attr error_message("Fee amount should be less than fee collateral balance"):
+        assert_le(standard_fee, fee_collateral_balance)
     end
-    tempvar new_L1_fee_collateral_balance = L1_fee_collateral_balance - L1_fee_amount_
+    tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee
 
-    # Update L1 fee collateral balance
-    balance.write(assetID=L1_fee_collateral_id_, value=new_L1_fee_collateral_balance)
+    # Update the new fee collateral balance
+    balance.write(assetID=fee_collateral_id, value=new_fee_collateral_balance)
 
-    # Compute current L2 fee collateral balance
-    let (L2_fee_collateral_balance) = balance.read(assetID=L2_fee_collateral_id_)
-    with_attr error_message("L2 fee collateral balance should be more than L2 fee"):
-        assert_le(L2_fee_amount_, L2_fee_collateral_balance)
-    end
-    tempvar new_L2_fee_collateral_balance = L2_fee_collateral_balance - L2_fee_amount_
-
-    # Update L2 fee collateral balance
-    balance.write(assetID=L2_fee_collateral_id_, value=new_L2_fee_collateral_balance)
+    IWithdrawalFeeBalance.update_withdrawal_fee_mapping(
+        contract_address=withdrawal_fee_balance_address,
+        user_l2_address_=user_l2_address,
+        collateral_id_=fee_collateral_id,
+        fee_to_add_=standard_fee,
+    )
 
     # Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_)
@@ -1207,23 +1217,8 @@ func withdrawal{
     # Update the new balance
     balance.write(assetID=collateral_id_, value=new_balance)
 
-    # get L2 Account contract address
-    let (user_l2_address) = get_contract_address()
-
-    # Update the fees to be paid by user in withdrawal fee balance contract
-    let (withdrawal_fee_balance_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=WithdrawalFeeBalance_INDEX, version=version
-    )
-    IWithdrawalFeeBalance.update_withdrawal_fee_mapping(
-        contract_address=withdrawal_fee_balance_address,
-        user_l2_address_=user_l2_address,
-        collateral_id_=collateral_id_,
-        fee_to_add_=L2_fee_amount_,
-    )
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    # Calculate the timestamp
+    let (timestamp_) = get_block_timestamp()
 
     # Get asset contract address
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
@@ -1232,6 +1227,7 @@ func withdrawal{
     # Reading token decimal field of an asset
     let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
     tempvar decimal = asset.token_decimal
+    tempvar ticker = asset.ticker
 
     let (ten_power_decimal) = pow(10, decimal)
     let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
@@ -1248,10 +1244,23 @@ func withdrawal{
     )
     IWithdrawalRequest.add_withdrawal_request(
         contract_address=withdrawal_request_address,
+        request_id_=request_id_,
         user_l1_address_=user_l1_address,
-        collateral_id_=collateral_id_,
-        amount_=amount_,
-        timestamp_=timestamp_,
+        ticker_=ticker,
+        amount_=amount_in_felt,
+    )
+
+    # Get L1 ZKX contract address
+    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
+
+    # Create a withdrawal history object
+    local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
+        request_id=request_id_,
+        collateral_id=collateral_id_,
+        amount=amount_in_felt,
+        timestamp=timestamp_,
+        node_operator_L2_address=node_operator_L2_address_,
+        status=0
     )
 
     # Update Withdrawal history
@@ -1259,16 +1268,13 @@ func withdrawal{
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_)
     withdrawal_history_array_len.write(array_len + 1)
 
-    # Get L1 ZKX contract address
-    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
-
     # Send the withdrawal message.
     let (message_payload : felt*) = alloc()
     assert message_payload[0] = MESSAGE_WITHDRAW
     assert message_payload[1] = user_l1_address
-    assert message_payload[2] = collateral_id_
+    assert message_payload[2] = ticker
     assert message_payload[3] = amount_in_felt
-    assert message_payload[4] = timestamp_
+    assert message_payload[4] = request_id_
 
     # Send Message to L1
     send_message_to_l1(to_address=L1_ZKX_contract_address, payload_size=5, payload=message_payload)
@@ -1313,14 +1319,8 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         amount_in_64x61_format, decimal_in_64x61_format
     )
 
-    # Read the current balance.
-    let (res) = balance.read(assetID=assetID_)
-
-    # Compute and update the new balance.
-    tempvar new_balance = res + amount_in_decimal_representation
-    balance.write(assetID=assetID_, value=new_balance)
-
     let (array_len) = collateral_array_len.read()
+    # Read the current balance.
     let (balance_collateral) = balance.read(assetID=assetID_)
 
     if balance_collateral == 0:
@@ -1333,6 +1333,10 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     end
+
+    # Compute and update the new balance.
+    tempvar new_balance = balance_collateral + amount_in_decimal_representation
+    balance.write(assetID=assetID_, value=new_balance)
 
     return ()
 end
