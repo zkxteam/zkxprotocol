@@ -170,7 +170,7 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
 
 
 @pytest.mark.asyncio
-async def test_should_pass_if_non_admin_changed_base_abr(abr_factory):
+async def test_should_pass_if_admin_changed_base_abr(abr_factory):
     _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
 
     new_base_abr = to64x61(0.000025)
@@ -190,7 +190,7 @@ async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
     print("cairo rate", from64x61(abr_cairo.result.response[0]))
 
-    abr_value = await abr.get_abr_value(92391239).call()
+    abr_value = await abr.get_abr_value(1282198).call()
     print("abr value of the market is:",
           from64x61(abr_value.result.abr))
     print("The last price is:",
@@ -199,4 +199,4 @@ async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
           from64x61(abr_value.result.timestamp))
 
     assert abr_python == pytest.approx(
-        from64x61(abr_cairo.result.response[0]), abs=1e-6)
+        from64x61(abr_cairo.result.response[0]), abs=1e-4)

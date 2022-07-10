@@ -22,10 +22,9 @@ from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from starkware.starknet.common.syscalls import get_caller_address
-from contracts.Constants import AdminAuth_INDEX
+from contracts.Constants import AdminAuth_INDEX, MasterAdmin_ACTION
 
 const NUM_1 = 2305843009213693952
-const NUM_100 = 230584300921369395200
 const NUM_8 = 18446744073709551616
 const NUM_STD = 4611686018427387904
 
@@ -82,7 +81,7 @@ func modify_base_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
         contract_address=registry, index=AdminAuth_INDEX, version=version
     )
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=admin_auth, address=caller, action=0
+        contract_address=admin_auth, address=caller, action=MasterAdmin_ACTION
     )
     with_attr error_message("Caller does not have permission to update base abr value"):
         assert_not_zero(access)
@@ -461,11 +460,11 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
         jump_value_upper = 0
     else:
         # Calculate jump
-        let (jump) = Math64x61_div(upper_diff, [index_prices])
-        let (ln_jump) = Math64x61_ln(jump)
+        let (ln_jump) = Math64x61_ln(upper_diff)
+        let (jump) = Math64x61_div(ln_jump, [index_prices])
 
         # Add the jump to the premium
-        jump_value_upper = ln_jump
+        jump_value_upper = jump
 
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -485,11 +484,11 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
         jump_value_lower = 0
     else:
         # Calculate jump
-        let (jump) = Math64x61_div(lower_diff, [index_prices])
-        let (ln_jump) = Math64x61_ln(jump)
+        let (ln_jump) = Math64x61_ln(lower_diff)
+        let (jump) = Math64x61_div(ln_jump, [index_prices])
 
         # Add the jump to the premium
-        jump_value_lower = ln_jump
+        jump_value_lower = jump
 
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -736,8 +735,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (base_abr_) = base_abr.read()
     let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0, base_abr_)
     let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
-    let (rate_percentage) = Math64x61_div(rate_sum, array_size)
-    let (rate) = Math64x61_div(rate_percentage, NUM_100)
+    let (rate) = Math64x61_div(rate_sum, array_size)
 
     # Store the result and the timestamp in their storage vars
     let (block_timestamp) = get_block_timestamp()

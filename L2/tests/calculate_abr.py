@@ -36,11 +36,11 @@ def find_jump(premium, perp, spot, lower, upper):
         lower_diff = max(lower[i] - perp[i], 0)
 
         if upper_diff > 0:
-            jump = log(upper_diff/spot[i])
+            jump = log(upper_diff)/spot[i]
             premium[i] += jump
 
         if lower_diff > 0:
-            jump = log(lower_diff/spot[i])
+            jump = log(lower_diff)/spot[i]
             premium[i] -= jump
 
     return premium
@@ -76,7 +76,7 @@ def bollinger(data, avg, window):
     return (lower, upper)
 
 
-def effective_abr(premium):
+def effective_abr(premium, base_rate):
     sum = 0
     for i in range(len(premium)):
         premium[i] /= 8.0
@@ -104,7 +104,7 @@ def reduce(perp_spot, perp, window):
     return (index, mark)
 
 
-def calculate_abr(perp_spot, perp):
+def calculate_abr(perp_spot, perp, base_rate):
     (index_prices, mark_prices) = reduce(
         perp_spot, perp, 8)
     avg_array = sliding_mean(mark_prices, 8)
@@ -114,6 +114,6 @@ def calculate_abr(perp_spot, perp):
 
     premium = sliding_mean(diff, 8)
     final_premium = find_jump(premium, mark_prices, index_prices, lower, upper)
-    abr = effective_abr(final_premium)
+    abr = effective_abr(final_premium, base_rate)
 
-    return abr/100
+    return abr
