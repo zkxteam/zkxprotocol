@@ -2,7 +2,7 @@
 
 %builtins pedersen range_check ecdsa
 
-from contracts.DataTypes import OrderRequest, OrderDetails, Signature, Market, MultipleOrder, Asset
+from contracts.DataTypes import OrderRequest, OrderDetails, Signature, Market, MultipleOrder, Asset, MarketPrice
 from contracts.Constants import (
     Asset_INDEX,
     Market_INDEX,
@@ -11,6 +11,7 @@ from contracts.Constants import (
     FeeBalance_INDEX,
     LiquidityFund_INDEX,
     InsuranceFund_INDEX,
+    MarketPrices_INDEX
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
@@ -21,6 +22,7 @@ from contracts.interfaces.IFeeBalance import IFeeBalance
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
+from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.Constants import AdminAuth_INDEX
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.math import assert_not_zero, assert_le, assert_in_range
@@ -28,6 +30,7 @@ from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+from starkware.starknet.common.syscalls import get_block_timestamp
 
 # @notice Stores the contract version
 @storage_var
@@ -683,6 +686,56 @@ func execute_batch{
     request_list : MultipleOrder*,
 ) -> (res : felt):
     alloc_locals
+
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Calculate the timestamp
+    let (current_timestamp) = get_block_timestamp()
+
+    # Get market contract address
+    let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    )
+
+    # Get Market from the corresponding Id
+    let (market : Market) = IMarkets.getMarket(
+        contract_address=market_contract_address,
+        id=marketID
+    )
+
+    tempvar ttl = market.ttl
+
+    # Get market prices contract address
+    let (market_prices_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=MarketPrices_INDEX, version=version
+    )
+
+    # Get Market price for the corresponding market Id
+    let (market_prices : MarketPrice) = IMarketPrices.get_market_price(
+        contract_address=market_prices_contract_address,
+        id=marketID
+    )
+
+    tempvar timestamp = market_prices.timestamp
+    tempvar time_difference = current_timestamp - timestamp
+    let (status) = is_le(time_difference, ttl)
+
+    # update market price
+    if status == 0:
+        IMarketPrices.update_market_price(
+            contract_address=market_prices_contract_address,
+            id=marketID,
+            price=execution_price
+        )
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
 
     # Recursively loop through the orders in the batch
     let (result) = check_and_execute(

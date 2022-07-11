@@ -211,8 +211,8 @@ struct WithdrawalRequestForHashing:
     member amount : felt
 end
 
-# Struct to store Market prices
-struct MarketPrices:
+# Struct to store Market price
+struct MarketPrice:
   member asset_id : felt
   member collateral_id : felt
   member timestamp : felt

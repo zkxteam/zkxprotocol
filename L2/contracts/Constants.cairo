@@ -21,6 +21,7 @@ const ABR_INDEX = 17
 const ABR_FUNDS_INDEX = 18
 const ABR_PAYMENT_INDEX = 19
 const AccountDeployer_INDEX = 20
+const MarketPrices_INDEX = 21
 
 # Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
