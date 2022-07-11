@@ -317,6 +317,7 @@ contract L1ZKXContract is AccessControl {
         uint256 amount_,
         uint256 requestId_
     ) public {
+        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdraw recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -360,6 +361,7 @@ contract L1ZKXContract is AccessControl {
         uint256 amount_,
         uint256 requestId_
     ) public {
+        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdraw recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
