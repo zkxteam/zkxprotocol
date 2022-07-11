@@ -1,7 +1,7 @@
 %lang starknet
 %builtins pedersen range_check ecdsa
 
-from contracts.DataTypes import MarketPrices, Market
+from contracts.DataTypes import MarketPrice, Market
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAdminAuth import IAdminAuth
@@ -27,7 +27,7 @@ end
 
 # @notice Mapping between market ID and Market Prices
 @storage_var
-func market_prices(id : felt) -> (res : MarketPrices):
+func market_prices(id : felt) -> (res : MarketPrice):
 end
 
 #
@@ -55,7 +55,7 @@ end
 @external
 func get_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt,
-)-> (market_price : MarketPrices):
+)-> (market_price : MarketPrice):
     let (res) = market_prices.read(id=market_id_)
     return (market_price=res)
 end
@@ -122,7 +122,7 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     )
 
     # Create a struct object for the market prices
-    tempvar new_market_price : MarketPrices = MarketPrices(
+    tempvar new_market_price : MarketPrice = MarketPrice(
         asset_id=market.asset,
         collateral_id=market.assetCollateral,
         timestamp=timestamp_,
