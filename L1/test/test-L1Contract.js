@@ -50,7 +50,7 @@ describe("L1ZKXContract", function () {
     const bobContract = L1ZKXContract.connect(bob)
     await expect(
       bobContract.withdrawEth(alice.address, withdrawalAmount, requestID)
-    ).to.be.revertedWith("Sender is not withdraw recipient")
+    ).to.be.revertedWith("Sender is not withdrawal recipient")
     
     // Alice successfully withdraws
     await aliceContract.withdrawEth(alice.address, withdrawalAmount, requestID);
