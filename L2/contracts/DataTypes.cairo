@@ -88,6 +88,7 @@ struct MultipleOrder:
     member assetID : felt
     member collateralID : felt
     member price : felt
+    member stopPrice: felt
     member orderType : felt
     member positionSize : felt
     member direction : felt
@@ -112,6 +113,7 @@ struct OrderRequest:
     member assetID : felt
     member collateralID : felt
     member price : felt
+    member stopPrice: felt
     member orderType : felt
     member positionSize : felt
     member direction : felt
