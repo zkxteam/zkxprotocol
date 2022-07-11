@@ -243,9 +243,10 @@ contract L1ZKXContract is AccessControl {
          * If l2 contract address is not set, then it will be set for the corresponding
          * user's L1 wallet address
          */
-        if (l2ContractAddress[uint256(uint160(address(msg.sender)))] == 0) {
+        uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
+        if (l2ContractAddress[senderAsUint256] == 0) {
             l2ContractAddress[
-                uint256(uint160(address(msg.sender)))
+                senderAsUint256
             ] = userL2Address_;
         }
 
@@ -260,12 +261,12 @@ contract L1ZKXContract is AccessControl {
         uint256 collateralId = assetID[ticker_];
 
         // Update the User balance.
-        userBalance[uint256(uint160(address(msg.sender)))][
+        userBalance[senderAsUint256][
             collateralId
-        ] = userBalance[uint256(uint160(address(msg.sender)))][collateralId]
+        ] = userBalance[senderAsUint256][collateralId]
             .add(amount_);
         depositToL2(
-            uint256(uint160(address(msg.sender))),
+            senderAsUint256,
             collateralId,
             amount_
         );
@@ -282,21 +283,22 @@ contract L1ZKXContract is AccessControl {
          * If l2 contract address is not set, then it will be set for the corresponding
          * user's L1 wallet address
          */
-        if (l2ContractAddress[uint256(uint160(address(msg.sender)))] == 0) {
+        uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
+        if (l2ContractAddress[senderAsUint256] == 0) {
             l2ContractAddress[
-                uint256(uint160(address(msg.sender)))
+                senderAsUint256
             ] = userL2Address_;
         }
 
         uint256 collateralId = assetID[ETH_TICKER];
 
         // Update the User balance.
-        userBalance[uint256(uint160(address(msg.sender)))][
+        userBalance[senderAsUint256][
             collateralId
-        ] = userBalance[uint256(uint160(address(msg.sender)))][collateralId]
+        ] = userBalance[senderAsUint256][collateralId]
             .add(msg.value);
         depositToL2(
-            uint256(uint160(address(msg.sender))),
+            senderAsUint256,
             collateralId,
             msg.value
         );
