@@ -9,7 +9,6 @@ contract StarknetCoreMock is IStarknetCore {
 
     /* IStarknetCore public */
 
-    bool public invokedSendMessageToL2 = false;
     uint public invokedSendMessageToL2Count = 0;
     
     function sendMessageToL2(
@@ -21,13 +20,12 @@ contract StarknetCoreMock is IStarknetCore {
         external 
         returns (bytes32)
     {
-        invokedSendMessageToL2 = true;
         invokedSendMessageToL2Count += 1;
+        /* Do nothing */
         return bytes32(0);
     }
 
-    bool invokedConsumeMessageFromL2 = false;
-    uint invokedConsumeMessageFromL2Count = 0;
+    uint public invokedConsumeMessageFromL2Count = 0;
     
     function consumeMessageFromL2(
         uint256 fromAddress, 
@@ -37,9 +35,7 @@ contract StarknetCoreMock is IStarknetCore {
         external
         returns (bytes32) 
     {
-        invokedConsumeMessageFromL2 = true;
         invokedConsumeMessageFromL2Count += 1;
-
         bytes32 msgHash = keccak256(
             abi.encodePacked(fromAddress, uint256(uint160(msg.sender)), payload.length, payload)
         );

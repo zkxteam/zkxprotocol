@@ -21,9 +21,9 @@ const WITHDRAWAL_INDEX = 0;
 
 describe("L1ZKXContract", function () {
 
-  it("Should consume messages from StarknetCore", async function () {
+  it("Deposit and withdrawal basic scenario", async function () {
     // Setup
-    const [admin, alice, bob] = await ethers.getSigners();
+    const [admin, alice, rogue] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
     const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
     const aliceL2Address = 123456789987654;
@@ -31,6 +31,8 @@ describe("L1ZKXContract", function () {
     // Deposit to L1
     const aliceContract = L1ZKXContract.connect(alice);
     await aliceContract.depositEthToL1(aliceL2Address, { value: parseEther("2.5") });
+    expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(0)
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1)
 
     // Prepare withdrawal details
     const requestID = 42;
@@ -46,13 +48,15 @@ describe("L1ZKXContract", function () {
     // Prepare mock for withdrawal
     await starknetCoreMock.addL2ToL1Message(aliceL2Address, L1ZKXContract.address, payload);
 
-    // Bob can't withdraw Alice's funds
-    const bobContract = L1ZKXContract.connect(bob)
+    // Rogue can't withdraw Alice's funds
+    const rogueContract = L1ZKXContract.connect(rogue)
     await expect(
-      bobContract.withdrawEth(alice.address, withdrawalAmount, requestID)
+      rogueContract.withdrawEth(alice.address, withdrawalAmount, requestID)
     ).to.be.revertedWith("Sender is not withdrawal recipient")
     
     // Alice successfully withdraws
     await aliceContract.withdrawEth(alice.address, withdrawalAmount, requestID);
+    expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(1)
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(2)
   });
 });
