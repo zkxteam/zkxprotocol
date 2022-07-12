@@ -36,7 +36,7 @@ contract L1ZKXContract is AccessControl {
     using SafeMath for uint256;
 
     // The StarkNet core contract.
-    IStarknetCore starknetCore;
+    IStarknetCore public starknetCore;
 
     // Maps ticker to the token contract addresses
     mapping(uint256 => address) public tokenContractAddress;
@@ -88,7 +88,7 @@ contract L1ZKXContract is AccessControl {
      * @param assetId_ - Id of the asset created
      **/
     function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         // Construct the update asset list message's payload.
@@ -113,7 +113,7 @@ contract L1ZKXContract is AccessControl {
      * @param assetId_ - Id of the asset to be removed
      **/
     function removeAssetFromList(uint256 ticker_, uint256 assetId_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         // Construct the remove asset message's payload.
@@ -146,7 +146,7 @@ contract L1ZKXContract is AccessControl {
     /**
      * @dev function to get the list of available assets
      **/
-    function getAssetList() public view returns (uint256[] memory) {
+    function getAssetList() external view returns (uint256[] memory) {
         return assetList;
     }
 
@@ -158,7 +158,10 @@ contract L1ZKXContract is AccessControl {
     function setTokenContractAddress(
         uint256 ticker_,
         address tokenContractAddress_
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
         // Update token contract address
         tokenContractAddress[ticker_] = tokenContractAddress_;
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
@@ -169,7 +172,7 @@ contract L1ZKXContract is AccessControl {
      * @param assetContractAddress_ - address of the asset contract
      **/
     function setAssetContractAddress(uint256 assetContractAddress_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         assetContractAddress = assetContractAddress_;
@@ -180,7 +183,7 @@ contract L1ZKXContract is AccessControl {
      * @param withdrawalRequestAddress_ - address of withdrawal request contract
      **/
     function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         withdrawalRequestContractAddress = withdrawalRequestAddress_;
@@ -196,7 +199,7 @@ contract L1ZKXContract is AccessControl {
         uint256 userL1Address_,
         uint256 collateralId_,
         uint256 amount_
-    ) internal {
+    ) private {
         require(
             amount_ <= userBalance[userL1Address_][collateralId_],
             "The user's balance is not large enough."
@@ -240,7 +243,10 @@ contract L1ZKXContract is AccessControl {
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_
-    ) public isValidL2Address(userL2Address_) {
+    ) 
+        external 
+        isValidL2Address(userL2Address_) 
+    {
         /**
          * If l2 contract address is not set, then it will be set for the corresponding
          * user's L1 wallet address
@@ -278,9 +284,11 @@ contract L1ZKXContract is AccessControl {
      * @dev function to deposit ETH to L1ZKX contract
      * @param userL2Address_ - The L2 account address of the user
      **/
-    function depositEthToL1(
-        uint256 userL2Address_
-    ) payable public isValidL2Address(userL2Address_) {
+    function depositEthToL1(uint256 userL2Address_) 
+        payable 
+        external 
+        isValidL2Address(userL2Address_) 
+    {
         /**
          * If l2 contract address is not set, then it will be set for the corresponding
          * user's L1 wallet address
@@ -318,7 +326,7 @@ contract L1ZKXContract is AccessControl {
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
-    ) public {
+    ) external {
         require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
@@ -362,7 +370,7 @@ contract L1ZKXContract is AccessControl {
         uint256 userL1Address_,
         uint256 amount_,
         uint256 requestId_
-    ) public {
+    ) external {
         require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
@@ -403,7 +411,7 @@ contract L1ZKXContract is AccessControl {
      * @param tokenAddress_ - address of the token contract
      **/
     function transferFunds(address recipient_, uint256 amount_, address tokenAddress_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         uint256 balance = IERC20(tokenAddress_).balanceOf(address(this));
@@ -417,7 +425,7 @@ contract L1ZKXContract is AccessControl {
      * @param amount_ - amount that needs to be transferred
      **/
     function transferEth(address payable recipient_, uint256 amount_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
