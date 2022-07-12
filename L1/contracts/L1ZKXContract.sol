@@ -44,9 +44,6 @@ contract L1ZKXContract is AccessControl {
     // Maps ticker with the asset ID
     mapping(uint256 => uint256) public assetID;
 
-    // Maps the user address to the corresponding asset balance
-    mapping(uint256 => mapping(uint256 => uint256)) public userBalance;
-
     // Maps L1 metamask account address to the l2 account contract address
     mapping(uint256 => uint256) public l2ContractAddress;
 
@@ -201,15 +198,6 @@ contract L1ZKXContract is AccessControl {
         uint256 collateralId_,
         uint256 amount_
     ) private {
-        require(
-            amount_ <= userBalance[userL1Address_][collateralId_],
-            "The user's balance is not large enough."
-        );
-
-        // Update the User balance.
-        userBalance[userL1Address_][collateralId_] = userBalance[
-            userL1Address_
-        ][collateralId_].sub(amount_);
 
         // Construct the deposit message's payload.
         uint256[] memory depositPayload = new uint256[](3);
@@ -267,11 +255,6 @@ contract L1ZKXContract is AccessControl {
         IERC20(tokenContract).transferFrom(msg.sender, address(this), amount_);
         uint256 collateralId = assetID[ticker_];
 
-        // Update the User balance.
-        userBalance[senderAsUint256][
-            collateralId
-        ] = userBalance[senderAsUint256][collateralId]
-            .add(amount_);
         depositToL2(
             senderAsUint256,
             userL2Address_,
@@ -299,14 +282,8 @@ contract L1ZKXContract is AccessControl {
                 senderAsUint256
             ] = userL2Address_;
         }
-
         uint256 collateralId = assetID[ETH_TICKER];
 
-        // Update the User balance.
-        userBalance[senderAsUint256][
-            collateralId
-        ] = userBalance[senderAsUint256][collateralId]
-            .add(msg.value);
         depositToL2(
             senderAsUint256,
             userL2Address_,
