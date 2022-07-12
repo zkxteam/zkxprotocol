@@ -2436,6 +2436,7 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(500)
+    stopPrice1 = 0
     orderType1 = 0
     position1 = to64x61(10)
     direction1 = 1
@@ -2448,6 +2449,7 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(500)
+    stopPrice2 = 0
     orderType2 = 0
     position2 = to64x61(10)
     direction2 = 0
@@ -2459,9 +2461,9 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     execution_price1 = to64x61(500)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
@@ -2472,9 +2474,9 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
     ])
 
     orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
@@ -2536,6 +2538,7 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     assetID_3 = BTC_ID
     collateralID_3 = USDC_ID
     price3 = to64x61(250)
+    stopPrice3 = 0
     orderType3 = 0
     position3 = to64x61(10)
     direction3 = 1
@@ -2548,6 +2551,7 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     assetID_4 = BTC_ID
     collateralID_4 = USDC_ID
     price4 = to64x61(250)
+    stopPrice4 = 0
     orderType4 = 0
     position4 = to64x61(10)
     direction4 = 0
@@ -2559,9 +2563,9 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     execution_price2 = to64x61(250)
 
     hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3,
-                                price3, orderType3, position3, direction3, closeOrder3, leverage3)
+                                price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3)
     hash_computed4 = hash_order(order_id_4, assetID_4, collateralID_4,
-                                price4, orderType4, position4, direction4, closeOrder4, leverage4)
+                                price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4)
 
     signed_message3 = alice_signer.sign(hash_computed3)
     signed_message4 = bob_signer.sign(hash_computed4)
@@ -2572,7 +2576,7 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 0,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 0,
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 1,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 1,
     ]))
