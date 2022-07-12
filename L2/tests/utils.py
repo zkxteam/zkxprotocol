@@ -137,12 +137,11 @@ def hash_order(order_id, ticker, collateral, price, orderType, position, directi
     return compute_hash_on_elements(order)
 
 
-def convertList(res_list):
-    conv_list = list(map(lambda x: from64x61(x), res_list[1:7]))
-    conv_list.append(res_list[0])
-    conv_list.append(res_list[7])
+def convertList(list_):
+    for i in range(len(list_)):
+        list_[i] = from64x61(list_[i])
 
-    return conv_list
+    return list_
 
 
 async def assert_revert(fun, reverted_with=None):

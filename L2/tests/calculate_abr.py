@@ -1,3 +1,4 @@
+from audioop import avg
 import math
 import ABR_data
 from numpy import log
@@ -82,7 +83,7 @@ def effective_abr(premium, base_rate):
         premium[i] /= 8.0
         premium[i] += 0.0000125
         sum += premium[i]
-    print(premium)
+    print("sum", sum)
     return sum/len(premium)
 
 
@@ -110,14 +111,13 @@ def calculate_abr(perp_spot, perp, base_rate, boll_width):
         perp_spot, perp, 8)
     avg_array = sliding_mean(mark_prices, 8)
     (lower, upper) = bollinger(mark_prices, avg_array, 8, boll_width)
-
     diff = calc_premium(mark_prices, index_prices)
 
     premium = sliding_mean(diff, 8)
     final_premium = find_jump(premium, mark_prices, index_prices, lower, upper)
     abr = effective_abr(final_premium, base_rate)
-
     return abr
 
 
-# print(calculate_abr(ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 2.0))
+# calculate_abr(ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 2.0)
+

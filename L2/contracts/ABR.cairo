@@ -151,7 +151,7 @@ func calc_diff{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     )
 end
 
-# @notice Function to calculate the effective abr of a premium array
+# @notice Function to calculate the sum of effective abr of a premium array
 # @param array_len - Length of the array
 # @param array - Array for which to calculate the abr
 # @param sum - Current sum of the array
@@ -655,7 +655,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     perp_index : felt*,
     perp_mark_len : felt,
     perp_mark : felt*,
-) -> (res : felt):
+) -> (diff_len : felt):
     alloc_locals
 
     # # The nodes signatures check goes here##
@@ -709,7 +709,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         mark_prices_len, mark_prices, mark_prices_len, mark_prices, 8, 0, avg_array, 0
     )
 
-    # # Calculate the upper & lower band
+    # Calculate the upper & lower band
     let (upper_array : felt*) = alloc()
     let (lower_array : felt*) = alloc()
     let (boll_width : felt) = bollinger_width.read()
@@ -762,6 +762,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     # Find the effective ABR rate
     let (base_abr_) = base_abr.read()
     let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0, base_abr_)
+
     let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
     let (rate) = Math64x61_div(rate_sum, array_size)
 

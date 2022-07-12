@@ -5,7 +5,7 @@ import time
 import calculate_abr
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, from64x61, to64x61, assert_revert
+from utils import Signer, from64x61, to64x61, assert_revert, convertList
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -104,16 +104,16 @@ async def test_should_revert_if_non_admin_changed_base_abr(abr_factory):
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
-    _, abr, admin1, _, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, _, btc_spot, btc_perp, eth_spot, eth_perp = abr_factory
 
-    arguments = [1282193, 480] + btc_spot + [480]+btc_perp
+    arguments = [1282193, 480] + btc_spot + [480] + btc_perp
 
     abr_python = calculate_abr.calculate_abr(
         ABR_data.btc_perp_spot, ABR_data.btc_perp, 0.0000125, 2.0)
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
-    print("cairo rate", from64x61(abr_cairo.result.response[0]))
+    print("cairo rate", convertList(abr_cairo.result.response))
 
     abr_value = await abr.get_abr_value(1282193).call()
     print("abr value of the market is:",
@@ -124,7 +124,7 @@ async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
           from64x61(abr_value.result.timestamp))
 
     assert abr_python == pytest.approx(
-        from64x61(abr_cairo.result.response[0]), abs=1e-6)
+        from64x61(abr_value.result.abr)), abs=1e-6)
 
 
 @pytest.mark.asyncio
