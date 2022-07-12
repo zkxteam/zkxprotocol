@@ -7,25 +7,27 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./IStarknetCore.sol";
 import "./Constants.sol";
 
-/**
-  Contract for L1 <-> L2 interaction between an L2 contracts and this
-  L1 ZKX contract.
-*/
+// Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
 contract L1ZKXContract is AccessControl {
+
     event LogDeposit(
         address sender,
         uint256 amount_,
         uint256 collateralId_,
         uint256 l2Recipient
     );
+
     event LogWithdrawal(
         address recipient,
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
     );
+
     event LogAssetListUpdated(uint256 ticker_, uint256 collateralId_);
+
     event LogAssetRemovedFromList(uint256 ticker_, uint256 collateralId_);
+
     event LogTokenContractAddressUpdated(
         uint256 ticker_,
         address tokenContractAddresses_
