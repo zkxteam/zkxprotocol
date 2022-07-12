@@ -564,6 +564,7 @@ func populate_asset_prices_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuilt
         let (empty_price_array : PriceData*) = alloc()
         return (0, empty_price_array)
     end
+    assert prices[prices_len] = price_data
     return populate_asset_prices_recurse(market_contract_address, market_price_address, iterator + 1, positions_len, positions + OrderDetailsWithIDs.SIZE, prices_len + 1, prices)
 end
 
@@ -630,7 +631,8 @@ func populate_collateral_prices_recurse{syscall_ptr : felt*, pedersen_ptr : Hash
             collateralID=[collaterals].assetID,
             assetPrice=0,
             collateralPrice=2305843009213693952, # to64x61(1) == 2305843009213693952
-        )
+    )
+    assert prices[prices_len] = price_data
     return populate_collateral_prices_recurse(market_contract_address, market_price_address, iterator + 1, collaterals_len, collaterals + CollateralBalance.SIZE, prices_len + 1, prices)
 end
 
