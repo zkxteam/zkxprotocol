@@ -455,8 +455,8 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (version) = contract_version.read()
 
     # Check if the list is empty
-    with_attr error_message("Invalid Input"):
-        assert_not_zero(prices_len)
+    if prices_len == 0:
+        return ()
     end
 
     # Fetch all the positions from the Account contract
@@ -465,8 +465,8 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
 
     # Check if the list is empty
-    with_attr error_message("Position array length is 0"):
-        assert_not_zero(positions_len)
+    if positions_len == 0:
+        return ()
     end
 
     # Fetch the maintatanence margin requirement from asset contract
@@ -477,7 +477,7 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         contract_address=asset_address, id=order.assetID
     )
 
-    # Calculate the required margin in usd
+    # Calculate the required margin 
     let (maintenance_position) = Math64x61_mul(
         execution_price, size
     )
@@ -592,39 +592,45 @@ func populate_collateral_prices_recurse{syscall_ptr : felt*, pedersen_ptr : Hash
         return (prices_len, prices)
     end
 
-    # Get the market id from market contract
-    let (market_id) = IMarkets.getMarket_from_assets(
-        contract_address=market_contract_address,
-        asset_id=[collaterals].assetID,
-        collateral_id=[collaterals].assetID, # get standard collateral ID
-    )
-    let (market_price : MarketPrice) = IMarketPrices.get_market_price(
-        contract_address=market_price_address,
-        id=market_id
-    )
-    # Get Market from the corresponding Id
-    let (market : Market) = IMarkets.getMarket(
-        contract_address=market_contract_address,
-        id=market_id
-    )
-    # Calculate the timestamp
-    let (current_timestamp) = get_block_timestamp()
-    tempvar ttl = market.ttl
+    # # Get the market id from market contract
+    # let (market_id) = IMarkets.getMarket_from_assets(
+    #     contract_address=market_contract_address,
+    #     asset_id=[collaterals].assetID,
+    #     collateral_id=[collaterals].assetID, # get standard collateral ID
+    # )
+    # let (market_price : MarketPrice) = IMarketPrices.get_market_price(
+    #     contract_address=market_price_address,
+    #     id=market_id
+    # )
+    # # Get Market from the corresponding Id
+    # let (market : Market) = IMarkets.getMarket(
+    #     contract_address=market_contract_address,
+    #     id=market_id
+    # )
+    # # Calculate the timestamp
+    # let (current_timestamp) = get_block_timestamp()
+    # tempvar ttl = market.ttl
     
-    tempvar timestamp = market_price.timestamp
-    tempvar time_difference = current_timestamp - timestamp
-    let (status) = is_le(time_difference, ttl)
-    if status == 1:
-        let price_data = PriceData(
+    # tempvar timestamp = market_price.timestamp
+    # tempvar time_difference = current_timestamp - timestamp
+    # let (status) = is_le(time_difference, ttl)
+    # if status == 1:
+    #     let price_data = PriceData(
+    #         assetID=0,
+    #         collateralID=[collaterals].assetID,
+    #         assetPrice=0,
+    #         collateralPrice=market_price.price
+    #     )
+    # else:
+    #     let (empty_price_array : PriceData*) = alloc()
+    #     return (0, empty_price_array)
+    # end
+    let price_data = PriceData(
             assetID=0,
             collateralID=[collaterals].assetID,
             assetPrice=0,
-            collateralPrice=market_price.price
+            collateralPrice=2305843009213693952, # to64x61(1) == 2305843009213693952
         )
-    else:
-        let (empty_price_array : PriceData*) = alloc()
-        return (0, empty_price_array)
-    end
     return populate_collateral_prices_recurse(market_contract_address, market_price_address, iterator + 1, collaterals_len + 1, collaterals, prices_len + 1, prices)
 end
 
@@ -639,6 +645,7 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
+    let (prices : PriceData*) = alloc()
 
     # Get market price contract address
     let (market_prices_address) = IAuthorizedRegistry.get_contract_address(
@@ -650,11 +657,15 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         contract_address=registry, index=Market_INDEX, version=version
     )
 
-    let (prices : PriceData*) = alloc()
     # Fetch all the positions from the Account contract
     let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
         contract_address=account_address
     )
+
+    if positions_len == 0:
+        let (empty_positions_array : PriceData*) = alloc()
+        return (0, empty_positions_array)
+    end
 
     let (prices_array_len : felt, prices_array : PriceData*) = populate_asset_prices_recurse(
         market_contract_address=market_contract_address,
@@ -674,6 +685,11 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     let (
         collaterals_len : felt, collaterals : CollateralBalance*
     ) = IAccount.return_array_collaterals(contract_address=account_address)
+
+    if collaterals_len == 0:
+        let (empty_collateral_array : PriceData*) = alloc()
+        return (0, empty_collateral_array)
+    end
 
     return populate_collateral_prices_recurse(
         market_contract_address=market_contract_address,
