@@ -73,20 +73,20 @@ describe('L1ZKXContract', function () {
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(2);
   });
 
-  it('Deposit tokens', async function () {
+  it('Multiple token deposits', async function () {
     // Setup environment
-    const [admin, alice, rogue] = await ethers.getSigners();
+    const [admin, alice] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
     const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
     const ZKXToken = await deployZKXToken(admin);
     const aliceContract = L1ZKXContract.connect(alice);
 
-    // Now Alice's balance is 100 tokens
-    ZKXToken.mint(alice.address, 100 * TOKEN_UNIT);
+    // Now Alice's balance is 300 tokens
+    ZKXToken.mint(alice.address, 300 * TOKEN_UNIT);
     
     // Reverts because ZKXToken is not registered by admin yet
     await expect(
-      aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 100 * TOKEN_UNIT)
+      aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 300 * TOKEN_UNIT)
     ).to.be.revertedWith('Unregistered ticker');
 
     // Now admin registers ZXKToken address linked to ZKX ticker
@@ -97,17 +97,42 @@ describe('L1ZKXContract', function () {
     // Before deposit Alice sets large allowance amount for ZKXContract
     await ZKXToken.connect(alice).approve(L1ZKXContract.address, 1_000_000 * TOKEN_UNIT)
 
-    // Transfer reverts inside ERC20, because Alice has only 100 tokens
-    await expect(aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 101 * TOKEN_UNIT)).to.be.reverted;
+    // Transfer reverts inside ERC20, because Alice has only 300 tokens
+    await expect(aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 301 * TOKEN_UNIT)).to.be.reverted;
     
-    // This deposit succeeds, because Alice has exactly 100 tokens (and 0 tokens left after deposit)
+    // This deposit succeeds, after tx Alice has 200 tokens left
     await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 100 * TOKEN_UNIT);
+
+    // Second deposit succeeds, after tx Alice has 100 tokens left
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 100 * TOKEN_UNIT);
+
+    // Third deposti also succeeds, after tx Alice has no tokens left
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 100 * TOKEN_UNIT);
+
     // Deposit doesn't consume messages from L2
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(0);
     // Deposit sends message to L2
-    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1);
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(3);
 
     // Revert second deposit because Alice has no more tokens left
     await expect(aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 1 * TOKEN_UNIT)).to.be.reverted;
+  });
+
+  it('Multiple ETH deposits', async function () {
+    // Setup environment
+    const [admin, alice] = await ethers.getSigners();
+    const starknetCoreMock = await deployStarknetCoreMock(admin);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const aliceContract = L1ZKXContract.connect(alice);
+
+    // Transfer ETH 3 times, all should succeed
+    await aliceContract.depositEthToL1(ALICE_L2_ADDRESS, { value: parseEther("10") });
+    await aliceContract.depositEthToL1(ALICE_L2_ADDRESS, { value: parseEther("5") });
+    await aliceContract.depositEthToL1(ALICE_L2_ADDRESS, { value: parseEther("7") });
+
+    // Deposits don't consume messages from L2
+    expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(0);
+    // Every deposit sends a message to L2
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(3);
   });
 });
