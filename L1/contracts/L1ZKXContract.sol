@@ -60,8 +60,7 @@ contract L1ZKXContract is AccessControl {
       Modifier to verify valid L2 address.
     */
     modifier isValidL2Address(uint256 l2Address_) {
-        require(l2Address_ != 0, "L2_ADDRESS_OUT_OF_RANGE");
-        require(l2Address_ < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
+        require(l2Address_ != 0 && l2Address_ < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
         _;
     }
 
@@ -213,7 +212,7 @@ contract L1ZKXContract is AccessControl {
         );
 
         emit LogDeposit(
-            address(uint160(userL1Address_)),
+            msg.sender,
             amount_,
             collateralId_,
             userL2Address
@@ -233,23 +232,24 @@ contract L1ZKXContract is AccessControl {
     ) 
         external 
         isValidL2Address(userL2Address_) 
-    {
+    {   
+        // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
-            // If not yet set, store L2 address linked to sender L1 address
             l2ContractAddress[senderAsUint256] = userL2Address_;
         }
 
+        // Transfer tokens
         address tokenContract = tokenContractAddress[ticker_];
-        uint256 balance = IERC20(tokenContract).balanceOf(msg.sender);
-        require(
-            balance >= amount_,
-            "User is trying to deposit more than he has"
-        );
+        IERC20 Token = IERC20(tokenContract);
+        address zkxAddress = address(this);
+        uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
+        Token.transferFrom(msg.sender, zkxAddress, amount_);
+        uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
+        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Invalid transfer amount");
 
-        IERC20(tokenContract).transferFrom(msg.sender, address(this), amount_);
+        // Submit deposit
         uint256 collateralId = assetID[ticker_];
-
         depositToL2(
             senderAsUint256,
             userL2Address_,
@@ -267,13 +267,14 @@ contract L1ZKXContract is AccessControl {
         external 
         isValidL2Address(userL2Address_) 
     {
+        // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
-            // If not yet set, store L2 address linked to sender L1 address
             l2ContractAddress[senderAsUint256] = userL2Address_;
         }
-        uint256 collateralId = assetID[ETH_TICKER];
 
+        // Submit deposit
+        uint256 collateralId = assetID[ETH_TICKER];
         depositToL2(
             senderAsUint256,
             userL2Address_,
