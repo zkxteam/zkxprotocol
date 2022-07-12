@@ -63,13 +63,13 @@ async def abr_factory():
 
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [17, 1, abr.contract_address])
-     # create relay contract
+    # create relay contract
     relay_abr = await starknet.deploy(
         "contracts/relay_contracts/RelayABR.cairo",
         constructor_calldata=[
             registry.contract_address,
             1,
-            17 # abr index
+            17  # abr index
         ]
     )
 
@@ -106,7 +106,7 @@ async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
     arguments = [1282193, 480] + btc_spot + [480]+btc_perp
 
     abr_python = calculate_abr.calculate_abr(
-        ABR_data.btc_perp_spot, ABR_data.btc_perp)
+        ABR_data.btc_perp_spot, ABR_data.btc_perp, 0.0000125, 2.0)
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
@@ -148,7 +148,7 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
     arguments = [1282193, 480] + btc_spot + [480]+btc_perp
 
     abr_python = calculate_abr.calculate_abr(
-        ABR_data.btc_perp_spot, ABR_data.btc_perp)
+        ABR_data.btc_perp_spot, ABR_data.btc_perp, 0.0000125, 2.0)
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
@@ -173,7 +173,7 @@ async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
     arguments = [1282198, 480] + eth_spot + [480] + eth_perp
 
     abr_python = calculate_abr.calculate_abr(
-        ABR_data.eth_perp_spot, ABR_data.eth_perp)
+        ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.0000125, 2, 0)
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
