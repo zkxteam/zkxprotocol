@@ -224,16 +224,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     )
     # If the order is to be opened
     if temp_order.closeOrder == 0:
-
-        let (liquidate_contract_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=Liquidate_INDEX, version=version
-        )
-        ILiquidate.check_order_can_be_opened(
-            contract_address=liquidate_contract_address,
-            order=temp_order,
-            size=order_size,
-            execution_price=execution_price
-        )
         
         # Get the fees from Trading Fee contract
         let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
@@ -293,6 +283,16 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             assert_le(total_amount, user_balance)
         end
 
+        let (liquidate_contract_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=Liquidate_INDEX, version=version
+        )
+        ILiquidate.check_order_can_be_opened(
+            contract_address=liquidate_contract_address,
+            order=temp_order,
+            size=order_size,
+            execution_price=execution_price
+        )
+        
         # Deduct the amount from account contract
         IAccount.transfer_from(
             contract_address=temp_order.pub_key,
