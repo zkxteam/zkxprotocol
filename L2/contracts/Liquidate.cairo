@@ -478,10 +478,12 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
 
     # Calculate the required margin 
-    let (maintenance_position) = Math64x61_mul(
-        execution_price, size
-    )
-    let (maintenance_requirement) = Math64x61_mul(req_margin, maintenance_position)
+    let (leveraged_position_value) = Math64x61_mul(execution_price, size)
+    let (total_position_value) = Math64x61_div(leveraged_position_value, order.leverage)
+    tempvar amount_to_be_borrowed = leveraged_position_value - total_position_value
+
+    tempvar account_value =  leveraged_position_value - amount_to_be_borrowed
+    let (maintenance_requirement) = Math64x61_mul(req_margin, leveraged_position_value)
 
     # Recurse through all positions to see if it needs to liquidated
     let (liq_result, least_collateral_ratio_position, least_collateral_ratio_position_collateral_price, least_collateral_ratio_position_asset_price) = check_liquidation_recurse(
@@ -490,7 +492,7 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         positions=positions,
         prices_len=prices_len,
         prices=prices,
-        total_account_value=maintenance_position,
+        total_account_value=account_value,
         total_maintenance_requirement=maintenance_requirement,
         least_collateral_ratio=2305843009213693952,
         least_collateral_ratio_position=0,
