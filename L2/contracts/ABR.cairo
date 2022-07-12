@@ -655,7 +655,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     perp_index : felt*,
     perp_mark_len : felt,
     perp_mark : felt*,
-) -> (diff_len : felt):
+) -> (result : felt):
     alloc_locals
 
     # # The nodes signatures check goes here##
@@ -759,7 +759,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         0,
     )
 
-    # Find the effective ABR rate
+    # # Find the effective ABR rate
     let (base_abr_) = base_abr.read()
     let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0, base_abr_)
 

@@ -81,9 +81,8 @@ def effective_abr(premium, base_rate):
     sum = 0
     for i in range(len(premium)):
         premium[i] /= 8.0
-        premium[i] += 0.0000125
+        premium[i] += base_rate
         sum += premium[i]
-    print("sum", sum)
     return sum/len(premium)
 
 
@@ -119,5 +118,4 @@ def calculate_abr(perp_spot, perp, base_rate, boll_width):
     return abr
 
 
-# calculate_abr(ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 2.0)
-
+calculate_abr(ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 2.0)
