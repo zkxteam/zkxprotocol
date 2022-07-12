@@ -1,17 +1,20 @@
 %lang starknet
 %builtins pedersen range_check ecdsa
 
-from contracts.DataTypes import OrderDetails, OrderDetailsWithIDs, PriceData, CollateralBalance
-from contracts.Constants import Asset_INDEX
+from contracts.DataTypes import OrderDetails, OrderDetailsWithIDs, PriceData, CollateralBalance, MarketPrice, Market, MultipleOrder
+from contracts.Constants import Asset_INDEX, MarketPrices_INDEX, Market_INDEX
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAsset import IAsset
+from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IAccount import IAccount
+from starkware.cairo.common.alloc import alloc
+from contracts.interfaces.IMarketPrices import IMarketPrices
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.math import assert_not_zero, assert_nn
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.hash import hash2
-from starkware.starknet.common.syscalls import get_caller_address
+from starkware.starknet.common.syscalls import get_caller_address, get_block_timestamp
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
 
@@ -435,4 +438,195 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     return (liq_result, least_collateral_ratio_position)
+end
+
+# @notice Internal function to populate prices
+# @param market_contract_address - Address of Market contract 
+# @param market_price_address - Address of Market Price contract
+# @param iterator - Index of the position_array currently pointing to
+# @param positions_len - Length of the positions array
+# @param postions - Array with all the position details
+# @param prices_len - Length of the prices array
+# @param prices - Array with all the price details
+# @return prices_len - Length of prices array
+# @return prices - Fully populated prices
+func populate_asset_prices_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_contract_address : felt,
+    market_price_address : felt,
+    iterator : felt,
+    positions_len : felt,
+    positions : OrderDetailsWithIDs*,
+    prices_len : felt,
+    prices : PriceData*,
+) -> (prices_len : felt, prices : PriceData*):
+    alloc_locals
+
+    if [positions].assetID == 0:
+        return (prices_len, prices)
+    end
+
+    # Get the market id from market contract
+    let (market_id) = IMarkets.getMarket_from_assets(
+        contract_address=market_contract_address,
+        asset_id=[positions].assetID,
+        collateral_id=[positions].collateralID,
+    )
+    let (market_price : MarketPrice) = IMarketPrices.get_market_price(
+        contract_address=market_price_address,
+        id=market_id
+    )
+    # Get Market from the corresponding Id
+    let (market : Market) = IMarkets.getMarket(
+        contract_address=market_contract_address,
+        id=market_id
+    )
+    # Calculate the timestamp
+    let (current_timestamp) = get_block_timestamp()
+    tempvar ttl = market.ttl
+    
+    tempvar timestamp = market_price.timestamp
+    tempvar time_difference = current_timestamp - timestamp
+    let (status) = is_le(time_difference, ttl)
+    if status == 1:
+        let price_data = PriceData(
+            assetID=[positions].assetID,
+            collateralID=[positions].collateralID,
+            assetPrice=market_price.price,
+            collateralPrice=2305843009213693952, # to64x61(1) == 2305843009213693952
+        )
+    else:
+        let (empty_price_array : PriceData*) = alloc()
+        return (0, empty_price_array)
+    end
+    return populate_asset_prices_recurse(market_contract_address, market_price_address, iterator + 1, positions_len + 1, positions, prices_len + 1, prices)
+end
+
+# @notice Internal function to populate collateral prices
+# @param market_contract_address - Address of Market contract 
+# @param market_price_address - Address of Market Price contract
+# @param iterator - Index of the position_array currently pointing to
+# @param collaterals_len - Length of the collaterals array
+# @param collaterals - Array with all the collateral details
+# @param prices_len - Length of the prices array
+# @param prices - Array with all the price details
+# @return prices_len - Length of prices array
+# @return prices - Fully populated prices
+func populate_collateral_prices_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_contract_address : felt,
+    market_price_address : felt,
+    iterator : felt,
+    collaterals_len : felt,
+    collaterals : CollateralBalance*,
+    prices_len : felt,
+    prices : PriceData*,
+) -> (prices_len : felt, prices : PriceData*):
+    alloc_locals
+
+    if [collaterals].assetID == 0:
+        return (prices_len, prices)
+    end
+
+    # Get the market id from market contract
+    let (market_id) = IMarkets.getMarket_from_assets(
+        contract_address=market_contract_address,
+        asset_id=[collaterals].assetID,
+        collateral_id=[collaterals].assetID, # get standard collateral ID
+    )
+    let (market_price : MarketPrice) = IMarketPrices.get_market_price(
+        contract_address=market_price_address,
+        id=market_id
+    )
+    # Get Market from the corresponding Id
+    let (market : Market) = IMarkets.getMarket(
+        contract_address=market_contract_address,
+        id=market_id
+    )
+    # Calculate the timestamp
+    let (current_timestamp) = get_block_timestamp()
+    tempvar ttl = market.ttl
+    
+    tempvar timestamp = market_price.timestamp
+    tempvar time_difference = current_timestamp - timestamp
+    let (status) = is_le(time_difference, ttl)
+    if status == 1:
+        let price_data = PriceData(
+            assetID=0,
+            collateralID=[collaterals].assetID,
+            assetPrice=0,
+            collateralPrice=market_price.price
+        )
+    else:
+        let (empty_price_array : PriceData*) = alloc()
+        return (0, empty_price_array)
+    end
+    return populate_collateral_prices_recurse(market_contract_address, market_price_address, iterator + 1, collaterals_len + 1, collaterals, prices_len + 1, prices)
+end
+
+# @notice Internal function to get asset prices
+# @param account_address - Address of L2 account contract
+# @return prices_len - Length of prices array
+# @return prices - Fully populated prices
+func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    account_address : felt
+) -> (prices_len : felt, prices : PriceData*):
+    alloc_locals
+
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Get market price contract address
+    let (market_prices_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=MarketPrices_INDEX, version=version
+    )
+
+    # Get market contract address
+    let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    )
+
+    let (prices : PriceData*) = alloc()
+    # Fetch all the positions from the Account contract
+    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
+        contract_address=account_address
+    )
+
+    let (prices_array_len : felt, prices_array : PriceData*) = populate_asset_prices_recurse(
+        market_contract_address=market_contract_address,
+        market_price_address=market_prices_address,
+        iterator=0,
+        positions_len=0,
+        positions=positions,
+        prices_len=0,
+        prices=prices
+    )
+    if prices_array_len == 0:
+        let (empty_price_array : PriceData*) = alloc()
+        return (0, empty_price_array)
+    end
+
+    # Fetch all the collaterals that the user holds
+    let (
+        collaterals_len : felt, collaterals : CollateralBalance*
+    ) = IAccount.return_array_collaterals(contract_address=account_address)
+
+    return populate_collateral_prices_recurse(
+        market_contract_address=market_contract_address,
+        market_price_address=market_prices_address,
+        iterator=0,
+        collaterals_len=0,
+        collaterals=collaterals,
+        prices_len=prices_array_len,
+        prices=prices
+    )
+end
+
+# @notice Function to check if order can be opened
+# @param order - MultipleOrder structure
+# @return status - returns 1, If order can be opened, else 0
+@external
+func check_order_can_be_opened{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    order : MultipleOrder
+) -> (status : felt):
+    let (prices_len : felt, prices : PriceData*) = get_asset_prices(order.pub_key)
+        return (1)
 end

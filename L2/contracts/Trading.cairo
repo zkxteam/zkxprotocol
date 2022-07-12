@@ -11,7 +11,8 @@ from contracts.Constants import (
     FeeBalance_INDEX,
     LiquidityFund_INDEX,
     InsuranceFund_INDEX,
-    MarketPrices_INDEX
+    MarketPrices_INDEX,
+    Liquidate_INDEX
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
@@ -20,6 +21,7 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.IFeeBalance import IFeeBalance
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.ILiquidate import ILiquidate
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from contracts.interfaces.IMarketPrices import IMarketPrices
@@ -116,7 +118,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         liquidatorAddress=[request_list].liquidatorAddress,
         parentOrder=[request_list].parentOrder,
         side=[request_list].side
-        )
+    )
+
 
     # Get asset and market addresses
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
@@ -221,6 +224,15 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     )
     # If the order is to be opened
     if temp_order.closeOrder == 0:
+
+        let (liquidate_contract_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=Liquidate_INDEX, version=version
+        )
+        let (status) = ILiquidate.check_order_can_be_opened(
+            contract_address=liquidate_contract_address,
+            order=temp_order
+        )
+        
         # Get the fees from Trading Fee contract
         let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
             contract_address=registry, index=TradingFees_INDEX, version=version
