@@ -206,7 +206,7 @@ contract L1ZKXContract is AccessControl {
 
         // Send the message to the StarkNet core contract.
         starknetCore.sendMessageToL2(
-            userL2Address,
+            userL2Address_,
             DEPOSIT_SELECTOR,
             depositPayload
         );
@@ -215,7 +215,7 @@ contract L1ZKXContract is AccessControl {
             msg.sender,
             amount_,
             collateralId_,
-            userL2Address
+            userL2Address_
         );
     }
 
