@@ -96,6 +96,28 @@ func modify_base_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     return ()
 end
 
+@external
+func modify_bollinger_width{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    new_bollinger_width : felt
+):
+    let (caller) = get_caller_address()
+    let (version) = contract_version.read()
+    let (registry) = registry_address.read()
+    let (admin_auth) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AdminAuth_INDEX, version=version
+    )
+    let (access) = IAdminAuth.get_admin_mapping(
+        contract_address=admin_auth, address=caller, action=MasterAdmin_ACTION
+    )
+    with_attr error_message("Caller does not have permission to update bollinger width"):
+        assert_not_zero(access)
+    end
+
+    bollinger_width.write(new_bollinger_width)
+
+    return ()
+end
+
 @view
 func get_abr_value{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt

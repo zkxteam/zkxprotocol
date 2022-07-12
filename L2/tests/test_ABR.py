@@ -94,6 +94,15 @@ async def test_should_revert_if_wrong_number_of_arguments_passed_for_BTC(abr_fac
 
 
 @pytest.mark.asyncio
+async def test_should_revert_if_non_admin_changed_bollinger_width(abr_factory):
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
+
+    new_boll_width = to64x61(1.5)
+
+    await assert_revert(alice_signer.send_transaction(alice, abr.contract_address, 'modify_bollinger_width', [new_boll_width]))
+
+
+@ pytest.mark.asyncio
 async def test_should_revert_if_non_admin_changed_base_abr(abr_factory):
     _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
 
@@ -102,7 +111,7 @@ async def test_should_revert_if_non_admin_changed_base_abr(abr_factory):
         alice_signer.send_transaction(alice, abr.contract_address, 'modify_base_abr', [new_base_abr]))
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
     _, abr, admin1, _, btc_spot, btc_perp, eth_spot, eth_perp = abr_factory
 
@@ -113,7 +122,7 @@ async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
-    print("cairo rate", from64x61(abr_cairo.result.response))
+    print("cairo rate", from64x61(abr_cairo.result.response[0]))
 
     abr_value = await abr.get_abr_value(1282193).call()
     print("abr value of the market is:",
@@ -126,7 +135,7 @@ async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
         from64x61(abr_cairo.result.response[0]), abs=1e-6)
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_should_revert_if_called_before_8_hours(abr_factory):
     _, abr, admin1, _, btc_spot, btc_perp, _, _ = abr_factory
 
@@ -136,7 +145,7 @@ async def test_should_revert_if_called_before_8_hours(abr_factory):
         admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments))
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_should_pass_if_called_after_8_hours(abr_factory):
     starknet, abr, admin1, _, btc_spot, btc_perp, _, _ = abr_factory
 
@@ -168,7 +177,7 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
         from64x61(abr_cairo.result.response[0]), abs=1e-6)
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_should_pass_if_admin_changed_base_abr(abr_factory):
     _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
 
@@ -176,14 +185,22 @@ async def test_should_pass_if_admin_changed_base_abr(abr_factory):
     await admin1_signer.send_transaction(admin1, abr.contract_address, 'modify_base_abr', [new_base_abr])
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
+async def test_should_pass_if_admin_changed_bollinger_width(abr_factory):
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
+
+    new_boll_width = to64x61(1.5)
+    await admin1_signer.send_transaction(admin1, abr.contract_address, 'modify_bollinger_width', [new_boll_width])
+
+
+@ pytest.mark.asyncio
 async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
     _, abr, admin1, _, _, _, eth_spot, eth_perp = abr_factory
 
     arguments = [1282198, 480] + eth_spot + [480] + eth_perp
 
     abr_python = calculate_abr.calculate_abr(
-        ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 2.0)
+        ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 1.5)
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
