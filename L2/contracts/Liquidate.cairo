@@ -595,39 +595,6 @@ func populate_collateral_prices_recurse{syscall_ptr : felt*, pedersen_ptr : Hash
         return (prices_len, prices)
     end
 
-    # # Get the market id from market contract
-    # let (market_id) = IMarkets.getMarket_from_assets(
-    #     contract_address=market_contract_address,
-    #     asset_id=[collaterals].assetID,
-    #     collateral_id=[collaterals].assetID, # get standard collateral ID
-    # )
-    # let (market_price : MarketPrice) = IMarketPrices.get_market_price(
-    #     contract_address=market_price_address,
-    #     id=market_id
-    # )
-    # # Get Market from the corresponding Id
-    # let (market : Market) = IMarkets.getMarket(
-    #     contract_address=market_contract_address,
-    #     id=market_id
-    # )
-    # # Calculate the timestamp
-    # let (current_timestamp) = get_block_timestamp()
-    # tempvar ttl = market.ttl
-    
-    # tempvar timestamp = market_price.timestamp
-    # tempvar time_difference = current_timestamp - timestamp
-    # let (status) = is_le(time_difference, ttl)
-    # if status == 1:
-    #     let price_data = PriceData(
-    #         assetID=0,
-    #         collateralID=[collaterals].assetID,
-    #         assetPrice=0,
-    #         collateralPrice=market_price.price
-    #     )
-    # else:
-    #     let (empty_price_array : PriceData*) = alloc()
-    #     return (0, empty_price_array)
-    # end
     let price_data = PriceData(
             assetID=0,
             collateralID=[collaterals].assetID,
