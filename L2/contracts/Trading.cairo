@@ -230,7 +230,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
         let (status) = ILiquidate.check_order_can_be_opened(
             contract_address=liquidate_contract_address,
-            order=temp_order
+            order=temp_order,
+            size=order_size,
+            execution_price=execution_price
         )
         
         # Get the fees from Trading Fee contract

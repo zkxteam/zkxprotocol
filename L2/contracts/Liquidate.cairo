@@ -241,7 +241,7 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=1, version=version
+        contract_address=registry, index=Asset_INDEX, version=version
     )
     let (req_margin) = IAsset.get_maintenance_margin(
         contract_address=asset_address, id=order_details.assetID
@@ -440,6 +440,72 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     return (liq_result, least_collateral_ratio_position)
 end
 
+# @notice Internal function to check if position can be opened
+# @param order - MultipleOrder structure
+# @param size - matched order size of current order
+# @param execution_price - Execution price of current order
+# @param prices_len - Length of the prices array
+# @param prices - Array with all the price details
+func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    order : MultipleOrder, size : felt, execution_price : felt, prices_len : felt, prices : PriceData*
+):
+    alloc_locals
+
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Check if the list is empty
+    with_attr error_message("Invalid Input"):
+        assert_not_zero(prices_len)
+    end
+
+    # Fetch all the positions from the Account contract
+    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
+        contract_address=order.pub_key
+    )
+
+    # Check if the list is empty
+    with_attr error_message("Position array length is 0"):
+        assert_not_zero(positions_len)
+    end
+
+    # Fetch the maintatanence margin requirement from asset contract
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    )
+    let (req_margin) = IAsset.get_maintenance_margin(
+        contract_address=asset_address, id=order.assetID
+    )
+
+    # Calculate the required margin in usd
+    let (maintenance_position) = Math64x61_mul(
+        execution_price, size
+    )
+    let (maintenance_requirement) = Math64x61_mul(req_margin, maintenance_position)
+
+    # Recurse through all positions to see if it needs to liquidated
+    let (liq_result, least_collateral_ratio_position, least_collateral_ratio_position_collateral_price, least_collateral_ratio_position_asset_price) = check_liquidation_recurse(
+        account_address=order.pub_key,
+        positions_len=positions_len,
+        positions=positions,
+        prices_len=prices_len,
+        prices=prices,
+        total_account_value=maintenance_position,
+        total_maintenance_requirement=maintenance_requirement,
+        least_collateral_ratio=2305843009213693952,
+        least_collateral_ratio_position=0,
+        least_collateral_ratio_position_collateral_price = 0,
+        least_collateral_ratio_position_asset_price = 0,
+    )
+
+    if liq_result == 1:
+        with_attr error_message("Current order will make the total account value to go below maintenance requirement"):
+            assert liq_result = 0
+        end
+    end
+    return ()
+end
+
 # @notice Internal function to populate prices
 # @param market_contract_address - Address of Market contract 
 # @param market_price_address - Address of Market Price contract
@@ -622,11 +688,16 @@ end
 
 # @notice Function to check if order can be opened
 # @param order - MultipleOrder structure
-# @return status - returns 1, If order can be opened, else 0
+# @param size - matched order size of current order
+# @param execution_price - Execution price of current order
 @external
 func check_order_can_be_opened{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    order : MultipleOrder
-) -> (status : felt):
+    order : MultipleOrder, size : felt, execution_price : felt
+):
     let (prices_len : felt, prices : PriceData*) = get_asset_prices(order.pub_key)
-        return (1)
+    if prices_len != 0:
+        check_for_risk(order, size, execution_price, prices_len, prices)
+        return ()
+    end
+    return ()
 end
