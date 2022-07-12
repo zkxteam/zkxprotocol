@@ -234,15 +234,10 @@ contract L1ZKXContract is AccessControl {
         external 
         isValidL2Address(userL2Address_) 
     {
-        /**
-         * If l2 contract address is not set, then it will be set for the corresponding
-         * user's L1 wallet address
-         */
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
-            l2ContractAddress[
-                senderAsUint256
-            ] = userL2Address_;
+            // If not yet set, store L2 address linked to sender L1 address
+            l2ContractAddress[senderAsUint256] = userL2Address_;
         }
 
         address tokenContract = tokenContractAddress[ticker_];
@@ -272,15 +267,10 @@ contract L1ZKXContract is AccessControl {
         external 
         isValidL2Address(userL2Address_) 
     {
-        /**
-         * If l2 contract address is not set, then it will be set for the corresponding
-         * user's L1 wallet address
-         */
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
-            l2ContractAddress[
-                senderAsUint256
-            ] = userL2Address_;
+            // If not yet set, store L2 address linked to sender L1 address
+            l2ContractAddress[senderAsUint256] = userL2Address_;
         }
         uint256 collateralId = assetID[ETH_TICKER];
 
