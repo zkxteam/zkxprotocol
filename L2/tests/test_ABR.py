@@ -215,4 +215,4 @@ async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
           abr_value.result.timestamp)
 
     assert abr_python == pytest.approx(
-        from64x61(abr_cairo.result.response[0]), abs=1e-4)
+        from64x61(abr_cairo.result.response[0]), abs=1e-6)
