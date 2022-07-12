@@ -122,12 +122,13 @@ def hash_message(sender, to, selector, calldata, nonce):
     return compute_hash_on_elements(message)
 
 
-def hash_order(order_id, ticker, collateral, price, orderType, position, direction, closeOrder, leverage):
+def hash_order(order_id, ticker, collateral, price, stopPrice, orderType, position, direction, closeOrder, leverage):
     order = [
         order_id,
         ticker,
         collateral,
         price,
+        stopPrice,
         orderType,
         position,
         direction,
