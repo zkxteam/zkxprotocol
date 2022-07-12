@@ -527,7 +527,7 @@ func populate_asset_prices_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuilt
 ) -> (prices_len : felt, prices : PriceData*):
     alloc_locals
 
-    if [positions].assetID == 0:
+    if iterator == positions_len:
         return (prices_len, prices)
     end
 
@@ -564,7 +564,7 @@ func populate_asset_prices_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuilt
         let (empty_price_array : PriceData*) = alloc()
         return (0, empty_price_array)
     end
-    return populate_asset_prices_recurse(market_contract_address, market_price_address, iterator + 1, positions_len + 1, positions, prices_len + 1, prices)
+    return populate_asset_prices_recurse(market_contract_address, market_price_address, iterator + 1, positions_len, positions + OrderDetailsWithIDs.SIZE, prices_len + 1, prices)
 end
 
 # @notice Internal function to populate collateral prices
@@ -588,7 +588,7 @@ func populate_collateral_prices_recurse{syscall_ptr : felt*, pedersen_ptr : Hash
 ) -> (prices_len : felt, prices : PriceData*):
     alloc_locals
 
-    if [collaterals].assetID == 0:
+    if iterator == collaterals_len:
         return (prices_len, prices)
     end
 
@@ -631,7 +631,7 @@ func populate_collateral_prices_recurse{syscall_ptr : felt*, pedersen_ptr : Hash
             assetPrice=0,
             collateralPrice=2305843009213693952, # to64x61(1) == 2305843009213693952
         )
-    return populate_collateral_prices_recurse(market_contract_address, market_price_address, iterator + 1, collaterals_len + 1, collaterals, prices_len + 1, prices)
+    return populate_collateral_prices_recurse(market_contract_address, market_price_address, iterator + 1, collaterals_len, collaterals + CollateralBalance.SIZE, prices_len + 1, prices)
 end
 
 # @notice Internal function to get asset prices
@@ -671,7 +671,7 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         market_contract_address=market_contract_address,
         market_price_address=market_prices_address,
         iterator=0,
-        positions_len=0,
+        positions_len=positions_len,
         positions=positions,
         prices_len=0,
         prices=prices
@@ -695,7 +695,7 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         market_contract_address=market_contract_address,
         market_price_address=market_prices_address,
         iterator=0,
-        collaterals_len=0,
+        collaterals_len=collaterals_len,
         collaterals=collaterals,
         prices_len=prices_array_len,
         prices=prices
