@@ -197,6 +197,7 @@ contract L1ZKXContract is AccessControl {
      **/
     function depositToL2(
         uint256 userL1Address_,
+        uint256 userL2Address_,
         uint256 collateralId_,
         uint256 amount_
     ) private {
@@ -209,8 +210,6 @@ contract L1ZKXContract is AccessControl {
         userBalance[userL1Address_][collateralId_] = userBalance[
             userL1Address_
         ][collateralId_].sub(amount_);
-
-        uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct the deposit message's payload.
         uint256[] memory depositPayload = new uint256[](3);
@@ -275,6 +274,7 @@ contract L1ZKXContract is AccessControl {
             .add(amount_);
         depositToL2(
             senderAsUint256,
+            userL2Address_,
             collateralId,
             amount_
         );
@@ -309,6 +309,7 @@ contract L1ZKXContract is AccessControl {
             .add(msg.value);
         depositToL2(
             senderAsUint256,
+            userL2Address_,
             collateralId,
             msg.value
         );
