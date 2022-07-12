@@ -9,7 +9,7 @@ namespace ILiquidate:
                         ) -> (liq_result : felt, least_collateral_ratio_position : felt):
     end
 
-    func check_order_can_be_opened(order : MultipleOrder, size : felt, execution_price: felt) -> (status : felt):
+    func check_order_can_be_opened(order : MultipleOrder, size : felt, execution_price: felt):
     end
 
 end
