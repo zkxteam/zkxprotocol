@@ -254,7 +254,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let (liquidate_contract_address) = IAuthorizedRegistry.get_contract_address(
             contract_address=registry, index=Liquidate_INDEX, version=version
         )
-        let (status) = ILiquidate.check_order_can_be_opened(
+        ILiquidate.check_order_can_be_opened(
             contract_address=liquidate_contract_address,
             order=temp_order,
             size=order_size,
