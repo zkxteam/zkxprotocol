@@ -144,7 +144,7 @@ async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
     arguments = [1282198, 480] + eth_spot + [480] + eth_perp
 
     abr_python = calculate_abr.calculate_abr(
-        ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.0000125, 2)
+        ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.0000125, 2.0)
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
