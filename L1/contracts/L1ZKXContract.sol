@@ -241,6 +241,7 @@ contract L1ZKXContract is AccessControl {
 
         // Transfer tokens
         address tokenContract = tokenContractAddress[ticker_];
+        require(tokenContract != address(0), "Unregistered ticker");
         IERC20 Token = IERC20(tokenContract);
         address zkxAddress = address(this);
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
