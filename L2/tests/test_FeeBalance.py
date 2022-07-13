@@ -72,7 +72,7 @@ async def feeBalance_factory():
 
     callFeeBalance = await starknet.deploy(
         "contracts/CallFeeBalance.cairo",
-        constructor_calldata=[feeBalance.contract_address, 0]
+        constructor_calldata=[feeBalance.contract_address]
     )
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])

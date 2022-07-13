@@ -33,6 +33,8 @@ async def adminAuth_factory():
         constructor_calldata=[
             alice_signer.public_key,
             0,
+            1,
+            0
         ]
     )
 
@@ -40,7 +42,7 @@ async def adminAuth_factory():
 
 
 @pytest.mark.asyncio
-async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
+async def test_should_set_collaterals(adminAuth_factory):
     alice = adminAuth_factory
 
     alice_balance_usdc = to64x61(5500)
@@ -59,13 +61,3 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         alice_list.result.array_list[0].balance) == from64x61(alice_balance_usdc)
     assert from64x61(
         alice_list.result.array_list[1].balance) == from64x61(alice_balance_ust)
-
-    alice_increment = to64x61(100000)
-    await alice_signer.send_transaction(alice, alice.contract_address, 'set_balance', [USDC_ID, alice_increment])
-
-    alice_list_1 = await alice.return_array_collaterals().call()
-    assert from64x61(
-        alice_list_1.result.array_list[0].balance) == from64x61(alice_balance_usdc + alice_increment)
-    assert from64x61(
-        alice_list_1.result.array_list[1].balance) == from64x61(alice_balance_ust)
-    assert len(alice_list_1.result.array_list) == 2
