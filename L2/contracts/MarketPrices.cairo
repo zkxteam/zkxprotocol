@@ -5,7 +5,13 @@ from contracts.DataTypes import MarketPrice, Market
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAdminAuth import IAdminAuth
-from contracts.Constants import Trading_INDEX, Market_INDEX, AdminAuth_INDEX, ManageMarkets_ACTION
+from contracts.Constants import (
+    Trading_INDEX,
+    Market_INDEX,
+    AdminAuth_INDEX,
+    ManageMarkets_ACTION,
+    MasterAdmin_ACTION,
+)
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address, get_block_timestamp
@@ -30,6 +36,11 @@ end
 func market_prices(id : felt) -> (res : MarketPrice):
 end
 
+# @notice Stores the address of AuthorizedRegistry contract
+@storage_var
+func standard_collateral() -> (collateral_id : felt):
+end
+
 #
 # Constructor
 #
@@ -47,17 +58,54 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 end
 
 #
+# Setters
+#
+
+# @notice function to set standard collateral
+# @param collateral_id_ - standard collateral's collateral_id in the system
+@external
+func set_standard_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    collateral_id_ : felt
+):
+    alloc_locals
+    # Auth Check
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AdminAuth_INDEX, version=version
+    )
+
+    let (access) = IAdminAuth.get_admin_mapping(
+        contract_address=auth_address, address=caller, action=MasterAdmin_ACTION
+    )
+    assert_not_zero(access)
+
+    standard_collateral.write(value=collateral_id_)
+    return ()
+end
+
+#
 # Getters
 #
 
 # @notice function to get market price
 # @param market_id_ - Id of the market pair
-@external
+@view
 func get_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    market_id_ : felt,
-)-> (market_price : MarketPrice):
+    market_id_ : felt
+) -> (market_price : MarketPrice):
     let (res) = market_prices.read(id=market_id_)
     return (market_price=res)
+end
+
+# @notice function to get standard collateral
+# return collateral_id - standard collateral's collateral_id
+@view
+func get_standard_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (collateral_id : felt):
+    let (res) = standard_collateral.read()
+    return (collateral_id=res)
 end
 
 #
@@ -69,8 +117,7 @@ end
 # @param price_ - price of the market pair
 @external
 func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    market_id_ : felt,
-    price_ : felt
+    market_id_ : felt, price_ : felt
 ):
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -117,8 +164,7 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
 
     # Get Market from the corresponding Id
     let (market : Market) = IMarkets.getMarket(
-        contract_address=market_contract_address,
-        id=market_id_
+        contract_address=market_contract_address, id=market_id_
     )
 
     # Create a struct object for the market prices
@@ -127,8 +173,8 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
         collateral_id=market.assetCollateral,
         timestamp=timestamp_,
         price=price_,
-    )
-    
+        )
+
     market_prices.write(id=market_id_, value=new_market_price)
     return ()
 end

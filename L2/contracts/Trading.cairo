@@ -110,6 +110,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assetID=[request_list].assetID,
         collateralID=[request_list].collateralID,
         price=[request_list].price,
+        stopPrice=[request_list].stopPrice,
         orderType=[request_list].orderType,
         positionSize=[request_list].positionSize,
         direction=[request_list].direction,
@@ -168,6 +169,31 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     tempvar range_check_ptr = range_check_ptr
 
     # Check if the execution_price is correct
+
+    if temp_order.orderType == 2:
+        # if stop order
+        
+        if temp_order.direction == 1:
+            # if long stop order
+            # check that stop_price <= execution_price <= limit_price
+            assert_le(temp_order.stopPrice, execution_price)
+            tempvar range_check_ptr = range_check_ptr
+            assert_le(execution_price, temp_order.price)
+             tempvar range_check_ptr = range_check_ptr
+        else:
+            # if short stop order
+            # check that limit_price <= execution_price <= stop_price
+            assert_le(temp_order.price, execution_price)
+            tempvar range_check_ptr = range_check_ptr
+            assert_le(execution_price, temp_order.stopPrice)
+            tempvar range_check_ptr = range_check_ptr
+        end
+
+    else:
+        tempvar range_check_ptr = range_check_ptr
+    end
+    #tempvar range_check_ptr = range_check_ptr
+
     if temp_order.orderType == 1:
         # if it's a limit order
         if temp_order.direction == 1:
@@ -591,6 +617,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assetID=temp_order.assetID,
         collateralID=temp_order.collateralID,
         price=temp_order.price,
+        stopPrice = temp_order.stopPrice,
         orderType=temp_order.orderType,
         positionSize=temp_order.positionSize,
         direction=temp_order.direction,
