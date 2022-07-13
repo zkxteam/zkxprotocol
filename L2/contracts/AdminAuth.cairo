@@ -2,6 +2,7 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.Constants import MasterAdmin_ACTION
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_equal
 from starkware.starknet.common.syscalls import get_caller_address
@@ -41,19 +42,19 @@ func update_admin_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
 ):
     # Verify that caller has admin role
     let (caller) = get_caller_address()
-    let (is_admin) = admin_mapping.read(address=caller, action=0)
+    let (is_admin) = admin_mapping.read(address=caller, action=MasterAdmin_ACTION)
     assert is_admin = 1
     # Add or remove admin action
-    if action == 0:
+    if action == MasterAdmin_ACTION:
         let (caller) = get_caller_address()
-        let status : felt = admin_mapping.read(address=address, action=0)
+        let status : felt = admin_mapping.read(address=address, action=MasterAdmin_ACTION)
         # First approval for granting/revoking admin role
         if status == 0:
-            admin_mapping.write(address=address, action=0, value=caller)
+            admin_mapping.write(address=address, action=MasterAdmin_ACTION, value=caller)
             # Second approval for granting/revoking admin role
         else:
             assert_not_equal(status, caller)
-            admin_mapping.write(address=address, action=0, value=value)
+            admin_mapping.write(address=address, action=MasterAdmin_ACTION, value=value)
         end
         # All other actions
     else:

@@ -2,6 +2,7 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.Constants import AdminAuth_INDEX, ManageAuthRegistry_ACTION
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
@@ -31,7 +32,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     auth_address_ : felt
 ):
-    contract_registry.write(index=0, version=1, value=auth_address_)
+    contract_registry.write(index=AdminAuth_INDEX, version=1, value=auth_address_)
     return ()
 end
 
@@ -47,9 +48,9 @@ func update_contract_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
 
     # Auth Check
     let (caller) = get_caller_address()
-    let (auth_addr) = contract_registry.read(index=0, version=version_)
+    let (auth_addr) = contract_registry.read(index=AdminAuth_INDEX, version=version_)
     let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_addr, address=caller, action=3
+        contract_address=auth_addr, address=caller, action=ManageAuthRegistry_ACTION
     )
     assert_not_zero(access)
     with_attr error_message("Caller does not have permission to update contract registry"):

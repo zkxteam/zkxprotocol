@@ -86,7 +86,7 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 
     # Getting asset details
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=1, version=version
+        contract_address=registry, index=Asset_INDEX, version=version
     )
     let (asset1 : Asset) = IAsset.getAsset(contract_address=asset_address, id=newMarket.asset)
     let (asset2 : Asset) = IAsset.getAsset(
