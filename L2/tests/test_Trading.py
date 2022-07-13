@@ -63,6 +63,14 @@ async def adminAuth_factory():
         ]
     )
 
+    account_registry = await starknet.deploy(
+        "contracts/AccountRegistry.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1
+        ]
+    )
+
     fees = await starknet.deploy(
         "contracts/TradingFees.cairo",
         constructor_calldata=[
@@ -220,6 +228,29 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 5, 1])
 
+    # spoof admin1 as account_deployer so that it can update account registry
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
+
+    # add user accounts to account registry
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[admin1.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[admin2.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[alice.contract_address])
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[bob.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[charlie.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[dave.contract_address])
+
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
@@ -232,7 +263,10 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidity.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insurance.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
+
+    
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
