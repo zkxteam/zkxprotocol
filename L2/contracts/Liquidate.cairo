@@ -454,11 +454,6 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
 
-    # Check if the list is empty
-    if prices_len == 0:
-        return ()
-    end
-
     # Fetch all the positions from the Account contract
     let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
         contract_address=order.pub_key
