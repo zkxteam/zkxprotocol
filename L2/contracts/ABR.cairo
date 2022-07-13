@@ -26,7 +26,6 @@ from contracts.Constants import AdminAuth_INDEX, MasterAdmin_ACTION
 
 const NUM_1 = 2305843009213693952
 const NUM_8 = 18446744073709551616
-const NUM_STD = 4611686018427387904
 
 # @notice Stores the contract version
 @storage_var
@@ -48,6 +47,7 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     base_abr.write(28823037615171)
+    bollinger_width.write(4611686018427387904)
     return ()
 end
 
@@ -63,6 +63,10 @@ end
 
 @storage_var
 func base_abr() -> (value : felt):
+end
+
+@storage_var
+func bollinger_width() -> (value : felt):
 end
 
 # @notice Stores the last mark price of an asset
@@ -88,6 +92,28 @@ func modify_base_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     end
 
     base_abr.write(new_base_abr)
+
+    return ()
+end
+
+@external
+func modify_bollinger_width{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    new_bollinger_width : felt
+):
+    let (caller) = get_caller_address()
+    let (version) = contract_version.read()
+    let (registry) = registry_address.read()
+    let (admin_auth) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AdminAuth_INDEX, version=version
+    )
+    let (access) = IAdminAuth.get_admin_mapping(
+        contract_address=admin_auth, address=caller, action=MasterAdmin_ACTION
+    )
+    with_attr error_message("Caller does not have permission to update bollinger width"):
+        assert_not_zero(access)
+    end
+
+    bollinger_width.write(new_bollinger_width)
 
     return ()
 end
@@ -147,7 +173,7 @@ func calc_diff{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     )
 end
 
-# @notice Function to calculate the effective abr of a premium array
+# @notice Function to calculate the sum of effective abr of a premium array
 # @param array_len - Length of the array
 # @param array - Array for which to calculate the abr
 # @param sum - Current sum of the array
@@ -321,6 +347,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     avg_array : felt*,
     window_size : felt,
     iterator : felt,
+    boll_width : felt,
 ) -> (upper_array_len : felt, upper_array : felt*, lower_array_len : felt, lower_array : felt*):
     alloc_locals
 
@@ -348,7 +375,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 
         let (std_temp) = Math64x61_div(std_deviation, curr_window)
         let (movstd) = Math64x61_sqrt(std_temp)
-        let (movstd_const) = Math64x61_mul(movstd, NUM_STD)
+        let (movstd_const) = Math64x61_mul(movstd, boll_width)
 
         let (lower) = Math64x61_sub(mean, movstd_const)
         let (upper) = Math64x61_add(mean, movstd_const)
@@ -369,6 +396,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
             avg_array + 1,
             window_size,
             iterator + 1,
+            boll_width,
         )
     else:
         # Calculate the std deviation of the window
@@ -379,7 +407,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 
         let (std_temp) = Math64x61_div(std_deviation, curr_size)
         let (movstd) = Math64x61_sqrt(std_temp)
-        let (movstd_const) = Math64x61_mul(movstd, NUM_STD)
+        let (movstd_const) = Math64x61_mul(movstd, boll_width)
 
         let (lower) = Math64x61_sub(mean, movstd_const)
         let (upper) = Math64x61_add(mean, movstd_const)
@@ -400,6 +428,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
             avg_array + 1,
             window_size,
             iterator + 1,
+            boll_width,
         )
     end
 end
@@ -461,10 +490,15 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     else:
         # Calculate jump
         let (ln_jump) = Math64x61_ln(upper_diff)
-        let (jump) = Math64x61_div(ln_jump, [index_prices])
+        let (is_jump_negative) = is_le(ln_jump, 0)
 
         # Add the jump to the premium
-        jump_value_upper = jump
+        if is_jump_negative == 0:
+            let (jump) = Math64x61_div(ln_jump, [index_prices])
+            jump_value_upper = jump
+        else:
+            jump_value_upper = 0
+        end
 
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -485,10 +519,15 @@ func calc_jump{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     else:
         # Calculate jump
         let (ln_jump) = Math64x61_ln(lower_diff)
-        let (jump) = Math64x61_div(ln_jump, [index_prices])
+        let (is_jump_negative) = is_le(ln_jump, 0)
 
         # Add the jump to the premium
-        jump_value_lower = jump
+        if is_jump_negative == 0:
+            let (jump) = Math64x61_div(ln_jump, [index_prices])
+            jump_value_lower = jump
+        else:
+            jump_value_lower = 0
+        end
 
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -551,6 +590,7 @@ func reduce_values{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 ) -> (index_prices_len : felt, index_prices : felt*, mark_prices_len : felt, mark_prices : felt*):
     alloc_locals
 
+    # Store the last price in last_mark_price variable
     if perp_index_len == 1:
         last_mark_price.write(market_id=market_id, value=[perp_mark])
         tempvar syscall_ptr = syscall_ptr
@@ -637,7 +677,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     perp_index : felt*,
     perp_mark_len : felt,
     perp_mark : felt*,
-) -> (res : felt):
+) -> (result : felt):
     alloc_locals
 
     # # The nodes signatures check goes here##
@@ -691,14 +731,24 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         mark_prices_len, mark_prices, mark_prices_len, mark_prices, 8, 0, avg_array, 0
     )
 
-    # # Calculate the upper & lower band
+    # Calculate the upper & lower band
     let (upper_array : felt*) = alloc()
     let (lower_array : felt*) = alloc()
-
+    let (boll_width : felt) = bollinger_width.read()
     let (
         upper_array_len : felt, upper_array : felt*, lower_array_len : felt, lower_array : felt*
     ) = calc_bollinger(
-        0, upper_array, 0, lower_array, mark_prices_len, mark_prices, avg_array_len, avg_array, 8, 0
+        0,
+        upper_array,
+        0,
+        lower_array,
+        mark_prices_len,
+        mark_prices,
+        avg_array_len,
+        avg_array,
+        8,
+        0,
+        boll_width,
     )
 
     # Calculate the diff b/w index and mark
@@ -731,9 +781,10 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         0,
     )
 
-    # Find the effective ABR rate
+    # # Find the effective ABR rate
     let (base_abr_) = base_abr.read()
     let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0, base_abr_)
+
     let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
     let (rate) = Math64x61_div(rate_sum, array_size)
 

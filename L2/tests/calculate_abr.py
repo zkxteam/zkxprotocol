@@ -1,3 +1,4 @@
+from audioop import avg
 import math
 import ABR_data
 from numpy import log
@@ -17,7 +18,7 @@ def calc_premium(perp, spot):
     return diff
 
 
-def calc_std(data, mean):
+def calc_std(data, mean, boll_width):
     sum = 0
     length = len(data)
     for i in range(length):
@@ -27,7 +28,7 @@ def calc_std(data, mean):
     if length > 1:
         length -= 1
 
-    return 2*math.sqrt(sum/(length))
+    return boll_width*math.sqrt(sum/(length))
 
 
 def find_jump(premium, perp, spot, lower, upper):
@@ -35,14 +36,14 @@ def find_jump(premium, perp, spot, lower, upper):
         upper_diff = max(perp[i] - upper[i], 0)
         lower_diff = max(lower[i] - perp[i], 0)
 
+        jump = 0
         if upper_diff > 0:
-            jump = log(upper_diff)/spot[i]
+            jump = max(log(upper_diff)/spot[i], 0)
             premium[i] += jump
 
         if lower_diff > 0:
-            jump = log(lower_diff)/spot[i]
+            jump = max(log(lower_diff)/spot[i], 0)
             premium[i] -= jump
-
     return premium
 
 
@@ -59,17 +60,17 @@ def sliding_mean(data, window):
     return avg
 
 
-def bollinger(data, avg, window):
+def bollinger(data, avg, window, boll_width):
     lower = []
     upper = []
 
     for i in range(len(data)):
         if i <= window - 1:
-            std = calc_std(data[0:i + 1], avg[i])
+            std = calc_std(data[0:i + 1], avg[i], boll_width)
             lower.append(avg[i] - std)
             upper.append(avg[i] + std)
         else:
-            std = calc_std(data[i-window + 1:i+1], avg[i])
+            std = calc_std(data[i-window + 1:i+1], avg[i], boll_width)
             lower.append(avg[i] - std)
             upper.append(avg[i] + std)
 
@@ -80,7 +81,7 @@ def effective_abr(premium, base_rate):
     sum = 0
     for i in range(len(premium)):
         premium[i] /= 8.0
-        premium[i] += 0.0000125
+        premium[i] += base_rate
         sum += premium[i]
     return sum/len(premium)
 
@@ -104,16 +105,17 @@ def reduce(perp_spot, perp, window):
     return (index, mark)
 
 
-def calculate_abr(perp_spot, perp, base_rate):
+def calculate_abr(perp_spot, perp, base_rate, boll_width):
     (index_prices, mark_prices) = reduce(
         perp_spot, perp, 8)
     avg_array = sliding_mean(mark_prices, 8)
-    (lower, upper) = bollinger(mark_prices, avg_array, 8)
-
+    (lower, upper) = bollinger(mark_prices, avg_array, 8, boll_width)
     diff = calc_premium(mark_prices, index_prices)
 
     premium = sliding_mean(diff, 8)
     final_premium = find_jump(premium, mark_prices, index_prices, lower, upper)
     abr = effective_abr(final_premium, base_rate)
-
     return abr
+
+
+calculate_abr(ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 2.0)
