@@ -7,8 +7,6 @@ from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 
 signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
-signer3 = Signer(123456789987654323)
-signer4 = Signer(123456789987654324)
 
 
 @pytest.fixture(scope='module')
@@ -52,27 +50,17 @@ async def adminAuth_factory():
         ]
     )
 
-    alice = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, 0, 1, 0]
-    )
-
-    bob = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer4.public_key, 0, 1, 0]
-    )
-
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
 
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
 
-    return adminAuth, account_registry, admin1, admin2, alice, bob
+    return adminAuth, account_registry, admin1, admin2
 
 
 @pytest.mark.asyncio
 async def test_add_address_to_account_registry(adminAuth_factory):
-    adminAuth, account_registry, admin1, admin2, _, _ = adminAuth_factory
+    adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
     await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("123")])
     await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("456")])
@@ -91,7 +79,7 @@ async def test_add_address_to_account_registry(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_remove_address_from_account_registry(adminAuth_factory):
-    adminAuth, account_registry, admin1, admin2, _, _ = adminAuth_factory
+    adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
     await signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [0])
 
@@ -105,7 +93,7 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test__unauthorized_add_address_to_account_registry(adminAuth_factory):
-    adminAuth, account_registry, admin1, admin2, _, _ = adminAuth_factory
+    adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
     assert_revert(lambda: signer2.send_transaction(
         admin2, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("1234")]))
@@ -113,26 +101,8 @@ async def test__unauthorized_add_address_to_account_registry(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_add_address_to_account_registry_duplicate(adminAuth_factory):
-    adminAuth, account_registry, admin1, admin2, _, _ = adminAuth_factory
+    adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
     await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("456")])
     fetched_account_registry = await account_registry.get_account_registry().call()
     assert fetched_account_registry.result.account_registry == [3421494]
-
-
-@pytest.mark.asyncio
-async def test_add_address_by_non_admin(adminAuth_factory):
-    adminAuth, account_registry, admin1, admin2, alice, bob = adminAuth_factory
-
-    assert_revert(lambda: signer4.send_transaction(
-        bob, account_registry.contract_address, 'add_to_account_registry_admin', [signer3.public_key]))
-
-
-@pytest.mark.asyncio
-async def test_add_address_by_admin(adminAuth_factory):
-    adminAuth, account_registry, admin1, admin2, alice, bob = adminAuth_factory
-
-    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry_admin', [signer3.public_key])
-    fetched_account_registry = await account_registry.get_account_registry().call()
-
-    assert fetched_account_registry.result.account_registry[1] == signer3.public_key
