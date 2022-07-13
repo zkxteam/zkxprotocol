@@ -12,7 +12,8 @@ from contracts.Constants import (
     LiquidityFund_INDEX,
     InsuranceFund_INDEX,
     MarketPrices_INDEX,
-    Liquidate_INDEX
+    Liquidate_INDEX,
+    AccountRegistry_INDEX
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
@@ -25,6 +26,7 @@ from contracts.interfaces.ILiquidate import ILiquidate
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from contracts.interfaces.IMarketPrices import IMarketPrices
+from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.Constants import AdminAuth_INDEX
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.math import assert_not_zero, assert_le, assert_in_range
@@ -121,6 +123,17 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         side=[request_list].side
     )
 
+    # check that the user account is present in account registry (and thus that it was deployed by us)
+
+    let (account_registry) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AccountRegistry_INDEX, version=version)
+
+    let (is_registered) = IAccountRegistry.is_registered_user(
+        contract_address=account_registry, address_=temp_order.pub_key)
+    
+    with_attr error_message("User account not registered"):
+        assert_not_zero(is_registered)
+    end
 
     # Get asset and market addresses
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
