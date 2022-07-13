@@ -197,7 +197,7 @@ async def abr_factory():
         constructor_calldata=[
             registry.contract_address,
             1,
-            17 # abr index
+            17  # abr index
         ]
     )
 
@@ -206,7 +206,7 @@ async def abr_factory():
         constructor_calldata=[
             registry.contract_address,
             1,
-            19 # abr_payment index
+            19  # abr_payment index
         ]
     )
 
@@ -243,6 +243,7 @@ async def abr_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [17, 1, abr.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [18, 1, abr_fund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [19, 1, abr_payment.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -262,8 +263,8 @@ async def abr_factory():
     await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Add markets
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1])
@@ -282,6 +283,10 @@ async def abr_factory():
 
     btc_perp_spot_64x61 = convertTo64x61(ABR_data.btc_perp_spot)
     btc_perp_64x61 = convertTo64x61(ABR_data.btc_perp)
+
+    # Add accounts to Account Registry
+    await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [alice.contract_address])
+    await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [bob.contract_address])
 
     return admin1, trading, fixed_math, alice, bob, relay_abr, abr_fund, relay_abr_payment, btc_perp_spot_64x61, btc_perp_64x61
 
@@ -304,19 +309,20 @@ async def test_opening_and_closing_full_orders(abr_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(40900)
+    stopPrice1 = 0
     orderType1 = 0
     position1 = to64x61(1)
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
     leverage1 = to64x61(1)
-    isLiquidation1 = 0
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljerw")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(40900)
+    stopPrice2 = 0
     orderType2 = 0
     position2 = to64x61(1)
     direction2 = 1
@@ -329,9 +335,9 @@ async def test_opening_and_closing_full_orders(abr_factory):
     execution_price1 = to64x61(40900)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
@@ -342,9 +348,9 @@ async def test_opening_and_closing_full_orders(abr_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
     ])
 
     alice_balance = await alice.get_balance(USDC_ID).call()

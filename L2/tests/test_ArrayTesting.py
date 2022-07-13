@@ -19,7 +19,7 @@ async def contract_factory():
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0]
+        constructor_calldata=[signer1.public_key, 0, 1, 0]
     )
 
     arrayTesting = await starknet.deploy(
@@ -41,8 +41,6 @@ async def test_get_admin_mapping(contract_factory):
     arrayTesting, admin1 = contract_factory
 
     await create_positions(arrayTesting, admin1)
-
-    # await signer1.send_transaction(admin1, arrayTesting.contract_address, 'add_position', [ 1, 261, 361])
 
     for i in range(1, 6):
         position = await arrayTesting.get_position(i).call()

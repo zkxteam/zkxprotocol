@@ -3,7 +3,12 @@
 
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.Constants import AdminAuth_INDEX, Trading_INDEX, MasterAdmin_ACTION, AccountDeployer_INDEX
+from contracts.Constants import (
+    AdminAuth_INDEX,
+    Trading_INDEX,
+    MasterAdmin_ACTION,
+    AccountDeployer_INDEX,
+)
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
@@ -57,7 +62,6 @@ end
 func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt
 ) -> (res : felt):
-
     # Check whether the call is from account deployer contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
