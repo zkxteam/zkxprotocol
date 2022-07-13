@@ -664,7 +664,7 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         collaterals_len=collaterals_len,
         collaterals=collaterals,
         prices_len=prices_array_len,
-        prices=prices
+        prices=prices_array
     )
 end
 

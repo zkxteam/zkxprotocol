@@ -1,9 +1,11 @@
 from copyreg import constructor
 import pytest
 import asyncio
+import time
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
+from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, convertList
 
 admin1_signer = Signer(123456789987654321)
@@ -205,6 +207,21 @@ async def adminAuth_factory():
         constructor_calldata=[]
     )
 
+    marketPrices = await starknet.deploy(
+        "contracts/MarketPrices.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1
+        ]
+    )
+
+    timestamp = int(time.time())
+
+    starknet.state.state.block_info = BlockInfo(
+        block_number=1, block_timestamp=timestamp, gas_price=starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet.state.state.block_info.sequencer_address
+    )
+
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
@@ -223,6 +240,7 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidityFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insuranceFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -488,7 +506,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     print("bob acc value:", from64x61(bob_acc_value.result.res))
 
     assert from64x61(bob_acc_value.result.res) == 6572.963000000001
-
+    
     ###### Opening of Orders 2 #######
     size2 = to64x61(3)
     marketID_2 = ETH_USD_ID
