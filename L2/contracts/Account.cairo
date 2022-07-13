@@ -56,6 +56,7 @@ from contracts.Constants import (
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
     WithdrawalRequest_INDEX,
+    ABR_PAYMENT_INDEX
 )
 
 from contracts.Math_64x61 import (
@@ -541,7 +542,7 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     let (version) = contract_version.read()
 
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=19, version=version
+        contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
     )
 
     with_attr error_message("Caller is not authorized to do transferFrom in account contract."):
@@ -573,7 +574,7 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     let (version) = contract_version.read()
 
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=19, version=version
+        contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
     )
     with_attr error_message("Caller is not authorized to do transfer in account contract."):
         assert caller = abr_payment_address
