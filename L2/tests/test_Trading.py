@@ -23,8 +23,10 @@ ETH_ID = str_to_felt("65ksgn23nv")
 USDC_ID = str_to_felt("fghj3am52qpzsib")
 UST_ID = str_to_felt("yjk45lvmasopq")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
+BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
 TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
+UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
@@ -60,6 +62,14 @@ async def adminAuth_factory():
         "contracts/AuthorizedRegistry.cairo",
         constructor_calldata=[
             adminAuth.contract_address
+        ]
+    )
+
+    account_registry = await starknet.deploy(
+        "contracts/AccountRegistry.cairo",
+        constructor_calldata=[
+            registry.contract_address,
+            1
         ]
     )
 
@@ -220,6 +230,29 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 5, 1])
 
+    # spoof admin1 as account_deployer so that it can update account registry
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
+
+    # add user accounts to account registry
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[admin1.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[admin2.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[alice.contract_address])
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[bob.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[charlie.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[dave.contract_address])
+
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
@@ -232,7 +265,10 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidity.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insurance.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
+
+    
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -261,8 +297,16 @@ async def adminAuth_factory():
 
     # Add markets
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_UST_ID, BTC_ID, UST_ID, 0, 1, 10])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, 0, 1, 10])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [TSLA_USD_ID, TSLA_ID, USDC_ID, 0, 0, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [UST_USDC_ID, UST_ID, USDC_ID, 0, 0, 10000])
+
+    # Set standard collateral
+    await admin1_signer.send_transaction(admin1, marketPrices.contract_address, 'set_standard_collateral', [USDC_ID])
+
+    # Set market price for UST-USDC market
+    await admin1_signer.send_transaction(admin1, marketPrices.contract_address, 'update_market_price', [UST_USDC_ID, 2328901439305830912])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
