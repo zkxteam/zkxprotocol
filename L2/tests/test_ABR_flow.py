@@ -298,7 +298,6 @@ async def test_abr_payments(abr_factory):
     closeOrder1 = 0
     parentOrder1 = 0
     leverage1 = to64x61(1)
-    isLiquidation1 = 0
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljerw")
@@ -312,7 +311,6 @@ async def test_abr_payments(abr_factory):
     closeOrder2 = 0
     parentOrder2 = 0
     leverage2 = to64x61(1)
-    isLiquidation2 = 0
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(40900)
