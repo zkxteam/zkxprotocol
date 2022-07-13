@@ -7,25 +7,27 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./IStarknetCore.sol";
 import "./Constants.sol";
 
-/**
-  Contract for L1 <-> L2 interaction between an L2 contracts and this
-  L1 ZKX contract.
-*/
+// Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
 contract L1ZKXContract is AccessControl {
+
     event LogDeposit(
         address sender,
         uint256 amount_,
         uint256 collateralId_,
         uint256 l2Recipient
     );
+
     event LogWithdrawal(
         address recipient,
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
     );
+
     event LogAssetListUpdated(uint256 ticker_, uint256 collateralId_);
+
     event LogAssetRemovedFromList(uint256 ticker_, uint256 collateralId_);
+
     event LogTokenContractAddressUpdated(
         uint256 ticker_,
         address tokenContractAddresses_
@@ -34,16 +36,13 @@ contract L1ZKXContract is AccessControl {
     using SafeMath for uint256;
 
     // The StarkNet core contract.
-    IStarknetCore starknetCore;
+    IStarknetCore public starknetCore;
 
     // Maps ticker to the token contract addresses
     mapping(uint256 => address) public tokenContractAddress;
 
     // Maps ticker with the asset ID
     mapping(uint256 => uint256) public assetID;
-
-    // Maps the user address to the corresponding asset balance
-    mapping(uint256 => mapping(uint256 => uint256)) public userBalance;
 
     // Maps L1 metamask account address to the l2 account contract address
     mapping(uint256 => uint256) public l2ContractAddress;
@@ -61,8 +60,7 @@ contract L1ZKXContract is AccessControl {
       Modifier to verify valid L2 address.
     */
     modifier isValidL2Address(uint256 l2Address_) {
-        require(l2Address_ != 0, "L2_ADDRESS_OUT_OF_RANGE");
-        require(l2Address_ < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
+        require(l2Address_ != 0 && l2Address_ < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
         _;
     }
 
@@ -86,7 +84,7 @@ contract L1ZKXContract is AccessControl {
      * @param assetId_ - Id of the asset created
      **/
     function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         // Construct the update asset list message's payload.
@@ -111,7 +109,7 @@ contract L1ZKXContract is AccessControl {
      * @param assetId_ - Id of the asset to be removed
      **/
     function removeAssetFromList(uint256 ticker_, uint256 assetId_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         // Construct the remove asset message's payload.
@@ -144,7 +142,7 @@ contract L1ZKXContract is AccessControl {
     /**
      * @dev function to get the list of available assets
      **/
-    function getAssetList() public view returns (uint256[] memory) {
+    function getAssetList() external view returns (uint256[] memory) {
         return assetList;
     }
 
@@ -156,7 +154,10 @@ contract L1ZKXContract is AccessControl {
     function setTokenContractAddress(
         uint256 ticker_,
         address tokenContractAddress_
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
         // Update token contract address
         tokenContractAddress[ticker_] = tokenContractAddress_;
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
@@ -167,7 +168,7 @@ contract L1ZKXContract is AccessControl {
      * @param assetContractAddress_ - address of the asset contract
      **/
     function setAssetContractAddress(uint256 assetContractAddress_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         assetContractAddress = assetContractAddress_;
@@ -178,7 +179,7 @@ contract L1ZKXContract is AccessControl {
      * @param withdrawalRequestAddress_ - address of withdrawal request contract
      **/
     function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         withdrawalRequestContractAddress = withdrawalRequestAddress_;
@@ -192,20 +193,10 @@ contract L1ZKXContract is AccessControl {
      **/
     function depositToL2(
         uint256 userL1Address_,
+        uint256 userL2Address_,
         uint256 collateralId_,
         uint256 amount_
-    ) internal {
-        require(
-            amount_ <= userBalance[userL1Address_][collateralId_],
-            "The user's balance is not large enough."
-        );
-
-        // Update the User balance.
-        userBalance[userL1Address_][collateralId_] = userBalance[
-            userL1Address_
-        ][collateralId_].sub(amount_);
-
-        uint256 userL2Address = l2ContractAddress[userL1Address_];
+    ) private {
 
         // Construct the deposit message's payload.
         uint256[] memory depositPayload = new uint256[](3);
@@ -215,16 +206,16 @@ contract L1ZKXContract is AccessControl {
 
         // Send the message to the StarkNet core contract.
         starknetCore.sendMessageToL2(
-            userL2Address,
+            userL2Address_,
             DEPOSIT_SELECTOR,
             depositPayload
         );
 
         emit LogDeposit(
-            address(uint160(userL1Address_)),
+            msg.sender,
             amount_,
             collateralId_,
-            userL2Address
+            userL2Address_
         );
     }
 
@@ -238,35 +229,31 @@ contract L1ZKXContract is AccessControl {
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_
-    ) public isValidL2Address(userL2Address_) {
-        /**
-         * If l2 contract address is not set, then it will be set for the corresponding
-         * user's L1 wallet address
-         */
+    ) 
+        external 
+        isValidL2Address(userL2Address_) 
+    {   
+        // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
-            l2ContractAddress[
-                senderAsUint256
-            ] = userL2Address_;
+            l2ContractAddress[senderAsUint256] = userL2Address_;
         }
 
+        // Transfer tokens
         address tokenContract = tokenContractAddress[ticker_];
-        uint256 balance = IERC20(tokenContract).balanceOf(msg.sender);
-        require(
-            balance >= amount_,
-            "User is trying to deposit more than he has"
-        );
+        require(tokenContract != address(0), "Unregistered ticker");
+        IERC20 Token = IERC20(tokenContract);
+        address zkxAddress = address(this);
+        uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
+        Token.transferFrom(msg.sender, zkxAddress, amount_);
+        uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
+        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Invalid transfer amount");
 
-        IERC20(tokenContract).transferFrom(msg.sender, address(this), amount_);
+        // Submit deposit
         uint256 collateralId = assetID[ticker_];
-
-        // Update the User balance.
-        userBalance[senderAsUint256][
-            collateralId
-        ] = userBalance[senderAsUint256][collateralId]
-            .add(amount_);
         depositToL2(
             senderAsUint256,
+            userL2Address_,
             collateralId,
             amount_
         );
@@ -276,29 +263,22 @@ contract L1ZKXContract is AccessControl {
      * @dev function to deposit ETH to L1ZKX contract
      * @param userL2Address_ - The L2 account address of the user
      **/
-    function depositEthToL1(
-        uint256 userL2Address_
-    ) payable public isValidL2Address(userL2Address_) {
-        /**
-         * If l2 contract address is not set, then it will be set for the corresponding
-         * user's L1 wallet address
-         */
+    function depositEthToL1(uint256 userL2Address_) 
+        payable 
+        external 
+        isValidL2Address(userL2Address_) 
+    {
+        // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
-            l2ContractAddress[
-                senderAsUint256
-            ] = userL2Address_;
+            l2ContractAddress[senderAsUint256] = userL2Address_;
         }
 
+        // Submit deposit
         uint256 collateralId = assetID[ETH_TICKER];
-
-        // Update the User balance.
-        userBalance[senderAsUint256][
-            collateralId
-        ] = userBalance[senderAsUint256][collateralId]
-            .add(msg.value);
         depositToL2(
             senderAsUint256,
+            userL2Address_,
             collateralId,
             msg.value
         );
@@ -316,7 +296,7 @@ contract L1ZKXContract is AccessControl {
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
-    ) public {
+    ) external {
         require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
@@ -360,7 +340,7 @@ contract L1ZKXContract is AccessControl {
         uint256 userL1Address_,
         uint256 amount_,
         uint256 requestId_
-    ) public {
+    ) external {
         require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
@@ -401,7 +381,7 @@ contract L1ZKXContract is AccessControl {
      * @param tokenAddress_ - address of the token contract
      **/
     function transferFunds(address recipient_, uint256 amount_, address tokenAddress_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         uint256 balance = IERC20(tokenAddress_).balanceOf(address(this));
@@ -415,7 +395,7 @@ contract L1ZKXContract is AccessControl {
      * @param amount_ - amount that needs to be transferred
      **/
     function transferEth(address payable recipient_, uint256 amount_)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
