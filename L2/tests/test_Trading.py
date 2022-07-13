@@ -23,8 +23,10 @@ ETH_ID = str_to_felt("65ksgn23nv")
 USDC_ID = str_to_felt("fghj3am52qpzsib")
 UST_ID = str_to_felt("yjk45lvmasopq")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
+BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
 TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
+UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
@@ -295,8 +297,16 @@ async def adminAuth_factory():
 
     # Add markets
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_UST_ID, BTC_ID, UST_ID, 0, 1, 10])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, 0, 1, 10])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [TSLA_USD_ID, TSLA_ID, USDC_ID, 0, 0, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [UST_USDC_ID, UST_ID, USDC_ID, 0, 0, 10000])
+
+    # Set standard collateral
+    await admin1_signer.send_transaction(admin1, marketPrices.contract_address, 'set_standard_collateral', [USDC_ID])
+
+    # Set market price for UST-USDC market
+    await admin1_signer.send_transaction(admin1, marketPrices.contract_address, 'update_market_price', [UST_USDC_ID, 2328901439305830912])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
