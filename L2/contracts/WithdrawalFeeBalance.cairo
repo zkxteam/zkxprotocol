@@ -1,7 +1,6 @@
 %lang starknet
 
-from contracts.Constants import AccountRegistry_INDEX, AdminAuth_INDEX, MasterAdmin_ACTION
-from contracts.interfaces.IAdminAuth import IAdminAuth
+from contracts.Constants import AccountRegistry_INDEX, MasterAdmin_ACTION
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.libraries.Utils import verify_caller_authority

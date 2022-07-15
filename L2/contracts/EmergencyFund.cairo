@@ -1,14 +1,12 @@
 %lang starknet
 
 from contracts.Constants import (
-    AdminAuth_INDEX,
     Holding_INDEX,
     LiquidityFund_INDEX,
     InsuranceFund_INDEX,
     ManageFunds_ACTION
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IInsuranceFund import IInsuranceFund

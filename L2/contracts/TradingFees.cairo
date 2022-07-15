@@ -1,17 +1,14 @@
 %lang starknet
 
 from contracts.Constants import (
-    AdminAuth_INDEX,
     FeeDiscount_INDEX,
     ManageFeeDetails_ACTION
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IFeeDiscount import IFeeDiscount
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_nn
-from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Math_64x61 import Math64x61_mul
 from contracts.libraries.Utils import verify_caller_authority
 

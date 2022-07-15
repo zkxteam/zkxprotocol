@@ -1,12 +1,10 @@
 %lang starknet
 
 from contracts.Constants import (
-    AdminAuth_INDEX,
     ABR_PAYMENT_INDEX,
     ManageFunds_ACTION
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IAccountRegistry import IAccountRegistry

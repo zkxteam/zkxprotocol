@@ -2,19 +2,16 @@
 
 from contracts.DataTypes import Asset, Market, MarketWID
 from contracts.Constants import (
-    AdminAuth_INDEX,
     Asset_INDEX,
     ManageMarkets_ACTION,
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAsset import IAsset
 from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
-from starkware.starknet.common.syscalls import get_caller_address
 
 # @notice Stores the contract version
 @storage_var

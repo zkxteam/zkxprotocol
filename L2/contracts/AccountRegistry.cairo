@@ -1,9 +1,7 @@
 %lang starknet
 
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.Constants import (
-    AdminAuth_INDEX,
     Trading_INDEX,
     MasterAdmin_ACTION,
     AccountDeployer_INDEX,
@@ -98,17 +96,16 @@ func remove_from_account_registry{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }(id_ : felt) -> (res : felt):
     
-    with_attr error_message(""):
+    alloc_locals
+    with_attr error_message("Caller is not Master Admin"):
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
         verify_caller_authority(registry, version, MasterAdmin_ACTION)
     end
 
     let (account_address) = account_registry.read(index=id_)
-    if account_address == 0:
-        with_attr error_message("account address does not exists in that index"):
-            assert 1 = 0
-        end
+    with_attr error_message("Account address does not exists in that index"):
+        assert_not_zero(account_address)
     end
 
     let (reg_len) = account_registry_len.read()

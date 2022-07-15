@@ -1,10 +1,9 @@
 %lang starknet
 
-from contracts.Constants import AccountRegistry_INDEX, AdminAuth_INDEX, MasterAdmin_ACTION
+from contracts.Constants import AccountRegistry_INDEX, MasterAdmin_ACTION
 from contracts.DataTypes import WithdrawalRequest
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAccount import IAccount
 from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.alloc import alloc

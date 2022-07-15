@@ -7,8 +7,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.alloc import alloc
 from starkware.starknet.common.messages import send_message_to_l1
 from contracts.DataTypes import QuoteL1Message
-from contracts.Constants import AdminAuth_INDEX, AccountRegistry_INDEX, MasterAdmin_ACTION
-from contracts.interfaces.IAdminAuth import IAdminAuth
+from contracts.Constants import AccountRegistry_INDEX, MasterAdmin_ACTION
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.libraries.Utils import verify_caller_authority

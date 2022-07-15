@@ -17,10 +17,7 @@ from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IABRFund import IABRFund
-from contracts.interfaces.IAdminAuth import IAdminAuth
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from starkware.starknet.common.syscalls import get_caller_address
-from contracts.Constants import AdminAuth_INDEX, MasterAdmin_ACTION
+from contracts.Constants import MasterAdmin_ACTION
 from contracts.libraries.Utils import verify_caller_authority
 
 const NUM_1 = 2305843009213693952
