@@ -13,6 +13,12 @@ from contracts.Constants import (
 
 from contracts.DataTypes import RouterFunctionCall
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from starkware.cairo.common.hash_state import (
+    hash_init,
+    hash_finalize,
+    hash_update_with_hashchain,
+    hash_update_single,
+)
 
 
 # @notice - helper function to verify authority of caller for action

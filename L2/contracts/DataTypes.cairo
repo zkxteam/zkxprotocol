@@ -237,3 +237,9 @@ struct RouterFunctionCall:
     member calldata_size: felt
     member calldata: felt*
 end
+
+struct ContractCall:
+    member index: felt
+    member version: felt
+    member function_selector: felt
+end

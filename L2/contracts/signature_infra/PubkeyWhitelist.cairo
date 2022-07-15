@@ -1,9 +1,9 @@
 %lang starknet
-%builtins pedersen range_check
 
 from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.cairo_builtins import HashBuiltin
+from contracts.Constants import MasterAdmin_ACTION
 
 @storage_var
 func pubkey_to_whitelist(pubkey: felt) -> (res: felt):
