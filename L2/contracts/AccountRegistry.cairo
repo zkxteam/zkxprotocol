@@ -1,5 +1,4 @@
 %lang starknet
-%builtins pedersen range_check ecdsa
 
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -9,6 +8,7 @@ from contracts.Constants import (
     MasterAdmin_ACTION,
     AccountDeployer_INDEX,
 )
+from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
@@ -97,19 +97,12 @@ end
 func remove_from_account_registry{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }(id_ : felt) -> (res : felt):
-    alloc_locals
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=MasterAdmin_ACTION
-    )
-    assert_not_zero(access)
+    
+    with_attr error_message(""):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, MasterAdmin_ACTION)
+    end
 
     let (account_address) = account_registry.read(index=id_)
     if account_address == 0:

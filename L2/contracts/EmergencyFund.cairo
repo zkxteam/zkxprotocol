@@ -1,7 +1,5 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
 from contracts.Constants import (
     AdminAuth_INDEX,
     Holding_INDEX,
@@ -14,6 +12,7 @@ from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
+from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.math import assert_not_zero, assert_le
@@ -63,20 +62,11 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt
 ):
-    alloc_locals
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    assert_not_zero(access)
+    with_attr error_message("Caller is not authorized to manage funds"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
     balance_mapping.write(asset_id=asset_id_, value=current_amount + amount)
@@ -90,20 +80,11 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt
 ):
-    alloc_locals
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    assert_not_zero(access)
+    with_attr error_message("Caller is not authorized to manage funds"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
@@ -122,25 +103,16 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     asset_id_ : felt, amount : felt
 ):
     alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    assert_not_zero(access)
+    with_attr error_message("Caller is not authorized to manage funds"):
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     # Get holding contract address
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Holding_INDEX, version=version
     )
-
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount, current_amount)
@@ -159,26 +131,18 @@ end
 func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount : felt
 ):
+    
     alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    assert_not_zero(access)
+    with_attr error_message("Caller is not authorized to manage funds"):    
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     # Get liquidity fund contract address
     let (liquidity_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=LiquidityFund_INDEX, version=version
     )
-
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount, current_amount)
@@ -198,19 +162,12 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     asset_id_ : felt, amount : felt
 ):
     alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
+    # Verify auth
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    assert_not_zero(access)
+    with_attr error_message("Caller is not authorized to manage funds"):    
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     # Get insurance fund contract address
     let (insurance_address) = IAuthorizedRegistry.get_contract_address(
@@ -236,19 +193,12 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     asset_id : felt, amount : felt
 ):
     alloc_locals
-
-    let (caller) = get_caller_address()
+    # Verify auth
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    assert_not_zero(access)
+    with_attr error_message("Caller is not authorized to manage funds"):    
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     # Get holding contract address
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
@@ -271,19 +221,12 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     asset_id : felt, amount : felt
 ):
     alloc_locals
-
-    let (caller) = get_caller_address()
+    # Verify auth
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    assert_not_zero(access)
+    with_attr error_message("Caller is not authorized to manage funds"):    
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     # Get insurance fund contract address
     let (insurance_address) = IAuthorizedRegistry.get_contract_address(
@@ -306,25 +249,17 @@ func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     asset_id : felt, amount : felt
 ):
     alloc_locals
-
-    let (caller) = get_caller_address()
+    # Verify auth
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    assert_not_zero(access)
+    with_attr error_message("Caller is not authorized to manage funds"):    
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     # Get liquidity contract address
     let (liquidity_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=LiquidityFund_INDEX, version=version
     )
-
     ILiquidityFund.defund(contract_address=liquidity_address, asset_id_=asset_id, amount=amount)
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id)

@@ -1,7 +1,5 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_nn
@@ -13,6 +11,7 @@ from contracts.Constants import AdminAuth_INDEX, AccountRegistry_INDEX, MasterAd
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.libraries.Utils import verify_caller_authority
 
 const MESSAGE_WITHDRAW = 0
 
@@ -72,19 +71,12 @@ end
 func set_L1_zkx_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     l1_zkx_address : felt
 ):
-    alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=MasterAdmin_ACTION
-    )
-    assert_not_zero(access)
+    # Auth check
+    with_attr error_message("Caller is not authorized to set L1 ZKX address"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, MasterAdmin_ACTION)
+    end
 
     L1_zkx_address.write(value=l1_zkx_address)
     return ()
@@ -96,19 +88,12 @@ end
 func set_max_length{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     length_ : felt
 ):
-    alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=MasterAdmin_ACTION
-    )
-    assert_not_zero(access)
+    # Auth check
+    with_attr error_message("Caller is not authorized to set message max length"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, MasterAdmin_ACTION)
+    end
 
     L1_message_array_max_length.write(value=length_)
     return ()
