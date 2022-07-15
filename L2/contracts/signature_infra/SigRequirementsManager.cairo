@@ -4,7 +4,7 @@ from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.math import assert_not_zero, assert_nn
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import MasterAdmin_ACTION
-from contracts.DataTypes import ContractCall
+from contracts.DataTypes import CoreFunction
 
 @storage_var
 func registry_address() -> (address:felt):
@@ -15,11 +15,11 @@ func version() -> (res:felt):
 end
 
 @storage_var
-func func_to_registration_mapping(contract_call: ContractCall) -> (res:felt):
+func func_to_registration_mapping(core_function: CoreFunction) -> (res:felt):
 end
 
 @storage_var
-func func_to_num_sig_mapping(contract_call: ContractCall) -> (num: felt):
+func func_to_num_sig_mapping(core_function: CoreFunction) -> (num: felt):
 end
 
 @constructor
@@ -38,7 +38,7 @@ end
 
 @external
 func set_sig_requirement{syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, range_check_ptr}(contract_call: ContractCall, num_req: felt):
+    pedersen_ptr : HashBuiltin*, range_check_ptr}(core_function: CoreFunction, num_req: felt):
 
     let (current_registry_address) = registry_address.read()
     let (current_version) = version.read()
@@ -47,21 +47,21 @@ func set_sig_requirement{syscall_ptr : felt*,
 
     assert_nn(num_req)
 
-    func_to_registration_mapping.write(contract_call, 1)
-    func_to_num_sig_mapping.write(contract_call, num_req)
+    func_to_registration_mapping.write(core_function, 1)
+    func_to_num_sig_mapping.write(core_function, num_req)
 
     return()
 end
 
 @external
 func deregister_func{syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, range_check_ptr}(contract_call: ContractCall):
+    pedersen_ptr : HashBuiltin*, range_check_ptr}(core_function: CoreFunction):
 
     let (current_registry_address) = registry_address.read()
     let (current_version) = version.read()
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
-    func_to_registration_mapping.write(contract_call, 0)
+    func_to_registration_mapping.write(core_function, 0)
     return()
 end
 
@@ -81,9 +81,9 @@ end
 
 @view
 func assert_func_handled{syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, range_check_ptr}(contract_call: ContractCall):
+    pedersen_ptr : HashBuiltin*, range_check_ptr}(core_function: CoreFunction):
 
-    let (is_registered) = func_to_registration_mapping.read(contract_call)
+    let (is_registered) = func_to_registration_mapping.read(core_function)
 
     assert_not_zero(is_registered)
 
@@ -92,9 +92,9 @@ end
 
 @view
 func get_sig_requirement{syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, range_check_ptr}(contract_call: ContractCall) -> (num_req: felt):
+    pedersen_ptr : HashBuiltin*, range_check_ptr}(core_function: CoreFunction) -> (num_req: felt):
 
-    let (num_req) = func_to_num_sig_mapping.read(contract_call)
+    let (num_req) = func_to_num_sig_mapping.read(core_function)
 
     return(num_req)
 end

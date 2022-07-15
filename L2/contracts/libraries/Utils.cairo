@@ -11,7 +11,7 @@ from contracts.Constants import (
     AdminAuth_INDEX
 )
 
-from contracts.DataTypes import RouterFunctionCall
+from contracts.DataTypes import CoreFunctionCall, Signature
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from starkware.cairo.common.hash_state import (
     hash_init,
@@ -44,18 +44,18 @@ namespace SignatureVerification:
 
     func verify_sig{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
-        range_check_ptr, ecdsa_ptr: SignatureBuiltin*}(hash: felt, public_key: felt, sig: (felt,felt)):
+        range_check_ptr, ecdsa_ptr: SignatureBuiltin*}(hash: felt, public_key: felt, sig: Signature):
 
         verify_ecdsa_signature(message=hash,
                                public_key=public_key,
-                               signature_r=sig[0],
-                               signature_s=sig[1])
+                               signature_r=sig.r_value,
+                               signature_s=sig.s_value)
         return()
     end
 
     func calc_call_hash{
         syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
-        range_check_ptr}(data:RouterFunctionCall) -> (hash:felt):
+        range_check_ptr}(data:CoreFunctionCall) -> (hash:felt):
 
         let hash_ptr = pedersen_ptr
         with hash_ptr:
@@ -64,7 +64,7 @@ namespace SignatureVerification:
           let (hash_state_ptr) = hash_update_single(hash_state_ptr, data.version)
           let (hash_state_ptr) = hash_update_single(hash_state_ptr, data.nonce)
           let (hash_state_ptr) = hash_update_single(hash_state_ptr, data.function_selector)
-          let (hash_state_ptr) = hash_update_with_hashchain(hash_state_ptr, data.calldata, data.calldata_size)
+          let (hash_state_ptr) = hash_update_with_hashchain(hash_state_ptr, data.calldata, data.calldata_len)
           let (hash) = hash_finalize(hash_state_ptr)
           return(hash)
         end

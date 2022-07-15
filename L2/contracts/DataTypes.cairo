@@ -229,16 +229,16 @@ struct QuoteL1Message:
     member L1_fee_ticker : felt
 end
 
-struct RouterFunctionCall:
+struct CoreFunctionCall:
     member index: felt
     member version: felt
     member nonce: felt
     member function_selector: felt
-    member calldata_size: felt
+    member calldata_len: felt
     member calldata: felt*
 end
 
-struct ContractCall:
+struct CoreFunction:
     member index: felt
     member version: felt
     member function_selector: felt
