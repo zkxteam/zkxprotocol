@@ -182,6 +182,8 @@ func check_and_add_message{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     L1_fee_amount_ : felt,
     L1_fee_ticker_ : felt,
 ) -> (result : felt):
+    
+    alloc_locals
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     let (caller) = get_caller_address()

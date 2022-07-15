@@ -200,6 +200,7 @@ end
 func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt, tradable : felt
 ):
+    alloc_locals
     # Auth Check
     with_attr error_message("Caller is not authorized to manage markets"):    
         let (registry) = registry_address.read()

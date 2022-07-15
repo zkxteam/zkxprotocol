@@ -74,6 +74,7 @@ end
 func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tier_ : felt, fee_details : BaseFee
 ):
+    alloc_locals
     # Auth check
     with_attr error_message("Caller is not authorized to manage fee details"):
         let (registry) = registry_address.read()
