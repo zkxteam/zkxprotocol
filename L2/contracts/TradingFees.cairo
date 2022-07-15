@@ -108,6 +108,7 @@ end
 func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tier_ : felt, discount_details : Discount
 ):
+    alloc_locals
     # Auth check
     with_attr error_message("Caller is not authorized to manage fee details"):
         let (registry) = registry_address.read()
