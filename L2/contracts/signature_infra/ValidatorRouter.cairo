@@ -27,6 +27,10 @@ end
 func nonce() -> (res: felt):
 end
 
+@storage_var
+func check_sig() -> (res: felt):
+end
+
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
@@ -79,6 +83,11 @@ func call_core_function{syscall_ptr : felt*,
     retdata_len: felt, retdata: felt*):
 
     alloc_locals
+
+    let (should_check_sig) = check_sig.read()
+
+    assert_not_zero(should_check_sig)
+
     local core_function_call:CoreFunctionCall = CoreFunctionCall(index,
                                                 version_,
                                                 nonce_,
@@ -145,8 +154,28 @@ func call_core_function{syscall_ptr : felt*,
 end
 
 
+@external
+func toggle_check_sig{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ):
 
+    let (current_registry_address) = registry_address.read()
+    let (current_version) = version.read()
 
+    verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
+
+    let(should_check_sig)=check_sig.read()
+
+    check_sig.write(1-should_check_sig)
+    return()
+end
+
+@view
+func get_check_sig{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (res:felt):
+
+    let(should_check_sig)=check_sig.read()
+    return (should_check_sig)
+end
 
 @view
 func get_registry_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -162,4 +191,12 @@ func get_current_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
 
     let (current_version) = version.read()
     return (current_version)
+end
+
+@view
+func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (current_nonce:felt):
+
+    let (current_nonce) = nonce.read()
+    return (current_nonce)
 end

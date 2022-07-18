@@ -55,6 +55,19 @@ func whitelist_pubkey{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     return()
 end
 
+@external
+func delist_pubkey{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    pubkey: felt):
+
+    let (current_registry_address) = registry_address.read()
+    let (current_version) = version.read()
+
+    verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
+
+    pubkey_to_whitelist.write(pubkey,0)
+    return()
+end
+
 
 @view
 func is_whitelisted{
