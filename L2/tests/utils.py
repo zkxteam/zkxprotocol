@@ -34,6 +34,11 @@ def to64x61(num):
         raise Exception("Number is out of valid range")
     return trunc(res)
 
+def convertTo64x61(nums):
+    result = []
+    for n in nums:
+        result.append(to64x61(n))
+    return result
 
 def str_to_felt(text):
     b_text = bytes(text, 'UTF-8')
@@ -136,13 +141,6 @@ def hash_order(order_id, ticker, collateral, price, stopPrice, orderType, positi
         leverage
     ]
     return compute_hash_on_elements(order)
-
-
-def convertList(list_):
-    for i in range(len(list_)):
-        list_[i] = from64x61(list_[i])
-
-    return list_
 
 
 async def assert_revert(fun, reverted_with=None):
