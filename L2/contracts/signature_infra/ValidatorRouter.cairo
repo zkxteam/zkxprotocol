@@ -84,10 +84,6 @@ func call_core_function{syscall_ptr : felt*,
 
     alloc_locals
 
-    let (should_check_sig) = check_sig.read()
-
-    assert_not_zero(should_check_sig)
-
     local core_function_call:CoreFunctionCall = CoreFunctionCall(index,
                                                 version_,
                                                 nonce_,
@@ -99,6 +95,25 @@ func call_core_function{syscall_ptr : felt*,
                                        core_function_call.version,
                                        core_function_call.function_selector)
 
+    let (current_registry_address) = registry_address.read()
+    let (current_version) = version.read()
+
+    let (should_check_sig) = check_sig.read()
+
+    if should_check_sig == 0:
+        let (contract_address ) = IAuthorizedRegistry.get_contract_address(current_registry_address,
+                                                                       core_function_call.index,
+                                                                       core_function_call.version)
+   
+
+
+        let (retdata_len: felt, retdata: felt*) = call_contract(contract_address, 
+                                                                core_function_call.function_selector,
+                                                                core_function_call.calldata_len,
+                                                                core_function_call.calldata)
+        return (retdata_len, retdata)
+    end
+
     # check nonce
     let (current_nonce) = nonce.read()
 
@@ -109,8 +124,6 @@ func call_core_function{syscall_ptr : felt*,
     assert sig_len = pubkey_len
 
     # check whether function being called is handled by the signature infra
-    let (current_registry_address) = registry_address.read()
-    let (current_version) = version.read()
 
     let (sig_req_manager_address) = IAuthorizedRegistry.get_contract_address(
                                     current_registry_address,
@@ -125,6 +138,21 @@ func call_core_function{syscall_ptr : felt*,
     
     assert_le(num_req, sig_len)
 
+    if num_req == 0:
+        let (contract_address ) = IAuthorizedRegistry.get_contract_address(current_registry_address,
+                                                                        core_function_call.index,
+                                                                        core_function_call.version)
+    
+
+
+        let (retdata_len: felt, retdata: felt*) = call_contract(contract_address, 
+                                                                core_function_call.function_selector,
+                                                                core_function_call.calldata_len,
+                                                                core_function_call.calldata)
+
+        return (retdata_len, retdata)
+    end
+
     let (hash) = SignatureVerification.calc_call_hash(core_function_call)
     local num_left
     assert num_left = sig_len # we can validate at most sig_len number of signatures
@@ -134,8 +162,11 @@ func call_core_function{syscall_ptr : felt*,
                                     PubkeyWhitelister_INDEX,
                                     current_version)
     # get number of valid signatures provided
+   
+    
     let (num_sig_provided) = get_num_valid_sig(num_left, 0 , hash, sig, pubkey, pubkey_whitelister_adddress)
 
+    
     # check that number of signatures provided  >= number of signatures required
     assert_le(num_req, num_sig_provided)
 
@@ -145,6 +176,9 @@ func call_core_function{syscall_ptr : felt*,
     let (contract_address ) = IAuthorizedRegistry.get_contract_address(current_registry_address,
                                                                        core_function_call.index,
                                                                        core_function_call.version)
+   
+
+
     let (retdata_len: felt, retdata: felt*) = call_contract(contract_address, 
                                                             core_function_call.function_selector,
                                                             core_function_call.calldata_len,

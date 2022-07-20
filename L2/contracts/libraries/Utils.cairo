@@ -66,6 +66,7 @@ namespace SignatureVerification:
           let (hash_state_ptr) = hash_update_single(hash_state_ptr, data.function_selector)
           let (hash_state_ptr) = hash_update_with_hashchain(hash_state_ptr, data.calldata, data.calldata_len)
           let (hash) = hash_finalize(hash_state_ptr)
+          let pedersen_ptr = hash_ptr
           return(hash)
         end
     end
