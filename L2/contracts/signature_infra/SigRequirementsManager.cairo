@@ -7,39 +7,38 @@ from contracts.Constants import MasterAdmin_ACTION
 from contracts.DataTypes import CoreFunction
 
 @storage_var
-func registry_address() -> (address:felt):
+func registry_address() -> (address : felt):
 end
 
 @storage_var
-func version() -> (res:felt):
+func version() -> (res : felt):
 end
 
 @storage_var
-func func_to_registration_mapping(core_function: CoreFunction) -> (res:felt):
+func func_to_registration_mapping(core_function : CoreFunction) -> (res : felt):
 end
 
 @storage_var
-func func_to_num_sig_mapping(core_function: CoreFunction) -> (num: felt):
+func func_to_num_sig_mapping(core_function : CoreFunction) -> (num : felt):
 end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    registry_address_ : felt, version_ : felt
-):
-
+        registry_address_ : felt, version_ : felt):
     assert_not_zero(registry_address_)
     assert_not_zero(version_)
 
     registry_address.write(registry_address_)
     version.write(version_)
-    return()
+    return ()
 end
 
-
+# @notice - function to set number of signature requirement for a function (index, version, selector)
+# this also does the function registration (this is the only way to register a function)
+# only a function which is registered i.e. func_to_registration_mapping value of 1 is handled by the sig infra
 @external
-func set_sig_requirement{syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, range_check_ptr}(core_function: CoreFunction, num_req: felt):
-
+func set_sig_requirement{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        core_function : CoreFunction, num_req : felt):
     let (current_registry_address) = registry_address.read()
     let (current_version) = version.read()
 
@@ -50,69 +49,61 @@ func set_sig_requirement{syscall_ptr : felt*,
     func_to_registration_mapping.write(core_function, 1)
     func_to_num_sig_mapping.write(core_function, num_req)
 
-    return()
+    return ()
 end
 
+# @notice - function to deregister a function - callable by admin only
 @external
-func deregister_func{syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, range_check_ptr}(core_function: CoreFunction):
-
+func deregister_func{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        core_function : CoreFunction):
     let (current_registry_address) = registry_address.read()
     let (current_version) = version.read()
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
     func_to_registration_mapping.write(core_function, 0)
-    return()
+    return ()
 end
-
 
 @external
 func set_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    new_version:felt):
-
+        new_version : felt):
     let (current_registry_address) = registry_address.read()
     let (current_version) = version.read()
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
     version.write(new_version)
-    return()
+    return ()
 end
 
-
+# @notice - this function will revert if core function is not registered or has been de-registered
 @view
-func assert_func_handled{syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, range_check_ptr}(core_function: CoreFunction):
-
+func assert_func_handled{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        core_function : CoreFunction):
     let (is_registered) = func_to_registration_mapping.read(core_function)
 
     assert_not_zero(is_registered)
 
-    return()
+    return ()
 end
 
 @view
-func get_sig_requirement{syscall_ptr : felt*, 
-    pedersen_ptr : HashBuiltin*, range_check_ptr}(core_function: CoreFunction) -> (num_req: felt):
-
+func get_sig_requirement{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+        core_function : CoreFunction) -> (num_req : felt):
     let (num_req) = func_to_num_sig_mapping.read(core_function)
 
-    return(num_req)
+    return (num_req)
 end
 
-
 @view
-func get_registry_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ) -> (address:felt):
-
-    let(current_registry_address)=registry_address.read()
+func get_registry_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+        address : felt):
+    let (current_registry_address) = registry_address.read()
     return (current_registry_address)
 end
 
 @view
-func get_current_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ) -> (current_version:felt):
-
+func get_current_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+        current_version : felt):
     let (current_version) = version.read()
     return (current_version)
 end
-
