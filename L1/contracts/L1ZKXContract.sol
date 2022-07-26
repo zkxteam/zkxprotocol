@@ -44,9 +44,6 @@ contract L1ZKXContract is AccessControl {
     // Maps ticker with the asset ID
     mapping(uint256 => uint256) public assetID;
 
-    // Maps L1 metamask account address to the l2 account contract address
-    mapping(uint256 => uint256) public l2ContractAddress;
-
     // List of assets
     uint256[] public assetList;
 
@@ -233,13 +230,9 @@ contract L1ZKXContract is AccessControl {
         external 
         isValidL2Address(userL2Address_) 
     {   
-        // If not yet set, store L2 address linked to sender's L1 address
-        uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
-        if (l2ContractAddress[senderAsUint256] == 0) {
-            l2ContractAddress[senderAsUint256] = userL2Address_;
-        }
 
         // Transfer tokens
+        uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         address tokenContract = tokenContractAddress[ticker_];
         require(tokenContract != address(0), "Unregistered ticker");
         IERC20 Token = IERC20(tokenContract);
@@ -286,19 +279,17 @@ contract L1ZKXContract is AccessControl {
 
     /**
      * @dev function to withdraw funds from an L2 Account contract
-     * @param userL1Address_ - Users L1 wallet address
+     * @param userL2Address_ - Users L2 Account address
      * @param ticker_ - felt representation of the ticker
      * @param amount_ - The amount of tokens to be withdrawn
      * @param requestId_ - ID of the withdrawal request
      **/
     function withdraw(
-        uint256 userL1Address_,
+        uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
-        uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
         uint256[] memory withdrawal_payload = new uint256[](5);
@@ -310,14 +301,14 @@ contract L1ZKXContract is AccessControl {
 
         // Consume the message from the StarkNet core contract.
         // This will revert the (Ethereum) transaction if the message does not exist.
-        starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
+        starknetCore.consumeMessageFromL2(userL2Address_, withdrawal_payload);
 
         address tokenContract = tokenContractAddress[ticker_];
         IERC20(tokenContract).transfer(msg.sender, amount_);
 
         // Construct update withdrawal request message payload.
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
-        updateWithdrawalRequestPayload[0] = userL2Address;
+        updateWithdrawalRequestPayload[0] = userL2Address_;
         updateWithdrawalRequestPayload[1] = requestId_;
 
         // Send the message to the StarkNet core contract.
@@ -332,37 +323,35 @@ contract L1ZKXContract is AccessControl {
 
     /**
      * @dev function to withdraw funds from an L2 Account contract
-     * @param userL1Address_ - Users L1 wallet address
+     * @param userL2Address_ - Users L2 Account address
      * @param amount_ - The amount of tokens to be withdrawn
      * @param requestId_ - ID of the withdrawal request
      **/
     function withdrawEth(
-        uint256 userL1Address_,
+        uint256 userL2Address_,
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
-        uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
         uint256[] memory withdrawal_payload = new uint256[](5);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
-        withdrawal_payload[1] = userL1Address_;
+        withdrawal_payload[1] = uint256(uint160(userL1Address_));
         withdrawal_payload[2] = ETH_TICKER;
         withdrawal_payload[3] = amount_;
         withdrawal_payload[4] = requestId_;
-
-        // Consume the message from the StarkNet core contract.
-        // This will revert the (Ethereum) transaction if the message does not exist.
-        starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
 
         require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
         payable(msg.sender).transfer(amount_);
 
         // Construct update withdrawal request message payload.
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
-        updateWithdrawalRequestPayload[0] = userL2Address;
+        updateWithdrawalRequestPayload[0] = userL2Address_;
         updateWithdrawalRequestPayload[1] = requestId_;
+
+        // Consume the message from the StarkNet core contract.
+        // This will revert the (Ethereum) transaction if the message does not exist.
+        starknetCore.consumeMessageFromL2(userL2Address_, withdrawal_payload);
 
         // Send the message to the StarkNet core contract.
         starknetCore.sendMessageToL2(
