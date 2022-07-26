@@ -33,8 +33,6 @@ contract L1ZKXContract is AccessControl {
         address tokenContractAddresses_
     );
 
-    using SafeMath for uint256;
-
     // The StarkNet core contract.
     IStarknetCore public starknetCore;
 
