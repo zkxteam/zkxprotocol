@@ -356,7 +356,6 @@ contract L1ZKXContract is AccessControl {
         // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
 
-        require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
         payable(msg.sender).transfer(amount_);
 
         // Construct update withdrawal request message payload.
@@ -385,7 +384,6 @@ contract L1ZKXContract is AccessControl {
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         uint256 balance = IERC20(tokenAddress_).balanceOf(address(this));
-        require(amount_ <= balance, "Not enough ERC-20 tokens to withdraw");
         IERC20(tokenAddress_).transfer(recipient_, amount_);
     }
 
@@ -398,7 +396,6 @@ contract L1ZKXContract is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
         recipient_.transfer(amount_);
     }
 }
