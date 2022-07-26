@@ -3,12 +3,15 @@ pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./IStarknetCore.sol";
 import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
 contract L1ZKXContract is AccessControl {
+
+    using SafeERC20 for IERC20;
 
     event LogDeposit(
         address sender,
@@ -245,7 +248,7 @@ contract L1ZKXContract is AccessControl {
         IERC20 Token = IERC20(tokenContract);
         address zkxAddress = address(this);
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
-        Token.transferFrom(msg.sender, zkxAddress, amount_);
+        Token.safeTransferFrom(msg.sender, zkxAddress, amount_);
         uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
         require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Invalid transfer amount");
 
@@ -313,7 +316,7 @@ contract L1ZKXContract is AccessControl {
         starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
 
         address tokenContract = tokenContractAddress[ticker_];
-        IERC20(tokenContract).transfer(msg.sender, amount_);
+        IERC20(tokenContract).safeTransfer(msg.sender, amount_);
 
         // Construct update withdrawal request message payload.
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
@@ -385,6 +388,7 @@ contract L1ZKXContract is AccessControl {
     {
         require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
         require(amount_ >= 0, "ETH Transfer failed: amount is zero");
+        IERC20(tokenAddress_).safeTransfer(recipient_, amount_);
     }
 
     /**
