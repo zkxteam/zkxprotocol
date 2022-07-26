@@ -184,7 +184,8 @@ contract L1ZKXContract is Ownable {
 
     /**
      * @dev function to deposit funds to L2 Account contract
-     * @param userL1Address_ - Users L1 wallet address
+     * @param userL1Address_ - L1 user address
+     * @param userL2Address_ - L2 address of user's ZKX account
      * @param collateralId_ - ID of the collateral
      * @param amount_ - The amount of tokens to be deposited
      **/
