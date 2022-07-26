@@ -385,6 +385,8 @@ contract L1ZKXContract is AccessControl {
     {
         uint256 balance = IERC20(tokenAddress_).balanceOf(address(this));
         IERC20(tokenAddress_).transfer(recipient_, amount_);
+        require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
+        require(amount_ >= 0, "ETH Transfer failed: amount is zero");
     }
 
     /**
@@ -396,6 +398,8 @@ contract L1ZKXContract is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
+        require(amount_ >= 0, "ETH Transfer failed: amount is zero");
         recipient_.transfer(amount_);
     }
 }
