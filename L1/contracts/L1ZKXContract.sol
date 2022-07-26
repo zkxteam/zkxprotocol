@@ -9,7 +9,6 @@ import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
 contract L1ZKXContract is Ownable {
-
     using SafeERC20 for IERC20;
 
     event LogDeposit(
@@ -60,7 +59,10 @@ contract L1ZKXContract is Ownable {
       Modifier to verify valid L2 address.
     */
     modifier isValidL2Address(uint256 l2Address_) {
-        require(l2Address_ != 0 && l2Address_ < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
+        require(
+            l2Address_ != 0 && l2Address_ < FIELD_PRIME,
+            "L2_ADDRESS_OUT_OF_RANGE"
+        );
         _;
     }
 
@@ -72,7 +74,10 @@ contract L1ZKXContract is Ownable {
         uint256 assetContractAddress_,
         uint256 withdrawalRequestContractAddress_
     ) {
-        require(address(starknetCore_) != address(0), "StarknetCore address not provided");
+        require(
+            address(starknetCore_) != address(0),
+            "StarknetCore address not provided"
+        );
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
@@ -154,10 +159,7 @@ contract L1ZKXContract is Ownable {
     function setTokenContractAddress(
         uint256 ticker_,
         address tokenContractAddress_
-    ) 
-        external 
-        onlyOwner 
-    {
+    ) external onlyOwner {
         // Update token contract address
         tokenContractAddress[ticker_] = tokenContractAddress_;
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
@@ -198,7 +200,6 @@ contract L1ZKXContract is Ownable {
         uint256 collateralId_,
         uint256 amount_
     ) private {
-
         // Construct the deposit message's payload.
         uint256[] memory depositPayload = new uint256[](3);
         depositPayload[0] = userL1Address_;
@@ -212,12 +213,7 @@ contract L1ZKXContract is Ownable {
             depositPayload
         );
 
-        emit LogDeposit(
-            msg.sender,
-            amount_,
-            collateralId_,
-            userL2Address_
-        );
+        emit LogDeposit(msg.sender, amount_, collateralId_, userL2Address_);
     }
 
     /**
@@ -230,10 +226,7 @@ contract L1ZKXContract is Ownable {
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_
-    ) 
-        external 
-        isValidL2Address(userL2Address_) 
-    {   
+    ) external isValidL2Address(userL2Address_) {
         // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
@@ -242,32 +235,33 @@ contract L1ZKXContract is Ownable {
 
         // Transfer tokens
         address tokenContract = tokenContractAddress[ticker_];
-        require(tokenContract != address(0), "Deposit failed: Unregistered ticker");
+        require(
+            tokenContract != address(0),
+            "Deposit failed: Unregistered ticker"
+        );
         IERC20 Token = IERC20(tokenContract);
         address zkxAddress = address(this);
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
         Token.safeTransferFrom(msg.sender, zkxAddress, amount_);
         uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
-        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Deposit failed: Invalid transfer amount");
+        require(
+            zkxBalanceAfter >= zkxBalanceBefore + amount_,
+            "Deposit failed: Invalid transfer amount"
+        );
 
         // Submit deposit
         uint256 collateralId = assetID[ticker_];
-        depositToL2(
-            senderAsUint256,
-            userL2Address_,
-            collateralId,
-            amount_
-        );
+        depositToL2(senderAsUint256, userL2Address_, collateralId, amount_);
     }
 
     /**
      * @dev function to deposit ETH to L1ZKX contract
      * @param userL2Address_ - The L2 account address of the user
      **/
-    function depositEthToL1(uint256 userL2Address_) 
-        payable 
-        external 
-        isValidL2Address(userL2Address_) 
+    function depositEthToL1(uint256 userL2Address_)
+        external
+        payable
+        isValidL2Address(userL2Address_)
     {
         // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
@@ -277,12 +271,7 @@ contract L1ZKXContract is Ownable {
 
         // Submit deposit
         uint256 collateralId = assetID[ETH_TICKER];
-        depositToL2(
-            senderAsUint256,
-            userL2Address_,
-            collateralId,
-            msg.value
-        );
+        depositToL2(senderAsUint256, userL2Address_, collateralId, msg.value);
     }
 
     /**
@@ -298,7 +287,10 @@ contract L1ZKXContract is Ownable {
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(uint256(uint160(msg.sender)) == userL1Address_, "Sender is not withdrawal recipient");
+        require(
+            uint256(uint160(msg.sender)) == userL1Address_,
+            "Sender is not withdrawal recipient"
+        );
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -342,7 +334,10 @@ contract L1ZKXContract is Ownable {
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(uint256(uint160(msg.sender)) == userL1Address_, "Sender is not withdrawal recipient");
+        require(
+            uint256(uint160(msg.sender)) == userL1Address_,
+            "Sender is not withdrawal recipient"
+        );
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -374,17 +369,21 @@ contract L1ZKXContract is Ownable {
         emit LogWithdrawal(msg.sender, ETH_TICKER, amount_, requestId_);
     }
 
-     /**
+    /**
      * @dev function to transfer funds from this contract to another address
      * @param recipient_ - address of the recipient
      * @param amount_ - amount that needs to be transferred
      * @param tokenAddress_ - address of the token contract
      **/
-    function transferFunds(address recipient_, uint256 amount_, address tokenAddress_)
-        external
-        onlyOwner
-    {
-        require(recipient_ != address(0), "Token Transfer failed: recipient address is zero");
+    function transferFunds(
+        address recipient_,
+        uint256 amount_,
+        address tokenAddress_
+    ) external onlyOwner {
+        require(
+            recipient_ != address(0),
+            "Token Transfer failed: recipient address is zero"
+        );
         require(amount_ >= 0, "Token Transfer failed: amount is zero");
         IERC20(tokenAddress_).safeTransfer(recipient_, amount_);
     }
@@ -398,7 +397,10 @@ contract L1ZKXContract is Ownable {
         external
         onlyOwner
     {
-        require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
+        require(
+            recipient_ != address(0),
+            "ETH Transfer failed: recipient address is zero"
+        );
         require(amount_ >= 0, "ETH Transfer failed: amount is zero");
         recipient_.transfer(amount_);
     }
