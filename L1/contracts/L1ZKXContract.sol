@@ -70,6 +70,7 @@ contract L1ZKXContract is Ownable {
         uint256 assetContractAddress_,
         uint256 withdrawalRequestContractAddress_
     ) {
+        require(address(starknetCore_) != address(0), "StarknetCore address not provided");
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
