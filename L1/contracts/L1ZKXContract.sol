@@ -33,22 +33,25 @@ contract L1ZKXContract is AccessControl {
         address tokenContractAddresses_
     );
 
+    struct Asset {
+        bool exists;
+        uint32 index;
+        address contractAddress;
+        uint256 collateralID;
+    }
+
     using SafeMath for uint256;
 
     // The StarkNet core contract.
     IStarknetCore public starknetCore;
 
-    // Maps ticker to the token contract addresses
-    mapping(uint256 => address) public tokenContractAddress;
+    // List of assets
+    uint256[] public assetList;
 
-    // Maps ticker with the asset ID
-    mapping(uint256 => uint256) public assetID;
+    mapping(uint256 => AssetInfo) private assetsByTicker;
 
     // Maps L1 metamask account address to the l2 account contract address
     mapping(uint256 => uint256) public l2ContractAddress;
-
-    // List of assets
-    uint256[] public assetList;
 
     // Asset Contract address
     uint256 public assetContractAddress;
@@ -86,7 +89,12 @@ contract L1ZKXContract is AccessControl {
     function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    {   
+        require(
+            assetInfoByTicker[ticker_].exists == false, 
+            "Failed to add asset: Ticker already present"
+        );
+
         // Construct the update asset list message's payload.
         uint256[] memory payload = new uint256[](3);
         payload[0] = ADD_ASSET_INDEX;
@@ -96,10 +104,15 @@ contract L1ZKXContract is AccessControl {
         // Consume the message from the StarkNet core contract.
         // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(assetContractAddress, payload);
-
-        // Update the asset list
-        assetID[ticker_] = assetId_;
+        
+        assetsByTicker[ticker_] = Asset({
+            exists: true,
+            index: uint32(assetList.length()),
+            contractAddress: address(0),
+            collateralID: assetId_
+        });
         assetList.push(ticker_);
+
         emit LogAssetListUpdated(ticker_, assetId_);
     }
 
@@ -112,6 +125,18 @@ contract L1ZKXContract is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        Asset storage assetToRemove = assetsByTicker[ticker_];
+        require(assetToRemove.exists, "Failed to remove non-existing asset");
+        
+        uint32 toRemoveIndex = assetToRemove.index;
+        uint256 lastAssetIndex = assetList.length - 1;
+        uint256 lastAssetTicker = assetList[lastAssetIndex];
+        Asset storage lastAsset = assetsByTicker[lastAssetTicker];
+        lastAsset.index = toRemoveIndex;
+        assetList[uint256(toRemoveIndex)] = lastAsset.ticker;
+        assetList.pop();
+        delete assetToRemove;
+
         // Construct the remove asset message's payload.
         uint256[] memory payload = new uint256[](3);
         payload[0] = REMOVE_ASSET_INDEX;
@@ -121,20 +146,6 @@ contract L1ZKXContract is AccessControl {
         // Consume the message from the StarkNet core contract.
         // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(assetContractAddress, payload);
-
-        // Update the asset mapping
-        assetID[ticker_] = 0;
-
-        // Remove the asset from the asset list
-        uint256 index;
-        for (uint256 i = 0; i < assetList.length; i++) {
-            if (assetList[i] == ticker_) {
-                index = i;
-                break;
-            }
-        }
-        assetList[index] = assetList[assetList.length - 1];
-        assetList.pop();
 
         emit LogAssetRemovedFromList(ticker_, assetId_);
     }
@@ -159,7 +170,16 @@ contract L1ZKXContract is AccessControl {
         onlyRole(DEFAULT_ADMIN_ROLE) 
     {
         // Update token contract address
-        tokenContractAddress[ticker_] = tokenContractAddress_;
+        require(
+            tokenContractAddress_ != address(0), 
+            "Failed to set token address: New address is 0"
+        );
+        Asset storage asset = assetByTicker[ticker_];
+        require(
+            asset.contractAddress == address(0), 
+            "Failed to set token address: Already set"
+        );
+        asset.contractAddress = tokenContractAddress_;
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
     }
 
@@ -240,9 +260,12 @@ contract L1ZKXContract is AccessControl {
         }
 
         // Transfer tokens
-        address tokenContract = tokenContractAddress[ticker_];
-        require(tokenContract != address(0), "Unregistered ticker");
-        IERC20 Token = IERC20(tokenContract);
+        Asset memory asset = assetsByTicker[ticker_];
+        require(asset.exists, "Failed to deposit non-registered asset");
+        require(asset.contractAddress != address(0), "Contract address for asset not set");
+
+        // Performa transfer
+        IERC20 Token = IERC20(asset.contractAddress);
         address zkxAddress = address(this);
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
         Token.transferFrom(msg.sender, zkxAddress, amount_);
@@ -250,11 +273,10 @@ contract L1ZKXContract is AccessControl {
         require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Invalid transfer amount");
 
         // Submit deposit
-        uint256 collateralId = assetID[ticker_];
         depositToL2(
             senderAsUint256,
             userL2Address_,
-            collateralId,
+            asset.id,
             amount_
         );
     }
@@ -298,6 +320,11 @@ contract L1ZKXContract is AccessControl {
         uint256 requestId_
     ) external {
         require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
+
+        Asset memory asset = assetsByTicker[ticker_];
+        require(asset.exists, "Withdrawal failed: non-registered asset");
+        require(asset.contractAddress != address(0), "Withdrawal failed: Asset contract address is 0");
+
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -312,8 +339,7 @@ contract L1ZKXContract is AccessControl {
         // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
 
-        address tokenContract = tokenContractAddress[ticker_];
-        IERC20(tokenContract).transfer(msg.sender, amount_);
+        IERC20(asset.contractAddress).transfer(msg.sender, amount_);
 
         // Construct update withdrawal request message payload.
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
