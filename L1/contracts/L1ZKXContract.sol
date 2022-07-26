@@ -295,7 +295,7 @@ contract L1ZKXContract is Ownable {
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
+        require(uint256(uint160(msg.sender)) == userL1Address_, "Sender is not withdrawal recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -339,7 +339,7 @@ contract L1ZKXContract is Ownable {
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
+        require(uint256(uint160(msg.sender)) == userL1Address_, "Sender is not withdrawal recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
