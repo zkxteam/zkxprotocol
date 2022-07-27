@@ -28,8 +28,9 @@ const WITHDRAWAL_INDEX = 0;
 const ALICE_L2_ADDRESS = 123456789987654;
 const TOKEN_UNIT = 10**6;
 const ZKX_TICKER = 1234567;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-describe('L1ZKXContract', function () {
+describe('Deposits', function () {
 
   it('Deposit and then withdraw ETH', async function () {
     // Setup environment
@@ -134,5 +135,27 @@ describe('L1ZKXContract', function () {
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(0);
     // Every deposit sends a message to L2
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(3);
+  });
+});
+
+describe('L1ZKXContract deployment', function () {
+
+  it('State after deployment', async function () {
+    // Deploy contract
+    const [admin] = await ethers.getSigners();
+    const starknetCoreMock = await deployStarknetCoreMock(admin);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    
+    // Check state
+    expect(await L1ZKXContract.owner()).to.be.eq(admin.address);
+    expect(await L1ZKXContract.starknetCore()).to.be.eq(starknetCoreMock.address);
+  });
+
+  it('Unable to deploy with zero StarknetCore address', async function () {
+    const [admin] = await ethers.getSigners();
+
+    await expect(
+      deployL1ZKXContract(admin, ZERO_ADDRESS, 0, 0)
+    ).to.be.revertedWith("StarknetCore address not provided");
   });
 });

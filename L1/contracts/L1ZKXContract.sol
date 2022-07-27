@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0.
-pragma solidity ^0.8.7;
+pragma solidity 0.8.14;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./IStarknetCore.sol";
 import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
-contract L1ZKXContract is AccessControl {
+contract L1ZKXContract is Ownable {
 
     using SafeERC20 for IERC20;
 
@@ -35,8 +34,6 @@ contract L1ZKXContract is AccessControl {
         uint256 ticker_,
         address tokenContractAddresses_
     );
-
-    using SafeMath for uint256;
 
     // The StarkNet core contract.
     IStarknetCore public starknetCore;
@@ -75,10 +72,10 @@ contract L1ZKXContract is AccessControl {
         uint256 assetContractAddress_,
         uint256 withdrawalRequestContractAddress_
     ) {
+        require(address(starknetCore_) != address(0), "StarknetCore address not provided");
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /**
@@ -88,7 +85,7 @@ contract L1ZKXContract is AccessControl {
      **/
     function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
         // Construct the update asset list message's payload.
         uint256[] memory payload = new uint256[](3);
@@ -113,7 +110,7 @@ contract L1ZKXContract is AccessControl {
      **/
     function removeAssetFromList(uint256 ticker_, uint256 assetId_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
         // Construct the remove asset message's payload.
         uint256[] memory payload = new uint256[](3);
@@ -159,7 +156,7 @@ contract L1ZKXContract is AccessControl {
         address tokenContractAddress_
     ) 
         external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
+        onlyOwner 
     {
         // Update token contract address
         tokenContractAddress[ticker_] = tokenContractAddress_;
@@ -172,7 +169,7 @@ contract L1ZKXContract is AccessControl {
      **/
     function setAssetContractAddress(uint256 assetContractAddress_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
         assetContractAddress = assetContractAddress_;
     }
@@ -183,14 +180,15 @@ contract L1ZKXContract is AccessControl {
      **/
     function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
         withdrawalRequestContractAddress = withdrawalRequestAddress_;
     }
 
     /**
      * @dev function to deposit funds to L2 Account contract
-     * @param userL1Address_ - Users L1 wallet address
+     * @param userL1Address_ - L1 user address
+     * @param userL2Address_ - L2 address of user's ZKX account
      * @param collateralId_ - ID of the collateral
      * @param amount_ - The amount of tokens to be deposited
      **/
@@ -300,7 +298,7 @@ contract L1ZKXContract is AccessControl {
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
+        require(uint256(uint160(msg.sender)) == userL1Address_, "Sender is not withdrawal recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -344,7 +342,7 @@ contract L1ZKXContract is AccessControl {
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
+        require(uint256(uint160(msg.sender)) == userL1Address_, "Sender is not withdrawal recipient");
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -384,7 +382,7 @@ contract L1ZKXContract is AccessControl {
      **/
     function transferFunds(address recipient_, uint256 amount_, address tokenAddress_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
         require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
         require(amount_ >= 0, "ETH Transfer failed: amount is zero");
@@ -398,7 +396,7 @@ contract L1ZKXContract is AccessControl {
      **/
     function transferEth(address payable recipient_, uint256 amount_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
         require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
         require(amount_ >= 0, "ETH Transfer failed: amount is zero");
