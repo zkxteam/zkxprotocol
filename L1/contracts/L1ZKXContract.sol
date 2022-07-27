@@ -231,7 +231,6 @@ contract L1ZKXContract is Ownable {
         external 
         isValidL2Address(userL2Address_) 
     {   
-
         // Transfer tokens
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         address tokenContract = tokenContractAddress[ticker_];
@@ -262,13 +261,7 @@ contract L1ZKXContract is Ownable {
         external 
         isValidL2Address(userL2Address_) 
     {
-        // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
-        if (l2ContractAddress[senderAsUint256] == 0) {
-            l2ContractAddress[senderAsUint256] = userL2Address_;
-        }
-
-        // Submit deposit
         uint256 collateralId = assetID[ETH_TICKER];
         depositToL2(
             senderAsUint256,
