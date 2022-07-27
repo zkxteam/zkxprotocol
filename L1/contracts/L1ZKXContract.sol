@@ -9,6 +9,11 @@ import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
 contract L1ZKXContract is AccessControl {
+    event LogContractInitialized(
+        IStarknetCore starknetCore,
+        uint256 assetContractAddress,
+        uint256 withdrawalRequestContractAddress
+    );
 
     event LogDeposit(
         address sender,
@@ -32,6 +37,24 @@ contract L1ZKXContract is AccessControl {
         uint256 ticker_,
         address tokenContractAddresses_
     );
+
+    event LogAssetContractAddressChanged(
+        uint256 oldAssetContract,
+        uint256 newAssetContract
+    );
+
+    event LogWithdrawalRequestContractChanged(
+        uint256 oldWithdrawalContract,
+        uint256 newWithdrawalContract
+    );
+
+    event LogAdminTransferFunds(
+        address recipient,
+        uint256 amount,
+        address tokenAddress
+    );
+
+    event LogAdminTransferEth(address payable recipient, uint256 amount);
 
     using SafeMath for uint256;
 
@@ -60,7 +83,10 @@ contract L1ZKXContract is AccessControl {
       Modifier to verify valid L2 address.
     */
     modifier isValidL2Address(uint256 l2Address_) {
-        require(l2Address_ != 0 && l2Address_ < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
+        require(
+            l2Address_ != 0 && l2Address_ < FIELD_PRIME,
+            "L2_ADDRESS_OUT_OF_RANGE"
+        );
         _;
     }
 
@@ -76,6 +102,12 @@ contract L1ZKXContract is AccessControl {
         assetContractAddress = assetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+
+        emit LogContractInitialized(
+            starknetCore_,
+            assetContractAddress_,
+            withdrawalRequestContractAddress_
+        );
     }
 
     /**
@@ -154,10 +186,7 @@ contract L1ZKXContract is AccessControl {
     function setTokenContractAddress(
         uint256 ticker_,
         address tokenContractAddress_
-    ) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         // Update token contract address
         tokenContractAddress[ticker_] = tokenContractAddress_;
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
@@ -171,7 +200,12 @@ contract L1ZKXContract is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        uint256 oldAssetContractAddress = assetContractAddress;
         assetContractAddress = assetContractAddress_;
+        emit LogAssetContractAddressChanged(
+            oldAssetContractAddress,
+            assetContractAddress_
+        );
     }
 
     /**
@@ -182,7 +216,12 @@ contract L1ZKXContract is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        uint256 oldWithdrawalRequestContractAddress = withdrawalRequestContractAddress;
         withdrawalRequestContractAddress = withdrawalRequestAddress_;
+        emit LogWithdrawalRequestContractChanged(
+            oldWithdrawalRequestContractAddress,
+            withdrawalRequestAddress_
+        );
     }
 
     /**
@@ -197,7 +236,6 @@ contract L1ZKXContract is AccessControl {
         uint256 collateralId_,
         uint256 amount_
     ) private {
-
         // Construct the deposit message's payload.
         uint256[] memory depositPayload = new uint256[](3);
         depositPayload[0] = userL1Address_;
@@ -211,12 +249,7 @@ contract L1ZKXContract is AccessControl {
             depositPayload
         );
 
-        emit LogDeposit(
-            msg.sender,
-            amount_,
-            collateralId_,
-            userL2Address_
-        );
+        emit LogDeposit(msg.sender, amount_, collateralId_, userL2Address_);
     }
 
     /**
@@ -229,10 +262,7 @@ contract L1ZKXContract is AccessControl {
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_
-    ) 
-        external 
-        isValidL2Address(userL2Address_) 
-    {   
+    ) external isValidL2Address(userL2Address_) {
         // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
@@ -247,26 +277,24 @@ contract L1ZKXContract is AccessControl {
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
         Token.transferFrom(msg.sender, zkxAddress, amount_);
         uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
-        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Invalid transfer amount");
+        require(
+            zkxBalanceAfter >= zkxBalanceBefore + amount_,
+            "Invalid transfer amount"
+        );
 
         // Submit deposit
         uint256 collateralId = assetID[ticker_];
-        depositToL2(
-            senderAsUint256,
-            userL2Address_,
-            collateralId,
-            amount_
-        );
+        depositToL2(senderAsUint256, userL2Address_, collateralId, amount_);
     }
 
     /**
      * @dev function to deposit ETH to L1ZKX contract
      * @param userL2Address_ - The L2 account address of the user
      **/
-    function depositEthToL1(uint256 userL2Address_) 
-        payable 
-        external 
-        isValidL2Address(userL2Address_) 
+    function depositEthToL1(uint256 userL2Address_)
+        external
+        payable
+        isValidL2Address(userL2Address_)
     {
         // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
@@ -276,12 +304,7 @@ contract L1ZKXContract is AccessControl {
 
         // Submit deposit
         uint256 collateralId = assetID[ETH_TICKER];
-        depositToL2(
-            senderAsUint256,
-            userL2Address_,
-            collateralId,
-            msg.value
-        );
+        depositToL2(senderAsUint256, userL2Address_, collateralId, msg.value);
     }
 
     /**
@@ -297,7 +320,10 @@ contract L1ZKXContract is AccessControl {
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
+        require(
+            msg.sender == address(uint160(userL1Address_)),
+            "Sender is not withdrawal recipient"
+        );
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -341,7 +367,10 @@ contract L1ZKXContract is AccessControl {
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
+        require(
+            msg.sender == address(uint160(userL1Address_)),
+            "Sender is not withdrawal recipient"
+        );
         uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
@@ -356,7 +385,10 @@ contract L1ZKXContract is AccessControl {
         // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
 
-        require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
+        require(
+            amount_ <= address(this).balance,
+            "ETH to be transferred is more than the balance"
+        );
         payable(msg.sender).transfer(amount_);
 
         // Construct update withdrawal request message payload.
@@ -374,19 +406,22 @@ contract L1ZKXContract is AccessControl {
         emit LogWithdrawal(msg.sender, ETH_TICKER, amount_, requestId_);
     }
 
-     /**
+    /**
      * @dev function to transfer funds from this contract to another address
      * @param recipient_ - address of the recipient
      * @param amount_ - amount that needs to be transferred
      * @param tokenAddress_ - address of the token contract
      **/
-    function transferFunds(address recipient_, uint256 amount_, address tokenAddress_)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function transferFunds(
+        address recipient_,
+        uint256 amount_,
+        address tokenAddress_
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 balance = IERC20(tokenAddress_).balanceOf(address(this));
         require(amount_ <= balance, "Not enough ERC-20 tokens to withdraw");
         IERC20(tokenAddress_).transfer(recipient_, amount_);
+
+        emit LogAdminTransferFunds(recipient_, amount_, tokenAddress_);
     }
 
     /**
@@ -398,7 +433,12 @@ contract L1ZKXContract is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
+        require(
+            amount_ <= address(this).balance,
+            "ETH to be transferred is more than the balance"
+        );
         recipient_.transfer(amount_);
+
+        emit LogAdminTransferEth(recipient_, amount_);
     }
 }
