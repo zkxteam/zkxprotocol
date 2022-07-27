@@ -25,11 +25,14 @@ async function deployZKXToken(deployer) {
 const parseEther = ethers.utils.parseEther;
 const ETH_TICKER = 4543560;
 const WITHDRAWAL_INDEX = 0;
+const ADD_ASSET_INDEX = 1;
 const ALICE_L2_ADDRESS = 123456789987654;
 const ROGUE_L2_ADDRESS = 444444444444444;
 const TOKEN_UNIT = 10**6;
-const ZKX_TICKER = 1234567;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const ASSET_ADDRESS = "0xA33E7000000000000000000000000000000A33E7";
+const ZKX_TICKER = 1234567;
+const ZKX_ASSET_ID = 90986567876;
 
 describe('Deposits', function () {
 
@@ -37,7 +40,7 @@ describe('Deposits', function () {
     // Setup environment
     const [admin, alice, rogue] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, ASSET_ADDRESS, 0);
     const aliceContract = L1ZKXContract.connect(alice);
 
     // Deposit to L1
@@ -79,11 +82,84 @@ describe('Deposits', function () {
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(2);
   });
 
+  it('Deposit and then withdraw tokens', async function () {
+    // Setup environment
+    const [admin, alice, rogue] = await ethers.getSigners();
+    const starknetCoreMock = await deployStarknetCoreMock(admin);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, ASSET_ADDRESS, 0);
+    const ZKXToken = await deployZKXToken(admin);
+    const aliceContract = L1ZKXContract.connect(alice);
+
+    // Add ZKX-Token as asset
+    const addAssetPayload = [
+      ADD_ASSET_INDEX,
+      ZKX_TICKER,
+      ZKX_ASSET_ID
+    ];
+    await starknetCoreMock.addL2ToL1Message(ASSET_ADDRESS, L1ZKXContract.address, addAssetPayload);
+    await L1ZKXContract.updateAssetListInL1(ZKX_TICKER, ZKX_ASSET_ID);
+
+    // Now Alice's balance is 100 tokens
+    ZKXToken.mint(alice.address, 100 * TOKEN_UNIT);
+    
+    // Reverts because ZKXToken is not registered by admin yet
+    await expect(
+      aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 100 * TOKEN_UNIT)
+    ).to.be.revertedWith('Unregistered ticker');
+
+    // Now admin registers ZXKToken address linked to ZKX ticker
+    await expect(L1ZKXContract.setTokenContractAddress(ZKX_TICKER, ZKXToken.address))
+      .to.emit(L1ZKXContract, 'LogTokenContractAddressUpdated')
+      .withArgs(ZKX_TICKER, ZKXToken.address)
+
+    // Before deposit Alice sets large allowance amount for ZKXContract
+    await ZKXToken.connect(alice).approve(L1ZKXContract.address, 1_000_000 * TOKEN_UNIT)
+    
+    // This deposit succeeds, after tx Alice has 200 tokens left
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 100 * TOKEN_UNIT);
+
+    // Deposit should not consume messages from L2
+    expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(1)
+    // Deposit should send a message to L2
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1)
+
+    // Prepare withdrawal details
+    const requestID = 42;
+    const withdrawalAmount = 100 * TOKEN_UNIT;
+    const withdrawalPayload = [
+      WITHDRAWAL_INDEX,
+      alice.address,
+      ZKX_TICKER,
+      withdrawalAmount,
+      requestID
+    ];
+
+    // Prepare mock for withdrawal
+    await starknetCoreMock.addL2ToL1Message(ALICE_L2_ADDRESS, L1ZKXContract.address, withdrawalPayload);
+
+    // Rogue can't withdraw Alice's funds
+    const rogueContract = L1ZKXContract.connect(rogue)
+    await expect(
+      rogueContract.withdraw(ROGUE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID)
+    ).to.be.revertedWith('INVALID_MESSAGE_TO_CONSUME')
+
+    await expect(
+      rogueContract.withdraw(ALICE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID)
+    ).to.be.revertedWith('INVALID_MESSAGE_TO_CONSUME')
+    
+    // Alice successfully withdraws funds
+    await aliceContract.withdraw(ALICE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID);
+    // Withdrawal should consume 1 message from L2
+    expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(2);
+    // Withdrawal should send a message to L2
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(2);
+  });
+
   it('Multiple token deposits', async function () {
     // Setup environment
     const [admin, alice] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, ASSET_ADDRESS, 0);
     const ZKXToken = await deployZKXToken(admin);
     const aliceContract = L1ZKXContract.connect(alice);
 
@@ -128,7 +204,7 @@ describe('Deposits', function () {
     // Setup environment
     const [admin, alice] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, ASSET_ADDRESS, 0);
     const aliceContract = L1ZKXContract.connect(alice);
 
     // Transfer ETH 3 times, all should succeed
@@ -149,7 +225,7 @@ describe('L1ZKXContract deployment', function () {
     // Deploy contract
     const [admin] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, ASSET_ADDRESS, 0);
     
     // Check state
     expect(await L1ZKXContract.owner()).to.be.eq(admin.address);
