@@ -67,7 +67,7 @@ from contracts.Math_64x61 import (
     Math64x61_sub,
 )
 
-const MESSAGE_WITHDRAW = 0
+const MESSAGE_WITHDRAW = 3
 
 #
 # Storage
