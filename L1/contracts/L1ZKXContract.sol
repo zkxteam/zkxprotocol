@@ -250,10 +250,7 @@ contract L1ZKXContract is Ownable {
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
         Token.safeTransferFrom(msg.sender, zkxAddress, amount_);
         uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
-<<<<<<< HEAD
 
-=======
->>>>>>> adds changes on audit fix branch
         require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Deposit failed: Invalid transfer amount");
 
         // Submit deposit
