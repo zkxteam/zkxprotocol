@@ -24,13 +24,13 @@ async function deployZKXToken(deployer) {
 
 const parseEther = ethers.utils.parseEther;
 const ETH_TICKER = 4543560;
-const WITHDRAWAL_INDEX = 0;
-const ALICE_L2_ADDRESS = 123456789987654;
-const TOKEN_UNIT = 10 ** 6;
+const WITHDRAWAL_INDEX = 3;
+const ALICE_L2_ADDRESS = "0x2bcede62aeb41831af3b1d24b0f3733abbf7590eb38e7dc1b923ef578d76ea8";
+const TOKEN_UNIT = 10**6;
 const ZKX_TICKER = 1234567;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-describe('L1ZKXContract', function () {
-
+describe('Deposits', function () {
   it("Constructor event emission ", async function () {
     const [admin] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
@@ -45,7 +45,7 @@ describe('L1ZKXContract', function () {
     // Setup environment
     const [admin, alice, rogue] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb");
     const aliceContract = L1ZKXContract.connect(alice);
 
     // Deposit to L1
@@ -74,7 +74,7 @@ describe('L1ZKXContract', function () {
     await expect(
       rogueContract.withdrawEth(alice.address, withdrawalAmount, requestID)
     ).to.be.revertedWith('Sender is not withdrawal recipient')
-
+    
     // Alice successfully withdraws funds
     await aliceContract.withdrawEth(alice.address, withdrawalAmount, requestID);
     // Withdrawal should consume 1 message from L2
@@ -82,18 +82,18 @@ describe('L1ZKXContract', function () {
     // Withdrawal should send a message to L2
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(2);
   });
-
+  
   it('Multiple token deposits', async function () {
     // Setup environment
     const [admin, alice] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb");
     const ZKXToken = await deployZKXToken(admin);
     const aliceContract = L1ZKXContract.connect(alice);
 
     // Now Alice's balance is 300 tokens
     ZKXToken.mint(alice.address, 300 * TOKEN_UNIT);
-
+    
     // Reverts because ZKXToken is not registered by admin yet
     await expect(
       aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 300 * TOKEN_UNIT)
@@ -109,7 +109,7 @@ describe('L1ZKXContract', function () {
 
     // Transfer reverts inside ERC20, because Alice has only 300 tokens
     await expect(aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 301 * TOKEN_UNIT)).to.be.reverted;
-
+    
     // This deposit succeeds, after tx Alice has 200 tokens left
     await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_TICKER, 100 * TOKEN_UNIT);
 
@@ -132,7 +132,7 @@ describe('L1ZKXContract', function () {
     // Setup environment
     const [admin, alice] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb");
     const aliceContract = L1ZKXContract.connect(alice);
 
     // Transfer ETH 3 times, all should succeed
@@ -144,6 +144,28 @@ describe('L1ZKXContract', function () {
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(0);
     // Every deposit sends a message to L2
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(3);
+  });
+});
+
+describe('L1ZKXContract deployment', function () {
+
+  it('State after deployment', async function () {
+    // Deploy contract
+    const [admin] = await ethers.getSigners();
+    const starknetCoreMock = await deployStarknetCoreMock(admin);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb");
+    
+    // Check state
+    expect(await L1ZKXContract.owner()).to.be.eq(admin.address);
+    expect(await L1ZKXContract.starknetCore()).to.be.eq(starknetCoreMock.address);
+  });
+
+  it('Unable to deploy with zero StarknetCore address', async function () {
+    const [admin] = await ethers.getSigners();
+
+    await expect(
+      deployL1ZKXContract(admin, ZERO_ADDRESS, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb")
+    ).to.be.revertedWith("StarknetCore address not provided");
   });
 
   it("Change Withdrawal Request Address", async function () {
@@ -163,7 +185,7 @@ describe('L1ZKXContract', function () {
     // Should revert if called by a non-admin
     await expect(
       rogueContract.setWithdrawalRequestAddress(maliciousContract)
-    ).to.be.revertedWith(`AccessControl: account ${rogue.address.toLowerCase()} is missing role 0x0000000000000000000000000000000000000000000000000000000000000000`);
+    ).to.be.revertedWith('Ownable: caller is not the owner');
 
     // Connect admin account to L1ZKXContract
     const adminContract = L1ZKXContract.connect(admin);
@@ -192,7 +214,7 @@ describe('L1ZKXContract', function () {
     // Should revert if called by a non-admin
     await expect(
       rogueContract.setAssetContractAddress(maliciousContract)
-    ).to.be.revertedWith(`AccessControl: account ${rogue.address.toLowerCase()} is missing role 0x0000000000000000000000000000000000000000000000000000000000000000`);
+    ).to.be.revertedWith('Ownable: caller is not the owner');
 
     // Connect admin account to L1ZKXContract
     const adminContract = L1ZKXContract.connect(admin);
@@ -203,7 +225,4 @@ describe('L1ZKXContract', function () {
     // Check if the address has changed
     expect(await L1ZKXContract.assetContractAddress()).to.be.eq(properContract);
   });
-
-
-
 });
