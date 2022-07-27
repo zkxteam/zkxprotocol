@@ -8,7 +8,6 @@ import "./IStarknetCore.sol";
 import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
-
 contract L1ZKXContract is Ownable {
 
     using SafeERC20 for IERC20;
