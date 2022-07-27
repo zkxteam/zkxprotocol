@@ -60,10 +60,7 @@ contract L1ZKXContract is Ownable {
       Modifier to verify valid L2 address.
     */
     modifier isValidL2Address(uint256 l2Address_) {
-        require(
-            l2Address_ != 0 && l2Address_ < FIELD_PRIME,
-            "L2_ADDRESS_OUT_OF_RANGE"
-        );
+        require(l2Address_ != 0 && l2Address_ < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
         _;
     }
 
@@ -74,10 +71,7 @@ contract L1ZKXContract is Ownable {
         IStarknetCore starknetCore_,
         uint256 assetContractAddress_,
         uint256 withdrawalRequestContractAddress_
-    )
-        isValidL2Address(assetContractAddress_)
-        isValidL2Address(withdrawalRequestContractAddress_)
-    {
+    ) isValidL2Address(assetContractAddress_) isValidL2Address(withdrawalRequestContractAddress_) {
         require(address(starknetCore_) != address(0), "StarknetCore address not provided");
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
@@ -206,6 +200,7 @@ contract L1ZKXContract is Ownable {
         uint256 collateralId_,
         uint256 amount_
     ) private isValidL2Address(userL2Address_) {
+
         // Construct the deposit message's payload.
         uint256[] memory depositPayload = new uint256[](3);
         depositPayload[0] = userL1Address_;
@@ -219,7 +214,12 @@ contract L1ZKXContract is Ownable {
             depositPayload
         );
 
-        emit LogDeposit(msg.sender, amount_, collateralId_, userL2Address_);
+        emit LogDeposit(
+            msg.sender,
+            amount_,
+            collateralId_,
+            userL2Address_
+        );
     }
 
     /**
@@ -232,7 +232,10 @@ contract L1ZKXContract is Ownable {
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_
-    ) external isValidL2Address(userL2Address_) {
+    ) 
+        external 
+        isValidL2Address(userL2Address_) 
+    {   
         // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         if (l2ContractAddress[senderAsUint256] == 0) {
@@ -247,22 +250,30 @@ contract L1ZKXContract is Ownable {
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
         Token.safeTransferFrom(msg.sender, zkxAddress, amount_);
         uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
+<<<<<<< HEAD
 
+=======
+>>>>>>> adds changes on audit fix branch
         require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Deposit failed: Invalid transfer amount");
 
         // Submit deposit
         uint256 collateralId = assetID[ticker_];
-        depositToL2(senderAsUint256, userL2Address_, collateralId, amount_);
+        depositToL2(
+            senderAsUint256,
+            userL2Address_,
+            collateralId,
+            amount_
+        );
     }
 
     /**
      * @dev function to deposit ETH to L1ZKX contract
      * @param userL2Address_ - The L2 account address of the user
      **/
-    function depositEthToL1(uint256 userL2Address_)
-        external
-        payable
-        isValidL2Address(userL2Address_)
+    function depositEthToL1(uint256 userL2Address_) 
+        payable 
+        external 
+        isValidL2Address(userL2Address_) 
     {
         // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
@@ -272,7 +283,12 @@ contract L1ZKXContract is Ownable {
 
         // Submit deposit
         uint256 collateralId = assetID[ETH_TICKER];
-        depositToL2(senderAsUint256, userL2Address_, collateralId, msg.value);
+        depositToL2(
+            senderAsUint256,
+            userL2Address_,
+            collateralId,
+            msg.value
+        );
     }
 
     /**
@@ -364,7 +380,7 @@ contract L1ZKXContract is Ownable {
         emit LogWithdrawal(msg.sender, ETH_TICKER, amount_, requestId_);
     }
 
-    /**
+     /**
      * @dev function to transfer funds from this contract to another address
      * @param recipient_ - address of the recipient
      * @param amount_ - amount that needs to be transferred
