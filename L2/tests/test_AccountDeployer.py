@@ -34,17 +34,17 @@ async def adminAuth_factory():
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 123, 0, 1, 0]
+        constructor_calldata=[signer1.public_key, 123, 0, 1, 1]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 123, 0, 1, 0]
+        constructor_calldata=[signer2.public_key, 123, 0, 1, 1]
     )
 
     user4 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer4.public_key, 123, 0, 1, 0]
+        constructor_calldata=[signer4.public_key, 123, 0, 1, 1]
     )
 
     adminAuth = await starknet.deploy(
@@ -78,6 +78,8 @@ async def adminAuth_factory():
         ]
     )
 
+    print(registry.contract_address)
+
     #await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, 
@@ -92,7 +94,7 @@ async def test_deploy_account_contract_with_zero_hash(adminAuth_factory):
     pubkey = signer3.public_key
 
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
-    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey]))
+    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))
 
 
 
@@ -102,7 +104,7 @@ async def test_deploy_account_contract(adminAuth_factory):
     pubkey = signer3.public_key
 
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
-    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey]))
+    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))
 
     #print(pubkey)
     await signer1.send_transaction(admin1, 

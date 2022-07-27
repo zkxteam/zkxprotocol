@@ -178,13 +178,8 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     public_key_ : felt, L1_address_: felt, registry_address_ : felt, version_ : felt, L1_ZKX_address_ : felt
 ):
     assert_not_zero(public_key_)
-    assert_not_zero(registry_address_)
-
-    # basic check that 0 < eth addr <  2^160 i.e. valid 20 byte value
-    assert_lt(0, L1_address_)
-    assert_lt(0, L1_ZKX_address_)
-    assert_lt(L1_address_, 2 ** 160)
-    assert_lt(L1_ZKX_address_, 2 ** 160)
+    assert_not_zero(L1_address_)
+    assert_not_zero(L1_ZKX_address_)
 
     public_key.write(public_key_)
     L1_address.write(L1_address_)
