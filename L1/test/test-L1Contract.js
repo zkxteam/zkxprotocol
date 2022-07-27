@@ -24,7 +24,7 @@ async function deployZKXToken(deployer) {
 
 const parseEther = ethers.utils.parseEther;
 const ETH_TICKER = 4543560;
-const WITHDRAWAL_INDEX = 0;
+const WITHDRAWAL_INDEX = 3;
 const ALICE_L2_ADDRESS = 123456789987654;
 const TOKEN_UNIT = 10**6;
 const ZKX_TICKER = 1234567;
