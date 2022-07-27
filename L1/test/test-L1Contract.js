@@ -26,6 +26,7 @@ const parseEther = ethers.utils.parseEther;
 const ETH_TICKER = 4543560;
 const WITHDRAWAL_INDEX = 0;
 const ALICE_L2_ADDRESS = 123456789987654;
+const ROGUE_L2_ADDRESS = 444444444444444;
 const TOKEN_UNIT = 10**6;
 const ZKX_TICKER = 1234567;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -63,11 +64,15 @@ describe('Deposits', function () {
     // Rogue can't withdraw Alice's funds
     const rogueContract = L1ZKXContract.connect(rogue)
     await expect(
-      rogueContract.withdrawEth(alice.address, withdrawalAmount, requestID)
-    ).to.be.revertedWith('Sender is not withdrawal recipient')
+      rogueContract.withdrawEth(ROGUE_L2_ADDRESS, withdrawalAmount, requestID)
+    ).to.be.revertedWith('INVALID_MESSAGE_TO_CONSUME')
+
+    await expect(
+      rogueContract.withdrawEth(ALICE_L2_ADDRESS, withdrawalAmount, requestID)
+    ).to.be.revertedWith('INVALID_MESSAGE_TO_CONSUME')
     
     // Alice successfully withdraws funds
-    await aliceContract.withdrawEth(alice.address, withdrawalAmount, requestID);
+    await aliceContract.withdrawEth(ALICE_L2_ADDRESS, withdrawalAmount, requestID);
     // Withdrawal should consume 1 message from L2
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(1);
     // Withdrawal should send a message to L2
