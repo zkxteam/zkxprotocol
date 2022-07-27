@@ -25,7 +25,7 @@ async function deployZKXToken(deployer) {
 const parseEther = ethers.utils.parseEther;
 const ETH_TICKER = 4543560;
 const WITHDRAWAL_INDEX = 3;
-const ALICE_L2_ADDRESS = 123456789987654;
+const ALICE_L2_ADDRESS = "0x2bcede62aeb41831af3b1d24b0f3733abbf7590eb38e7dc1b923ef578d76ea8";
 const TOKEN_UNIT = 10**6;
 const ZKX_TICKER = 1234567;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -36,7 +36,7 @@ describe('Deposits', function () {
     // Setup environment
     const [admin, alice, rogue] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb");
     const aliceContract = L1ZKXContract.connect(alice);
 
     // Deposit to L1
@@ -78,7 +78,7 @@ describe('Deposits', function () {
     // Setup environment
     const [admin, alice] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb");
     const ZKXToken = await deployZKXToken(admin);
     const aliceContract = L1ZKXContract.connect(alice);
 
@@ -123,7 +123,7 @@ describe('Deposits', function () {
     // Setup environment
     const [admin, alice] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb");
     const aliceContract = L1ZKXContract.connect(alice);
 
     // Transfer ETH 3 times, all should succeed
@@ -144,7 +144,7 @@ describe('L1ZKXContract deployment', function () {
     // Deploy contract
     const [admin] = await ethers.getSigners();
     const starknetCoreMock = await deployStarknetCoreMock(admin);
-    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, 0, 0);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb");
     
     // Check state
     expect(await L1ZKXContract.owner()).to.be.eq(admin.address);
@@ -155,7 +155,7 @@ describe('L1ZKXContract deployment', function () {
     const [admin] = await ethers.getSigners();
 
     await expect(
-      deployL1ZKXContract(admin, ZERO_ADDRESS, 0, 0)
+      deployL1ZKXContract(admin, ZERO_ADDRESS, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb")
     ).to.be.revertedWith("StarknetCore address not provided");
   });
 });

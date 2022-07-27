@@ -71,7 +71,7 @@ contract L1ZKXContract is Ownable {
         IStarknetCore starknetCore_,
         uint256 assetContractAddress_,
         uint256 withdrawalRequestContractAddress_
-    ) {
+    ) isValidL2Address(assetContractAddress_) isValidL2Address(withdrawalRequestContractAddress_) {
         require(address(starknetCore_) != address(0), "StarknetCore address not provided");
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
@@ -170,6 +170,7 @@ contract L1ZKXContract is Ownable {
     function setAssetContractAddress(uint256 assetContractAddress_)
         external
         onlyOwner
+        isValidL2Address(assetContractAddress_)
     {
         assetContractAddress = assetContractAddress_;
     }
@@ -181,6 +182,7 @@ contract L1ZKXContract is Ownable {
     function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
         external
         onlyOwner
+        isValidL2Address(withdrawalRequestAddress_)
     {
         withdrawalRequestContractAddress = withdrawalRequestAddress_;
     }
