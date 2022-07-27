@@ -242,13 +242,13 @@ contract L1ZKXContract is Ownable {
 
         // Transfer tokens
         address tokenContract = tokenContractAddress[ticker_];
-        require(tokenContract != address(0), "Unregistered ticker");
+        require(tokenContract != address(0), "Deposit failed: Unregistered ticker");
         IERC20 Token = IERC20(tokenContract);
         address zkxAddress = address(this);
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
         Token.safeTransferFrom(msg.sender, zkxAddress, amount_);
         uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
-        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Invalid transfer amount");
+        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Deposit failed: Invalid transfer amount");
 
         // Submit deposit
         uint256 collateralId = assetID[ticker_];
@@ -384,8 +384,8 @@ contract L1ZKXContract is Ownable {
         external
         onlyOwner
     {
-        require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
-        require(amount_ >= 0, "ETH Transfer failed: amount is zero");
+        require(recipient_ != address(0), "Token Transfer failed: recipient address is zero");
+        require(amount_ >= 0, "Token Transfer failed: amount is zero");
         IERC20(tokenAddress_).safeTransfer(recipient_, amount_);
     }
 
