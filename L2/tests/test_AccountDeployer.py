@@ -34,17 +34,17 @@ async def adminAuth_factory():
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0, 1, 0]
+        constructor_calldata=[signer1.public_key, 123, 0, 1, 0]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0, 1, 0]
+        constructor_calldata=[signer2.public_key, 123, 0, 1, 0]
     )
 
     user4 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer4.public_key, 0, 1, 0]
+        constructor_calldata=[signer4.public_key, 123, 0, 1, 0]
     )
 
     adminAuth = await starknet.deploy(
@@ -114,10 +114,10 @@ async def test_deploy_account_contract(adminAuth_factory):
                                    'set_L1_ZKX_address',
                                    [12345])
 
-    await signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey])
+    await signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456])
 
     # get address of deployed contract
-    deployed_address = await account_deployer.get_pubkey_to_address(pubkey).call()
+    deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, 123456).call()
     #print(deployed_address.result)
     print(hex(deployed_address.result.address))
     deployed_address=deployed_address.result.address
@@ -139,6 +139,12 @@ async def test_deploy_account_contract(adminAuth_factory):
     #print(result)
 
     assert result.result.res == pubkey
+
+    # check that the account contract has the correct L1 address stored that was used during deployment
+
+    result = await new_account_contract.get_L1_address().call()
+
+    assert result.result.res == 123456
 
     
     fetched_account_registry = await account_registry.get_account_registry().call()

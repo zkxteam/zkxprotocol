@@ -13,10 +13,12 @@ from contracts.Constants import (
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 
+# stores mapping from (pubkey, L1 address) -> (L2 address)
 @storage_var
 func pubkey_L1_to_address(pubkey:felt, L1_address: felt) -> (address:felt):
 end
 
+# stores class hash of Account contract
 @storage_var
 func account_class_hash() -> (class_hash:felt):
 end
@@ -56,6 +58,12 @@ func deploy_account{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (current_version) = version.read()
 
     assert_not_zero(hash)
+    let (stored_deployed_address) = pubkey_L1_to_address.read(public_key, L1_address)
+
+    # check we havent already deployed this combination of public key and L1 address
+    with_attr error_message("Account already exists with given pubkey and L1 address"):
+        assert stored_deployed_address = 0
+    end
 
     # prepare constructor calldata for deploy call
     let calldata:felt* = alloc()
@@ -67,6 +75,7 @@ func deploy_account{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     assert calldata[4] = current_L1_ZKX_address
 
     # using a constant value for salt means redeploying with same public_key would not override the account address
+    # in any case we now check that re-deployment cannot happen with same (pubkey, L1 address) so salt does not matter
     let (deployed_address) = deploy(hash, 0, 5, calldata) 
 
     pubkey_L1_to_address.write(public_key, L1_address, deployed_address)
@@ -136,7 +145,7 @@ end
 func get_pubkey_L1_to_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     public_key:felt, L1_address: felt) -> (address:felt):
 
-    let (address) = pubkey_to_address.read(public_key, L1_address)
+    let (address) = pubkey_L1_to_address.read(public_key, L1_address)
     return(address)
 end
 

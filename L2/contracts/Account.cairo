@@ -39,6 +39,7 @@ from starkware.cairo.common.math import (
     assert_not_zero,
     assert_nn,
     abs_value,
+    assert_lt
 )
 from starkware.cairo.common.pow import pow
 from contracts.Constants import (
@@ -177,9 +178,11 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     public_key_ : felt, L1_address_: felt, registry_address_ : felt, version_ : felt, L1_ZKX_address_ : felt
 ):
     assert_not_zero(public_key_)
-    assert_not_zero(L1_address_)
     assert_not_zero(registry_address_)
-    assert_not_zero(L1_ZKX_address_)
+
+    # basic check that 0 < eth addr <  2^160 i.e. valid 20 byte value
+    assert_lt(0, L1_address_)
+    assert_lt(0, L1_ZKX_address_)
     assert_lt(L1_address_, 2 ** 160)
     assert_lt(L1_ZKX_address_, 2 ** 160)
 
@@ -1306,7 +1309,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 
     let (stored_L1_address) = L1_address.read()
 
-    assert stored_L1_address == user
+    assert stored_L1_address = user
 
     # Reading token decimal field of an asset
     let (caller) = get_caller_address()
