@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0.
 pragma solidity 0.8.14;
 
-
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./IStarknetCore.sol";
 import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
 contract L1ZKXContract is Ownable {
+
+    using SafeERC20 for IERC20;
 
     event LogDeposit(
         address sender,
@@ -240,13 +242,13 @@ contract L1ZKXContract is Ownable {
 
         // Transfer tokens
         address tokenContract = tokenContractAddress[ticker_];
-        require(tokenContract != address(0), "Unregistered ticker");
+        require(tokenContract != address(0), "Deposit failed: Unregistered ticker");
         IERC20 Token = IERC20(tokenContract);
         address zkxAddress = address(this);
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
-        Token.transferFrom(msg.sender, zkxAddress, amount_);
+        Token.safeTransferFrom(msg.sender, zkxAddress, amount_);
         uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
-        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Invalid transfer amount");
+        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Deposit failed: Invalid transfer amount");
 
         // Submit deposit
         uint256 collateralId = assetID[ticker_];
@@ -312,7 +314,7 @@ contract L1ZKXContract is Ownable {
         starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
 
         address tokenContract = tokenContractAddress[ticker_];
-        IERC20(tokenContract).transfer(msg.sender, amount_);
+        IERC20(tokenContract).safeTransfer(msg.sender, amount_);
 
         // Construct update withdrawal request message payload.
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
@@ -355,7 +357,6 @@ contract L1ZKXContract is Ownable {
         // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
 
-        require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
         payable(msg.sender).transfer(amount_);
 
         // Construct update withdrawal request message payload.
@@ -383,9 +384,9 @@ contract L1ZKXContract is Ownable {
         external
         onlyOwner
     {
-        uint256 balance = IERC20(tokenAddress_).balanceOf(address(this));
-        require(amount_ <= balance, "Not enough ERC-20 tokens to withdraw");
-        IERC20(tokenAddress_).transfer(recipient_, amount_);
+        require(recipient_ != address(0), "Token Transfer failed: recipient address is zero");
+        require(amount_ >= 0, "Token Transfer failed: amount is zero");
+        IERC20(tokenAddress_).safeTransfer(recipient_, amount_);
     }
 
     /**
@@ -397,7 +398,8 @@ contract L1ZKXContract is Ownable {
         external
         onlyOwner
     {
-        require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
+        require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
+        require(amount_ >= 0, "ETH Transfer failed: amount is zero");
         recipient_.transfer(amount_);
     }
 }
