@@ -12,28 +12,52 @@ contract L1ZKXContract is Ownable {
 
     using SafeERC20 for IERC20;
 
+    event LogContractInitialized(
+        IStarknetCore starknetCore,
+        uint256 assetContractAddress,
+        uint256 withdrawalRequestContractAddress
+    );
+
     event LogDeposit(
         address sender,
-        uint256 amount_,
-        uint256 collateralId_,
+        uint256 amount,
+        uint256 collateralId,
         uint256 l2Recipient
     );
 
     event LogWithdrawal(
         address recipient,
-        uint256 ticker_,
-        uint256 amount_,
-        uint256 requestId_
+        uint256 ticker,
+        uint256 amount,
+        uint256 requestId
     );
 
-    event LogAssetListUpdated(uint256 ticker_, uint256 collateralId_);
+    event LogAssetListUpdated(uint256 ticker, uint256 collateralId);
 
-    event LogAssetRemovedFromList(uint256 ticker_, uint256 collateralId_);
+    event LogAssetRemovedFromList(uint256 ticker, uint256 collateralId);
 
     event LogTokenContractAddressUpdated(
-        uint256 ticker_,
-        address tokenContractAddresses_
+        uint256 ticker,
+        address tokenContractAddresses
     );
+
+    event LogAssetContractAddressChanged(
+        uint256 oldAssetContract,
+        uint256 newAssetContract
+    );
+
+    event LogWithdrawalRequestContractChanged(
+        uint256 oldWithdrawalContract,
+        uint256 newWithdrawalContract
+    );
+
+    event LogAdminTransferFunds(
+        address indexed recipient,
+        uint256 amount,
+        address indexed tokenAddress
+    );
+
+    event LogAdminTransferEth(address payable indexed recipient, uint256 amount);
 
     // The StarkNet core contract.
     IStarknetCore public starknetCore;
@@ -76,6 +100,12 @@ contract L1ZKXContract is Ownable {
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
+
+        emit LogContractInitialized(
+            starknetCore_,
+            assetContractAddress_,
+            withdrawalRequestContractAddress_
+        );
     }
 
     /**
@@ -172,7 +202,12 @@ contract L1ZKXContract is Ownable {
         onlyOwner
         isValidL2Address(assetContractAddress_)
     {
+        uint256 oldAssetContractAddress = assetContractAddress;
         assetContractAddress = assetContractAddress_;
+        emit LogAssetContractAddressChanged(
+            oldAssetContractAddress,
+            assetContractAddress_
+        );
     }
 
     /**
@@ -183,8 +218,13 @@ contract L1ZKXContract is Ownable {
         external
         onlyOwner
         isValidL2Address(withdrawalRequestAddress_)
-    {
+    {   
+        uint256 oldWithdrawalRequestContractAddress = withdrawalRequestContractAddress;
         withdrawalRequestContractAddress = withdrawalRequestAddress_;
+        emit LogWithdrawalRequestContractChanged(
+            oldWithdrawalRequestContractAddress,
+            withdrawalRequestAddress_
+        );
     }
 
     /**
@@ -389,6 +429,8 @@ contract L1ZKXContract is Ownable {
         require(recipient_ != address(0), "Token Transfer failed: recipient address is zero");
         require(amount_ >= 0, "Token Transfer failed: amount is zero");
         IERC20(tokenAddress_).safeTransfer(recipient_, amount_);
+
+        emit LogAdminTransferFunds(recipient_, amount_, tokenAddress_);
     }
 
     /**
@@ -403,5 +445,7 @@ contract L1ZKXContract is Ownable {
         require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
         require(amount_ >= 0, "ETH Transfer failed: amount is zero");
         recipient_.transfer(amount_);
+
+        emit LogAdminTransferEth(recipient_, amount_);
     }
 }

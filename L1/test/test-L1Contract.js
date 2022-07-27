@@ -31,6 +31,15 @@ const ZKX_TICKER = 1234567;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 describe('Deposits', function () {
+  it("Constructor event emission ", async function () {
+    const [admin] = await ethers.getSigners();
+    const starknetCoreMock = await deployStarknetCoreMock(admin);
+    const L1ZKXContractFactory = await ethers.getContractFactory("L1ZKXContract", admin);
+    const L2ZKXContract = await L1ZKXContractFactory.deploy(starknetCoreMock.address, 54, 42);
+    await L2ZKXContract.deployed();
+
+    await expect(L2ZKXContract.deployTransaction).to.emit(L2ZKXContract, "LogContractInitialized").withArgs(starknetCoreMock.address, 54, 42);
+  });
 
   it('Deposit and then withdraw ETH', async function () {
     // Setup environment
@@ -73,7 +82,7 @@ describe('Deposits', function () {
     // Withdrawal should send a message to L2
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(2);
   });
-
+  
   it('Multiple token deposits', async function () {
     // Setup environment
     const [admin, alice] = await ethers.getSigners();
@@ -157,5 +166,63 @@ describe('L1ZKXContract deployment', function () {
     await expect(
       deployL1ZKXContract(admin, ZERO_ADDRESS, "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbda", "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb")
     ).to.be.revertedWith("StarknetCore address not provided");
+  });
+
+  it("Change Withdrawal Request Address", async function () {
+    // Setup environment
+    const assetContractAddress = BigInt(0x06e2ed6c28ff10eef7391edd6f3151ebc3528ccb55dd78f9babfc89a40ac6139);
+    const withdrawalRequestAddress = BigInt(0x04f9a757a5d412b6f2996b2dfd2b598e5bd4bad4d8fbf2e6437f59e7da718833);
+
+    const [admin, alice, rogue] = await ethers.getSigners();
+    const starknetCoreMock = await deployStarknetCoreMock(admin);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, assetContractAddress, withdrawalRequestAddress);
+    const rogueContract = L1ZKXContract.connect(rogue);
+
+    // Address of the malicious withdrawal address
+    const maliciousContract = BigInt(0x0543a757a5d412b6f2996b2dfd2b598e5bd4bad4d8fbf2e6437f59e7da718855);
+    const properContract = BigInt(0x0673a757a5d412b6f2996b2dfd2b598e5bd4bad4d8fbf2e6437f59e7da718875);
+
+    // Should revert if called by a non-admin
+    await expect(
+      rogueContract.setWithdrawalRequestAddress(maliciousContract)
+    ).to.be.revertedWith('Ownable: caller is not the owner');
+
+    // Connect admin account to L1ZKXContract
+    const adminContract = L1ZKXContract.connect(admin);
+
+    // Admin should be able to change the Withdrawal Request Address
+    await expect(adminContract.setWithdrawalRequestAddress(properContract)).to.emit(L1ZKXContract, "LogWithdrawalRequestContractChanged").withArgs(withdrawalRequestAddress, properContract);
+
+    // Check if the address has changed
+    expect(await L1ZKXContract.withdrawalRequestContractAddress()).to.be.eq(properContract);
+  });
+
+  it("Change Asset Address", async function () {
+    // Setup environment
+    const assetContractAddress = BigInt(0x06e2ed6c28ff10eef7391edd6f3151ebc3528ccb55dd78f9babfc89a40ac6139);
+    const withdrawalRequestAddress = BigInt(0x04f9a757a5d412b6f2996b2dfd2b598e5bd4bad4d8fbf2e6437f59e7da718833);
+
+    const [admin, alice, rogue] = await ethers.getSigners();
+    const starknetCoreMock = await deployStarknetCoreMock(admin);
+    const L1ZKXContract = await deployL1ZKXContract(admin, starknetCoreMock.address, assetContractAddress, withdrawalRequestAddress);
+    const rogueContract = L1ZKXContract.connect(rogue);
+
+    // Address of the malicious withdrawal contract
+    const maliciousContract = BigInt(0x0543a757a5d412b6f2996b2dfd2b598e5bd4bad4d8fbf2e6437f59e7da718855);
+    const properContract = BigInt(0x0673a757a5d412b6f2996b2dfd2b598e5bd4bad4d8fbf2e6437f59e7da718875);
+
+    // Should revert if called by a non-admin
+    await expect(
+      rogueContract.setAssetContractAddress(maliciousContract)
+    ).to.be.revertedWith('Ownable: caller is not the owner');
+
+    // Connect admin account to L1ZKXContract
+    const adminContract = L1ZKXContract.connect(admin);
+
+    // Admin should be able to change the Asset Address
+    await expect(adminContract.setAssetContractAddress(properContract)).to.emit(L1ZKXContract, "LogAssetContractAddressChanged").withArgs(assetContractAddress, properContract);
+
+    // Check if the address has changed
+    expect(await L1ZKXContract.assetContractAddress()).to.be.eq(properContract);
   });
 });
