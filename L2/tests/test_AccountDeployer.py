@@ -34,17 +34,17 @@ async def adminAuth_factory():
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0, 1, 0]
+        constructor_calldata=[signer1.public_key, 123, 0, 1, 1]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0, 1, 0]
+        constructor_calldata=[signer2.public_key, 123, 0, 1, 1]
     )
 
     user4 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer4.public_key, 0, 1, 0]
+        constructor_calldata=[signer4.public_key, 123, 0, 1, 1]
     )
 
     adminAuth = await starknet.deploy(
@@ -78,6 +78,8 @@ async def adminAuth_factory():
         ]
     )
 
+    print(registry.contract_address)
+
     #await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, 
@@ -92,7 +94,7 @@ async def test_deploy_account_contract_with_zero_hash(adminAuth_factory):
     pubkey = signer3.public_key
 
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
-    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey]))
+    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))
 
 
 
@@ -102,7 +104,7 @@ async def test_deploy_account_contract(adminAuth_factory):
     pubkey = signer3.public_key
 
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
-    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey]))
+    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))
 
     #print(pubkey)
     await signer1.send_transaction(admin1, 
@@ -114,10 +116,10 @@ async def test_deploy_account_contract(adminAuth_factory):
                                    'set_L1_ZKX_address',
                                    [12345])
 
-    await signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey])
+    await signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456])
 
     # get address of deployed contract
-    deployed_address = await account_deployer.get_pubkey_to_address(pubkey).call()
+    deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, 123456).call()
     #print(deployed_address.result)
     print(hex(deployed_address.result.address))
     deployed_address=deployed_address.result.address
@@ -139,6 +141,12 @@ async def test_deploy_account_contract(adminAuth_factory):
     #print(result)
 
     assert result.result.res == pubkey
+
+    # check that the account contract has the correct L1 address stored that was used during deployment
+
+    result = await new_account_contract.get_L1_address().call()
+
+    assert result.result.res == 123456
 
     
     fetched_account_registry = await account_registry.get_account_registry().call()
@@ -171,3 +179,28 @@ async def test_unauthorized_changes_to_config(adminAuth_factory):
     assert result.result.address == auth_registry.contract_address
 
 
+@pytest.mark.asyncio
+async def test_check_unknown_pubkey_L1_address(adminAuth_factory):
+    adminAuth, auth_registry, account_registry, admin1, admin2, user4, account_deployer = adminAuth_factory
+
+    pubkey = signer3.public_key
+    deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, 456).call() #456 is not a known L1 address
+    #print(deployed_address.result)
+    deployed_address=deployed_address.result.address
+
+    assert deployed_address == 0
+
+    deployed_address = await account_deployer.get_pubkey_L1_to_address(123, 123456).call() #123 is not a known pubkey
+   
+    deployed_address=deployed_address.result.address
+
+    assert deployed_address == 0
+
+
+@pytest.mark.asyncio
+async def test_redeploy_existing_account(adminAuth_factory):
+    adminAuth, auth_registry, account_registry, admin1, admin2, user4, account_deployer = adminAuth_factory
+    pubkey = signer3.public_key
+
+    # this pubkey, L1 address combination is already deployed and hence should revert
+    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))

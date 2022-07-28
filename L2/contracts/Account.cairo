@@ -39,6 +39,7 @@ from starkware.cairo.common.math import (
     assert_not_zero,
     assert_nn,
     abs_value,
+    assert_lt
 )
 from starkware.cairo.common.pow import pow
 from contracts.Constants import (
@@ -67,7 +68,7 @@ from contracts.Math_64x61 import (
     Math64x61_sub,
 )
 
-const MESSAGE_WITHDRAW = 0
+const MESSAGE_WITHDRAW = 3
 
 #
 # Storage
@@ -174,9 +175,14 @@ end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    public_key_ : felt, registry_address_ : felt, version_ : felt, L1_ZKX_address_ : felt
+    public_key_ : felt, L1_address_: felt, registry_address_ : felt, version_ : felt, L1_ZKX_address_ : felt
 ):
+    assert_not_zero(public_key_)
+    assert_not_zero(L1_address_)
+    assert_not_zero(L1_ZKX_address_)
+
     public_key.write(public_key_)
+    L1_address.write(L1_address_)
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     L1_ZKX_address.write(value=L1_ZKX_address_)
@@ -1296,8 +1302,9 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (L1_ZKX_contract_address) = L1_ZKX_address.read()
     assert from_address = L1_ZKX_contract_address
 
-    # Update the L1 address
-    L1_address.write(user)
+    let (stored_L1_address) = L1_address.read()
+
+    assert stored_L1_address = user
 
     # Reading token decimal field of an asset
     let (caller) = get_caller_address()

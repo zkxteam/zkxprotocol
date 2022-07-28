@@ -1,36 +1,46 @@
 // SPDX-License-Identifier: Apache-2.0.
-pragma solidity ^0.8.7;
+pragma solidity 0.8.14;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./IStarknetCore.sol";
 import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
-contract L1ZKXContract is AccessControl {
+contract L1ZKXContract is Ownable {
+
+    using SafeERC20 for IERC20;
+
+    event LogContractInitialized(
+        IStarknetCore starknetCore,
+        uint256 assetContractAddress,
+        uint256 withdrawalRequestContractAddress
+    );
 
     event LogDeposit(
-        address sender,
-        uint256 amount_,
-        uint256 collateralId_,
-        uint256 l2Recipient
+        address indexed sender,
+        uint256 amount,
+        uint256 indexed collateralId,
+        uint256 indexed l2Recipient,
+        bytes32 msgHash
     );
 
     event LogWithdrawal(
-        address recipient,
-        uint256 ticker_,
-        uint256 amount_,
-        uint256 requestId_
+        address indexed recipient,
+        uint256 indexed ticker,
+        uint256 amount,
+        uint256 requestId,
+        bytes32 msgHash
     );
 
-    event LogAssetListUpdated(uint256 ticker_, uint256 collateralId_);
+    event LogAssetListUpdated(uint256 ticker, uint256 collateralId);
 
-    event LogAssetRemovedFromList(uint256 ticker_, uint256 collateralId_);
+    event LogAssetRemovedFromList(uint256 ticker, uint256 collateralId);
 
     event LogTokenContractAddressUpdated(
-        uint256 ticker_,
-        address tokenContractAddresses_
+        uint256 indexed ticker,
+        address indexed tokenContractAddresses
     );
 
     struct Asset {
@@ -40,7 +50,23 @@ contract L1ZKXContract is AccessControl {
         uint256 collateralID;
     }
 
-    using SafeMath for uint256;
+    event LogAssetContractAddressChanged(
+        uint256 oldAssetContract,
+        uint256 newAssetContract
+    );
+
+    event LogWithdrawalRequestContractChanged(
+        uint256 oldWithdrawalContract,
+        uint256 newWithdrawalContract
+    );
+
+    event LogAdminTransferFunds(
+        address indexed recipient,
+        uint256 amount,
+        address indexed tokenAddress
+    );
+
+    event LogAdminTransferEth(address payable indexed recipient, uint256 amount);
 
     // The StarkNet core contract.
     IStarknetCore public starknetCore;
@@ -74,11 +100,17 @@ contract L1ZKXContract is AccessControl {
         IStarknetCore starknetCore_,
         uint256 assetContractAddress_,
         uint256 withdrawalRequestContractAddress_
-    ) {
+    ) isValidL2Address(assetContractAddress_) isValidL2Address(withdrawalRequestContractAddress_) {
+        require(address(starknetCore_) != address(0), "StarknetCore address not provided");
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+
+        emit LogContractInitialized(
+            starknetCore_,
+            assetContractAddress_,
+            withdrawalRequestContractAddress_
+        );
     }
 
     /**
@@ -88,13 +120,12 @@ contract L1ZKXContract is AccessControl {
      **/
     function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {   
         require(
             assetInfoByTicker[ticker_].exists == false, 
             "Failed to add asset: Ticker already present"
         );
-
         // Construct the update asset list message's payload.
         uint256[] memory payload = new uint256[](3);
         payload[0] = ADD_ASSET_INDEX;
@@ -123,7 +154,7 @@ contract L1ZKXContract is AccessControl {
      **/
     function removeAssetFromList(uint256 ticker_, uint256 assetId_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
         Asset storage assetToRemove = assetsByTicker[ticker_];
         require(assetToRemove.exists, "Failed to remove non-existing asset");
@@ -167,7 +198,7 @@ contract L1ZKXContract is AccessControl {
         address tokenContractAddress_
     ) 
         external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
+        onlyOwner 
     {
         // Update token contract address
         require(
@@ -189,9 +220,15 @@ contract L1ZKXContract is AccessControl {
      **/
     function setAssetContractAddress(uint256 assetContractAddress_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
+        isValidL2Address(assetContractAddress_)
     {
+        uint256 oldAssetContractAddress = assetContractAddress;
         assetContractAddress = assetContractAddress_;
+        emit LogAssetContractAddressChanged(
+            oldAssetContractAddress,
+            assetContractAddress_
+        );
     }
 
     /**
@@ -200,14 +237,21 @@ contract L1ZKXContract is AccessControl {
      **/
     function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+        onlyOwner
+        isValidL2Address(withdrawalRequestAddress_)
+    {   
+        uint256 oldWithdrawalRequestContractAddress = withdrawalRequestContractAddress;
         withdrawalRequestContractAddress = withdrawalRequestAddress_;
+        emit LogWithdrawalRequestContractChanged(
+            oldWithdrawalRequestContractAddress,
+            withdrawalRequestAddress_
+        );
     }
 
     /**
      * @dev function to deposit funds to L2 Account contract
-     * @param userL1Address_ - Users L1 wallet address
+     * @param userL1Address_ - L1 user address
+     * @param userL2Address_ - L2 address of user's ZKX account
      * @param collateralId_ - ID of the collateral
      * @param amount_ - The amount of tokens to be deposited
      **/
@@ -225,7 +269,7 @@ contract L1ZKXContract is AccessControl {
         depositPayload[2] = collateralId_;
 
         // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(
+        bytes32 msgHash = starknetCore.sendMessageToL2(
             userL2Address_,
             DEPOSIT_SELECTOR,
             depositPayload
@@ -235,7 +279,8 @@ contract L1ZKXContract is AccessControl {
             msg.sender,
             amount_,
             collateralId_,
-            userL2Address_
+            userL2Address_,
+            msgHash
         );
     }
 
@@ -253,24 +298,19 @@ contract L1ZKXContract is AccessControl {
         external 
         isValidL2Address(userL2Address_) 
     {   
-        // If not yet set, store L2 address linked to sender's L1 address
-        uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
-        if (l2ContractAddress[senderAsUint256] == 0) {
-            l2ContractAddress[senderAsUint256] = userL2Address_;
-        }
-
-        // Transfer tokens
+        // Prepare transfer
         Asset memory asset = assetsByTicker[ticker_];
         require(asset.exists, "Failed to deposit non-registered asset");
-        require(asset.contractAddress != address(0), "Contract address for asset not set");
-
-        // Performa transfer
+        require(asset.contractAddress != address(0), "Deposit failed: Contract address not set");
+        uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
         IERC20 Token = IERC20(asset.contractAddress);
         address zkxAddress = address(this);
+
+        // Transfer funds
         uint256 zkxBalanceBefore = Token.balanceOf(zkxAddress);
-        Token.transferFrom(msg.sender, zkxAddress, amount_);
+        Token.safeTransferFrom(msg.sender, zkxAddress, amount_);
         uint256 zkxBalanceAfter = Token.balanceOf(zkxAddress);
-        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Invalid transfer amount");
+        require(zkxBalanceAfter >= zkxBalanceBefore + amount_, "Deposit failed: Invalid transfer amount");
 
         // Submit deposit
         depositToL2(
@@ -290,13 +330,7 @@ contract L1ZKXContract is AccessControl {
         external 
         isValidL2Address(userL2Address_) 
     {
-        // If not yet set, store L2 address linked to sender's L1 address
         uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
-        if (l2ContractAddress[senderAsUint256] == 0) {
-            l2ContractAddress[senderAsUint256] = userL2Address_;
-        }
-
-        // Submit deposit
         uint256 collateralId = assetID[ETH_TICKER];
         depositToL2(
             senderAsUint256,
@@ -308,96 +342,95 @@ contract L1ZKXContract is AccessControl {
 
     /**
      * @dev function to withdraw funds from an L2 Account contract
-     * @param userL1Address_ - Users L1 wallet address
+     * @param userL1Address_ - User's L1 Account address
+     * @param userL2Address_ - User's L2 Account address
      * @param ticker_ - felt representation of the ticker
      * @param amount_ - The amount of tokens to be withdrawn
      * @param requestId_ - ID of the withdrawal request
      **/
     function withdraw(
-        uint256 userL1Address_,
+        address userL1Address_,
+        uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
 
         Asset memory asset = assetsByTicker[ticker_];
         require(asset.exists, "Withdrawal failed: non-registered asset");
-        require(asset.contractAddress != address(0), "Withdrawal failed: Asset contract address is 0");
-
-        uint256 userL2Address = l2ContractAddress[userL1Address_];
+        require(asset.contractAddress != address(0), "Withdrawal failed: Contract address not set");
 
         // Construct withdrawal message payload.
         uint256[] memory withdrawal_payload = new uint256[](5);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
-        withdrawal_payload[1] = userL1Address_;
+        withdrawal_payload[1] = uint256(uint160(userL1Address_));
         withdrawal_payload[2] = ticker_;
         withdrawal_payload[3] = amount_;
         withdrawal_payload[4] = requestId_;
 
         // Consume the message from the StarkNet core contract.
         // This will revert the (Ethereum) transaction if the message does not exist.
-        starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
-
-        IERC20(asset.contractAddress).transfer(msg.sender, amount_);
+        starknetCore.consumeMessageFromL2(userL2Address_, withdrawal_payload);
 
         // Construct update withdrawal request message payload.
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
-        updateWithdrawalRequestPayload[0] = userL2Address;
+        updateWithdrawalRequestPayload[0] = userL2Address_;
         updateWithdrawalRequestPayload[1] = requestId_;
 
         // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(
+        bytes32 msgHash = starknetCore.sendMessageToL2(
             withdrawalRequestContractAddress,
             UPDATE_WITHDRAWAL_REQUEST_SELECTOR,
             updateWithdrawalRequestPayload
         );
 
-        emit LogWithdrawal(msg.sender, ticker_, amount_, requestId_);
+        address tokenContract = tokenContractAddress[ticker_];
+        IERC20(tokenContract).safeTransfer(userL1Address_, amount_);
+
+        emit LogWithdrawal(userL1Address_, ticker_, amount_, requestId_, msgHash);
     }
 
     /**
      * @dev function to withdraw funds from an L2 Account contract
-     * @param userL1Address_ - Users L1 wallet address
+     * @param userL1Address_ - User's L1 Account address
+     * @param userL2Address_ - User's L2 Account address
      * @param amount_ - The amount of tokens to be withdrawn
      * @param requestId_ - ID of the withdrawal request
      **/
     function withdrawEth(
-        uint256 userL1Address_,
+        address userL1Address_,
+        uint256 userL2Address_,
         uint256 amount_,
         uint256 requestId_
     ) external {
-        require(msg.sender == address(uint160(userL1Address_)), "Sender is not withdrawal recipient");
-        uint256 userL2Address = l2ContractAddress[userL1Address_];
 
         // Construct withdrawal message payload.
         uint256[] memory withdrawal_payload = new uint256[](5);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
-        withdrawal_payload[1] = userL1Address_;
+        withdrawal_payload[1] = uint256(uint160(userL1Address_));
         withdrawal_payload[2] = ETH_TICKER;
         withdrawal_payload[3] = amount_;
         withdrawal_payload[4] = requestId_;
 
         // Consume the message from the StarkNet core contract.
         // This will revert the (Ethereum) transaction if the message does not exist.
-        starknetCore.consumeMessageFromL2(userL2Address, withdrawal_payload);
-
-        require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
-        payable(msg.sender).transfer(amount_);
+        starknetCore.consumeMessageFromL2(userL2Address_, withdrawal_payload);
 
         // Construct update withdrawal request message payload.
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
-        updateWithdrawalRequestPayload[0] = userL2Address;
+        updateWithdrawalRequestPayload[0] = userL2Address_;
         updateWithdrawalRequestPayload[1] = requestId_;
 
         // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(
+        bytes32 msgHash = starknetCore.sendMessageToL2(
             withdrawalRequestContractAddress,
             UPDATE_WITHDRAWAL_REQUEST_SELECTOR,
             updateWithdrawalRequestPayload
         );
 
-        emit LogWithdrawal(msg.sender, ETH_TICKER, amount_, requestId_);
+        payable(userL1Address_).transfer(amount_);
+
+        emit LogWithdrawal(userL1Address_, ETH_TICKER, amount_, requestId_, msgHash);
     }
 
      /**
@@ -408,11 +441,13 @@ contract L1ZKXContract is AccessControl {
      **/
     function transferFunds(address recipient_, uint256 amount_, address tokenAddress_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
-        uint256 balance = IERC20(tokenAddress_).balanceOf(address(this));
-        require(amount_ <= balance, "Not enough ERC-20 tokens to withdraw");
-        IERC20(tokenAddress_).transfer(recipient_, amount_);
+        require(recipient_ != address(0), "Token Transfer failed: recipient address is zero");
+        require(amount_ >= 0, "Token Transfer failed: amount is zero");
+        IERC20(tokenAddress_).safeTransfer(recipient_, amount_);
+
+        emit LogAdminTransferFunds(recipient_, amount_, tokenAddress_);
     }
 
     /**
@@ -422,9 +457,12 @@ contract L1ZKXContract is AccessControl {
      **/
     function transferEth(address payable recipient_, uint256 amount_)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyOwner
     {
-        require(amount_ <= address(this).balance, "ETH to be transferred is more than the balance");
+        require(recipient_ != address(0), "ETH Transfer failed: recipient address is zero");
+        require(amount_ >= 0, "ETH Transfer failed: amount is zero");
         recipient_.transfer(amount_);
+
+        emit LogAdminTransferEth(recipient_, amount_);
     }
 }
