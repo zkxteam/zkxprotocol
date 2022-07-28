@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, L1_address_dummy
 
 signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
@@ -20,17 +20,17 @@ async def adminAuth_factory():
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0, 1, 0]
+        constructor_calldata=[signer1.public_key, L1_address_dummy, 0, 1, 1]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0, 1, 0]
+        constructor_calldata=[signer2.public_key, L1_address_dummy, 0, 1, 1]
     )
 
     user1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, 0, 1, 0]
+        constructor_calldata=[signer3.public_key, L1_address_dummy, 0, 1, 1]
     )
 
     adminAuth = await starknet.deploy(
