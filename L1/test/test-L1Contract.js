@@ -229,7 +229,7 @@ describe('Asset management', function () {
     // When
     await expect(
       L1ZKXContract.updateAssetListInL1(ETH_ASSET.ticker, ETH_ASSET.collateralID)
-    ).to.be.revertedWith("Failed to add asset: uint256 already exists");
+    ).to.be.revertedWith("Failed to add asset: Ticker already exists");
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();
@@ -246,7 +246,7 @@ describe('Asset management', function () {
     // When
     await expect(
       L1ZKXContract.updateAssetListInL1(ZKX_ASSET.ticker, ZKX_ASSET.collateralID)
-    ).to.be.revertedWith("Failed to add asset: uint256 already exists");
+    ).to.be.revertedWith("Failed to add asset: Ticker already exists");
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();

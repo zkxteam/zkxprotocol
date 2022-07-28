@@ -68,32 +68,30 @@ contract L1ZKXContract is Ownable {
         uint256 collateralID;
     }
 
-    // The StarkNet core contract
+    /// The StarkNet core contract
     IStarknetCore public starknetCore;
 
-    // List of assets tickers
+    /// List of assets tickers
     uint256[] public assetList;
 
-    // Assets by ticker
-    mapping(uint256 => Asset) private assetsByTicker;
-
-    // L2 ZKX AssetContract address
+    /// L2 ZKX AssetContract address
     uint256 public assetContractAddress;
 
-    // L2 ZKX WithdrawalRequestContract address
+    /// L2 ZKX WithdrawalRequestContract address
     uint256 public withdrawalRequestContractAddress;
 
-    /**
-      Modifier to verify valid L2 address.
-    */
+    /// Assets by ticker
+    mapping(uint256 => Asset) private assetsByTicker;
+
+    /// Modifier to verify valid L2 address.
     modifier isValidL2Address(uint256 l2Address_) {
         require(l2Address_ != 0 && l2Address_ < FIELD_PRIME, "L2_ADDRESS_OUT_OF_RANGE");
         _;
     }
 
-    /**
-      Initializes the contract state.
-    */
+    /// @param starknetCore_ StarknetCore contract address used for L1-to-L2 messaging
+    /// @param assetContractAddress_ L2 ZKX AssetContract address
+    /// @param withdrawalRequestContractAddress_ L2 ZKX WithdrawalReuqestContract address
     constructor(
         IStarknetCore starknetCore_,
         uint256 assetContractAddress_,
@@ -114,26 +112,16 @@ contract L1ZKXContract is Ownable {
         );
     }
 
-    function tokenContractAddress(uint256 ticker_) external view returns (address) {
-        return assetsByTicker[ticker_].tokenAddress;
-    }
-
-    function assetID(uint256 ticker_) external view returns (uint256) {
-        return assetsByTicker[ticker_].collateralID;
-    }
-
-    /**
-     * @dev function to update asset list in L1
-     * @param ticker_ - felt representation of the ticker
-     * @param assetId_ - Id of the asset created
-     **/
+    /// @dev function to update asset list in L1
+    /// @param ticker_ - felt representation of the ticker
+    /// @param assetId_ - Id of the asset created
     function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
         external
         onlyOwner
     {   
         require(
             assetsByTicker[ticker_].exists == false,
-            "Failed to add asset: uint256 already exists"
+            "Failed to add asset: Ticker already exists"
         );
         // Construct the update asset list message's payload.
         uint256[] memory payload = new uint256[](3);
@@ -156,11 +144,9 @@ contract L1ZKXContract is Ownable {
         emit LogAssetListUpdated(ticker_, assetId_);
     }
 
-    /**
-     * @dev function to remove asset from list in L1
-     * @param ticker_ - felt representation of the ticker
-     * @param assetId_ - Id of the asset to be removed
-     **/
+    /// @dev function to remove asset from list in L1
+    /// @param ticker_ - felt representation of the ticker
+    /// @param assetId_ - Id of the asset to be removed
     function removeAssetFromList(uint256 ticker_, uint256 assetId_)
         external
         onlyOwner
@@ -196,18 +182,27 @@ contract L1ZKXContract is Ownable {
         emit LogAssetRemovedFromList(ticker_, assetId_);
     }
 
-    /**
-     * @dev function to get the list of available assets
-     **/
+    /// @dev Function to get the list of available assets
+    /// @return List of available asset tickers
     function getAssetList() external view returns (uint256[] memory) {
         return assetList;
     }
 
-    /**
-     * @dev function to set token contract address
-     * @param ticker_ - felt representation of the ticker
-     * @param tokenContractAddress_ - address of the token contract
-     **/
+    /// @dev Function to get asset contract address by its ticker
+    /// @return Token contract address
+    function tokenContractAddress(uint256 ticker_) external view returns (address) {
+        return assetsByTicker[ticker_].tokenAddress;
+    }
+
+    /// @dev Function to get asset ID by its ticker
+    /// @return Asset collateral ID
+    function assetID(uint256 ticker_) external view returns (uint256) {
+        return assetsByTicker[ticker_].collateralID;
+    }
+
+    /// @dev function to set token contract address
+    /// @param ticker_ - felt representation of the ticker
+    /// @param tokenContractAddress_ - address of the token contract
     function setTokenContractAddress(
         uint256 ticker_,
         address tokenContractAddress_
@@ -229,10 +224,8 @@ contract L1ZKXContract is Ownable {
         emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
     }
 
-    /**
-     * @dev function to set asset contract address
-     * @param assetContractAddress_ - address of the asset contract
-     **/
+    /// @dev function to set asset contract address
+    /// @param assetContractAddress_ - address of the asset contract
     function setAssetContractAddress(uint256 assetContractAddress_)
         external
         onlyOwner
@@ -245,10 +238,8 @@ contract L1ZKXContract is Ownable {
         assetContractAddress = assetContractAddress_;   
     }
 
-    /**
-     * @dev function to set withdrawal request contract address
-     * @param withdrawalRequestAddress_ - address of withdrawal request contract
-     **/
+    /// @dev function to set withdrawal request contract address
+    /// @param withdrawalRequestAddress_ - address of withdrawal request contract
     function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
         external
         onlyOwner
@@ -261,13 +252,11 @@ contract L1ZKXContract is Ownable {
         withdrawalRequestContractAddress = withdrawalRequestAddress_;
     }
 
-    /**
-     * @dev function to deposit funds to L2 Account contract
-     * @param userL1Address_ - L1 user address
-     * @param userL2Address_ - L2 address of user's ZKX account
-     * @param collateralId_ - ID of the collateral
-     * @param amount_ - The amount of tokens to be deposited
-     **/
+    /// @dev function to deposit funds to L2 Account contract
+    /// @param userL1Address_ - L1 user address
+    /// @param userL2Address_ - L2 address of user's ZKX account
+    /// @param collateralId_ - ID of the collateral
+    /// @param amount_ - The amount of tokens to be deposited
     function depositToL2(
         uint256 userL1Address_,
         uint256 userL2Address_,
@@ -297,12 +286,10 @@ contract L1ZKXContract is Ownable {
         );
     }
 
-    /**
-     * @dev function to deposit funds to L1ZKX contract
-     * @param userL2Address_ - The L2 account address of the user
-     * @param ticker_ - felt representation of the ticker
-     * @param amount_ - The amount of collateral to be deposited
-     **/
+    /// @dev function to deposit funds to L1ZKX contract
+    /// @param userL2Address_ - The L2 account address of the user
+    /// @param ticker_ - felt representation of the ticker
+    /// @param amount_ - The amount of collateral to be deposited
     function depositToL1(
         uint256 userL2Address_,
         uint256 ticker_,
@@ -334,10 +321,8 @@ contract L1ZKXContract is Ownable {
         );
     }
 
-    /**
-     * @dev function to deposit ETH to L1ZKX contract
-     * @param userL2Address_ - The L2 account address of the user
-     **/
+    /// @dev function to deposit ETH to L1ZKX contract
+    /// @param userL2Address_ - The L2 account address of the user
     function depositEthToL1(uint256 userL2Address_) 
         payable 
         external 
@@ -355,14 +340,12 @@ contract L1ZKXContract is Ownable {
         );
     }
 
-    /**
-     * @dev function to withdraw funds from an L2 Account contract
-     * @param userL1Address_ - User's L1 Account address
-     * @param userL2Address_ - User's L2 Account address
-     * @param ticker_ - felt representation of the ticker
-     * @param amount_ - The amount of tokens to be withdrawn
-     * @param requestId_ - ID of the withdrawal request
-     **/
+    /// @dev function to withdraw funds from an L2 Account contract
+    /// @param userL1Address_ - User's L1 Account address
+    /// @param userL2Address_ - User's L2 Account address
+    /// @param ticker_ - felt representation of the ticker
+    /// @param amount_ - The amount of tokens to be withdrawn
+    /// @param requestId_ - ID of the withdrawal request
     function withdraw(
         address userL1Address_,
         uint256 userL2Address_,
@@ -404,13 +387,11 @@ contract L1ZKXContract is Ownable {
         emit LogWithdrawal(userL1Address_, ticker_, amount_, requestId_, msgHash);
     }
 
-    /**
-     * @dev function to withdraw funds from an L2 Account contract
-     * @param userL1Address_ - User's L1 Account address
-     * @param userL2Address_ - User's L2 Account address
-     * @param amount_ - The amount of tokens to be withdrawn
-     * @param requestId_ - ID of the withdrawal request
-     **/
+    /// @dev function to withdraw funds from an L2 Account contract
+    /// @param userL1Address_ - User's L1 Account address
+    /// @param userL2Address_ - User's L2 Account address
+    /// @param amount_ - The amount of tokens to be withdrawn
+    /// @param requestId_ - ID of the withdrawal request
     function withdrawEth(
         address userL1Address_,
         uint256 userL2Address_,
@@ -452,12 +433,10 @@ contract L1ZKXContract is Ownable {
         emit LogWithdrawal(userL1Address_, ETH_TICKER, amount_, requestId_, msgHash);
     }
 
-     /**
-     * @dev function to transfer funds from this contract to another address
-     * @param recipient_ - address of the recipient
-     * @param amount_ - amount that needs to be transferred
-     * @param tokenAddress_ - address of the token contract
-     **/
+    /// @dev function to transfer funds from this contract to another address
+    /// @param recipient_ - address of the recipient
+    /// @param amount_ - amount that needs to be transferred
+    /// @param tokenAddress_ - address of the token contract
     function transferFunds(address recipient_, uint256 amount_, address tokenAddress_)
         external
         onlyOwner
@@ -469,11 +448,9 @@ contract L1ZKXContract is Ownable {
         emit LogAdminTransferFunds(recipient_, amount_, tokenAddress_);
     }
 
-    /**
-     * @dev function to transfer funds from this contract to another address
-     * @param recipient_ - address of the recipient
-     * @param amount_ - amount that needs to be transferred
-     **/
+    /// @dev function to transfer funds from this contract to another address
+    /// @param recipient_ - address of the recipient
+    /// @param amount_ - amount that needs to be transferred
     function transferEth(address payable recipient_, uint256 amount_)
         external
         onlyOwner
