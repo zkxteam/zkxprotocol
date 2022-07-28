@@ -12,9 +12,6 @@ contract L1ZKXContract is Ownable {
 
     using SafeERC20 for IERC20;
 
-    type Ticker is uint256;
-    Ticker constant ETH_TICKER = Ticker.wrap(ETH_TICKER_VALUE);
-
     event LogContractInitialized(
         IStarknetCore starknetCore,
         uint256 assetContractAddress,
@@ -31,18 +28,18 @@ contract L1ZKXContract is Ownable {
 
     event LogWithdrawal(
         address indexed recipient,
-        Ticker indexed ticker,
+        uint256 indexed ticker,
         uint256 amount,
         uint256 requestId,
         bytes32 msgHash
     );
 
-    event LogAssetListUpdated(Ticker ticker, uint256 collateralId);
+    event LogAssetListUpdated(uint256 ticker, uint256 collateralId);
 
-    event LogAssetRemovedFromList(Ticker ticker, uint256 collateralId);
+    event LogAssetRemovedFromList(uint256 ticker, uint256 collateralId);
 
     event LogTokenContractAddressUpdated(
-        Ticker indexed ticker,
+        uint256 indexed ticker,
         address indexed tokenContractAddress
     );
 
@@ -75,10 +72,10 @@ contract L1ZKXContract is Ownable {
     IStarknetCore public starknetCore;
 
     // List of assets tickers
-    Ticker[] public assetList;
+    uint256[] public assetList;
 
     // Assets by ticker
-    mapping(Ticker => Asset) private assetsByTicker;
+    mapping(uint256 => Asset) private assetsByTicker;
 
     // L2 ZKX AssetContract address
     uint256 public assetContractAddress;
@@ -117,11 +114,11 @@ contract L1ZKXContract is Ownable {
         );
     }
 
-    function tokenContractAddress(Ticker ticker_) external view returns (address) {
+    function tokenContractAddress(uint256 ticker_) external view returns (address) {
         return assetsByTicker[ticker_].tokenAddress;
     }
 
-    function assetID(Ticker ticker_) external view returns (uint256) {
+    function assetID(uint256 ticker_) external view returns (uint256) {
         return assetsByTicker[ticker_].collateralID;
     }
 
@@ -130,18 +127,18 @@ contract L1ZKXContract is Ownable {
      * @param ticker_ - felt representation of the ticker
      * @param assetId_ - Id of the asset created
      **/
-    function updateAssetListInL1(Ticker ticker_, uint256 assetId_)
+    function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
         external
         onlyOwner
     {   
         require(
             assetsByTicker[ticker_].exists == false,
-            "Failed to add asset: Ticker already present"
+            "Failed to add asset: uint256 already exists"
         );
         // Construct the update asset list message's payload.
         uint256[] memory payload = new uint256[](3);
         payload[0] = ADD_ASSET_INDEX;
-        payload[1] = Ticker.unwrap(ticker_);
+        payload[1] = ticker_;
         payload[2] = assetId_;
 
         // Consume the message from the StarkNet core contract.
@@ -164,7 +161,7 @@ contract L1ZKXContract is Ownable {
      * @param ticker_ - felt representation of the ticker
      * @param assetId_ - Id of the asset to be removed
      **/
-    function removeAssetFromList(Ticker ticker_, uint256 assetId_)
+    function removeAssetFromList(uint256 ticker_, uint256 assetId_)
         external
         onlyOwner
     {
@@ -173,24 +170,23 @@ contract L1ZKXContract is Ownable {
         // Prepare asset to remove
         Asset storage assetToRemove = assetsByTicker[ticker_];
         uint256 toRemoveIndex = assetToRemove.index;
-        Ticker toRemoveTicker = assetList[toRemoveIndex];
         require(assetToRemove.exists, "Failed to remove non-existing asset");
         
         // Prepare asset for swap
         uint256 lastAssetIndex = assetList.length - 1;
-        Ticker lastAssetTicker = assetList[lastAssetIndex];
+        uint256 lastAssetTicker = assetList[lastAssetIndex];
         Asset storage lastAsset = assetsByTicker[lastAssetTicker];
 
         // Swap and delete last
         lastAsset.index = toRemoveIndex;
-        assetList[toRemoveIndex] = toRemoveTicker;
+        assetList[toRemoveIndex] = lastAssetTicker;
         assetList.pop();
         delete assetsByTicker[ticker_];
 
         // Construct the remove asset message's payload.
         uint256[] memory payload = new uint256[](3);
         payload[0] = REMOVE_ASSET_INDEX;
-        payload[1] = Ticker.unwrap(ticker_);
+        payload[1] = ticker_;
         payload[2] = assetId_;
 
         // Consume the message from the StarkNet core contract.
@@ -203,7 +199,7 @@ contract L1ZKXContract is Ownable {
     /**
      * @dev function to get the list of available assets
      **/
-    function getAssetList() external view returns (Ticker[] memory) {
+    function getAssetList() external view returns (uint256[] memory) {
         return assetList;
     }
 
@@ -213,7 +209,7 @@ contract L1ZKXContract is Ownable {
      * @param tokenContractAddress_ - address of the token contract
      **/
     function setTokenContractAddress(
-        Ticker ticker_,
+        uint256 ticker_,
         address tokenContractAddress_
     ) 
         external 
@@ -309,7 +305,7 @@ contract L1ZKXContract is Ownable {
      **/
     function depositToL1(
         uint256 userL2Address_,
-        Ticker ticker_,
+        uint256 ticker_,
         uint256 amount_
     ) 
         external 
@@ -370,7 +366,7 @@ contract L1ZKXContract is Ownable {
     function withdraw(
         address userL1Address_,
         uint256 userL2Address_,
-        Ticker ticker_,
+        uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
     ) external {
@@ -383,7 +379,7 @@ contract L1ZKXContract is Ownable {
         uint256[] memory withdrawal_payload = new uint256[](5);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
         withdrawal_payload[1] = uint256(uint160(userL1Address_));
-        withdrawal_payload[2] = Ticker.unwrap(ticker_);
+        withdrawal_payload[2] = ticker_;
         withdrawal_payload[3] = amount_;
         withdrawal_payload[4] = requestId_;
 
@@ -431,7 +427,7 @@ contract L1ZKXContract is Ownable {
         uint256[] memory withdrawal_payload = new uint256[](5);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
         withdrawal_payload[1] = uint256(uint160(userL1Address_));
-        withdrawal_payload[2] = ETH_TICKER_VALUE;
+        withdrawal_payload[2] = ETH_TICKER;
         withdrawal_payload[3] = amount_;
         withdrawal_payload[4] = requestId_;
 
