@@ -22,14 +22,16 @@ contract L1ZKXContract is Ownable {
         address indexed sender,
         uint256 amount,
         uint256 indexed collateralId,
-        uint256 indexed l2Recipient
+        uint256 indexed l2Recipient,
+        bytes32 msgHash
     );
 
     event LogWithdrawal(
         address indexed recipient,
         uint256 indexed ticker,
         uint256 amount,
-        uint256 requestId
+        uint256 requestId,
+        bytes32 msgHash
     );
 
     event LogAssetListUpdated(uint256 ticker, uint256 collateralId);
@@ -245,7 +247,7 @@ contract L1ZKXContract is Ownable {
         depositPayload[2] = collateralId_;
 
         // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(
+        bytes32 msgHash = starknetCore.sendMessageToL2(
             userL2Address_,
             DEPOSIT_SELECTOR,
             depositPayload
@@ -255,7 +257,8 @@ contract L1ZKXContract is Ownable {
             msg.sender,
             amount_,
             collateralId_,
-            userL2Address_
+            userL2Address_,
+            msgHash
         );
     }
 
@@ -345,7 +348,7 @@ contract L1ZKXContract is Ownable {
         updateWithdrawalRequestPayload[1] = requestId_;
 
         // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(
+        bytes32 msgHash = starknetCore.sendMessageToL2(
             withdrawalRequestContractAddress,
             UPDATE_WITHDRAWAL_REQUEST_SELECTOR,
             updateWithdrawalRequestPayload
@@ -354,7 +357,7 @@ contract L1ZKXContract is Ownable {
         address tokenContract = tokenContractAddress[ticker_];
         IERC20(tokenContract).safeTransfer(msg.sender, amount_);
 
-        emit LogWithdrawal(msg.sender, ticker_, amount_, requestId_);
+        emit LogWithdrawal(msg.sender, ticker_, amount_, requestId_, msgHash);
     }
 
     /**
@@ -387,7 +390,7 @@ contract L1ZKXContract is Ownable {
         updateWithdrawalRequestPayload[1] = requestId_;
 
         // Send the message to the StarkNet core contract.
-        starknetCore.sendMessageToL2(
+        bytes32 msgHash = starknetCore.sendMessageToL2(
             withdrawalRequestContractAddress,
             UPDATE_WITHDRAWAL_REQUEST_SELECTOR,
             updateWithdrawalRequestPayload
@@ -395,7 +398,7 @@ contract L1ZKXContract is Ownable {
 
         payable(msg.sender).transfer(amount_);
 
-        emit LogWithdrawal(msg.sender, ETH_TICKER, amount_, requestId_);
+        emit LogWithdrawal(msg.sender, ETH_TICKER, amount_, requestId_, msgHash);
     }
 
      /**
