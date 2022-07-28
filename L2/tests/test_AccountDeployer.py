@@ -9,6 +9,7 @@ from starkware.starknet.core.os.class_hash import compute_class_hash
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 from starkware.starknet.services.api.contract_class import ContractClass
 from starkware.starknet.testing.contract import StarknetContract
+
 signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
 signer3 = Signer(12345)
@@ -23,8 +24,6 @@ def event_loop():
 @pytest.fixture(scope='module')
 async def adminAuth_factory():
     starknet = await Starknet.empty()
-
-    
 
     # a contract definition has to be declared before we can use class hash
     dec_class = await starknet.declare("contracts/Account.cairo")

@@ -8,6 +8,9 @@ from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -17,14 +20,15 @@ def event_loop():
 @pytest.fixture(scope='module')
 async def adminAuth_factory():
     starknet = await Starknet.empty()
+
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0, 1, 0]
+        constructor_calldata=[signer1.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0, 1, 0]
+        constructor_calldata=[signer2.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     adminAuth = await starknet.deploy(
