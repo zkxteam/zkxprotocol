@@ -149,9 +149,10 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             liquidator_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 
