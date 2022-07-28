@@ -82,15 +82,15 @@ describe('Deposits', function () {
     // Rogue can't withdraw Alice's funds
     const rogueContract = L1ZKXContract.connect(rogue)
     await expect(
-      rogueContract.withdrawEth(ROGUE_L2_ADDRESS, withdrawalAmount, requestID)
+      rogueContract.withdrawEth(rogue.address, ROGUE_L2_ADDRESS, withdrawalAmount, requestID)
     ).to.be.revertedWith('INVALID_MESSAGE_TO_CONSUME')
 
     await expect(
-      rogueContract.withdrawEth(ALICE_L2_ADDRESS, withdrawalAmount, requestID)
+      rogueContract.withdrawEth(rogue.address, ALICE_L2_ADDRESS, withdrawalAmount, requestID)
     ).to.be.revertedWith('INVALID_MESSAGE_TO_CONSUME')
     
     // Alice successfully withdraws funds
-    await aliceContract.withdrawEth(ALICE_L2_ADDRESS, withdrawalAmount, requestID);
+    await aliceContract.withdrawEth(alice.address, ALICE_L2_ADDRESS, withdrawalAmount, requestID);
     // Withdrawal should consume 1 message from L2
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(1);
     // Withdrawal should send a message to L2
@@ -155,15 +155,15 @@ describe('Deposits', function () {
     // Rogue can't withdraw Alice's funds
     const rogueContract = L1ZKXContract.connect(rogue)
     await expect(
-      rogueContract.withdraw(ROGUE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID)
+      rogueContract.withdraw(rogue.address, ROGUE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID)
     ).to.be.revertedWith('INVALID_MESSAGE_TO_CONSUME')
 
     await expect(
-      rogueContract.withdraw(ALICE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID)
+      rogueContract.withdraw(rogue.address, ALICE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID)
     ).to.be.revertedWith('INVALID_MESSAGE_TO_CONSUME')
     
     // Alice successfully withdraws funds
-    await aliceContract.withdraw(ALICE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID);
+    await aliceContract.withdraw(alice.address, ALICE_L2_ADDRESS, ZKX_TICKER, withdrawalAmount, requestID);
     // Withdrawal should consume 1 message from L2
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(2);
     // Withdrawal should send a message to L2

@@ -318,12 +318,14 @@ contract L1ZKXContract is Ownable {
 
     /**
      * @dev function to withdraw funds from an L2 Account contract
-     * @param userL2Address_ - Users L2 Account address
+     * @param userL1Address_ - User's L1 Account address
+     * @param userL2Address_ - User's L2 Account address
      * @param ticker_ - felt representation of the ticker
      * @param amount_ - The amount of tokens to be withdrawn
      * @param requestId_ - ID of the withdrawal request
      **/
     function withdraw(
+        address userL1Address_,
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_,
@@ -333,7 +335,7 @@ contract L1ZKXContract is Ownable {
         // Construct withdrawal message payload.
         uint256[] memory withdrawal_payload = new uint256[](5);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
-        withdrawal_payload[1] = uint256(uint160(msg.sender));
+        withdrawal_payload[1] = uint256(uint160(userL1Address_));
         withdrawal_payload[2] = ticker_;
         withdrawal_payload[3] = amount_;
         withdrawal_payload[4] = requestId_;
@@ -355,18 +357,20 @@ contract L1ZKXContract is Ownable {
         );
 
         address tokenContract = tokenContractAddress[ticker_];
-        IERC20(tokenContract).safeTransfer(msg.sender, amount_);
+        IERC20(tokenContract).safeTransfer(userL1Address_, amount_);
 
-        emit LogWithdrawal(msg.sender, ticker_, amount_, requestId_, msgHash);
+        emit LogWithdrawal(userL1Address_, ticker_, amount_, requestId_, msgHash);
     }
 
     /**
      * @dev function to withdraw funds from an L2 Account contract
-     * @param userL2Address_ - Users L2 Account address
+     * @param userL1Address_ - User's L1 Account address
+     * @param userL2Address_ - User's L2 Account address
      * @param amount_ - The amount of tokens to be withdrawn
      * @param requestId_ - ID of the withdrawal request
      **/
     function withdrawEth(
+        address userL1Address_,
         uint256 userL2Address_,
         uint256 amount_,
         uint256 requestId_
@@ -375,7 +379,7 @@ contract L1ZKXContract is Ownable {
         // Construct withdrawal message payload.
         uint256[] memory withdrawal_payload = new uint256[](5);
         withdrawal_payload[0] = WITHDRAWAL_INDEX;
-        withdrawal_payload[1] = uint256(uint160(msg.sender));
+        withdrawal_payload[1] = uint256(uint160(userL1Address_));
         withdrawal_payload[2] = ETH_TICKER;
         withdrawal_payload[3] = amount_;
         withdrawal_payload[4] = requestId_;
@@ -396,9 +400,9 @@ contract L1ZKXContract is Ownable {
             updateWithdrawalRequestPayload
         );
 
-        payable(msg.sender).transfer(amount_);
+        payable(userL1Address_).transfer(amount_);
 
-        emit LogWithdrawal(msg.sender, ETH_TICKER, amount_, requestId_, msgHash);
+        emit LogWithdrawal(userL1Address_, ETH_TICKER, amount_, requestId_, msgHash);
     }
 
      /**
