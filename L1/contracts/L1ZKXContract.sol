@@ -19,15 +19,15 @@ contract L1ZKXContract is Ownable {
     );
 
     event LogDeposit(
-        address sender,
+        address indexed sender,
         uint256 amount,
-        uint256 collateralId,
-        uint256 l2Recipient
+        uint256 indexed collateralId,
+        uint256 indexed l2Recipient
     );
 
     event LogWithdrawal(
-        address recipient,
-        uint256 ticker,
+        address indexed recipient,
+        uint256 indexed ticker,
         uint256 amount,
         uint256 requestId
     );
@@ -37,8 +37,8 @@ contract L1ZKXContract is Ownable {
     event LogAssetRemovedFromList(uint256 ticker, uint256 collateralId);
 
     event LogTokenContractAddressUpdated(
-        uint256 ticker,
-        address tokenContractAddresses
+        uint256 indexed ticker,
+        address indexed tokenContractAddresses
     );
 
     event LogAssetContractAddressChanged(
