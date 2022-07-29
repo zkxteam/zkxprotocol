@@ -25,9 +25,9 @@ const ZKX_ASSET = {
   collateralID: 90986567876
 }
 
-const ASSET_1 = { ticker: 123, collateralID: 90001 }
-const ASSET_2 = { ticker: 234, collateralID: 90002 }
-const ASSET_3 = { ticker: 345, collateralID: 90003 }
+const ASSET_1 = { ticker: 123, collateralID: 90001, tokenAddress: "0x1111111111111111111111111111111111111111" }
+const ASSET_2 = { ticker: 234, collateralID: 90002, tokenAddress: "0x2222222222222222222222222222222222222222" }
+const ASSET_3 = { ticker: 345, collateralID: 90003, tokenAddress: "0x3333333333333333333333333333333333333333" }
 
 const INDEX = {
   ADD_ASSET: 1,
@@ -290,6 +290,9 @@ describe('Asset management', function () {
     await L1ZKXContract.updateAssetListInL1(ASSET_1.ticker, ASSET_1.collateralID);
     await L1ZKXContract.updateAssetListInL1(ASSET_2.ticker, ASSET_2.collateralID);
     await L1ZKXContract.updateAssetListInL1(ASSET_3.ticker, ASSET_3.collateralID);
+    await L1ZKXContract.setTokenContractAddress(ASSET_1.ticker, ASSET_1.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_2.ticker, ASSET_2.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_3.ticker, ASSET_3.tokenAddress);
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
@@ -301,9 +304,16 @@ describe('Asset management', function () {
     expect(assetList.length).to.be.eq(2);
     expect(assetList[0]).to.be.eq(ASSET_3.ticker);
     expect(assetList[1]).to.be.eq(ASSET_2.ticker);
+
+    // Check asset IDs
     expect(await L1ZKXContract.assetID(ASSET_1.ticker)).to.be.eq(0);
     expect(await L1ZKXContract.assetID(ASSET_2.ticker)).to.be.eq(ASSET_2.collateralID);
     expect(await L1ZKXContract.assetID(ASSET_3.ticker)).to.be.eq(ASSET_3.collateralID);
+
+    // Check token addresses
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.ticker)).to.be.eq(ZERO_ADDRESS);
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.ticker)).to.be.eq(ASSET_2.tokenAddress);
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.ticker)).to.be.eq(ASSET_3.tokenAddress);
   })
 
   it("Add 3 assets, then remove middle", async function () {
@@ -316,6 +326,9 @@ describe('Asset management', function () {
     await L1ZKXContract.updateAssetListInL1(ASSET_1.ticker, ASSET_1.collateralID);
     await L1ZKXContract.updateAssetListInL1(ASSET_2.ticker, ASSET_2.collateralID);
     await L1ZKXContract.updateAssetListInL1(ASSET_3.ticker, ASSET_3.collateralID);
+    await L1ZKXContract.setTokenContractAddress(ASSET_1.ticker, ASSET_1.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_2.ticker, ASSET_2.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_3.ticker, ASSET_3.tokenAddress);
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
@@ -327,9 +340,16 @@ describe('Asset management', function () {
     expect(assetList.length).to.be.eq(2);
     expect(assetList[0]).to.be.eq(ASSET_1.ticker);
     expect(assetList[1]).to.be.eq(ASSET_3.ticker);
+
+    // Check asset IDs
     expect(await L1ZKXContract.assetID(ASSET_1.ticker)).to.be.eq(ASSET_1.collateralID);
     expect(await L1ZKXContract.assetID(ASSET_2.ticker)).to.be.eq(0);
     expect(await L1ZKXContract.assetID(ASSET_3.ticker)).to.be.eq(ASSET_3.collateralID);
+
+    // Check token addresses
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.ticker)).to.be.eq(ASSET_1.tokenAddress);
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.ticker)).to.be.eq(ZERO_ADDRESS);
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.ticker)).to.be.eq(ASSET_3.tokenAddress);
   })
 
   it("Add 3 assets, then remove last", async function () {
@@ -342,6 +362,9 @@ describe('Asset management', function () {
     await L1ZKXContract.updateAssetListInL1(ASSET_1.ticker, ASSET_1.collateralID);
     await L1ZKXContract.updateAssetListInL1(ASSET_2.ticker, ASSET_2.collateralID);
     await L1ZKXContract.updateAssetListInL1(ASSET_3.ticker, ASSET_3.collateralID);
+    await L1ZKXContract.setTokenContractAddress(ASSET_1.ticker, ASSET_1.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_2.ticker, ASSET_2.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_3.ticker, ASSET_3.tokenAddress);
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
@@ -353,9 +376,16 @@ describe('Asset management', function () {
     expect(assetList.length).to.be.eq(2);
     expect(assetList[0]).to.be.eq(ASSET_1.ticker);
     expect(assetList[1]).to.be.eq(ASSET_2.ticker);
+
+    // Check asset IDs
     expect(await L1ZKXContract.assetID(ASSET_1.ticker)).to.be.eq(ASSET_1.collateralID);
     expect(await L1ZKXContract.assetID(ASSET_2.ticker)).to.be.eq(ASSET_2.collateralID);
     expect(await L1ZKXContract.assetID(ASSET_3.ticker)).to.be.eq(0);
+
+    // Check token addresses
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.ticker)).to.be.eq(ASSET_1.tokenAddress);
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.ticker)).to.be.eq(ASSET_2.tokenAddress);
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.ticker)).to.be.eq(ZERO_ADDRESS);
   })
 })
 
