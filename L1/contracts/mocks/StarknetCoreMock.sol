@@ -60,4 +60,9 @@ contract StarknetCoreMock is IStarknetCore {
         l2ToL1Messages[msgHash] += 1;
         return msgHash;
     }
+
+    function resetCounters() external {
+        invokedSendMessageToL2Count = 0;
+        invokedConsumeMessageFromL2Count = 0;
+    }
 }
