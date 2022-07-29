@@ -70,7 +70,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     }
 
     /// The StarkNet core contract
-    IStarknetCore public starknetCore;
+    IStarknetCore immutable public starknetCore;
 
     /// List of assets tickers
     uint256[] public assetList;
