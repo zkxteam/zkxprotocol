@@ -30,6 +30,8 @@ TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -41,12 +43,12 @@ async def adminAuth_factory():
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, 0, 1, 0]
+        constructor_calldata=[admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin2_signer.public_key, 0, 1, 0]
+        constructor_calldata=[admin2_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     adminAuth = await starknet.deploy(
@@ -92,9 +94,10 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             alice_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 
@@ -102,19 +105,21 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             bob_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
-
+    
     charlie = await starknet.deploy(
         "contracts/Account.cairo",
         constructor_calldata=[
             charlie_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 
@@ -122,9 +127,10 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             daniel_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 
@@ -132,9 +138,10 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             eduard_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 
@@ -142,9 +149,10 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             liquidator_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 

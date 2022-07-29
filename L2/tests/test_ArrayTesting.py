@@ -8,6 +8,8 @@ from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 
 signer1 = Signer(123456789987654321)
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -19,7 +21,7 @@ async def contract_factory():
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0, 1, 0]
+        constructor_calldata=[signer1.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     arrayTesting = await starknet.deploy(

@@ -11,6 +11,8 @@ admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
 alice_signer = Signer(123456789987654323)
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
 
 def convertTo64x61(nums):
     for i in range(len(nums)):
@@ -31,17 +33,17 @@ async def abr_factory():
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, 0, 1, 0]
+        constructor_calldata=[admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin2_signer.public_key, 0, 1, 0]
+        constructor_calldata=[admin2_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     alice = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[alice_signer.public_key, 0, 1, 0]
+        constructor_calldata=[alice_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     adminAuth = await starknet.deploy(
