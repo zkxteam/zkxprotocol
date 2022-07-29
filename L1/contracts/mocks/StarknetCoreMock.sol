@@ -130,5 +130,6 @@ contract StarknetCoreMock is IStarknetCore {
     function resetCounters() external {
         invokedSendMessageToL2Count = 0;
         invokedConsumeMessageFromL2Count = 0;
+        invokedCancelMessageToL2Count = 0;
     }
 }

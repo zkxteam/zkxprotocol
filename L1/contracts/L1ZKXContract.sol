@@ -289,7 +289,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 userL1Address_,
         uint256 amount_,
         uint256 collateralId_
-    ) private returns (uint256[] memory) {
+    ) private pure returns (uint256[] memory) {
         uint256[] memory payload = new uint256[](3);
         payload[0] = userL1Address_;
         payload[1] = amount_;
@@ -307,7 +307,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
-    ) private returns (uint256[] memory) {
+    ) private pure returns (uint256[] memory) {
         uint256[] memory payload = new uint256[](5);
         payload[0] = WITHDRAWAL_INDEX;
         payload[1] = userL1Address_;
@@ -545,29 +545,30 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     }
 
     /// @dev function to cancel deposit funds to L2 Account contract
-    /// @param userL1Address_ - L1 user address
     /// @param userL2Address_ - L2 address of user's ZKX account
     /// @param ticker_ - felt representation of the ticker
     /// @param amount_ - The amount of tokens to be deposited
     /// @param nonce_ - L1 to L2 deposit message nonce
     function depositCancelRequest(
-        uint256 userL1Address_,
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_,
         uint256 nonce_
     ) external {
         Asset memory asset = assetsByTicker[ticker_];
-        uint256 user = uint256(uint160(address(msg.sender)));
         require(
-            user == userL1Address_,
-            "Deposit Cancel Request failed: Unauthorized cancel request initiation"
+            asset.exists,
+            "Failed to initiate deposit cancel request: non-registered asset"
         );
 
         starknetCore.startL1ToL2MessageCancellation(
             userL2Address_,
             DEPOSIT_SELECTOR,
-            depositMessagePayload(userL1Address_, amount_, asset.collateralID),
+            depositMessagePayload(
+                uint256(uint160(address(msg.sender))),
+                amount_,
+                asset.collateralID
+            ),
             nonce_
         );
 
@@ -581,29 +582,30 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     }
 
     /// @dev function to finalize cancel deposit funds to L2 Account contract
-    /// @param userL1Address_ - L1 user address
     /// @param userL2Address_ - L2 address of user's ZKX account
     /// @param ticker_ - felt representation of the ticker
     /// @param amount_ - The amount of tokens to be deposited
     /// @param nonce_ - L1 to L2 deposit message nonce
     function depositReclaim(
-        uint256 userL1Address_,
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_,
         uint256 nonce_
     ) external {
         Asset memory asset = assetsByTicker[ticker_];
-        uint256 user = uint256(uint160(address(msg.sender)));
         require(
-            user == userL1Address_,
-            "Deposit Reclaim failed: Unauthorized cancel request"
+            asset.exists,
+            "Failed to call deposit reclaim: non-registered asset"
         );
 
         starknetCore.cancelL1ToL2Message(
             userL2Address_,
             DEPOSIT_SELECTOR,
-            depositMessagePayload(userL1Address_, amount_, asset.collateralID),
+            depositMessagePayload(
+                uint256(uint160(address(msg.sender))),
+                amount_,
+                asset.collateralID
+            ),
             nonce_
         );
 
