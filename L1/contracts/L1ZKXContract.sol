@@ -4,11 +4,12 @@ pragma solidity 0.8.14;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./IStarknetCore.sol";
 import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
-contract L1ZKXContract is Ownable {
+contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     using SafeERC20 for IERC20;
 
@@ -118,6 +119,7 @@ contract L1ZKXContract is Ownable {
     function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
         external
         onlyOwner
+        nonReentrant
     {   
         // Add asset
         require(
@@ -149,6 +151,7 @@ contract L1ZKXContract is Ownable {
     function removeAssetFromList(uint256 ticker_, uint256 assetId_)
         external
         onlyOwner
+        nonReentrant
     {
         require(assetList.length > 0, "Nothing to remove");
 
@@ -297,6 +300,7 @@ contract L1ZKXContract is Ownable {
         uint256 amount_
     ) 
         external 
+        nonReentrant
         isValidL2Address(userL2Address_) 
     {   
         // Prepare transfer
@@ -327,6 +331,7 @@ contract L1ZKXContract is Ownable {
     function depositEthToL1(uint256 userL2Address_) 
         payable 
         external 
+        nonReentrant
         isValidL2Address(userL2Address_)
     {
         require(msg.value > 0, "Deposit failed: no value provided");
@@ -353,7 +358,7 @@ contract L1ZKXContract is Ownable {
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
-    ) external {
+    ) external nonReentrant {
 
         Asset memory asset = assetsByTicker[ticker_];
         require(asset.exists, "Withdrawal failed: non-registered asset");
@@ -398,7 +403,7 @@ contract L1ZKXContract is Ownable {
         uint256 userL2Address_,
         uint256 amount_,
         uint256 requestId_
-    ) external {
+    ) external nonReentrant {
         
         require(
             assetsByTicker[ETH_TICKER].exists, 
