@@ -298,8 +298,8 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 amount_
     ) 
         external 
-        nonReentrant 
-        isValidL2Address(userL2Address_)
+        nonReentrant
+        isValidL2Address(userL2Address_) 
     {   
         // Prepare transfer
         Asset memory asset = assetsByTicker[ticker_];
