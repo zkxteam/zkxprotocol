@@ -253,6 +253,17 @@ describe('Asset management', function () {
     expect(assetList.length).to.be.eq(2);
   })
 
+  it("NOT possible to set token address for non-existing asset", async function () {
+    
+    // When
+    await expect(
+      L1ZKXContract.setTokenContractAddress(ZKX_ASSET.ticker, ZKXToken.address)
+    ).to.be.revertedWith("Failed to set token address: non-registered asset");
+
+    // Then
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(ZERO_ADDRESS);
+  })
+
   it("NOT possible to set token address to ZERO", async function () {
     // Given
     await addAsset(ZKX_ASSET);

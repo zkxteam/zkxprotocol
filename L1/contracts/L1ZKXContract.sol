@@ -119,20 +119,11 @@ contract L1ZKXContract is Ownable {
         external
         onlyOwner
     {   
+        // Add asset
         require(
-            assetsByTicker[ticker_].exists == false,
+            assetsByTicker[ticker_].exists == false, 
             "Failed to add asset: Ticker already exists"
         );
-        // Construct the update asset list message's payload.
-        uint256[] memory payload = new uint256[](3);
-        payload[0] = ADD_ASSET_INDEX;
-        payload[1] = ticker_;
-        payload[2] = assetId_;
-
-        // Consume the message from the StarkNet core contract.
-        // This will revert the (Ethereum) transaction if the message does not exist.
-        starknetCore.consumeMessageFromL2(assetContractAddress, payload);
-        
         assetsByTicker[ticker_] = Asset({
             exists: true,
             tokenAddress: address(0),
@@ -140,6 +131,14 @@ contract L1ZKXContract is Ownable {
             collateralID: assetId_
         });
         assetList.push(ticker_);
+
+        // Consume the message from the StarkNet core contract.
+        // This will revert the (Ethereum) transaction if the message does not exist.
+        uint256[] memory payload = new uint256[](3);
+        payload[0] = ADD_ASSET_INDEX;
+        payload[1] = ticker_;
+        payload[2] = assetId_;
+        starknetCore.consumeMessageFromL2(assetContractAddress, payload);
 
         emit LogAssetListUpdated(ticker_, assetId_);
     }
@@ -169,14 +168,12 @@ contract L1ZKXContract is Ownable {
         assetList.pop();
         delete assetsByTicker[ticker_];
 
-        // Construct the remove asset message's payload.
+        // Consume the message from the StarkNet core contract.
+        // This will revert the (Ethereum) transaction if the message does not exist.
         uint256[] memory payload = new uint256[](3);
         payload[0] = REMOVE_ASSET_INDEX;
         payload[1] = ticker_;
         payload[2] = assetId_;
-
-        // Consume the message from the StarkNet core contract.
-        // This will revert the (Ethereum) transaction if the message does not exist.
         starknetCore.consumeMessageFromL2(assetContractAddress, payload);
 
         emit LogAssetRemovedFromList(ticker_, assetId_);
@@ -216,6 +213,10 @@ contract L1ZKXContract is Ownable {
             "Failed to set token address: zero address provided"
         );
         Asset storage asset = assetsByTicker[ticker_];
+        require(
+            asset.exists,
+            "Failed to set token address: non-registered asset"
+        );
         require(
             asset.tokenAddress == address(0), 
             "Failed to set token address: Already set"
