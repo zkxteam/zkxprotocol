@@ -234,7 +234,7 @@ struct DepositData:
 
     member user_L1_address: felt
     member user_L2_address: felt
-    member collateral_id: felt
+    member ticker: felt
     member amount: felt
     member nonce: felt
     member message_hash: felt
