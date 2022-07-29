@@ -1093,7 +1093,63 @@ describe("Deposit Cancellation", function () {
     rogueContract = L1ZKXContract.connect(rogue);
   });
 
-  it("Deposit and then request for cancelling deposit", async function () {
+  it("deposit by one user, cancellation by another user", async function () {
+    await addAsset(ZKX_ASSET);
+    await L1ZKXContract.setTokenContractAddress(
+      ZKX_ASSET.ticker,
+      ZKXToken.address
+    );
+    const amount = 100 * TOKEN_UNIT;
+    await ZKXToken.mint(alice.address, amount);
+    await ZKXToken.connect(alice).approve(L1ZKXContract.address, amount);
+    await starknetCoreMock.resetCounters();
+
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.ticker, amount);
+
+    // Deposit should send a message to L2
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1);
+
+    // Prepare mock for cancelling deposit
+    const nonce = 100;
+    await expect(
+      rogueContract.depositCancelRequest(
+        ALICE_L2_ADDRESS,
+        ZKX_ASSET.ticker,
+        amount,
+        nonce
+      )
+    ).to.be.revertedWith("NO_MESSAGE_TO_CANCEL");
+  });
+
+  it("Trying to finalize cancel without initiating", async function () {
+    await addAsset(ZKX_ASSET);
+    await L1ZKXContract.setTokenContractAddress(
+      ZKX_ASSET.ticker,
+      ZKXToken.address
+    );
+    const amount = 100 * TOKEN_UNIT;
+    await ZKXToken.mint(alice.address, amount);
+    await ZKXToken.connect(alice).approve(L1ZKXContract.address, amount);
+    await starknetCoreMock.resetCounters();
+
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.ticker, amount);
+
+    // Deposit should send a message to L2
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1);
+
+    // Prepare mock for cancelling deposit
+    const nonce = 100;
+    await expect(
+      aliceContract.depositReclaim(
+        ALICE_L2_ADDRESS,
+        ZKX_ASSET.ticker,
+        amount,
+        nonce
+      )
+    ).to.be.revertedWith("MESSAGE_CANCELLATION_NOT_REQUESTED");
+  });
+
+  it("Initiating cancel before Message Cancellation delay is complete", async function () {
     await addAsset(ZKX_ASSET);
     await L1ZKXContract.setTokenContractAddress(
       ZKX_ASSET.ticker,
@@ -1121,5 +1177,54 @@ describe("Deposit Cancellation", function () {
     ).to.emit(L1ZKXContract, "LogDepositCancelRequest");
 
     expect(await starknetCoreMock.invokedCancelMessageToL2Count()).to.be.eq(1);
+
+    await expect(
+      aliceContract.depositReclaim(
+        ALICE_L2_ADDRESS,
+        ZKX_ASSET.ticker,
+        amount,
+        nonce
+      )
+    ).to.be.revertedWith("MESSAGE_CANCELLATION_NOT_ALLOWED_YET");
+  });
+
+  it("Successful Cancellation of deposit", async function () {
+    await addAsset(ZKX_ASSET);
+    await L1ZKXContract.setTokenContractAddress(
+      ZKX_ASSET.ticker,
+      ZKXToken.address
+    );
+    const amount = 100 * TOKEN_UNIT;
+    await ZKXToken.mint(alice.address, amount);
+    await ZKXToken.connect(alice).approve(L1ZKXContract.address, amount);
+    await starknetCoreMock.resetCounters();
+
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.ticker, amount);
+
+    // Deposit should send a message to L2
+    expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1);
+
+    // Prepare mock for cancelling deposit
+    const nonce = 100;
+    await expect(
+      aliceContract.depositCancelRequest(
+        ALICE_L2_ADDRESS,
+        ZKX_ASSET.ticker,
+        amount,
+        nonce
+      )
+    ).to.emit(L1ZKXContract, "LogDepositCancelRequest");
+
+    expect(await starknetCoreMock.invokedCancelMessageToL2Count()).to.be.eq(1);
+    await ethers.provider.send("evm_increaseTime", [600]);
+    await ethers.provider.send("evm_mine");
+    await expect(
+      aliceContract.depositReclaim(
+        ALICE_L2_ADDRESS,
+        ZKX_ASSET.ticker,
+        amount,
+        nonce
+      )
+    ).to.emit(L1ZKXContract, "LogDepositReclaimed");
   });
 });

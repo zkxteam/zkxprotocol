@@ -554,11 +554,11 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 ticker_,
         uint256 amount_,
         uint256 nonce_
-    ) external {
+    ) external nonReentrant {
         Asset memory asset = assetsByTicker[ticker_];
         require(
             asset.exists,
-            "Failed to initiate deposit cancel request: non-registered asset"
+            "Failed to initiate deposit cancel request: non-existing asset"
         );
 
         starknetCore.startL1ToL2MessageCancellation(
@@ -591,11 +591,11 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 ticker_,
         uint256 amount_,
         uint256 nonce_
-    ) external {
+    ) external nonReentrant {
         Asset memory asset = assetsByTicker[ticker_];
         require(
             asset.exists,
-            "Failed to call deposit reclaim: non-registered asset"
+            "Failed to call deposit reclaim: non-existing asset"
         );
 
         starknetCore.cancelL1ToL2Message(
