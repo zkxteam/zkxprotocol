@@ -119,6 +119,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
         external
         onlyOwner
+        nonReentrant
     {   
         // Add asset
         require(
@@ -150,6 +151,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     function removeAssetFromList(uint256 ticker_, uint256 assetId_)
         external
         onlyOwner
+        removeAssetFromList
     {
         require(assetList.length > 0, "Nothing to remove");
 
