@@ -10,6 +10,7 @@ import "./Constants.sol";
 
 // Contract for L1 <-> L2 interaction between an L2 contracts and this L1 ZKX contract.
 contract L1ZKXContract is Ownable, ReentrancyGuard {
+
     using SafeERC20 for IERC20;
 
     event LogContractInitialized(
@@ -102,15 +103,6 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     /// Assets by ticker
     mapping(uint256 => Asset) private assetsByTicker;
 
-    /// Modifier to verify valid L2 address.
-    modifier isValidL2Address(uint256 l2Address_) {
-        require(
-            l2Address_ != 0 && l2Address_ < FIELD_PRIME,
-            "L2_ADDRESS_OUT_OF_RANGE"
-        );
-        _;
-    }
-
     /// @param starknetCore_ StarknetCore contract address used for L1-to-L2 messaging
     /// @param assetContractAddress_ L2 ZKX AssetContract address
     /// @param withdrawalRequestContractAddress_ L2 ZKX WithdrawalReuqestContract address
@@ -118,14 +110,11 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         IStarknetCore starknetCore_,
         uint256 assetContractAddress_,
         uint256 withdrawalRequestContractAddress_
-    )
-        isValidL2Address(assetContractAddress_)
-        isValidL2Address(withdrawalRequestContractAddress_)
-    {
-        require(
-            address(starknetCore_) != address(0),
-            "StarknetCore address not provided"
-        );
+    ) {
+        require(address(starknetCore_) != address(0));
+        require(isValidFelt(assetContractAddress_));
+        require(isValidFelt(withdrawalRequestContractAddress_));
+
         starknetCore = starknetCore_;
         assetContractAddress = assetContractAddress_;
         withdrawalRequestContractAddress = withdrawalRequestContractAddress_;
@@ -158,8 +147,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         });
         assetList.push(ticker_);
 
-        // Consume the message from the StarkNet core contract.
-        // This will revert the (Ethereum) transaction if the message does not exist.
+        // Consume call will revert if no matching message exists
         uint256[] memory payload = new uint256[](3);
         payload[0] = ADD_ASSET_INDEX;
         payload[1] = ticker_;
@@ -195,8 +183,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         assetList.pop();
         delete assetsByTicker[ticker_];
 
-        // Consume the message from the StarkNet core contract.
-        // This will revert the (Ethereum) transaction if the message does not exist.
+        // Consume call will revert if no matching message exists
         uint256[] memory payload = new uint256[](3);
         payload[0] = REMOVE_ASSET_INDEX;
         payload[1] = ticker_;
@@ -214,11 +201,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     /// @dev Function to get asset contract address by its ticker
     /// @return Token contract address
-    function tokenContractAddress(uint256 ticker_)
-        external
-        view
-        returns (address)
-    {
+    function tokenContractAddress(uint256 ticker_) external view returns (address) {
         return assetsByTicker[ticker_].tokenAddress;
     }
 
@@ -235,7 +218,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 ticker_,
         address tokenContractAddress_
     ) external onlyOwner {
-        // Update token contract address
+        
         require(
             tokenContractAddress_ != address(0),
             "Failed to set token address: zero address provided"
@@ -255,11 +238,9 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     /// @dev function to set asset contract address
     /// @param assetContractAddress_ - address of the asset contract
-    function setAssetContractAddress(uint256 assetContractAddress_)
-        external
-        onlyOwner
-        isValidL2Address(assetContractAddress_)
-    {
+    function setAssetContractAddress(uint256 assetContractAddress_) external onlyOwner {
+        require(isValidFelt(assetContractAddress_), "INVALID_FELT: assetContractAddress_");
+
         emit LogAssetContractAddressChanged(
             assetContractAddress,
             assetContractAddress_
@@ -269,11 +250,9 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     /// @dev function to set withdrawal request contract address
     /// @param withdrawalRequestAddress_ - address of withdrawal request contract
-    function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_)
-        external
-        onlyOwner
-        isValidL2Address(withdrawalRequestAddress_)
-    {
+    function setWithdrawalRequestAddress(uint256 withdrawalRequestAddress_) external onlyOwner {
+        require(isValidFelt(withdrawalRequestAddress_), "INVALID_FELT: withdrawalRequestAddress_");
+
         emit LogWithdrawalRequestContractChanged(
             withdrawalRequestContractAddress,
             withdrawalRequestAddress_
@@ -328,7 +307,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 collateralId_,
         uint256 amount_
     ) private {
-        // Send the message to the StarkNet core contract.
+        // Send the message to the StarkNet core contract
         bytes32 msgHash = starknetCore.sendMessageToL2(
             userL2Address_,
             DEPOSIT_SELECTOR,
@@ -352,7 +331,11 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_
-    ) external nonReentrant isValidL2Address(userL2Address_) {
+    ) external nonReentrant {   
+        // Validate input
+        require(isValidFelt(userL2Address_), "INVALID_FELT: userL2Address_");
+        require(isValidFelt(amount_), "INVALID_FELT: amount_");
+
         // Prepare transfer
         Asset memory asset = assetsByTicker[ticker_];
         require(asset.exists, "Deposit failed: non-registered asset");
@@ -360,7 +343,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             asset.tokenAddress != address(0),
             "Deposit failed: token address not set"
         );
-        uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
+        uint256 senderAsUint256 = uint256(uint160(msg.sender));
         IERC20 Token = IERC20(asset.tokenAddress);
         address zkxAddress = address(this);
 
@@ -388,12 +371,13 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         external
         payable
         nonReentrant
-        isValidL2Address(userL2Address_)
     {
+        require(isValidFelt(userL2Address_), "INVALID_FELT: userL2Address_");
         require(msg.value > 0, "Deposit failed: no value provided");
+
         Asset storage ethAsset = assetsByTicker[ETH_TICKER];
         require(ethAsset.exists, "Deposit failed: ETH not registered as asset");
-        uint256 senderAsUint256 = uint256(uint160(address(msg.sender)));
+        uint256 senderAsUint256 = uint256(uint160(msg.sender));
         depositToL2(
             senderAsUint256,
             userL2Address_,
@@ -422,8 +406,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             "Withdrawal failed: token address not set"
         );
 
-        // Consume the message from the StarkNet core contract.
-        // This will revert the (Ethereum) transaction if the message does not exist.
+        // Consume call will revert if no matching message exists
         starknetCore.consumeMessageFromL2(
             userL2Address_,
             withdrawalMessagePayload(
@@ -434,12 +417,12 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             )
         );
 
-        // Construct update withdrawal request message payload.
+        // Construct update withdrawal request message payload
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
         updateWithdrawalRequestPayload[0] = userL2Address_;
         updateWithdrawalRequestPayload[1] = requestId_;
 
-        // Send the message to the StarkNet core contract.
+        // Send the message to the StarkNet core contract
         bytes32 msgHash = starknetCore.sendMessageToL2(
             withdrawalRequestContractAddress,
             UPDATE_WITHDRAWAL_REQUEST_SELECTOR,
@@ -473,8 +456,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             "Deposit failed: ETH not registered as asset"
         );
 
-        // Consume the message from the StarkNet core contract.
-        // This will revert the (Ethereum) transaction if the message does not exist.
+        // Consume call will revert if no matching message exists
         starknetCore.consumeMessageFromL2(
             userL2Address_,
             withdrawalMessagePayload(
@@ -485,12 +467,12 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             )
         );
 
-        // Construct update withdrawal request message payload.
+        // Construct update withdrawal request message payload
         uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
         updateWithdrawalRequestPayload[0] = userL2Address_;
         updateWithdrawalRequestPayload[1] = requestId_;
 
-        // Send the message to the StarkNet core contract.
+        // Send the message to the StarkNet core contract
         bytes32 msgHash = starknetCore.sendMessageToL2(
             withdrawalRequestContractAddress,
             UPDATE_WITHDRAWAL_REQUEST_SELECTOR,
@@ -565,7 +547,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             userL2Address_,
             DEPOSIT_SELECTOR,
             depositMessagePayload(
-                uint256(uint160(address(msg.sender))),
+                uint256(uint160(msg.sender)),
                 amount_,
                 asset.collateralID
             ),
@@ -602,7 +584,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             userL2Address_,
             DEPOSIT_SELECTOR,
             depositMessagePayload(
-                uint256(uint160(address(msg.sender))),
+                uint256(uint160(msg.sender)),
                 amount_,
                 asset.collateralID
             ),
@@ -622,5 +604,9 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             amount_,
             nonce_
         );
+    }
+
+    function isValidFelt(uint256 value) private pure returns (bool isValid) {
+        return value != 0 && value < FIELD_PRIME;
     }
 }
