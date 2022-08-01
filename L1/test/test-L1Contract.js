@@ -656,7 +656,7 @@ describe("Deployment", function () {
         L2_ASSET_ADDRESS,
         L2_WITHDRAWAL_ADDRESS
       )
-    ).to.be.revertedWith("StarknetCore address not provided");
+    ).to.be.reverted;
   });
 
   it("Change Withdrawal Request Address", async function () {
