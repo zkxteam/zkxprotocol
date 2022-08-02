@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
+from utils import Signer, str_to_felt, MAX_UINT256, assert_revert, to64x61
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
 

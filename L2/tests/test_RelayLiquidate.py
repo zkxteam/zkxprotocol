@@ -57,6 +57,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
     ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    account_registry = await starknet_service.deploy(
+        ContractType.AccountRegistry, 
+        [registry.contract_address, 1]
+    )
     fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
 
@@ -86,6 +90,44 @@ async def adminAuth_factory(starknet_service: StarknetService):
     liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
     insuranceFund = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
     feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    marketPrices = await starknet_service.deploy(
+        ContractType.MarketPrices, 
+        [registry.contract_address, 1]
+    )
+    timestamp = int(time.time())
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address
+    )
+
+    # spoof admin1 as account_deployer so that it can update account registry
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
+
+    # add user accounts to account registry
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[admin1.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[admin2.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[alice.contract_address])
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[bob.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[charlie.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[daniel.contract_address])
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[eduard.contract_address])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -106,7 +148,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insuranceFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     # await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, liquidator.contract_address])
-
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
+    
     # Deploy relay contracts with appropriate indexes
     relay_trading = await starknet_service.deploy(ContractType.RelayTrading, [
         registry.contract_address, 
@@ -221,6 +265,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     return adminAuth, relay_fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, relay_holding, relay_feeBalance, relay_liquidate, insuranceFund
 
 
+
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
@@ -283,7 +328,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         alice.contract_address, signed_message1[0], signed_message1[
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice1, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
     ])
 
     orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
@@ -383,16 +428,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    #alice_maintenance = await liquidate.return_maintenance().call()
-    #print("Alice maintenance requirement:",
-    #      from64x61(alice_maintenance.result.res))
-
-    #assert from64x61(alice_maintenance.result.res) == 787.5
-
-    #alice_acc_value = await liquidate.return_acc_value().call()
-    #print("Alice acc value:", from64x61(alice_acc_value.result.res))
-
-    #assert from64x61(alice_acc_value.result.res) == 5819.9075
+    
 
     ##############################################
     ######## Bob's liquidation result 1 ##########
@@ -435,17 +471,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(bob_balance_ust.result.res) == 5500
 
-    #bob_maintenance = await liquidate.return_maintenance().call()
-    #print("Bob maintenance requirement:",
-    #      from64x61(bob_maintenance.result.res))
-
-    #assert from64x61(bob_maintenance.result.res) == 787.5
-
-    #bob_acc_value = await liquidate.return_acc_value().call()
-    #print("bob acc value:", from64x61(bob_acc_value.result.res))
-
-    #assert from64x61(bob_acc_value.result.res) == 6572.963000000001
-
+   
     ###### Opening of Orders 2 #######
     size2 = to64x61(3)
     marketID_2 = ETH_USD_ID
@@ -588,16 +614,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    #alice_maintenance = await liquidate.return_maintenance().call()
-    #print("Alice maintenance requirement:",
-    #      from64x61(alice_maintenance.result.res))
-
-    #assert from64x61(alice_maintenance.result.res) == 811.125
-
-    #alice_acc_value = await liquidate.return_acc_value().call()
-    #print("Alice acc value:", from64x61(alice_acc_value.result.res))
-
-    #assert from64x61(alice_acc_value.result.res) == 5819.754725000001
+    
 
     ##############################################
     ######## Bob's liquidation result 2 ##########
@@ -644,17 +661,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(bob_balance_ust.result.res) == 5500
 
-    #bob_maintenance = await liquidate.return_maintenance().call()
-    #print("Bob maintenance requirement:",
-    #      from64x61(bob_maintenance.result.res))
-
-    #assert from64x61(bob_maintenance.result.res) == 811.125
-
-    #bob_acc_value = await liquidate.return_acc_value().call()
-    #print("bob acc value:", from64x61(bob_acc_value.result.res))
-
-    #assert from64x61(bob_acc_value.result.res) == 6572.90189
-
+  
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
@@ -705,16 +712,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    #alice_maintenance = await liquidate.return_maintenance().call()
-    #print("Alice maintenance requirement:",
-    #      from64x61(alice_maintenance.result.res))
-
-    #assert from64x61(alice_maintenance.result.res) == 811.125
-
-    #alice_acc_value = await liquidate.return_acc_value().call()
-    #print("Alice acc value:", from64x61(alice_acc_value.result.res))
-
-    #assert from64x61(alice_acc_value.result.res) == -481.295275
+  
 
     order_state = await alice.get_order_data(orderID_=liquidate_result_alice.result.response[1]).call()
     res4 = list(order_state.result.res)
@@ -881,16 +879,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
 
     assert from64x61(charlie_balance_usdc.result.res) == 639.64529
 
-    #charlie_maintenance = await liquidate.return_maintenance().call()
-    #print("Charlie maintenance requirement:",
-    #      from64x61(charlie_maintenance.result.res))
-
-    #assert from64x61(charlie_maintenance.result.res) == 1158.80625
-
-    #charlie_acc_value = await liquidate.return_acc_value().call()
-    #print("Charlie acc value:", from64x61(charlie_acc_value.result.res))
-
-    #assert from64x61(charlie_acc_value.result.res) == -302.2474455
+   
 
     ###################
 
@@ -1216,16 +1205,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     assert liquidate_result_eduard.result.response[1] == str_to_felt(
         "343uofdsjxz")
 
-    #eduard_maintenance = await liquidate.return_maintenance().call()
-    #print("eduard maintenance requirement:",
-    #      from64x61(eduard_maintenance.result.res))
-
-    #assert from64x61(eduard_maintenance.result.res) == 393.75
-
-    #eduard_acc_value = await liquidate.return_acc_value().call()
-    #print("eduard acc value:", from64x61(eduard_acc_value.result.res))
-
-    #assert from64x61(eduard_acc_value.result.res) == 261.48150000000004
+   
 
     eduard_amount_to_be_sold = await eduard.get_deleveraged_or_liquidatable_position().call()
     print(eduard_amount_to_be_sold.result)
@@ -1398,16 +1378,7 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
     assert liquidate_result_eduard.result.response[1] == str_to_felt(
         "343uofdsjxz")
 
-    #eduard_maintenance = await liquidate.return_maintenance().call()
-    #print("eduard maintenance requirement:",
-    #      from64x61(eduard_maintenance.result.res))
-
-    #assert from64x61(eduard_maintenance.result.res) == 240.54545454545456
-
-    #eduard_acc_value = await liquidate.return_acc_value().call()
-    #print("eduard acc value:", from64x61(eduard_acc_value.result.res))
-
-    #assert from64x61(eduard_acc_value.result.res) == -1502.5185000000001
+  
 
     eduard_amount_to_be_sold = await eduard.get_deleveraged_or_liquidatable_position().call()
     print(eduard_amount_to_be_sold.result)
@@ -1527,6 +1498,3 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
 
     account_value = await trading.return_net_acc().call()
     print("account value after:", from64x61(account_value.result.res))
-
-    hash_list=await liquidate.get_caller_hash_list(liquidator.contract_address).call()
-    print(hash_list.result)
