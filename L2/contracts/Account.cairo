@@ -414,6 +414,70 @@ func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     return (is_eight_hours)
 end
 
+##############
+# L1 Handler #
+##############
+
+# @notice Function to handle deposit from L1ZKX contract
+# @param from_address - The address from where deposit function is called from
+# @param user - User's Metamask account address
+# @param amount - The Amount of funds that user wants to withdraw
+# @param assetID_ - Asset ID of the collateral that needs to be deposited
+@l1_handler
+func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    from_address : felt, user : felt, amount : felt, assetID_ : felt
+):
+    alloc_locals
+    # Make sure the message was sent by the intended L1 contract.
+    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
+    assert from_address = L1_ZKX_contract_address
+
+    let (stored_L1_address) = L1_address.read()
+
+    assert stored_L1_address = user
+
+    # Reading token decimal field of an asset
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Get asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    )
+    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_)
+    tempvar decimal = asset.token_decimal
+
+    let (ten_power_decimal) = pow(10, decimal)
+    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
+
+    let (amount_in_64x61_format) = Math64x61_fromFelt(amount)
+    let (amount_in_decimal_representation) = Math64x61_div(
+        amount_in_64x61_format, decimal_in_64x61_format
+    )
+
+    let (array_len) = collateral_array_len.read()
+    # Read the current balance.
+    let (balance_collateral) = balance.read(assetID=assetID_)
+
+    if balance_collateral == 0:
+        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
+    # Compute and update the new balance.
+    tempvar new_balance = balance_collateral + amount_in_decimal_representation
+    balance.write(assetID=assetID_, value=new_balance)
+
+    return ()
+end
+
 ######################
 # External Functions #
 ######################
@@ -1133,70 +1197,6 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     deleveraged_or_liquidatable_position.write(value=id_)
     # Update amount_to_be_sold storage variable
     amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
-
-    return ()
-end
-
-##############
-# L1 Handler #
-##############
-
-# @notice Function to handle deposit from L1ZKX contract
-# @param from_address - The address from where deposit function is called from
-# @param user - User's Metamask account address
-# @param amount - The Amount of funds that user wants to withdraw
-# @param assetID_ - Asset ID of the collateral that needs to be deposited
-@l1_handler
-func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    from_address : felt, user : felt, amount : felt, assetID_ : felt
-):
-    alloc_locals
-    # Make sure the message was sent by the intended L1 contract.
-    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
-    assert from_address = L1_ZKX_contract_address
-
-    let (stored_L1_address) = L1_address.read()
-
-    assert stored_L1_address = user
-
-    # Reading token decimal field of an asset
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    # Get asset contract address
-    let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Asset_INDEX, version=version
-    )
-    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_)
-    tempvar decimal = asset.token_decimal
-
-    let (ten_power_decimal) = pow(10, decimal)
-    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
-
-    let (amount_in_64x61_format) = Math64x61_fromFelt(amount)
-    let (amount_in_decimal_representation) = Math64x61_div(
-        amount_in_64x61_format, decimal_in_64x61_format
-    )
-
-    let (array_len) = collateral_array_len.read()
-    # Read the current balance.
-    let (balance_collateral) = balance.read(assetID=assetID_)
-
-    if balance_collateral == 0:
-        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    end
-
-    # Compute and update the new balance.
-    tempvar new_balance = balance_collateral + amount_in_decimal_representation
-    balance.write(assetID=assetID_, value=new_balance)
 
     return ()
 end
