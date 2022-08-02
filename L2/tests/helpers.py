@@ -9,6 +9,7 @@ from starkware.starknet.services.api.contract_class import ContractClass
 
 class ContractType(Enum):
     Account = "contracts/Account.cairo"
+    AccountDeployer = "contracts/AccountDeployer.cairo"
     AdminAuth = "contracts/AdminAuth.cairo"
     AuthorizedRegistry = "contracts/AuthorizedRegistry.cairo"
     Trading = "contracts/Trading.cairo"
@@ -28,6 +29,10 @@ class ContractType(Enum):
     ABRPayment = "contracts/ABRPayment.cairo"
     MarketPrices = "contracts/MarketPrices.cairo"
     Liquidate = "contracts/Liquidate.cairo"
+    CallFeeBalance = "contracts/CallFeeBalance.cairo"
+    DepositDataManager = "contracts/DepositDataManager.cairo"
+    WithdrawalFeeBalance = "contracts/WithdrawalFeeBalance.cairo"
+    # Relay contracts
     RelayABR = "contracts/relay_contracts/RelayABR.cairo"
     RelayABRPayment = "contracts/relay_contracts/RelayABRPayment.cairo"
     RelayTrading = "contracts/relay_contracts/RelayTrading.cairo"
@@ -35,7 +40,14 @@ class ContractType(Enum):
     RelayHolding = "contracts/relay_contracts/RelayHolding.cairo"
     RelayFeeBalance = "contracts/relay_contracts/RelayFeeBalance.cairo"
     RelayTradingFees = "contracts/relay_contracts/RelayTradingFees.cairo"
+    RelayAccountRegistry = "contracts/relay_contracts/RelayAccountRegistry.cairo"
+    RelayEmergencyFund = "contracts/relay_contracts/RelayEmergencyFund.cairo"
     RelayLiquidate = "contracts/relay_contracts/RelayLiquidate.cairo"
+    RelayMarkets = "contracts/relay_contracts/RelayMarkets.cairo"
+    RelayFeeDiscount = "contracts/relay_contracts/RelayFeeDiscount.cairo"
+    WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
+    # Test-helping contracts
+    ArrayTesting = "contracts/ArrayTesting.cairo"
 
 class OptimizedStarknetState(StarknetState):
 
@@ -76,3 +88,21 @@ class StarknetService:
         with set_class_hash_cache(self.compilation_cache):
             deployed_contract = await self.starknet.deploy(contract_class=contract_class, constructor_calldata=calldata)
             return deployed_contract
+
+class AccountFactory:
+
+    def __init__(self, starknet_service: StarknetService, L1_user_address, registry_address, version, L1_ZKX_address):
+        self.starknet_service = starknet_service
+        self.L1_user_address = L1_user_address
+        self.registry_address = registry_address
+        self.version = version
+        self.L1_ZKX_address = L1_ZKX_address
+
+    async def deploy_account(self, public_key) -> StarknetContract:
+        return await self.starknet_service.deploy(ContractType.Account, [
+            public_key,
+            self.L1_user_address,
+            self.registry_address,
+            self.version,
+            self.L1_ZKX_address
+        ])

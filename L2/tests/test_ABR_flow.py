@@ -6,7 +6,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, assert_revert, convertTo64x61
-from helpers import StarknetService, ContractType
+from helpers import StarknetService, ContractType, AccountFactory
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -46,26 +46,17 @@ async def abr_factory(starknet_service: StarknetService):
         [adminAuth.contract_address]
     )
 
-    alice = await starknet_service.deploy(
-        ContractType.Account, 
-        [
-            alice_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
+    account_factory = AccountFactory(
+        starknet_service,
+        L1_dummy_address,
+        registry.contract_address,
+        1,
+        L1_ZKX_dummy_address
     )
-    bob = await starknet_service.deploy(
-        ContractType.Account, 
-        [
-            bob_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
+
+    alice = await account_factory.deploy_account(alice_signer.public_key)
+    bob = await account_factory.deploy_account(bob_signer.public_key)
+
     fees = await starknet_service.deploy(
         ContractType.TradingFees, 
         [registry.contract_address, 1]
@@ -139,7 +130,7 @@ async def abr_factory(starknet_service: StarknetService):
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
-        block_timestamp=timestamp, 
+        block_timestamp=timestamp,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address
     )

@@ -7,7 +7,9 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
-from helpers import StarknetService, ContractType
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -31,8 +33,6 @@ TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -83,60 +83,20 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
 
     ### Deploy user accounts
-    alice = await starknet_service.deploy(
-        ContractType.Account, [
-            alice_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
+    account_factory = AccountFactory(
+        starknet_service,
+        L1_dummy_address,
+        registry.contract_address,
+        1,
+        L1_ZKX_dummy_address
     )
-    bob = await starknet_service.deploy(
-        ContractType.Account, [
-            bob_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-    charlie = await starknet_service.deploy(
-        ContractType.Account, [
-            charlie_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-    daniel = await starknet_service.deploy(
-        ContractType.Account, [
-            daniel_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-    eduard = await starknet_service.deploy(
-        ContractType.Account, [
-            eduard_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-    liquidator = await starknet_service.deploy(
-        ContractType.Account, [
-            liquidator_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
+
+    alice = await account_factory.deploy_account(alice_signer.public_key)
+    bob = await account_factory.deploy_account(bob_signer.public_key)
+    charlie = await account_factory.deploy_account(charlie_signer.public_key)
+    daniel = await account_factory.deploy_account(daniel_signer.public_key)
+    eduard = await account_factory.deploy_account(eduard_signer.public_key)
+    liquidator = await account_factory.deploy_account(liquidator_signer.public_key)
 
     ### Deploy infrastructure (Part 2)
     fixed_math = await starknet_service.deploy(
