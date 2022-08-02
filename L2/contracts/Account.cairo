@@ -3,7 +3,7 @@
 %builtins pedersen range_check ecdsa bitwise
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.cairo_builtins import BitwiseBuiltin, HashBuiltin, SignatureBuiltin
+from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.hash_state import (
     hash_finalize,
     hash_init,
@@ -357,7 +357,7 @@ func get_deleveraged_or_liquidatable_position{
     return (order_id=order_id_, amount_to_be_sold=amount_to_be_sold_)
 end
 
-# @notice Function to get all the open positions
+# @notice view function to get all the open positions
 # @return array_list_len - Length of the array_list
 # @return array_list - Fully populated list of OrderDetails
 @view
@@ -369,7 +369,7 @@ func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
 end
 
-# @notice Function to get all use collaterals
+# @notice view function to get all use collaterals
 # @return array_list_len - Length of the array_list
 # @return array_list - Fully populated list of CollateralBalance
 @view
@@ -381,7 +381,7 @@ func return_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     return populate_array_collaterals(0, array_list)
 end
 
-# @notice Function to get withdrawal history
+# @notice view function to get withdrawal history
 # @return withdrawal_list_len - Length of the withdrawal list
 # @return withdrawal_list - Fully populated list of withdrawals
 @view
@@ -408,7 +408,7 @@ func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     let (last_call) = last_updated.read(market_id=market_id)
 
     # Minimum time before the second call
-    let min_time = last_call + 28000
+    let min_time = last_call + 28800
     let (is_eight_hours) = is_le(block_timestamp, min_time)
 
     return (is_eight_hours)
