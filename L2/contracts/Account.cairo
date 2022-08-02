@@ -80,52 +80,42 @@ const MESSAGE_WITHDRAW = 3
 # Storage #
 ###########
 
-# @notice Stores the contract version
+# Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of Authorized Registry contract
+# Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
-# @notice Stores the address of Market contract
-@storage_var
-func market_address() -> (contract_address : felt):
-end
-
-# @notice Stores the address of ABR contract
-@storage_var
-func abr_address() -> (contract_address : felt):
-end
-
+# Stores current nonce
 @storage_var
 func current_nonce() -> (res : felt):
 end
 
+# Stores public key associated with an account
 @storage_var
 func public_key() -> (res : felt):
 end
 
-@storage_var
-func trading_volume() -> (res : felt):
-end
-
+# Stores balance of an asset
 @storage_var
 func balance(assetID : felt) -> (res : felt):
 end
 
+# Mapping of orderID to the order details
 @storage_var
 func order_mapping(orderID : felt) -> (res : OrderDetails):
 end
 
-# @notice Mapping of marketID to the timestamp of last updated value
+# Mapping of marketID to the timestamp of last updated value
 @storage_var
 func last_updated(market_id) -> (value : felt):
 end
 
-# L1 User associated with the account
+# Stores L1 address associated with the account
 @storage_var
 func L1_address() -> (res : felt):
 end
@@ -135,7 +125,7 @@ end
 func L1_ZKX_address() -> (res : felt):
 end
 
-# Store positions to facilitate liquidation request
+# Stores all positions held by the user
 @storage_var
 func position_array(index : felt) -> (position_id : felt):
 end
@@ -145,12 +135,12 @@ end
 func collateral_array(index : felt) -> (collateral_id : felt):
 end
 
-# Length of the position array
+# Stores length of the position array
 @storage_var
 func position_array_len() -> (len : felt):
 end
 
-# Length of the collateral array
+# Stores length of the collateral array
 @storage_var
 func collateral_array_len() -> (len : felt):
 end
@@ -170,7 +160,7 @@ end
 func withdrawal_history_array(index : felt) -> (res : WithdrawalHistory):
 end
 
-# Length of the withdrawal history array
+# Stores length of the withdrawal history array
 @storage_var
 func withdrawal_history_array_len() -> (len : felt):
 end
@@ -211,10 +201,12 @@ func assert_only_self{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     return ()
 end
 
-###########
-# Getters #
-###########
+##################
+# View Functions #
+##################
 
+# @notice view function to get public key
+# @return res - public key of an account
 @view
 func get_public_key{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     res : felt
@@ -223,13 +215,15 @@ func get_public_key{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
+# @notice view function to get current nonce
+# @return res - nonce
 @view
 func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (res : felt):
     let (res) = current_nonce.read()
     return (res=res)
 end
 
-# @notice Check if the transaction signature is valid
+# @notice view function to check if the transaction signature is valid
 # @param hash - Hash of the transaction parameters
 # @param singature_len - Length of the signatures
 # @param signature - Array of signatures
@@ -295,14 +289,9 @@ func is_valid_signature_order{
     return ()
 end
 
-@view
-func get_trading_volume{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
-):
-    let (res) = trading_volume.read()
-    return (res=res)
-end
-
+# @notice view function to get the balance of an asset
+# @param assetID_ - ID of an asset
+# @return res - balance of an asset
 @view
 func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     assetID_ : felt
@@ -311,6 +300,9 @@ func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return (res=res)
 end
 
+# @notice view function to get order details
+# @param orderID_ - ID of an order
+# @return res - Order details corresponding to an order
 @view
 func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     orderID_ : felt
@@ -319,7 +311,8 @@ func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
-# @notice get L1 address of the user
+# @notice view function to get L1 address of the user
+# @return res - L1 address of the user
 @view
 func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     res : felt
@@ -328,6 +321,9 @@ func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
+# @notice view function to get amount to be sold in a position
+# @param order_id_ - ID of an order
+# @return res - amount to be sold in a position
 @view
 func get_amount_to_be_sold{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_id_ : felt
@@ -336,6 +332,8 @@ func get_amount_to_be_sold{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     return (res=res)
 end
 
+# @notice view function to get deleveraged or liquidatable position
+# @return order_id - Id of an order, amount_to_be_sold - amount to be sold in a position
 @view
 func get_deleveraged_or_liquidatable_position{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
@@ -395,6 +393,9 @@ func get_withdrawal_history{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     return populate_withdrawals_array(0, withdrawal_list)
 end
 
+# @notice view function to check if eight hours is complete or not
+# @param market_id - ID of a market
+# @return res - true if it is complete, else false
 @view
 func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt
@@ -413,258 +414,9 @@ func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     return (is_eight_hours)
 end
 
-###########
-# Setters #
-###########
-
-@external
-func set_public_key{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    new_public_key : felt
-):
-    assert_only_self()
-    public_key.write(new_public_key)
-    return ()
-end
-
 ######################
-# Internal Functions #
+# External Functions #
 ######################
-
-# @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
-# @param withdrawal_list_len_ - Stores the current length of the populated withdrawals array
-# @param withdrawal_list_ - Array of WithdrawalRequest filled up to the index
-# @return withdrawal_list_len - Length of the withdrawal_list
-# @return withdrawal_list - Fully populated list of Withdrawals
-func populate_withdrawals_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    withdrawal_list_len_ : felt, withdrawal_list_ : WithdrawalHistory*
-) -> (withdrawal_list_len : felt, withdrawal_list : WithdrawalHistory*):
-    alloc_locals
-    let (withdrawal_history) = withdrawal_history_array.read(index=withdrawal_list_len_)
-
-    if withdrawal_history.collateral_id == 0:
-        return (withdrawal_list_len_, withdrawal_list_)
-    end
-
-    assert withdrawal_list_[withdrawal_list_len_] = withdrawal_history
-    return populate_withdrawals_array(withdrawal_list_len_ + 1, withdrawal_list_)
-end
-
-# @notice Internal Function called by return_array_collaterals to recursively add collateralBalance to the array and return it
-# @param array_list_len_ - Stores the current length of the populated array
-# @param array_list_ - Array of CollateralBalance filled up to the index
-# @return array_list_len - Length of the array_list
-# @return array_list - Fully populated list of CollateralBalance
-func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    array_list_len_ : felt, array_list_ : CollateralBalance*
-) -> (array_list_len : felt, array_list : CollateralBalance*):
-    alloc_locals
-    let (collateral_id) = collateral_array.read(index=array_list_len_)
-
-    if collateral_id == 0:
-        return (array_list_len_, array_list_)
-    end
-
-    let (collateral_balance : felt) = balance.read(assetID=collateral_id)
-    let collateral_balance_struct = CollateralBalance(
-        assetID=collateral_id, balance=collateral_balance
-    )
-
-    assert array_list_[array_list_len_] = collateral_balance_struct
-    return populate_array_collaterals(array_list_len_ + 1, array_list_)
-end
-
-# @notice Internal Function called by return array to recursively add positions to the array and return it
-# @param iterator - Index of the position_array currently pointing to
-# @param array_list_len - Stores the current length of the populated array
-# @param array_list - Array of OrderRequests filled up to the index
-# @return array_list_len - Length of the array_list
-# @return array_list - Fully populated list of OrderDetails
-func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
-) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-    alloc_locals
-    let (pos) = position_array.read(index=iterator)
-
-    if pos == 0:
-        return (array_list_len, array_list)
-    end
-
-    let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
-    let order_details_w_id = OrderDetailsWithIDs(
-        orderID=pos,
-        assetID=pos_details.assetID,
-        collateralID=pos_details.collateralID,
-        price=pos_details.price,
-        executionPrice=pos_details.executionPrice,
-        positionSize=pos_details.positionSize,
-        orderType=pos_details.orderType,
-        direction=pos_details.direction,
-        portionExecuted=pos_details.portionExecuted,
-        status=pos_details.status,
-        marginAmount=pos_details.marginAmount,
-        borrowedAmount=pos_details.borrowedAmount,
-    )
-
-    if pos_details.status == 4:
-        return populate_array_positions(iterator + 1, array_list_len, array_list)
-    else:
-        if pos_details.status == 7:
-            return populate_array_positions(iterator + 1, array_list_len, array_list)
-        else:
-            assert array_list[array_list_len] = order_details_w_id
-            return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
-        end
-    end
-end
-
-# @notice Function to hash the transaction parameters
-# @param message - Struct of details to hash
-# @param res - Hash of the parameters
-func hash_message{pedersen_ptr : HashBuiltin*}(message : Message*) -> (res : felt):
-    alloc_locals
-    # we need to make `res_calldata` local
-    # to prevent the reference from being revoked
-    let (local res_calldata) = hash_calldata(message.calldata, message.calldata_size)
-    let hash_ptr = pedersen_ptr
-    with hash_ptr:
-        let (hash_state_ptr) = hash_init()
-        # first three iterations are 'sender', 'to', and 'selector'
-        let (hash_state_ptr) = hash_update(hash_state_ptr, message, 3)
-        let (hash_state_ptr) = hash_update_single(hash_state_ptr, res_calldata)
-        let (hash_state_ptr) = hash_update_single(hash_state_ptr, message.nonce)
-        let (res) = hash_finalize(hash_state_ptr)
-        let pedersen_ptr = hash_ptr
-        return (res=res)
-    end
-end
-
-# @notice Function to hash the calldata
-# @param calldata - Array of params
-# @param calldata_size - Length of the params
-# @return res - hash of the calldata
-func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size : felt) -> (
-    res : felt
-):
-    let hash_ptr = pedersen_ptr
-    with hash_ptr:
-        let (hash_state_ptr) = hash_init()
-        let (hash_state_ptr) = hash_update(hash_state_ptr, calldata, calldata_size)
-        let (res) = hash_finalize(hash_state_ptr)
-        let pedersen_ptr = hash_ptr
-        return (res=res)
-    end
-end
-
-# @notice Function to hash the order parameters
-# @param message - Struct of order details to hash
-# @param res - Hash of the details
-func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (res : felt):
-    alloc_locals
-
-    let hash_ptr = pedersen_ptr
-    with hash_ptr:
-        let (hash_state_ptr) = hash_init()
-        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 10)
-        let (res) = hash_finalize(hash_state_ptr)
-        let pedersen_ptr = hash_ptr
-        return (res=res)
-    end
-end
-
-# @notice Function to hash the withdrawal request parameters
-# @param message - Struct of order details to hash
-# @param res - Hash of the details
-func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(
-    withdrawal_request_ : WithdrawalRequestForHashing*
-) -> (res : felt):
-    alloc_locals
-
-    let hash_ptr = pedersen_ptr
-    with hash_ptr:
-        let (hash_state_ptr) = hash_init()
-        let (hash_state_ptr) = hash_update(hash_state_ptr, withdrawal_request_, 3)
-        let (res) = hash_finalize(hash_state_ptr)
-        let pedersen_ptr = hash_ptr
-        return (res=res)
-    end
-end
-
-# @notice Internal function to add a position to the array when it is opened
-# @param id_ - OrderRequest Id to be added
-# @return 1 - If successfully added
-func add_to_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id_ : felt
-) -> (res : felt):
-    let (arr_len) = position_array_len.read()
-    position_array.write(index=arr_len, value=id_)
-    position_array_len.write(arr_len + 1)
-    return (1)
-end
-
-func add_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    new_asset_id : felt, iterator : felt, length : felt
-):
-    alloc_locals
-    if iterator == length:
-        collateral_array.write(index=iterator, value=new_asset_id)
-        collateral_array_len.write(iterator + 1)
-        return ()
-    end
-
-    let (collateral_id) = collateral_array.read(index=iterator)
-    local difference = collateral_id - new_asset_id
-    if difference == 0:
-        return ()
-    end
-
-    return add_collateral(new_asset_id=new_asset_id, iterator=iterator + 1, length=length)
-end
-
-# @notice Internal function to recursively find the index of the withdrawal history to be updated
-# @param request_id_ - Id of the withdrawal request
-# @param arr_len_ - current index which is being checked to be updated
-# @return index - returns the index which needs to be updated
-func find_index_to_be_updated_recurse{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(request_id_ : felt, arr_len_ : felt) -> (index : felt):
-    alloc_locals
-
-    if arr_len_ == 0:
-        return (-1)
-    end
-
-    let (request : WithdrawalHistory) = withdrawal_history_array.read(index=arr_len_ - 1)
-    if request.request_id == request_id_:
-        return (arr_len_ - 1)
-    end
-
-    return find_index_to_be_updated_recurse(request_id_, arr_len_ - 1)
-end
-
-# @notice Internal function to recursively check for withdrawal replays
-# @param request_id_ - Id of the withdrawal request
-# @param arr_len_ - current index which is being checked to be updated
-# @return - -1 if same withdrawal request already exists, else 1
-func check_for_withdrawal_replay{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    request_id_ : felt, arr_len_ : felt
-) -> (index : felt):
-    alloc_locals
-
-    if arr_len_ == 0:
-        return (1)
-    end
-
-    let (request : WithdrawalHistory) = withdrawal_history_array.read(index=arr_len_ - 1)
-    if request.request_id == request_id_:
-        return (-1)
-    end
-
-    return check_for_withdrawal_replay(request_id_, arr_len_ - 1)
-end
-
-##################
-# Business logic #
-##################
 
 # @notice External function called by the Trading Contract
 # @param amount - Amount of funds to transfer from this contract
@@ -1385,6 +1137,10 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     return ()
 end
 
+##############
+# L1 Handler #
+##############
+
 # @notice Function to handle deposit from L1ZKX contract
 # @param from_address - The address from where deposit function is called from
 # @param user - User's Metamask account address
@@ -1443,4 +1199,244 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     balance.write(assetID=assetID_, value=new_balance)
 
     return ()
+end
+
+######################
+# Internal Functions #
+######################
+
+# @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
+# @param withdrawal_list_len_ - Stores the current length of the populated withdrawals array
+# @param withdrawal_list_ - Array of WithdrawalRequest filled up to the index
+# @return withdrawal_list_len - Length of the withdrawal_list
+# @return withdrawal_list - Fully populated list of Withdrawals
+func populate_withdrawals_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    withdrawal_list_len_ : felt, withdrawal_list_ : WithdrawalHistory*
+) -> (withdrawal_list_len : felt, withdrawal_list : WithdrawalHistory*):
+    alloc_locals
+    let (withdrawal_history) = withdrawal_history_array.read(index=withdrawal_list_len_)
+
+    if withdrawal_history.collateral_id == 0:
+        return (withdrawal_list_len_, withdrawal_list_)
+    end
+
+    assert withdrawal_list_[withdrawal_list_len_] = withdrawal_history
+    return populate_withdrawals_array(withdrawal_list_len_ + 1, withdrawal_list_)
+end
+
+# @notice Internal Function called by return_array_collaterals to recursively add collateralBalance to the array and return it
+# @param array_list_len_ - Stores the current length of the populated array
+# @param array_list_ - Array of CollateralBalance filled up to the index
+# @return array_list_len - Length of the array_list
+# @return array_list - Fully populated list of CollateralBalance
+func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    array_list_len_ : felt, array_list_ : CollateralBalance*
+) -> (array_list_len : felt, array_list : CollateralBalance*):
+    alloc_locals
+    let (collateral_id) = collateral_array.read(index=array_list_len_)
+
+    if collateral_id == 0:
+        return (array_list_len_, array_list_)
+    end
+
+    let (collateral_balance : felt) = balance.read(assetID=collateral_id)
+    let collateral_balance_struct = CollateralBalance(
+        assetID=collateral_id, balance=collateral_balance
+    )
+
+    assert array_list_[array_list_len_] = collateral_balance_struct
+    return populate_array_collaterals(array_list_len_ + 1, array_list_)
+end
+
+# @notice Internal Function called by return array to recursively add positions to the array and return it
+# @param iterator - Index of the position_array currently pointing to
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of OrderRequests filled up to the index
+# @return array_list_len - Length of the array_list
+# @return array_list - Fully populated list of OrderDetails
+func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
+) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    alloc_locals
+    let (pos) = position_array.read(index=iterator)
+
+    if pos == 0:
+        return (array_list_len, array_list)
+    end
+
+    let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
+    let order_details_w_id = OrderDetailsWithIDs(
+        orderID=pos,
+        assetID=pos_details.assetID,
+        collateralID=pos_details.collateralID,
+        price=pos_details.price,
+        executionPrice=pos_details.executionPrice,
+        positionSize=pos_details.positionSize,
+        orderType=pos_details.orderType,
+        direction=pos_details.direction,
+        portionExecuted=pos_details.portionExecuted,
+        status=pos_details.status,
+        marginAmount=pos_details.marginAmount,
+        borrowedAmount=pos_details.borrowedAmount,
+    )
+
+    if pos_details.status == 4:
+        return populate_array_positions(iterator + 1, array_list_len, array_list)
+    else:
+        if pos_details.status == 7:
+            return populate_array_positions(iterator + 1, array_list_len, array_list)
+        else:
+            assert array_list[array_list_len] = order_details_w_id
+            return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
+        end
+    end
+end
+
+# @notice internal function to hash the transaction parameters
+# @param message - Struct of details to hash
+# @param res - Hash of the parameters
+func hash_message{pedersen_ptr : HashBuiltin*}(message : Message*) -> (res : felt):
+    alloc_locals
+    # we need to make `res_calldata` local
+    # to prevent the reference from being revoked
+    let (local res_calldata) = hash_calldata(message.calldata, message.calldata_size)
+    let hash_ptr = pedersen_ptr
+    with hash_ptr:
+        let (hash_state_ptr) = hash_init()
+        # first three iterations are 'sender', 'to', and 'selector'
+        let (hash_state_ptr) = hash_update(hash_state_ptr, message, 3)
+        let (hash_state_ptr) = hash_update_single(hash_state_ptr, res_calldata)
+        let (hash_state_ptr) = hash_update_single(hash_state_ptr, message.nonce)
+        let (res) = hash_finalize(hash_state_ptr)
+        let pedersen_ptr = hash_ptr
+        return (res=res)
+    end
+end
+
+# @notice Internal function to hash the calldata
+# @param calldata - Array of params
+# @param calldata_size - Length of the params
+# @return res - hash of the calldata
+func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size : felt) -> (
+    res : felt
+):
+    let hash_ptr = pedersen_ptr
+    with hash_ptr:
+        let (hash_state_ptr) = hash_init()
+        let (hash_state_ptr) = hash_update(hash_state_ptr, calldata, calldata_size)
+        let (res) = hash_finalize(hash_state_ptr)
+        let pedersen_ptr = hash_ptr
+        return (res=res)
+    end
+end
+
+# @notice Internal function to hash the order parameters
+# @param orderRequest - Struct of order request to hash
+# @param res - Hash of the details
+func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (res : felt):
+    alloc_locals
+
+    let hash_ptr = pedersen_ptr
+    with hash_ptr:
+        let (hash_state_ptr) = hash_init()
+        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 10)
+        let (res) = hash_finalize(hash_state_ptr)
+        let pedersen_ptr = hash_ptr
+        return (res=res)
+    end
+end
+
+# @notice Internal function to hash the withdrawal request parameters
+# @param withdrawal_request_ - Struct of withdrawal Request to hash
+# @param res - Hash of the details
+func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(
+    withdrawal_request_ : WithdrawalRequestForHashing*
+) -> (res : felt):
+    alloc_locals
+
+    let hash_ptr = pedersen_ptr
+    with hash_ptr:
+        let (hash_state_ptr) = hash_init()
+        let (hash_state_ptr) = hash_update(hash_state_ptr, withdrawal_request_, 3)
+        let (res) = hash_finalize(hash_state_ptr)
+        let pedersen_ptr = hash_ptr
+        return (res=res)
+    end
+end
+
+# @notice Internal function to add a position to the array when it is opened
+# @param id_ - OrderRequest Id to be added
+# @return 1 - If successfully added
+func add_to_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    id_ : felt
+) -> (res : felt):
+    let (arr_len) = position_array_len.read()
+    position_array.write(index=arr_len, value=id_)
+    position_array_len.write(arr_len + 1)
+    return (1)
+end
+
+# @notice Internal function to add collateral to the array
+# @param new_asset_id - asset Id to be added
+# @param iterator - index at which an asset to be added
+# @param length - length of collateral array
+func add_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    new_asset_id : felt, iterator : felt, length : felt
+):
+    alloc_locals
+    if iterator == length:
+        collateral_array.write(index=iterator, value=new_asset_id)
+        collateral_array_len.write(iterator + 1)
+        return ()
+    end
+
+    let (collateral_id) = collateral_array.read(index=iterator)
+    local difference = collateral_id - new_asset_id
+    if difference == 0:
+        return ()
+    end
+
+    return add_collateral(new_asset_id=new_asset_id, iterator=iterator + 1, length=length)
+end
+
+# @notice Internal function to recursively find the index of the withdrawal history to be updated
+# @param request_id_ - Id of the withdrawal request
+# @param arr_len_ - current index which is being checked to be updated
+# @return index - returns the index which needs to be updated
+func find_index_to_be_updated_recurse{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}(request_id_ : felt, arr_len_ : felt) -> (index : felt):
+    alloc_locals
+
+    if arr_len_ == 0:
+        return (-1)
+    end
+
+    let (request : WithdrawalHistory) = withdrawal_history_array.read(index=arr_len_ - 1)
+    if request.request_id == request_id_:
+        return (arr_len_ - 1)
+    end
+
+    return find_index_to_be_updated_recurse(request_id_, arr_len_ - 1)
+end
+
+# @notice Internal function to recursively check for withdrawal replays
+# @param request_id_ - Id of the withdrawal request
+# @param arr_len_ - current index which is being checked to be updated
+# @return - -1 if same withdrawal request already exists, else 1
+func check_for_withdrawal_replay{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    request_id_ : felt, arr_len_ : felt
+) -> (index : felt):
+    alloc_locals
+
+    if arr_len_ == 0:
+        return (1)
+    end
+
+    let (request : WithdrawalHistory) = withdrawal_history_array.read(index=arr_len_ - 1)
+    if request.request_id == request_id_:
+        return (-1)
+    end
+
+    return check_for_withdrawal_replay(request_id_, arr_len_ - 1)
 end
