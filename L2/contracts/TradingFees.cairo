@@ -208,9 +208,11 @@ func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     # with respect to the lower tier, if lower tier exists
     let (lower_tier_fee) = base_fee_tiers.read(tier=tier_ - 1)
     if tier_ - 1 != 0:
-        assert_lt(lower_tier_fee.numberOfTokens, fee_details.numberOfTokens)
-        assert_lt(fee_details.makerFee, lower_tier_fee.makerFee)
-        assert_lt(fee_details.takerFee, lower_tier_fee.takerFee)
+        with_attr error_message("New fee details are not valid with respect to lower tier"):
+            assert_lt(lower_tier_fee.numberOfTokens, fee_details.numberOfTokens)
+            assert_lt(fee_details.makerFee, lower_tier_fee.makerFee)
+            assert_lt(fee_details.takerFee, lower_tier_fee.takerFee)
+        end
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
@@ -225,9 +227,11 @@ func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     let (upper_tier_fee) = base_fee_tiers.read(tier=tier_ + 1)
     let (is_max_base_fee_tier) = is_le(current_max_base_fee_tier, tier_)
     if is_max_base_fee_tier != 1:
-        assert_lt(fee_details.numberOfTokens, upper_tier_fee.numberOfTokens)
-        assert_lt(upper_tier_fee.makerFee, fee_details.makerFee)
-        assert_lt(upper_tier_fee.takerFee, fee_details.takerFee)
+        with_attr error_message("New fee details are not valid with respect to upper tier"):
+            assert_lt(fee_details.numberOfTokens, upper_tier_fee.numberOfTokens)
+            assert_lt(upper_tier_fee.makerFee, fee_details.makerFee)
+            assert_lt(upper_tier_fee.takerFee, fee_details.takerFee)
+        end
         base_fee_tiers.write(tier=tier_, value=fee_details)
         return ()
     else:
@@ -269,8 +273,10 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     # with respect to the lower tier, if lower tier exists
     let (lower_tier_discount) = discount_tiers.read(tier=tier_ - 1)
     if tier_ - 1 != 0:
-        assert_lt(lower_tier_discount.numberOfTokens, discount_details.numberOfTokens)
-        assert_lt(lower_tier_discount.discount, discount_details.discount)
+        with_attr error_message("New fee details are not valid with respect to lower tier"):
+            assert_lt(lower_tier_discount.numberOfTokens, discount_details.numberOfTokens)
+            assert_lt(lower_tier_discount.discount, discount_details.discount)
+        end
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
@@ -285,13 +291,15 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     let (upper_tier_discount) = discount_tiers.read(tier=tier_ + 1)
     let (is_max_discount_tier) = is_le(current_max_discount_tier, tier_)
     if is_max_discount_tier != 1:
-        assert_lt(discount_details.numberOfTokens, upper_tier_discount.numberOfTokens)
-        assert_lt(discount_details.discount, upper_tier_discount.discount)
-        discount_tiers.write(tier=tier_, value=fee_details)
+        with_attr error_message("New fee details are not valid with respect to upper tier"):
+            assert_lt(discount_details.numberOfTokens, upper_tier_discount.numberOfTokens)
+            assert_lt(discount_details.discount, upper_tier_discount.discount)
+        end
+        discount_tiers.write(tier=tier_, value=discount_details)
         return ()
     else:
         max_discount_tier.write(value=tier_)
-        discount_tiers.write(tier=tier_, value=fee_details)
+        discount_tiers.write(tier=tier_, value=discount_details)
         return ()
     end
 end
