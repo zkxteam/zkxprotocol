@@ -8,7 +8,7 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
 from helpers import StarknetService, ContractType, AccountFactory
-from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+from dummy_addresses import L1_dummy_address
 
 
 admin1_signer = Signer(123456789987654321)
@@ -48,8 +48,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
             admin1_signer.public_key, 
             L1_dummy_address, 
             0, 
-            1, 
-            L1_ZKX_dummy_address
+            1
         ]
     )
     admin2 = await starknet_service.deploy(
@@ -57,8 +56,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
             admin2_signer.public_key, 
             L1_dummy_address, 
             0, 
-            1, 
-            L1_ZKX_dummy_address
+            1
         ]
     )
     adminAuth = await starknet_service.deploy(
@@ -87,8 +85,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         starknet_service,
         L1_dummy_address,
         registry.contract_address,
-        1,
-        L1_ZKX_dummy_address
+        1
     )
 
     alice = await account_factory.deploy_account(alice_signer.public_key)

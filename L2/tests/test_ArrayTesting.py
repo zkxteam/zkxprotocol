@@ -9,7 +9,6 @@ from helpers import StarknetService, ContractType
 signer1 = Signer(123456789987654321)
 
 L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -23,8 +22,7 @@ async def contract_factory(starknet_service: StarknetService):
         signer1.public_key,
         L1_dummy_address,
         0,
-        1,
-        L1_ZKX_dummy_address
+        1
     ])
 
     arrayTesting = await starknet_service.deploy(ContractType.ArrayTesting, [])
