@@ -1,5 +1,10 @@
 %lang starknet
 
+from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.starknet.common.syscalls import get_caller_address
+from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_lt, assert_le
+
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.Constants import (
     Trading_INDEX,
@@ -7,39 +12,34 @@ from contracts.Constants import (
     AccountDeployer_INDEX,
 )
 from contracts.libraries.Utils import verify_caller_authority
-from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_lt, assert_le
 
-# @notice Stores the contract version
+###########
+# Storage #
+###########
+
 @storage_var
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of AuthorizedRegistry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
-# stores all account contract addresses of users
 @storage_var
 func account_registry(index : felt) -> (address : felt):
 end
 
-# stores length of the account registry
 @storage_var
 func account_registry_len() -> (len : felt):
 end
 
-# stores account contract address to boolean mapping to check whether a user is present
 @storage_var
 func account_present(address : felt) -> (present : felt):
 end
 
-#
-# Constructor
-#
+###############
+# Constructor #
+###############
 
 # @notice Constructor for the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
@@ -52,6 +52,65 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     contract_version.write(value=version_)
     return ()
 end
+
+##################
+# View Functions #
+##################
+
+# @notice Function to check whether a user is present in account registry
+# @param address_ Address of the user that is to be checked
+# @returns present - 0 if not present, 1 if present
+@view
+func is_registered_user{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    address_ : felt
+) -> (present : felt):
+    let (present) = account_present.read(address=address_)
+    return (present)
+end
+
+# @notice Function to get the length of the account registry
+# @returns len - length of the registry array
+@view
+func get_registry_len{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}()->(len : felt):
+    let (reg_len) = account_registry_len.read()
+    return (reg_len)
+end
+
+# @notice Function to get all user account addresses
+# @returns account_registry_len - Length of the account registry
+# @returns account_registry - registry of account addresses
+@view
+func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    starting_index_ : felt, num_accounts : felt
+) -> (
+    account_registry_len : felt, account_registry : felt*
+):
+    alloc_locals
+
+    with_attr error_message("starting index cannot be negative"):
+        assert_nn(starting_index_)
+    end
+    
+    with_attr error_message("number of accounts cannot be negative or zero"):
+        assert_lt(0, num_accounts)
+    end
+
+    let ending_index = starting_index_ + num_accounts
+    let (reg_len) = account_registry_len.read()
+    with_attr error_message("cannot retrieve the specified num of accounts"):
+        assert_le(ending_index, reg_len)
+    end
+
+    let (account_registry_list : felt*) = alloc()
+    return populate_account_registry(
+        0, starting_index_, ending_index, account_registry_list
+    )
+end
+
+
+######################
+# External Functions #
+######################
 
 # @notice add to account registry
 # @param address_ - L2 account contract address of the user
@@ -94,7 +153,7 @@ end
 @external
 func remove_from_account_registry{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(id_ : felt) -> (res : felt):
+}(id_ : felt) -> ():
     
     alloc_locals
     with_attr error_message("Caller is not Master Admin"):
@@ -128,8 +187,13 @@ func remove_from_account_registry{
 
     account_registry_len.write(reg_len - 1)
     account_present.write(address=account_address, value=0)
-    return (1)
+
+    return ()
 end
+
+######################
+# Internal Functions #
+######################
 
 # @notice Internal Function called by get_account_registry to recursively add accounts to the registry and return it
 # @param account_registry_len_ - Stores the current length of the populated account registry
@@ -150,52 +214,5 @@ func populate_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     return populate_account_registry(iterator_ + 1, starting_index_ + 1, ending_index_, account_registry_list_)
 end
 
-# @notice Function to get all user account addresses
-# @returns account_registry_len - Length of the account registry
-# @returns account_registry - registry of account addresses
-@view
-func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    starting_index_ : felt, num_accounts : felt
-) -> (
-    account_registry_len : felt, account_registry : felt*
-):
-    alloc_locals
 
-    with_attr error_message("starting index cannot be negative"):
-        assert_nn(starting_index_)
-    end
-    
-    with_attr error_message("number of accounts cannot be negative or zero"):
-        assert_lt(0, num_accounts)
-    end
 
-    let ending_index = starting_index_ + num_accounts
-    let (reg_len) = account_registry_len.read()
-    with_attr error_message("cannot retrieve the specified num of accounts"):
-        assert_le(ending_index, reg_len)
-    end
-
-    let (account_registry_list : felt*) = alloc()
-    return populate_account_registry(
-        0, starting_index_, ending_index, account_registry_list
-    )
-end
-
-# @notice Function to check whether a user is present in account registry
-# @param address_ Address of the user that is to be checked
-# @returns present - 0 if not present, 1 if present
-@view
-func is_registered_user{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    address_ : felt
-) -> (present : felt):
-    let (present) = account_present.read(address=address_)
-    return (present)
-end
-
-# @notice Function to get the length of the account registry
-# @returns len - length of the registry array
-@view
-func get_registry_len{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}()->(len : felt):
-    let (reg_len) = account_registry_len.read()
-    return (reg_len)
-end
