@@ -5,6 +5,7 @@ artifacts/
 .pytest_cache
 
 .DS_Store
+.tox
 
 tests/__pycache__/
 
