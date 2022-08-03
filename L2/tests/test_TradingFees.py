@@ -33,7 +33,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     non_discount = 2305843009213693952 - to64x61(0.03)
     fee = to64x61(0.0002)
     val = await fixed_math.Math64x61_mul(non_discount, fee).call()
-    print(val.result)
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
@@ -95,6 +94,10 @@ async def test_update_base_fees(adminAuth_factory):
     assert result.makerFee == base_fee_maker3
     assert result.takerFee == base_fee_taker3
 
+    execution_info = await fees.get_max_base_fee_tier().call()
+    result = execution_info.result.value
+    assert result == 3
+
 
 @pytest.mark.asyncio
 async def test_update_discount(adminAuth_factory):
@@ -127,14 +130,13 @@ async def test_update_discount(adminAuth_factory):
     assert result.numberOfTokens == 5000
     assert result.discount == discount3
 
+    execution_info = await fees.get_max_discount_tier().call()
+    result = execution_info.result.value
+    assert result == 3
+
 @pytest.mark.asyncio
 async def test_get_fee1(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
-
-    # Commenting because of 64x61 bug
-    # execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 0).call()
-    # result = execution_info.result
-    # assert result.fee == to64x61(0.0002 * 0.97)
 
     execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
     result = execution_info.result
@@ -155,21 +157,67 @@ async def test_get_fee2(adminAuth_factory):
     assert result.fee == to64x61(0.0004 * 0.95)
 
 @pytest.mark.asyncio
-async def test_update_max_base_fee_tier(adminAuth_factory):
+async def test_update_base_fee_tier_to_higher_value(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_max_base_fee_tier', [0])
-
-    execution_info = await fees.get_max_base_fee_tier().call()
-    result = execution_info.result
-    assert result.value == 0
+    base_fee_maker3 = to64x61(0.0001)
+    base_fee_taker3 = to64x61(0.00035)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [5, 5000, base_fee_maker3, base_fee_taker3]))
 
 @pytest.mark.asyncio
-async def test_update_max_discount_tier(adminAuth_factory):
+async def test_update_discount_tier_to_higher_value(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await signer1.send_transaction(admin1, fees.contract_address, 'update_max_discount_tier', [0])
+    discount3 = to64x61(0.1)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [5, 5000, discount3]))
 
-    execution_info = await fees.get_max_discount_tier().call()
-    result = execution_info.result
-    assert result.value == 0
+@pytest.mark.asyncio
+async def test_update_base_fee_tier_with_incorrect_tier_and_details(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
+
+    base_fee_maker3 = to64x61(0.0002)
+    base_fee_taker3 = to64x61(0.00035)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [4, 5000, base_fee_maker3, base_fee_taker3]))
+
+    base_fee_maker3 = to64x61(0.00008)
+    base_fee_taker3 = to64x61(0.00035)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [4, 5000, base_fee_maker3, base_fee_taker3]))
+
+    base_fee_maker3 = to64x61(0.0001)
+    base_fee_taker3 = to64x61(0.0004)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 5000, base_fee_maker3, base_fee_taker3]))
+
+    base_fee_maker3 = to64x61(0.00015)
+    base_fee_taker3 = to64x61(0.00035)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 5000, base_fee_maker3, base_fee_taker3]))
+
+    base_fee_maker1 = to64x61(0.0002)
+    base_fee_taker1 = to64x61(0.0005)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [0, 0, base_fee_maker1, base_fee_taker1]))
+
+    base_fee_maker1 = to64x61(0.00015)
+    base_fee_taker1 = to64x61(0.0005)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1]))
+
+    base_fee_maker1 = to64x61(0.0002)
+    base_fee_taker1 = to64x61(0.0004)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1]))
+
+@pytest.mark.asyncio
+async def test_update_discount_tier_with_incorrect_tier_and_details(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
+
+    discount3 = to64x61(0.09)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [4, 5000, discount3]))
+
+    discount3 = to64x61(0.02)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 5000, discount3]))
+
+    discount3 = to64x61(0.11)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 5000, discount3]))
+
+    discount3 = to64x61(0.11)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [0, 5000, discount3]))
+
+    discount3 = to64x61(0.05)
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [1, 5000, discount3]))

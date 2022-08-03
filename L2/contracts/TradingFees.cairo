@@ -273,7 +273,7 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     # with respect to the lower tier, if lower tier exists
     let (lower_tier_discount) = discount_tiers.read(tier=tier_ - 1)
     if tier_ - 1 != 0:
-        with_attr error_message("New fee details are not valid with respect to lower tier"):
+        with_attr error_message("New discount details are not valid with respect to lower tier"):
             assert_lt(lower_tier_discount.numberOfTokens, discount_details.numberOfTokens)
             assert_lt(lower_tier_discount.discount, discount_details.discount)
         end
@@ -291,7 +291,7 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     let (upper_tier_discount) = discount_tiers.read(tier=tier_ + 1)
     let (is_max_discount_tier) = is_le(current_max_discount_tier, tier_)
     if is_max_discount_tier != 1:
-        with_attr error_message("New fee details are not valid with respect to upper tier"):
+        with_attr error_message("New discount details are not valid with respect to upper tier"):
             assert_lt(discount_details.numberOfTokens, upper_tier_discount.numberOfTokens)
             assert_lt(discount_details.discount, upper_tier_discount.discount)
         end
