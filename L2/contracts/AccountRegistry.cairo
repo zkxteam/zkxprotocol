@@ -2,8 +2,9 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_lt, assert_le
+from starkware.starknet.common.syscalls import get_caller_address
+
 
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.Constants import (
@@ -17,22 +18,27 @@ from contracts.libraries.Utils import verify_caller_authority
 # Storage #
 ###########
 
+# Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
 end
 
+# Stores the address of AuthorizedRegistry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
+# Stores all account contract addresses of users
 @storage_var
 func account_registry(index : felt) -> (address : felt):
 end
 
+# Stores length of the account registry
 @storage_var
 func account_registry_len() -> (len : felt):
 end
 
+# Stores account contract address to boolean mapping to check whether a user is present
 @storage_var
 func account_present(address : felt) -> (present : felt):
 end
@@ -77,11 +83,13 @@ func get_registry_len{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 end
 
 # @notice Function to get all user account addresses
+# @param starting_index_ - Index from which to fetch the array
+# @param num_accounts - Number of accounts to fetch from the array
 # @returns account_registry_len - Length of the account registry
 # @returns account_registry - registry of account addresses
 @view
 func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    starting_index_ : felt, num_accounts : felt
+    starting_index_ : felt, num_accounts_ : felt
 ) -> (
     account_registry_len : felt, account_registry : felt*
 ):
@@ -92,10 +100,10 @@ func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     end
     
     with_attr error_message("number of accounts cannot be negative or zero"):
-        assert_lt(0, num_accounts)
+        assert_lt(0, num_accounts_)
     end
 
-    let ending_index = starting_index_ + num_accounts
+    let ending_index = starting_index_ + num_accounts_
     let (reg_len) = account_registry_len.read()
     with_attr error_message("cannot retrieve the specified num of accounts"):
         assert_le(ending_index, reg_len)
@@ -149,7 +157,6 @@ end
 
 # @notice External function called to remove account address from registry
 # @param id_ - Index of the element in the list
-# @returns 1 - If successfully removed
 @external
 func remove_from_account_registry{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
@@ -196,10 +203,12 @@ end
 ######################
 
 # @notice Internal Function called by get_account_registry to recursively add accounts to the registry and return it
-# @param account_registry_len_ - Stores the current length of the populated account registry
+# @param iterator_ - The index of pointer of the array to be returned
+# @param starting_index_ - The current index of the registry array
+# @param ending_index_ - The index at which to stop
 # @param account_registry_list_ - Registry of accounts filled up to the index
-# @returns account_registry_len_ - Length of the account registry
-# @returns account_registry_list_ - registry of account addresses
+# @returns account_registry_len - Length of the account registry
+# @returns account_registry - registry of account addresses
 func populate_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     iterator_, starting_index_ : felt, ending_index_ :felt, account_registry_list_ : felt*
 ) -> (account_registry_len : felt, account_registry : felt*):
