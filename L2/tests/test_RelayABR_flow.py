@@ -5,7 +5,9 @@ import time
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, assert_revert
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, assert_revert, convertTo64x61
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -20,205 +22,66 @@ BTC_ID = str_to_felt("32f0406jz7qj8")
 USDC_ID = str_to_felt("fghj3am52qpzsib")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
-
 
 @pytest.fixture(scope='module')
 def event_loop():
     return asyncio.new_event_loop()
 
 
-def convertTo64x61(nums):
-    for i in range(len(nums)):
-        nums[i] = to64x61(nums[i])
-
-    return nums
-
-
 @pytest.fixture(scope='module')
-async def abr_factory():
-    starknet = await Starknet.empty()
+async def abr_factory(starknet_service: StarknetService):
 
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
+    # Deploy infrastructure (Part 1)
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        admin1_signer.public_key,
+        L1_dummy_address,
+        0,
+        1,
+        L1_ZKX_dummy_address
+    ])
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, 0x0])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
+    asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
 
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            0x0
-        ]
-    )
+    # Deploy accounts
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1, L1_ZKX_dummy_address)
+    alice = await account_factory.deploy_account(alice_signer.public_key)
+    bob = await account_factory.deploy_account(bob_signer.public_key)
 
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
-    )
-
-    fees = await starknet.deploy(
-        "contracts/TradingFees.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    asset = await starknet.deploy(
-        "contracts/Asset.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    alice = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            alice_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    bob = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            bob_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-    fixed_math = await starknet.deploy(
-        "contracts/Math_64x61.cairo",
-        constructor_calldata=[
-        ]
-    )
-
-    holding = await starknet.deploy(
-        "contracts/Holding.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    feeBalance = await starknet.deploy(
-        "contracts/FeeBalance.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    market = await starknet.deploy(
-        "contracts/Markets.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    liquidity = await starknet.deploy(
-        "contracts/LiquidityFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    insurance = await starknet.deploy(
-        "contracts/InsuranceFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    emergency = await starknet.deploy(
-        "contracts/EmergencyFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    trading = await starknet.deploy(
-        "contracts/Trading.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    feeDiscount = await starknet.deploy(
-        "contracts/FeeDiscount.cairo",
-        constructor_calldata=[]
-    )
-
-    accountRegistry = await starknet.deploy(
-        "contracts/AccountRegistry.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    abr = await starknet.deploy(
-        "contracts/ABR.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    abr_fund = await starknet.deploy(
-        "contracts/ABRFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    abr_payment = await starknet.deploy(
-        "contracts/ABRPayment.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    relay_abr = await starknet.deploy(
-        "contracts/relay_contracts/RelayABR.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            17  # abr index
-        ]
-    )
-
-    relay_abr_payment = await starknet.deploy(
-        "contracts/relay_contracts/RelayABRPayment.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            19  # abr_payment index
-        ]
-    )
+    # Deploy infrastructure (Part 2)
+    fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
+    holding = await starknet_service.deploy(ContractType.Holding, [registry.contract_address, 1])
+    feeBalance = await starknet_service.deploy(ContractType.FeeBalance, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
+    liquidity = await starknet_service.deploy(ContractType.LiquidityFund, [registry.contract_address, 1])
+    insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
+    emergency = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
+    trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    accountRegistry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
+    abr = await starknet_service.deploy(ContractType.ABR, [registry.contract_address, 1])
+    abr_fund = await starknet_service.deploy(ContractType.ABRFund, [registry.contract_address, 1])
+    abr_payment = await starknet_service.deploy(ContractType.ABRPayment, [registry.contract_address, 1])
+    relay_abr = await starknet_service.deploy(ContractType.RelayABR, [
+        registry.contract_address, 
+        1, 
+        17 # abr index
+    ])
+    relay_abr_payment = await starknet_service.deploy(ContractType.RelayABRPayment, [
+        registry.contract_address, 
+        1, 
+        19 # abr_payment index
+    ])
 
     timestamp = int(time.time())
 
-    starknet.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp, gas_price=starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet.state.state.block_info.sequencer_address
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address
     )
 
     # Access 1 allows adding and removing assets from the system

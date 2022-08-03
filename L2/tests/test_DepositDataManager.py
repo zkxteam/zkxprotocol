@@ -9,9 +9,9 @@ from starkware.starknet.core.os.class_hash import compute_class_hash
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 from starkware.starknet.services.api.contract_class import ContractClass
 from starkware.starknet.testing.contract import StarknetContract
-
-signer1 = Signer(123456789987654321)
-signer2 = Signer(123456789987654322)
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+from dummy_signers import signer1, signer2
 
 
 @pytest.fixture(scope='module')
@@ -20,41 +20,17 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory():
-    starknet = await Starknet.empty()
+async def adminAuth_factory(starknet_service: StarknetService):
 
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 123, 0, 1, 1]
-    )
-
-    admin2 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 123, 0, 1, 1]
-    )
-
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            admin2.contract_address
-        ]
-    )
-
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
-    )
-
-    deposit_data_manager = await starknet.deploy(
-        "contracts/DepositDataManager.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
+    # Deploy accounts
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1, L1_ZKX_dummy_address)
+    admin1 = await account_factory.deploy_account(signer1.public_key)
+    admin2 = await account_factory.deploy_account(signer2.public_key)
+    
+    # Deploy infrastructure
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    deposit_data_manager = await starknet_service.deploy(ContractType.DepositDataManager, [registry.contract_address, 1])
 
     return adminAuth, registry, deposit_data_manager, admin1, admin2
 

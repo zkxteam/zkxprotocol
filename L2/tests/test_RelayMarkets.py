@@ -4,13 +4,9 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
-
-signer1 = Signer(123456789987654321)
-signer2 = Signer(123456789987654322)
-signer3 = Signer(123456789987654323)
-
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+from dummy_signers import signer1, signer2, signer3
 
 
 @pytest.fixture(scope='module')
@@ -19,54 +15,19 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory():
-    starknet = await Starknet.empty()
+async def adminAuth_factory(starknet_service: StarknetService):
+
+    # Deploy accounts
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1, L1_ZKX_dummy_address)
+    admin1 = await account_factory.deploy_account(signer1.public_key)
+    admin2 = await account_factory.deploy_account(signer2.public_key)
+    user1 = await account_factory.deploy_account(signer3.public_key)
     
-    admin1 = await starknet.deploy(
-            "contracts/Account.cairo",
-            constructor_calldata=[signer1.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-        )
-
-    admin2 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    user1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            admin2.contract_address
-        ]
-    )
-
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
-    )
-
-    asset = await starknet.deploy(
-        "contracts/Asset.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    market = await starknet.deploy(
-        "contracts/Markets.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
+    # Deploy infrastructure
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
@@ -74,27 +35,19 @@ async def adminAuth_factory():
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
 
-    # create relay contracts with appropriate index as per entries in registry
+    # Deploy Relay contracts with appropriate index as per entries in registry
+    relay_asset = await starknet_service.deploy(ContractType.RelayAsset, [
+        registry.contract_address, 
+        1,
+        1 # asset index
+    ])
+    relay_market = await starknet_service.deploy(ContractType.RelayMarkets, [
+        registry.contract_address, 
+        1,
+        2 # market index
+    ])
 
-    relay_asset = await starknet.deploy(
-        "contracts/relay_contracts/RelayAsset.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            1 # asset index
-        ]
-    )
-
-    relay_market = await starknet.deploy(
-        "contracts/relay_contracts/RelayMarkets.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            2 # market index
-        ]
-    )
-
-    # give appropriate permissions to relays
+    # Give appropriate permissions to relays
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_asset.contract_address, 1, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_asset.contract_address, 2, 1])
 
@@ -107,9 +60,7 @@ async def adminAuth_factory():
     await signer1.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj9"), 0, str_to_felt("TSLA"), str_to_felt("Tesla"), 0, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
     await signer1.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj10"), 0, str_to_felt("USDT"), str_to_felt("USDTether"), 0, 1, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
 
-
-    
-    # return relay versions of asset, market to test logic of underlying contracts
+    # Return relay versions of asset, market to test logic of underlying contracts
     return adminAuth, relay_asset, relay_market, admin1, admin2, user1
 
 

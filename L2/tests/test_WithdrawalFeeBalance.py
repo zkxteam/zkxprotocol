@@ -5,6 +5,9 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -19,8 +22,6 @@ BTC_ID = str_to_felt("32f0406jz7qj8")
 USDC_ID = str_to_felt("fghj3am52qpzsib")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -28,141 +29,49 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory():
-    starknet = await Starknet.empty()
+async def adminAuth_factory(starknet_service: StarknetService):
 
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
+    ### Deploy infrastructure (Part 1)
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        admin1_signer.public_key, 
+        L1_dummy_address, 
+        0, 
+        1, 
+        L1_ZKX_dummy_address
+    ])
+    admin2 = await starknet_service.deploy(ContractType.Account, [
+        admin2_signer.public_key, 
+        L1_dummy_address, 
+        0, 
+        1, 
+        L1_ZKX_dummy_address
+    ])
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
+    asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
 
-    admin2 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[admin2_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
+    ### Deploy user accounts
+    account_factory = AccountFactory(
+        starknet_service,
+        L1_dummy_address,
+        registry.contract_address,
+        1,
+        L1_ZKX_dummy_address
     )
+    alice = await account_factory.deploy_account(alice_signer.public_key)
+    bob = await account_factory.deploy_account(bob_signer.public_key)
+    dave = await account_factory.deploy_account(dave_signer.public_key)
 
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            admin2.contract_address
-        ]
-    )
-
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
-    )
-
-    fees = await starknet.deploy(
-        "contracts/TradingFees.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    asset = await starknet.deploy(
-        "contracts/Asset.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    alice = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            alice_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    bob = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            bob_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    dave = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            dave_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    fixed_math = await starknet.deploy(
-        "contracts/Math_64x61.cairo",
-        constructor_calldata=[
-        ]
-    )
-
-    holding = await starknet.deploy(
-        "contracts/Holding.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    feeBalance = await starknet.deploy(
-        "contracts/FeeBalance.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    market = await starknet.deploy(
-        "contracts/Markets.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    trading = await starknet.deploy(
-        "contracts/Trading.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    feeDiscount = await starknet.deploy(
-        "contracts/FeeDiscount.cairo",
-        constructor_calldata=[]
-    )
-
-    accountRegistry = await starknet.deploy(
-        "contracts/AccountRegistry.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    withdrawFeeBalance = await starknet.deploy(
-        "contracts/WithdrawalFeeBalance.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
+    ### Deploy infrastructure (Part 2)
+    fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
+    holding = await starknet_service.deploy(ContractType.Holding, [registry.contract_address, 1])
+    feeBalance = await starknet_service.deploy(ContractType.FeeBalance, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
+    trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    accountRegistry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
+    withdrawFeeBalance = await starknet_service.deploy(ContractType.WithdrawalFeeBalance, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])

@@ -4,7 +4,10 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, convertList
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -14,7 +17,6 @@ charlie_signer = Signer(123456789987654325)
 liquidator_signer = Signer(123456789987654326)
 daniel_signer = Signer(123456789987654327)
 eduard_signer = Signer(123456789987654328)
-
 
 maker_trading_fees = to64x61(0.0002 * 0.97)
 taker_trading_fees = to64x61(0.0005 * 0.97)
@@ -29,9 +31,6 @@ TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
-
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -39,179 +38,96 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory():
-    starknet = await Starknet.empty()
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
+async def adminAuth_factory(starknet_service: StarknetService):
+
+    ### Deploy infrastructure (Part 1)
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        admin1_signer.public_key, 
+        L1_dummy_address, 
+        0, 
+        1, 
+        L1_ZKX_dummy_address
+    ])
+    admin2 = await starknet_service.deploy(ContractType.Account, [
+        admin2_signer.public_key, 
+        L1_dummy_address, 
+        0, 
+        1, 
+        L1_ZKX_dummy_address
+    ])
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    account_registry = await starknet_service.deploy(
+        ContractType.AccountRegistry, 
+        [registry.contract_address, 1]
+    )
+    fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
+    asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
+
+    ### Deploy user accounts
+    account_factory = AccountFactory(
+        starknet_service,
+        L1_dummy_address,
+        registry.contract_address,
+        1,
+        L1_ZKX_dummy_address
     )
 
-    admin2 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[admin2_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
+    alice = await account_factory.deploy_account(alice_signer.public_key)
+    bob = await account_factory.deploy_account(bob_signer.public_key)
+    charlie = await account_factory.deploy_account(charlie_signer.public_key)
+    daniel = await account_factory.deploy_account(daniel_signer.public_key)
+    eduard = await account_factory.deploy_account(eduard_signer.public_key)
+    liquidator = await account_factory.deploy_account(liquidator_signer.public_key)
+
+    ### Deploy infrastructure (Part 2)
+    fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
+    holding = await starknet_service.deploy(ContractType.Holding, [registry.contract_address, 1])
+    feeBalance = await starknet_service.deploy(ContractType.FeeBalance, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
+    liquidityFund = await starknet_service.deploy(ContractType.LiquidityFund, [registry.contract_address, 1])
+    trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
+    liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
+    insuranceFund = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    marketPrices = await starknet_service.deploy(
+        ContractType.MarketPrices, 
+        [registry.contract_address, 1]
+    )
+    timestamp = int(time.time())
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address
     )
 
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            admin2.contract_address
-        ]
-    )
+    # spoof admin1 as account_deployer so that it can update account registry
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
 
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
-    )
+    # add user accounts to account registry
 
-    fees = await starknet.deploy(
-        "contracts/TradingFees.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[admin1.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[admin2.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[alice.contract_address])
 
-    asset = await starknet.deploy(
-        "contracts/Asset.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[bob.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[charlie.contract_address])
+    
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[daniel.contract_address])
 
-    alice = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            alice_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    bob = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            bob_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-    charlie = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            charlie_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    daniel = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            daniel_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    eduard = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            eduard_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    liquidator = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            liquidator_signer.public_key,
-            registry.contract_address,
-            1,
-            0
-        ]
-    )
-
-    fixed_math = await starknet.deploy(
-        "contracts/Math_64x61.cairo",
-        constructor_calldata=[
-        ]
-    )
-
-    holding = await starknet.deploy(
-        "contracts/Holding.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    feeBalance = await starknet.deploy(
-        "contracts/FeeBalance.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    market = await starknet.deploy(
-        "contracts/Markets.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    liquidityFund = await starknet.deploy(
-        "contracts/LiquidityFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    trading = await starknet.deploy(
-        "contracts/Trading.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    liquidate = await starknet.deploy(
-        "contracts/Liquidate.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    insuranceFund = await starknet.deploy(
-        "contracts/InsuranceFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    feeDiscount = await starknet.deploy(
-        "contracts/FeeDiscount.cairo",
-        constructor_calldata=[]
-    )
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry',[eduard.contract_address])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -232,65 +148,40 @@ async def adminAuth_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insuranceFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     # await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, liquidator.contract_address])
-
-    # create relay contracts with appropriate indexes
-
-    relay_trading = await starknet.deploy(
-        "contracts/relay_contracts/RelayTrading.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            5 # trading index
-        ]
-    )
-
-    relay_asset = await starknet.deploy(
-        "contracts/relay_contracts/RelayAsset.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            1 # asset index
-        ]
-    )
-
-    relay_holding = await starknet.deploy(
-        "contracts/relay_contracts/RelayHolding.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            7 # holding index
-        ]
-    )
-
-    relay_feeBalance = await starknet.deploy(
-        "contracts/relay_contracts/RelayFeeBalance.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            6 # feeBalance index
-        ]
-
-    )
-
-    relay_fees = await starknet.deploy(
-        "contracts/relay_contracts/RelayTradingFees.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            4 # TradingFees index
-        ]
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
     
-    )
-
-    relay_liquidate = await starknet.deploy(
-        "contracts/relay_contracts/RelayLiquidate.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            11 # Liquidate index
-        ]
-    
-    )
+    # Deploy relay contracts with appropriate indexes
+    relay_trading = await starknet_service.deploy(ContractType.RelayTrading, [
+        registry.contract_address, 
+        1,
+        5 # trading index
+    ])
+    relay_asset = await starknet_service.deploy(ContractType.RelayAsset, [
+        registry.contract_address, 
+        1,
+        1 # asset index
+    ])
+    relay_holding = await starknet_service.deploy(ContractType.RelayHolding, [
+        registry.contract_address, 
+        1,
+        7 # holding index
+    ])
+    relay_feeBalance = await starknet_service.deploy(ContractType.RelayFeeBalance, [
+        registry.contract_address, 
+        1,
+        6 # feeBalance index
+    ])
+    relay_fees = await starknet_service.deploy(ContractType.RelayTradingFees, [
+        registry.contract_address, 
+        1,
+        4 # TradingFees index
+    ])
+    relay_liquidate = await starknet_service.deploy(ContractType.RelayLiquidate, [
+        registry.contract_address, 
+        1,
+        11 # Liquidate index
+    ])
 
     # give full permissions to relays
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_trading.contract_address, 0, 1])
@@ -374,6 +265,7 @@ async def adminAuth_factory():
     return adminAuth, relay_fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, relay_holding, relay_feeBalance, relay_liquidate, insuranceFund
 
 
+
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
@@ -396,6 +288,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
+    stopPrice1 = 0
     orderType1 = 0
     position1 = to64x61(2)
     direction1 = 0
@@ -408,6 +301,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(5000)
+    stopPrice2 = 0
     orderType2 = 0
     position2 = to64x61(2)
     direction2 = 1
@@ -419,9 +313,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     execution_price1 = to64x61(5000)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
@@ -432,9 +326,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
     ])
 
     orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
@@ -534,16 +428,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    #alice_maintenance = await liquidate.return_maintenance().call()
-    #print("Alice maintenance requirement:",
-    #      from64x61(alice_maintenance.result.res))
-
-    #assert from64x61(alice_maintenance.result.res) == 787.5
-
-    #alice_acc_value = await liquidate.return_acc_value().call()
-    #print("Alice acc value:", from64x61(alice_acc_value.result.res))
-
-    #assert from64x61(alice_acc_value.result.res) == 5819.9075
+    
 
     ##############################################
     ######## Bob's liquidation result 1 ##########
@@ -586,17 +471,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(bob_balance_ust.result.res) == 5500
 
-    #bob_maintenance = await liquidate.return_maintenance().call()
-    #print("Bob maintenance requirement:",
-    #      from64x61(bob_maintenance.result.res))
-
-    #assert from64x61(bob_maintenance.result.res) == 787.5
-
-    #bob_acc_value = await liquidate.return_acc_value().call()
-    #print("bob acc value:", from64x61(bob_acc_value.result.res))
-
-    #assert from64x61(bob_acc_value.result.res) == 6572.963000000001
-
+   
     ###### Opening of Orders 2 #######
     size2 = to64x61(3)
     marketID_2 = ETH_USD_ID
@@ -605,6 +480,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     assetID_3 = ETH_ID
     collateralID_3 = USDC_ID
     price3 = to64x61(100)
+    stopPrice3 = 0
     orderType3 = 0
     position3 = to64x61(3)
     direction3 = 0
@@ -617,6 +493,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     assetID_4 = ETH_ID
     collateralID_4 = USDC_ID
     price4 = to64x61(100)
+    stopPrice4 = 0
     orderType4 = 0
     position4 = to64x61(3)
     direction4 = 1
@@ -628,9 +505,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     execution_price2 = to64x61(100)
 
     hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3,
-                                price3, orderType3, position3, direction3, closeOrder3, leverage3)
+                                price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3)
     hash_computed4 = hash_order(order_id_4, assetID_4, collateralID_4,
-                                price4, orderType4, position4, direction4, closeOrder4, leverage4)
+                                price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4)
 
     signed_message3 = alice_signer.sign(hash_computed3)
     signed_message4 = bob_signer.sign(hash_computed4)
@@ -641,9 +518,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1, 
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1, 
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
     ])
 
     orderState3 = await alice.get_order_data(orderID_=order_id_3).call()
@@ -737,16 +614,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    #alice_maintenance = await liquidate.return_maintenance().call()
-    #print("Alice maintenance requirement:",
-    #      from64x61(alice_maintenance.result.res))
-
-    #assert from64x61(alice_maintenance.result.res) == 811.125
-
-    #alice_acc_value = await liquidate.return_acc_value().call()
-    #print("Alice acc value:", from64x61(alice_acc_value.result.res))
-
-    #assert from64x61(alice_acc_value.result.res) == 5819.754725000001
+    
 
     ##############################################
     ######## Bob's liquidation result 2 ##########
@@ -793,17 +661,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     assert from64x61(bob_balance_ust.result.res) == 5500
 
-    #bob_maintenance = await liquidate.return_maintenance().call()
-    #print("Bob maintenance requirement:",
-    #      from64x61(bob_maintenance.result.res))
-
-    #assert from64x61(bob_maintenance.result.res) == 811.125
-
-    #bob_acc_value = await liquidate.return_acc_value().call()
-    #print("bob acc value:", from64x61(bob_acc_value.result.res))
-
-    #assert from64x61(bob_acc_value.result.res) == 6572.90189
-
+  
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
@@ -854,16 +712,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
 
     assert from64x61(alice_balance_ust.result.res) == 1000
 
-    #alice_maintenance = await liquidate.return_maintenance().call()
-    #print("Alice maintenance requirement:",
-    #      from64x61(alice_maintenance.result.res))
-
-    #assert from64x61(alice_maintenance.result.res) == 811.125
-
-    #alice_acc_value = await liquidate.return_acc_value().call()
-    #print("Alice acc value:", from64x61(alice_acc_value.result.res))
-
-    #assert from64x61(alice_acc_value.result.res) == -481.295275
+  
 
     order_state = await alice.get_order_data(orderID_=liquidate_result_alice.result.response[1]).call()
     res4 = list(order_state.result.res)
@@ -892,6 +741,7 @@ async def test_liquidation_flow(adminAuth_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(7357.5)
+    stopPrice1 = 0
     orderType1 = 3
     position1 = to64x61(2)
     direction1 = 1
@@ -904,6 +754,7 @@ async def test_liquidation_flow(adminAuth_factory):
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(7357.5)
+    stopPrice2 = 0
     orderType2 = 0
     position2 = to64x61(2)
     direction2 = 0
@@ -915,9 +766,9 @@ async def test_liquidation_flow(adminAuth_factory):
     execution_price1 = to64x61(7357.5)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = liquidator_signer.sign(hash_computed1)
     signed_message2 = charlie_signer.sign(hash_computed2)
@@ -933,9 +784,9 @@ async def test_liquidation_flow(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
         charlie.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
     ])
 
     orderState1 = await alice.get_order_data(orderID_=parentOrder1).call()
@@ -1028,16 +879,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
 
     assert from64x61(charlie_balance_usdc.result.res) == 639.64529
 
-    #charlie_maintenance = await liquidate.return_maintenance().call()
-    #print("Charlie maintenance requirement:",
-    #      from64x61(charlie_maintenance.result.res))
-
-    #assert from64x61(charlie_maintenance.result.res) == 1158.80625
-
-    #charlie_acc_value = await liquidate.return_acc_value().call()
-    #print("Charlie acc value:", from64x61(charlie_acc_value.result.res))
-
-    #assert from64x61(charlie_acc_value.result.res) == -302.2474455
+   
 
     ###################
 
@@ -1062,6 +904,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(11500)
+    stopPrice1 = 0
     orderType1 = 3
     position1 = to64x61(2)
     direction1 = 1
@@ -1074,6 +917,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(11500)
+    stopPrice2 = 0
     orderType2 = 0
     position2 = to64x61(2)
     direction2 = 0
@@ -1085,9 +929,9 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
     execution_price1 = to64x61(11500)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = liquidator_signer.sign(hash_computed1)
     signed_message2 = alice_signer.sign(hash_computed2)
@@ -1105,9 +949,9 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         marketID_1,
         2,
         charlie.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
         alice.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
     ])
 
     orderState1 = await charlie.get_order_data(orderID_=parentOrder1).call()
@@ -1221,6 +1065,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1000)
+    stopPrice1 = 0
     orderType1 = 0
     position1 = to64x61(5)
     direction1 = 0
@@ -1233,6 +1078,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(1000)
+    stopPrice2 = 0
     orderType2 = 0
     position2 = to64x61(5)
     direction2 = 1
@@ -1244,9 +1090,9 @@ async def test_deleveraging_flow(adminAuth_factory):
     execution_price1 = to64x61(1000)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = eduard_signer.sign(hash_computed1)
     signed_message2 = daniel_signer.sign(hash_computed2)
@@ -1257,9 +1103,9 @@ async def test_deleveraging_flow(adminAuth_factory):
         marketID_1,
         2,
         eduard.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0, 
         daniel.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
     ])
 
     orderState1 = await eduard.get_order_data(orderID_=order_id_1).call()
@@ -1359,16 +1205,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     assert liquidate_result_eduard.result.response[1] == str_to_felt(
         "343uofdsjxz")
 
-    #eduard_maintenance = await liquidate.return_maintenance().call()
-    #print("eduard maintenance requirement:",
-    #      from64x61(eduard_maintenance.result.res))
-
-    #assert from64x61(eduard_maintenance.result.res) == 393.75
-
-    #eduard_acc_value = await liquidate.return_acc_value().call()
-    #print("eduard acc value:", from64x61(eduard_acc_value.result.res))
-
-    #assert from64x61(eduard_acc_value.result.res) == 261.48150000000004
+   
 
     eduard_amount_to_be_sold = await eduard.get_deleveraged_or_liquidatable_position().call()
     print(eduard_amount_to_be_sold.result)
@@ -1390,6 +1227,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     assetID_3 = BTC_ID
     collateralID_3 = USDC_ID
     price3 = to64x61(1250)
+    stopPrice3 = 0
     orderType3 = 4
     position3 = to64x61(1.9454545454545453)
     direction3 = 1
@@ -1402,6 +1240,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     assetID_4 = BTC_ID
     collateralID_4 = USDC_ID
     price4 = to64x61(1250)
+    stopPrice4 = 0
     orderType4 = 0
     position4 = to64x61(1.9454545454545453)
     direction4 = 0
@@ -1413,9 +1252,9 @@ async def test_deleveraging_flow(adminAuth_factory):
     execution_price2 = to64x61(1250)
 
     hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3,
-                                price3, orderType3, position3, direction3, closeOrder3, leverage3)
+                                price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3)
     hash_computed4 = hash_order(order_id_4, assetID_4, collateralID_4,
-                                price4, orderType4, position4, direction4, closeOrder4, leverage4)
+                                price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4)
 
     signed_message3 = liquidator_signer.sign(hash_computed3)
     signed_message4 = daniel_signer.sign(hash_computed4)
@@ -1426,9 +1265,9 @@ async def test_deleveraging_flow(adminAuth_factory):
         marketID_2,
         2,
         eduard.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1, 
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1, 
         daniel.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
     ])
 
     orderState3 = await eduard.get_order_data(orderID_=order_id_1).call()
@@ -1539,16 +1378,7 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
     assert liquidate_result_eduard.result.response[1] == str_to_felt(
         "343uofdsjxz")
 
-    #eduard_maintenance = await liquidate.return_maintenance().call()
-    #print("eduard maintenance requirement:",
-    #      from64x61(eduard_maintenance.result.res))
-
-    #assert from64x61(eduard_maintenance.result.res) == 240.54545454545456
-
-    #eduard_acc_value = await liquidate.return_acc_value().call()
-    #print("eduard acc value:", from64x61(eduard_acc_value.result.res))
-
-    #assert from64x61(eduard_acc_value.result.res) == -1502.5185000000001
+  
 
     eduard_amount_to_be_sold = await eduard.get_deleveraged_or_liquidatable_position().call()
     print(eduard_amount_to_be_sold.result)
@@ -1572,6 +1402,7 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1800)
+    stopPrice1 = 0
     orderType1 = 3
     position1 = to64x61(5 - 1.9454545454545453)
     direction1 = 1
@@ -1584,6 +1415,7 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(1800)
+    stopPrice2 = 0
     orderType2 = 0
     position2 = to64x61(5 - 1.9454545454545453)
     direction2 = 0
@@ -1595,9 +1427,9 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
     execution_price1 = to64x61(1800)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, orderType1, position1, direction1, closeOrder1, leverage1)
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, orderType2, position2, direction2, closeOrder2, leverage2)
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
 
     signed_message1 = liquidator_signer.sign(hash_computed1)
     signed_message2 = daniel_signer.sign(hash_computed2)
@@ -1613,9 +1445,9 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
         marketID_1,
         2,
         eduard.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
         daniel.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
     ])
 
     orderState1 = await eduard.get_order_data(orderID_=parentOrder1).call()
@@ -1666,6 +1498,3 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
 
     account_value = await trading.return_net_acc().call()
     print("account value after:", from64x61(account_value.result.res))
-
-    hash_list=await liquidate.get_caller_hash_list(liquidator.contract_address).call()
-    print(hash_list.result)
