@@ -21,7 +21,7 @@ const Math64x61_ONE = 1 * Math64x61_FRACT_PART
 const Math64x61_E = 6267931151224907085
 
 func Math64x61_assert64x61{range_check_ptr}(x : felt):
-    assert_le(x, Math64x61_BOUND)
+    assert_lt(x, Math64x61_BOUND)
     assert_le(-Math64x61_BOUND, x)
     return ()
 end
@@ -34,7 +34,7 @@ end
 
 # Converts a felt to a fixed point value ensuring it will not overflow
 func Math64x61_fromFelt{range_check_ptr}(x : felt) -> (res : felt):
-    assert_le(x, Math64x61_INT_PART)
+    assert_lt(x, Math64x61_INT_PART)
     assert_le(-Math64x61_INT_PART, x)
     return (x * Math64x61_FRACT_PART)
 end
@@ -54,6 +54,7 @@ end
 
 # Calculates the floor of a 64.61 value
 func Math64x61_floor{range_check_ptr}(x : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
     let (int_val, mod_val) = signed_div_rem(x, Math64x61_ONE, Math64x61_BOUND)
     let res = x - mod_val
     Math64x61_assert64x61(res)
@@ -62,14 +63,23 @@ end
 
 # Calculates the ceiling of a 64.61 value
 func Math64x61_ceil{range_check_ptr}(x : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
     let (int_val, mod_val) = signed_div_rem(x, Math64x61_ONE, Math64x61_BOUND)
-    let res = (int_val + 1) * Math64x61_ONE
-    Math64x61_assert64x61(res)
+    if mod_val != 0:
+        tempvar res = (int_val + 1) * Math64x61_ONE
+        Math64x61_assert64x61(res)
+    else:
+        tempvar res = int_val * Math64x61_ONE
+        Math64x61_assert64x61(res)
+    end
     return (res)
 end
 
 # Returns the minimum of two values
 func Math64x61_min{range_check_ptr}(x : felt, y : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
+    Math64x61_assert64x61(y)
+
     let (x_le) = is_le(x, y)
 
     if x_le == 1:
@@ -81,6 +91,9 @@ end
 
 # Returns the maximum of two values
 func Math64x61_max{range_check_ptr}(x : felt, y : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
+    Math64x61_assert64x61(y)
+
     let (x_le) = is_le(x, y)
 
     if x_le == 1:
@@ -93,6 +106,9 @@ end
 # Convenience addition method to assert no overflow before returning
 @view
 func Math64x61_add{range_check_ptr}(x : felt, y : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
+    Math64x61_assert64x61(y)
+
     let res = x + y
     Math64x61_assert64x61(res)
     return (res)
@@ -101,6 +117,9 @@ end
 # Convenience subtraction method to assert no overflow before returning
 @view
 func Math64x61_sub{range_check_ptr}(x : felt, y : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
+    Math64x61_assert64x61(y)
+
     let res = x - y
     Math64x61_assert64x61(res)
     return (res)
@@ -109,6 +128,9 @@ end
 # Multiples two fixed point values and checks for overflow before returning
 @view
 func Math64x61_mul{range_check_ptr}(x : felt, y : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
+    Math64x61_assert64x61(y)
+
     tempvar product = x * y
     let (res, _) = signed_div_rem(product, Math64x61_FRACT_PART, Math64x61_BOUND)
     Math64x61_assert64x61(res)
@@ -120,6 +142,9 @@ end
 @view
 func Math64x61_div{range_check_ptr}(x : felt, y : felt) -> (res : felt):
     alloc_locals
+    Math64x61_assert64x61(x)
+    Math64x61_assert64x61(y)
+
     let (div) = abs_value(y)
     let (div_sign) = sign(y)
     tempvar product = x * Math64x61_FRACT_PART
@@ -133,6 +158,7 @@ end
 # y is a standard felt (int)
 func Math64x61__pow_int{range_check_ptr}(x : felt, y : felt) -> (res : felt):
     alloc_locals
+    Math64x61_assert64x61(x)
     let (exp_sign) = sign(y)
     let (exp_val) = abs_value(y)
 
@@ -164,6 +190,8 @@ end
 # y is a 64x61 fixed point value
 func Math64x61_pow{range_check_ptr}(x : felt, y : felt) -> (res : felt):
     alloc_locals
+    Math64x61_assert64x61(x)
+    Math64x61_assert64x61(y)
     let (y_int, y_frac) = signed_div_rem(y, Math64x61_ONE, Math64x61_BOUND)
 
     # use the more performant integer pow when y is an int
@@ -185,6 +213,7 @@ end
 @view
 func Math64x61_sqrt{range_check_ptr}(x : felt) -> (res : felt):
     alloc_locals
+    Math64x61_assert64x61(x)
     let (root) = sqrt(x)
     let (scale_root) = sqrt(Math64x61_FRACT_PART)
     let (res, _) = signed_div_rem(root * Math64x61_FRACT_PART, scale_root, Math64x61_BOUND)
@@ -263,6 +292,7 @@ end
 # x must be greather than zero
 func Math64x61_log2{range_check_ptr}(x : felt) -> (res : felt):
     alloc_locals
+    Math64x61_assert64x61(x)
 
     if x == Math64x61_ONE:
         return (0)
@@ -313,6 +343,7 @@ end
 # x must be greater than zero
 @view
 func Math64x61_ln{range_check_ptr}(x : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
     const ln_2 = 1598288580650331957
     let (log2_x) = Math64x61_log2(x)
     let (product) = Math64x61_mul(log2_x, ln_2)
@@ -322,6 +353,7 @@ end
 # Calculates the base 10 log of x: log10(x)
 # x must be greater than zero
 func Math64x61_log10{range_check_ptr}(x : felt) -> (res : felt):
+    Math64x61_assert64x61(x)
     const log10_2 = 694127911065419642
     let (log10_x) = Math64x61_log2(x)
     let (product) = Math64x61_mul(log10_x, log10_2)
