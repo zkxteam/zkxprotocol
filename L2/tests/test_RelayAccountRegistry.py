@@ -5,7 +5,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 from helpers import StarknetService, ContractType, AccountFactory
-from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
 
 
@@ -23,7 +23,7 @@ AccountRegistry_INDEX=14
 async def adminAuth_factory(starknet_service: StarknetService):
 
     # Deploy admins
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1, L1_ZKX_dummy_address)
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
     admin1 = await account_factory.deploy_account(signer1.public_key)
     admin2 = await account_factory.deploy_account(signer2.public_key)
     admin3 = await account_factory.deploy_account(signer3.public_key)
@@ -33,7 +33,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address,3,1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address,2,1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address,3,1])
 
     # account registry contract has to be in index to be acceible by relay
@@ -56,7 +56,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # give relay master admin access for priviledged access
     await signer1.send_transaction(admin1, 
     adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address,0,1])
-
+    await signer2.send_transaction(admin2, 
+    adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address,0,1])
 
     return adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry
 

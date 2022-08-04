@@ -7,7 +7,7 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, from64x61, to64x61, assert_revert, convertTo64x61
 from helpers import StarknetService, ContractType, AccountFactory
-from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+from dummy_addresses import L1_dummy_address
 
 
 admin1_signer = Signer(123456789987654321)
@@ -23,7 +23,7 @@ def event_loop():
 async def abr_factory(starknet_service: StarknetService):
 
     # Deploy admins
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1, L1_ZKX_dummy_address)
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
     admin1 = await account_factory.deploy_account(admin1_signer.public_key)
     admin2 = await account_factory.deploy_account(admin2_signer.public_key)
     

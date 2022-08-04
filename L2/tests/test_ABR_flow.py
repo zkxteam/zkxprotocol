@@ -22,7 +22,6 @@ USDC_ID = str_to_felt("fghj3am52qpzsib")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 
 L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
 
 
 @pytest.fixture(scope='module')
@@ -35,7 +34,7 @@ async def abr_factory(starknet_service: StarknetService):
 
     admin1 = await starknet_service.deploy(
         ContractType.Account, 
-        [admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
+        [admin1_signer.public_key, L1_dummy_address, 0, 1]
     )
     adminAuth = await starknet_service.deploy(
         ContractType.AdminAuth, 
@@ -50,8 +49,7 @@ async def abr_factory(starknet_service: StarknetService):
         starknet_service,
         L1_dummy_address,
         registry.contract_address,
-        1,
-        L1_ZKX_dummy_address
+        1
     )
 
     alice = await account_factory.deploy_account(alice_signer.public_key)
