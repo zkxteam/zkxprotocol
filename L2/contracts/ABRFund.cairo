@@ -1,32 +1,37 @@
 %lang starknet
 
-from contracts.Constants import (
-    ABR_PAYMENT_INDEX,
-    ManageFunds_ACTION
-)
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IMarkets import IMarkets
+from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.cairo.common.math import assert_le, assert_nn, assert_not_zero
+from starkware.starknet.common.syscalls import get_caller_address
+from contracts.Constants import ABR_PAYMENT_INDEX, ManageFunds_ACTION
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.Utils import verify_caller_authority
-from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
 
-# @notice Stores the contract version
+###########
+# Storage #
+###########
+
+# Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of Authorized Registry contract
+# Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
-# @notice Stores the mapping from market_id to its balance
+# Stores the mapping from market_id to its balance
 @storage_var
 func balance_mapping(market_id : felt) -> (amount : felt):
 end
+
+###############
+# Constructor #
+###############
 
 # @notice Constructor of the smart-contract
 # @param resgitry_address_ Address of the AuthorizedRegistry contract
@@ -35,10 +40,34 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
+
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
 end
+
+##################
+# View Functions #
+##################
+
+# @notice Gets the amount of the balance for the market_id(asset)
+# @param market_id_ - Target market_id
+# @return amount - Balance amount corresponding to the market_id
+@view
+func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id_ : felt
+) -> (amount : felt):
+    let (amount) = balance_mapping.read(market_id=market_id_)
+    return (amount)
+end
+
+######################
+# External Functions #
+######################
 
 # @notice Manually add amount to market_id's balance
 # @param market_id_ - target market_id
@@ -137,15 +166,4 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     balance_mapping.write(market_id=market_id_, value=current_amount - amount)
 
     return ()
-end
-
-# @notice Displays the amount of the balance for the market_id(asset)
-# @param market_id_ - Target market_id
-# @return amount - Balance amount corresponding to the market_id
-@view
-func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    market_id_ : felt
-) -> (amount : felt):
-    let (amount) = balance_mapping.read(market_id=market_id_)
-    return (amount)
 end
