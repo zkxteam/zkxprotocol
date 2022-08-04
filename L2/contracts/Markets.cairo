@@ -10,7 +10,7 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_not_zero, assert_le_felt
 from starkware.cairo.common.math_cmp import is_le
 
 # @notice Stores the contract version
