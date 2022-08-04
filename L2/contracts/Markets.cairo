@@ -72,8 +72,7 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     end
 
     # Value of tradable field should be less than or equal to 2
-    let (is_less) = is_le(newMarket.tradable, 2)
-    assert_not_zero(is_less)
+    assert_le_felt(newMarket.tradable, 2)
 
     # Getting asset details
     let (asset_address) = IAuthorizedRegistry.get_contract_address(

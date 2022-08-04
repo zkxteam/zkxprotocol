@@ -46,3 +46,20 @@ const ManageMarkets_ACTION = 2
 const ManageAuthRegistry_ACTION = 3
 const ManageFeeDetails_ACTION = 4
 const ManageFunds_ACTION = 5
+
+const ORDER_INITIATED = 0
+const ORDER_OPENED_PARTIALLY = 1
+const ORDER_OPENED = 2
+const ORDER_CLOSED_PARTIALLY = 3
+const ORDER_CLOSED = 4
+const ORDER_TO_BE_DELEVERAGED = 5
+const ORDER_TO_BE_LIQUIDATED = 6
+const ORDER_LIQUIDATED = 7
+
+const MARKET_ORDER = 0
+const LIMIT_ORDER = 1
+const STOP_ORDER = 2
+const LIQUIDATION_ORDER = 3
+const DELEVERAGING_ORDER = 4
+
+

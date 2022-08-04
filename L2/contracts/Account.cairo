@@ -32,27 +32,30 @@ from starkware.starknet.common.syscalls import (
 )
 
 from contracts.Constants import (
-    ABR_FUNDS_INDEX,
-    ABR_INDEX,
     ABR_PAYMENT_INDEX,
-    AccountRegistry_INDEX,
     Asset_INDEX,
     FeeBalance_INDEX,
     Holding_INDEX,
     InsuranceFund_INDEX,
     Liquidate_INDEX,
-    LiquidityFund_INDEX,
-    Market_INDEX,
     Trading_INDEX,
-    TradingFees_INDEX,
     WithdrawalFeeBalance_INDEX,
     WithdrawalRequest_INDEX,
+    ORDER_INITIATED,
+    ORDER_OPENED_PARTIALLY,
+    ORDER_OPENED,
+    ORDER_CLOSED_PARTIALLY,
+    ORDER_CLOSED,
+    ORDER_TO_BE_DELEVERAGED,
+    ORDER_TO_BE_LIQUIDATED,
+    ORDER_LIQUIDATED,
+    LIQUIDATION_ORDER,
+    DELEVERAGING_ORDER
 )
 from contracts.DataTypes import (
     Asset,
     CollateralBalance,
     Message,
-    MultipleOrder,
     OrderDetails,
     OrderDetailsWithIDs,
     OrderRequest,
@@ -60,8 +63,8 @@ from contracts.DataTypes import (
     WithdrawalHistory,
     WithdrawalRequestForHashing,
 )
+
 from contracts.interfaces.IAccount import IAccount
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
@@ -262,10 +265,6 @@ func is_valid_signature_order{
     local pub_key
 
     if liquidator_address_ != 0:
-        let (caller) = get_caller_address()
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-
         # To-Do Verify whether call came from node operator
 
         let (_public_key) = IAccount.get_public_key(contract_address=liquidator_address_)
@@ -342,7 +341,7 @@ func get_deleveraged_or_liquidatable_position{
     let (order_id_) = deleveraged_or_liquidatable_position.read()
     let (order_details) = get_order_data(order_id_)
     local amount_to_be_sold_
-    if order_details.status == 5:
+    if order_details.status == ORDER_TO_BE_DELEVERAGED:
         let (amount) = amount_to_be_sold.read(order_id=order_id_)
         assert amount_to_be_sold_ = amount
         tempvar syscall_ptr = syscall_ptr
@@ -691,7 +690,7 @@ func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     let (posDetails : OrderDetails) = order_mapping.read(orderID=pos_id)
 
     with_attr error_message("The order is not fully closed yet."):
-        assert posDetails.status = 4
+        assert posDetails.status = ORDER_CLOSED
     end
 
     let (arr_len) = position_array_len.read()
@@ -753,12 +752,12 @@ func execute_order{
         # If it's a new order
         if orderDetails.assetID == 0:
             # Create if the order is being fully opened
-            # status_ == 1, partially opened
-            # status_ == 2, fully opened
+            # status_ == 1, partially opened; ORDER_OPENED_PARTIALLY
+            # status_ == 2, fully opened; ORDER_OPENED
             if request.positionSize == size:
-                assert status_ = 2
+                assert status_ = ORDER_OPENED
             else:
-                assert status_ = 1
+                assert status_ = ORDER_OPENED_PARTIALLY
             end
 
             # Create a new struct with the updated details
@@ -794,18 +793,18 @@ func execute_order{
             end
 
             # Check if the order is in the process of being closed or if it was deleveraged
-            if orderDetails.status == 5:
+            if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
                 tempvar range_check_ptr = range_check_ptr
             else:
-                assert_le(orderDetails.status, 3)
+                assert_le(orderDetails.status, ORDER_CLOSED_PARTIALLY)
                 tempvar range_check_ptr = range_check_ptr
             end
 
             # Check if the order is fully filled by executing the current one
             if request.positionSize == size + orderDetails.portionExecuted:
-                status_ = 2
+                status_ = ORDER_OPENED
             else:
-                status_ = 1
+                status_ = ORDER_OPENED_PARTIALLY
             end
 
             # Create a new struct with the updated details
@@ -846,7 +845,7 @@ func execute_order{
         assert_nn(orderDetails.portionExecuted - size)
 
         local new_leverage
-        if request.orderType == 4:
+        if request.orderType == DELEVERAGING_ORDER:
             let total_value = margin_amount + borrowed_amount
             let (leverage_) = Math64x61_div(total_value, margin_amount)
             new_leverage = leverage_
@@ -856,31 +855,31 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr
 
         # Check if the order is fully closed or not
-        # status_ == 4, fully closed
-        # status_ == 3, partially closed
-        # status_ == 5, toBeDeleveraged
-        # status_ == 6, toBeLiquidated
-        # status_ == 7, fullyLiquidated
+        # status_ == 4, fully closed; ORDER_CLOSED
+        # status_ == 3, partially closed; ORDER_CLOSED_PARTIALLY
+        # status_ == 5, toBeDeleveraged; ORDER_TO_BE_DELEVERAGED
+        # status_ == 6, toBeLiquidated; ORDER_TO_BE_LIQUIDATED
+        # status_ == 7, fullyLiquidated; ORDER_LIQUIDATED
         if orderDetails.portionExecuted - size == 0:
-            if request.orderType == 3:
-                assert status_ = 7
+            if request.orderType == LIQUIDATION_ORDER:
+                assert status_ = ORDER_LIQUIDATED
             else:
-                assert status_ = 4
+                assert status_ = ORDER_CLOSED
             end
         else:
-            if request.orderType == 4:
-                assert status_ = 5
+            if request.orderType == DELEVERAGING_ORDER:
+                assert status_ = ORDER_TO_BE_DELEVERAGED
             else:
-                if request.orderType == 3:
-                    assert status_ = 6
+                if request.orderType == LIQUIDATION_ORDER:
+                    assert status_ = ORDER_TO_BE_LIQUIDATED
                 else:
-                    assert status_ = 3
+                    assert status_ = ORDER_CLOSED_PARTIALLY
                 end
             end
         end
 
         # Update the amount to be sold after deleveraging
-        if orderDetails.status == 5:
+        if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
             let (amount) = amount_to_be_sold.read(order_id=request.parentOrder)
             let updated_amount = amount - size
             let (positive_updated_amount) = abs_value(updated_amount)
@@ -1049,7 +1048,7 @@ func withdraw{
 
     # Compute current balance
     let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id)
-    with_attr error_message("Fee amount should be less than fee collateral balance"):
+    with_attr error_message("Fee amount should be less than or equal to the fee collateral balance"):
         assert_le(standard_fee, fee_collateral_balance)
     end
     tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee
@@ -1153,7 +1152,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     with_attr error_message("Amount to be sold cannot be negative"):
         assert_nn(amount_to_be_sold_)
     end
-    with_attr error_message("Amount to be sold should be less than portion executed"):
+    with_attr error_message("Amount to be sold should be less than or equal to the portion executed"):
         assert_le(amount_to_be_sold_, order_details.portionExecuted)
     end
 
@@ -1171,9 +1170,9 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
 
     local status_
     if amount_to_be_sold_ == 0:
-        status_ = 6
+        status_ = ORDER_TO_BE_LIQUIDATED
     else:
-        status_ = 5
+        status_ = ORDER_TO_BE_DELEVERAGED
     end
 
     # Create a new struct with the updated details by setting toBeLiquidated flag to true
@@ -1280,10 +1279,10 @@ func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
         borrowedAmount=pos_details.borrowedAmount,
     )
 
-    if pos_details.status == 4:
+    if pos_details.status == ORDER_CLOSED:
         return populate_array_positions(iterator + 1, array_list_len, array_list)
     else:
-        if pos_details.status == 7:
+        if pos_details.status == ORDER_LIQUIDATED:
             return populate_array_positions(iterator + 1, array_list_len, array_list)
         else:
             assert array_list[array_list_len] = order_details_w_id

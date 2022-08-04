@@ -13,7 +13,13 @@ from contracts.Constants import (
     InsuranceFund_INDEX,
     MarketPrices_INDEX,
     Liquidate_INDEX,
-    AccountRegistry_INDEX
+    AccountRegistry_INDEX,
+    ORDER_CLOSED_PARTIALLY,
+    ORDER_TO_BE_DELEVERAGED,
+    ORDER_TO_BE_LIQUIDATED,
+    LIMIT_ORDER,
+    STOP_ORDER,
+    DELEVERAGING_ORDER
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
@@ -183,7 +189,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Check if the execution_price is correct
 
-    if temp_order.orderType == 2:
+    if temp_order.orderType == STOP_ORDER:
         # if stop order
         
         if temp_order.direction == 1:
@@ -207,7 +213,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
     #tempvar range_check_ptr = range_check_ptr
 
-    if temp_order.orderType == 1:
+    if temp_order.orderType == LIMIT_ORDER:
         # if it's a limit order
         if temp_order.direction == 1:
             # if it's a long order
@@ -430,7 +436,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order)
 
         # Calculate new values for margin and borrowed amounts
-        if temp_order.orderType == 4:
+        if temp_order.orderType == DELEVERAGING_ORDER:
             borrowed_amount_ = borrowed_amount - leveraged_amount_out
             margin_amount_ = margin_amount
         else:
@@ -439,7 +445,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         end
 
         # Check if the position is to be liquidated
-        let (not_liquidation) = is_le(order_details.status, 3)
+        let (not_liquidation) = is_le(order_details.status, ORDER_CLOSED_PARTIALLY)
 
         # If it's just a close order
         if not_liquidation == 1:
@@ -500,7 +506,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             end
         else:
             # Liquidation order
-            if order_details.status == 6:
+            if order_details.status == ORDER_TO_BE_LIQUIDATED:
                 let (insurance_fund_address) = IAuthorizedRegistry.get_contract_address(
                     contract_address=registry, index=InsuranceFund_INDEX, version=version
                 )
@@ -583,7 +589,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 end
             else:
                 # Deleveraging order
-                if order_details.status == 5:
+                if order_details.status == ORDER_TO_BE_DELEVERAGED:
                     # Withdraw the position from holding fund
                     let (holding_address) = IAuthorizedRegistry.get_contract_address(
                         contract_address=registry, index=Holding_INDEX, version=version
