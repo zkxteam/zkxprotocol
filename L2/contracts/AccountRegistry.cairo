@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero, 
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import (

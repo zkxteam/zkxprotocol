@@ -50,15 +50,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20,1, relay_account_registry.contract_address])
 
     # give relay master admin access for priviledged access
-<<<<<<< HEAD
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address, 0, 1])
     await signer2.send_transaction(admin2, adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address, 0, 1])
-=======
-    await signer1.send_transaction(admin1, 
-    adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address,0,1])
-    await signer2.send_transaction(admin2, 
-    adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address,0,1])
->>>>>>> audit-fixes-L2
 
     return adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry
 
