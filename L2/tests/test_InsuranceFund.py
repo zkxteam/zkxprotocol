@@ -54,7 +54,7 @@ async def test_fund_admin(holding_factory):
 async def test_fund_reject(holding_factory):
     _, insurance, _, _ = holding_factory
 
-    assert_revert(lambda: signer3.send_transaction(
+    await assert_revert(signer3.send_transaction(
         pytest.user1, insurance.contract_address, 'fund', [str_to_felt("USDC"), 100]))
 
 
@@ -71,12 +71,12 @@ async def test_defund_admin(holding_factory):
 async def test_defund_more_than_available(holding_factory):
     _, insurance, admin1, _ = holding_factory
 
-    assert_revert(lambda: signer1.send_transaction(
+    await assert_revert(signer1.send_transaction(
         admin1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 200]))
 
 @pytest.mark.asyncio
 async def test_defund_reject(holding_factory):
     _, insurance, _, _ = holding_factory
 
-    assert_revert(lambda: signer3.send_transaction(
+    await assert_revert(signer3.send_transaction(
         pytest.user1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 100]))

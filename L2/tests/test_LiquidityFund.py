@@ -53,7 +53,7 @@ async def test_fund_admin(holding_factory):
 async def test_fund_reject(holding_factory):
     _, liquidity, _, _ = holding_factory
 
-    assert_revert(lambda: signer3.send_transaction(
+    await assert_revert(signer3.send_transaction(
         pytest.user1, liquidity.contract_address, 'fund', [str_to_felt("USDC"), 100]))
 
 
@@ -71,5 +71,5 @@ async def test_defund_admin(holding_factory):
 async def test_defund_reject(holding_factory):
     _, liquidity, _, _ = holding_factory
 
-    assert_revert(lambda: signer3.send_transaction(
+    await assert_revert(signer3.send_transaction(
         pytest.user1, liquidity.contract_address, 'defund', [str_to_felt("USDC"), 100]))
