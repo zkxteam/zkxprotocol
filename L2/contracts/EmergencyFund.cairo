@@ -105,7 +105,7 @@ end
 # View Functions #
 ##################
 
-# @notice gets the amount of the balance for the asset_id (asset)
+# @notice Gets the amount of the balance for the asset_id (asset)
 # @param asset_id - Target asset_id
 # @returns amount - Balance of the corresponding asset
 @view

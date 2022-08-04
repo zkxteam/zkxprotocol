@@ -1,5 +1,6 @@
 %lang starknet
 
+from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
@@ -82,7 +83,7 @@ end
 # View Functions #
 ##################
 
-# @notice Displays the amount of the balance for the asset_id(asset)
+# @notice Gets the amount of the balance for the asset_id(asset)
 # @param asset_id_ - Target asset_id
 # @return amount - Balance amount corresponding to the asset_id
 @view
@@ -119,8 +120,9 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     let (access) = IAdminAuth.get_admin_mapping(
         contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
+    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
 
-    if access == 0:
+    if access == FALSE:
         # Get EmergencyFund address from registry
         let (emergency_fund_address) = IAuthorizedRegistry.get_contract_address(
             contract_address=registry, index=EmergencyFund_INDEX, version=version
@@ -130,10 +132,8 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
             assert caller = emergency_fund_address
         end
 
-        let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
         balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
     else:
-        let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
         balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
     end
 
@@ -170,7 +170,7 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
 
-    if access == 0:
+    if access == FALSE:
         # Get EmergencyFund address from registry
         let (emergency_fund_address) = IAuthorizedRegistry.get_contract_address(
             contract_address=registry, index=EmergencyFund_INDEX, version=version
