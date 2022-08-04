@@ -3,25 +3,26 @@ name: L2 tests
 on:
   - pull_request
 
+defaults:
+  run:
+    working-directory: L2
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Navigate to L2 dir
-        run: |
-          cd L2
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
           python-version: 3.8
-      - name: Install dependencies
+
+      - name: Install tox and any other packages
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 pytest tox cairo-lang
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: Test with tox and pytest
-        run: |
-          tox
-      - name: Navigate back to project root dir
-        run: |
-          cd ..
+          pip install pytest tox cairo-lang
+
+      - name: Run tox
+        # Run tox using the version of Python in `PATH`
+        run: tox
