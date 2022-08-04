@@ -66,8 +66,6 @@ async def test_deploy_account_contract_with_zero_hash(adminAuth_factory):
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
     await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))
 
-
-
 @pytest.mark.asyncio
 async def test_deploy_account_contract(adminAuth_factory):
     adminAuth, auth_registry, account_registry, admin1, admin2, user4, account_deployer = adminAuth_factory
@@ -114,12 +112,11 @@ async def test_deploy_account_contract(adminAuth_factory):
 
     assert result.result.res == 123456
 
+    array_length = await account_registry.get_registry_len().call()
+    fetched_account_registry = await account_registry.get_account_registry(0, array_length.result.len).call()
     
-    fetched_account_registry = await account_registry.get_account_registry().call()
     assert fetched_account_registry.result.account_registry[0] == deployed_address
    
-
-
 @pytest.mark.asyncio
 async def test_unauthorized_changes_to_config(adminAuth_factory):
     adminAuth, auth_registry, account_registry, admin1, admin2, user4, account_deployer = adminAuth_factory
