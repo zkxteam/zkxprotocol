@@ -279,11 +279,11 @@ func updateAssetListInL1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     assert message_payload[2] = assetId
 
     # Get L1 ZKX contract address
-    let (L1_CONTRACT_ADDRESS) = IAuthorizedRegistry.get_contract_address(
+    let (l1_zkx_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
     )
 
-    send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=3, payload=message_payload)
+    send_message_to_l1(to_address=l1_zkx_address, payload_size=3, payload=message_payload)
 
     return ()
 end
