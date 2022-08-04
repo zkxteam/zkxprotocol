@@ -91,18 +91,16 @@ class StarknetService:
 
 class AccountFactory:
 
-    def __init__(self, starknet_service: StarknetService, L1_user_address, registry_address, version, L1_ZKX_address):
+    def __init__(self, starknet_service: StarknetService, L1_user_address, registry_address, version):
         self.starknet_service = starknet_service
         self.L1_user_address = L1_user_address
         self.registry_address = registry_address
         self.version = version
-        self.L1_ZKX_address = L1_ZKX_address
 
     async def deploy_account(self, public_key) -> StarknetContract:
         return await self.starknet_service.deploy(ContractType.Account, [
             public_key,
             self.L1_user_address,
             self.registry_address,
-            self.version,
-            self.L1_ZKX_address
+            self.version
         ])

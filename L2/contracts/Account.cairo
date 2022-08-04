@@ -37,6 +37,7 @@ from contracts.Constants import (
     FeeBalance_INDEX,
     Holding_INDEX,
     InsuranceFund_INDEX,
+    L1_ZKX_Address_INDEX,
     Liquidate_INDEX,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
@@ -123,11 +124,6 @@ end
 func L1_address() -> (res : felt):
 end
 
-# Stores L1 ZKX Contract address
-@storage_var
-func L1_ZKX_address() -> (res : felt):
-end
-
 # Stores all positions held by the user
 @storage_var
 func position_array(index : felt) -> (position_id : felt):
@@ -174,21 +170,15 @@ end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    public_key_ : felt,
-    L1_address_ : felt,
-    registry_address_ : felt,
-    version_ : felt,
-    L1_ZKX_address_ : felt,
+    public_key_ : felt, L1_address_ : felt, registry_address_ : felt, version_ : felt
 ):
     assert_not_zero(public_key_)
     assert_not_zero(L1_address_)
-    assert_not_zero(L1_ZKX_address_)
 
     public_key.write(public_key_)
     L1_address.write(L1_address_)
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
-    L1_ZKX_address.write(value=L1_ZKX_address_)
     return ()
 end
 
@@ -427,23 +417,27 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt, user : felt, amount : felt, assetID_ : felt
 ):
     alloc_locals
-    # Make sure the message was sent by the intended L1 contract.
-    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Get L1 ZKX contract address
+    let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
+    )
+
+    # Make sure the message was sent by the intended L1 contract
     assert from_address = L1_ZKX_contract_address
 
     let (stored_L1_address) = L1_address.read()
 
     assert stored_L1_address = user
 
-    # Reading token decimal field of an asset
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
     # Get asset contract address
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
+    # Reading token decimal field of an asset
     let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_)
     tempvar decimal = asset.token_decimal
 
@@ -1107,7 +1101,9 @@ func withdraw{
     )
 
     # Get L1 ZKX contract address
-    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
+    let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
+    )
 
     # Create a withdrawal history object
     local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
