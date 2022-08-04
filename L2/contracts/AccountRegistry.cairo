@@ -1,17 +1,18 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_lt, assert_le
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero, 
 from starkware.starknet.common.syscalls import get_caller_address
 
+from contracts.Constants import (
+    AccountDeployer_INDEX,
+    MasterAdmin_ACTION,
+    Trading_INDEX,
+)
 
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.Constants import (
-    Trading_INDEX,
-    MasterAdmin_ACTION,
-    AccountDeployer_INDEX,
-)
 from contracts.libraries.Utils import verify_caller_authority
 
 ###########
@@ -139,7 +140,7 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     end
 
     let (is_present) = account_present.read(address=address_)
-    if is_present == 0:
+    if is_present == FALSE:
         let (reg_len) = account_registry_len.read()
         account_registry.write(index=reg_len, value=address_)
         account_registry_len.write(reg_len + 1)
@@ -193,7 +194,7 @@ func remove_from_account_registry{
     account_registry.write(index=reg_len - 1, value=0)
 
     account_registry_len.write(reg_len - 1)
-    account_present.write(address=account_address, value=0)
+    account_present.write(address=account_address, value=FALSE)
 
     return ()
 end
