@@ -2,13 +2,16 @@
 
 %builtins pedersen range_check ecdsa
 
-from contracts.Constants import MasterAdmin_ACTION
+from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_equal, assert_lt, assert_nn, assert_le
-from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.starknet.common.syscalls import get_caller_address
+from contracts.Constants import MasterAdmin_ACTION
 
-# ### STORAGE VARS ####
+###########
+# Storage #
+###########
+
 # @notice Stores the access permissions
 # Action - role
 # 0 - Master admin
@@ -44,6 +47,10 @@ end
 func current_total_admins() -> (res : felt):
 end
 
+###############
+# Constructor #
+###############
+
 # @notice Constructor for the contract
 # @param address1 - Address for first initial admin
 # @param address2 - Address for second initial admin
@@ -51,14 +58,16 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         address1 : felt, address2 : felt):
     # Action 0 is the admin role - the role which can add and remove admins
-    admin_mapping.write(address=address1, action=MasterAdmin_ACTION, value=1)
-    admin_mapping.write(address=address2, action=MasterAdmin_ACTION, value=1)
+    admin_mapping.write(address=address1, action=MasterAdmin_ACTION, value=TRUE)
+    admin_mapping.write(address=address2, action=MasterAdmin_ACTION, value=TRUE)
     min_num_admins.write(2)
     current_total_admins.write(2)
     return ()
 end
 
-# ### VIEW FUNCTIONS ####
+##################
+# View Functions #
+##################
 
 # @notice Function to find whether an address has permission to perform a specific role
 # @param address - Address for which permission has to be determined
@@ -71,6 +80,7 @@ func get_admin_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     return (allowed=allowed)
 end
 
+# @notice - Returns minimum number of admins required in the system
 @view
 func get_min_num_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
         res : felt):
@@ -78,6 +88,7 @@ func get_min_num_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     return (res)
 end
 
+# @notice - Returns the total number of admins currently in the system
 @view
 func get_current_total_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         ) -> (res : felt):
@@ -85,7 +96,9 @@ func get_current_total_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     return (res)
 end
 
-# ### EXTERNAL FUNCTIONS ####
+######################
+# External Functions #
+######################
 
 # @notice Function to update the permissions
 # @param address - Address for which permissions are to be granted/revoked
@@ -97,7 +110,10 @@ func update_admin_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     # Verify that caller has admin role
     let (caller) = get_caller_address()
     let (is_admin) = admin_mapping.read(address=caller, action=MasterAdmin_ACTION)
-    assert is_admin = TRUE
+    
+    with_attr error_message("Unauthorized call - only admin can call this function"):
+        assert is_admin = TRUE
+    end
 
     # if current permission for <address, action> is same as value then simply return without any processing
     let (current_val) = admin_mapping.read(address=address, action=action)
@@ -130,15 +146,23 @@ func set_min_num_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     # Verify that caller has admin role
     let (caller) = get_caller_address()
     let (is_admin) = admin_mapping.read(address=caller, action=MasterAdmin_ACTION)
-    assert is_admin = TRUE
 
-    assert_nn(num)
-    assert_le(2, num)  # we enforce that there have to be atleast 2 admins in the system
+    with_attr error_message("Unauthorized call - only admin can call this function"):
+        assert is_admin = TRUE
+    end
+
+    with_attr error_message("Incorrect value for minimum number of admins - should be >=2"):
+        assert_nn(num)
+        assert_le(2, num)  # we enforce that there have to be atleast 2 admins in the system
+    end
+    
     min_num_admins.write(num)
     return ()
 end
 
-# ### INTERNAL FUNCTIONS ####
+######################
+# Internal Functions #
+######################
 
 # @notice - This function processes the update admin mapping call when action = MasterAdmin_ACTION
 # It checks that caller is not the same as previous approver/remover and updates the mapping accordingly
