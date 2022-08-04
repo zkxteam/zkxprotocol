@@ -4,22 +4,22 @@
 
 from contracts.DataTypes import OrderRequest, OrderDetails, Signature, Market, MultipleOrder, Asset, MarketPrice
 from contracts.Constants import (
-    Asset_INDEX,
-    Market_INDEX,
-    TradingFees_INDEX,
-    Holding_INDEX,
-    FeeBalance_INDEX,
-    LiquidityFund_INDEX,
-    InsuranceFund_INDEX,
-    MarketPrices_INDEX,
-    Liquidate_INDEX,
     AccountRegistry_INDEX,
+    Asset_INDEX,
+    DELEVERAGING_ORDER,
+    FeeBalance_INDEX,
+    Holding_INDEX,
+    InsuranceFund_INDEX,
+    LIMIT_ORDER,
+    Liquidate_INDEX,
+    LiquidityFund_INDEX,
+    Market_INDEX,
+    MarketPrices_INDEX,
     ORDER_CLOSED_PARTIALLY,
     ORDER_TO_BE_DELEVERAGED,
     ORDER_TO_BE_LIQUIDATED,
-    LIMIT_ORDER,
     STOP_ORDER,
-    DELEVERAGING_ORDER
+    TradingFees_INDEX,
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccount import IAccount
