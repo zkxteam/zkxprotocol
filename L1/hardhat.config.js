@@ -32,9 +32,9 @@ module.exports = {
     myNetwork: {
       url: "http://localhost:5000",
     },
-    goerli: {
-      url: process.env.ALCHEMY_URL,
-      accounts: [`0x${process.env.PRIVATE_KEY}`],
-    },
+    // goerli: {
+    //   url: process.env.ALCHEMY_URL,
+    //   accounts: [`0x${process.env.PRIVATE_KEY}`],
+    // },
   },
 };
