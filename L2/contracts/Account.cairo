@@ -1,6 +1,6 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa bitwise
+%builtins pedersen range_check ecdsa 
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
@@ -13,7 +13,6 @@ from starkware.cairo.common.hash_state import (
 from starkware.cairo.common.math import (
     abs_value,
     assert_le,
-    assert_lt,
     assert_nn,
     assert_not_equal,
     assert_not_zero,
@@ -70,7 +69,6 @@ from contracts.Math_64x61 import (
     Math64x61_div,
     Math64x61_fromFelt,
     Math64x61_mul,
-    Math64x61_sub,
     Math64x61_toFelt,
 )
 
