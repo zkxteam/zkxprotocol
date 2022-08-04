@@ -7,7 +7,7 @@ from contracts.Constants import FeeDiscount_INDEX, ManageFeeDetails_ACTION
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IFeeDiscount import IFeeDiscount
 from contracts.libraries.Utils import verify_caller_authority
-from contracts.Math_64x61 import Math64x61_mul
+from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_mul
 
 ###########
 # Structs #
@@ -198,6 +198,11 @@ func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         assert_nn(fee_details.takerFee)
     end
 
+    with_attr error_message("Maker fee and taker fee values should be in 64x61 representation"):
+        Math64x61_assert64x61(fee_details.makerFee)
+        Math64x61_assert64x61(fee_details.takerFee)
+    end
+
     let (current_max_base_fee_tier) = max_base_fee_tier.read()
 
     with_attr error_message("Tier should be less than or equal to (current max base fee tier + 1)"):
@@ -261,6 +266,10 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
         assert_not_zero(tier_)
         assert_nn(discount_details.numberOfTokens)
         assert_nn(discount_details.discount)
+    end
+
+    with_attr error_message("Discount should be in 64x61 representation"):
+        Math64x61_assert64x61(discount_details.discount)
     end
 
     let (current_max_discount_tier) = max_discount_tier.read()
