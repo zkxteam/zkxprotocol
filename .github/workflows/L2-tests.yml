@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+      - audit-fixes
+      - audit-fixes-L2
 
 defaults:
   run:
