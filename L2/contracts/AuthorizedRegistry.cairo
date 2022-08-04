@@ -2,6 +2,7 @@
 
 %builtins pedersen range_check ecdsa
 
+from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.Constants import AdminAuth_INDEX, ManageAuthRegistry_ACTION
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
@@ -83,11 +84,4 @@ func get_contract_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
 ) -> (address : felt):
     let (address) = contract_registry.read(index=index_, version=version_)
     return (address=address)
-end
-
-# @notice AdminAuth interface
-@contract_interface
-namespace IAdminAuth:
-    func get_admin_mapping(address : felt, action : felt) -> (allowed : felt):
-    end
 end
