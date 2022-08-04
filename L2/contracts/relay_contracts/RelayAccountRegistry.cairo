@@ -20,7 +20,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 end
 
 # @notice - All the following are mirror functions for AccountRegistry.cairo - just record call details and forward call
-
 @external
 func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt
@@ -35,21 +34,21 @@ end
 @external
 func remove_from_account_registry{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}(id_ : felt) -> (res : felt):
+}(id_ : felt) -> ():
 
     record_call_details('remove_from_account_registry')
     let (inner_address)=get_inner_contract()
-    let (res)=IAccountRegistry.remove_from_account_registry(inner_address, id_)
-    return(res)
+    IAccountRegistry.remove_from_account_registry(inner_address, id_)
+    return()
 end
 
 @view
-func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    account_registry_len : felt, account_registry : felt*
-):
+func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    starting_index_ : felt, num_accounts_ : felt
+) -> (account_registry_len : felt, account_registry : felt*):
 
     let (inner_address)=get_inner_contract()
-    let (res_len, res:felt*)=IAccountRegistry.get_account_registry(inner_address)
+    let (res_len, res:felt*)=IAccountRegistry.get_account_registry(inner_address, starting_index_, num_accounts_)
     return(res_len, res)
 end
 

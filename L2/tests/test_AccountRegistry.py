@@ -37,23 +37,28 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     return adminAuth, account_registry, admin1, admin2
 
+@pytest.mark.asyncio
+async def test_remove_address_from_account_registry_empty(adminAuth_factory):
+    adminAuth, account_registry, admin1, admin2 = adminAuth_factory
+
+    await assert_revert(signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [0]))
 
 @pytest.mark.asyncio
 async def test_add_address_to_account_registry(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("123")])
-    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("456")])
+    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [0x12345])
+    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [0x98765])
 
-    fetched_account_registry = await account_registry.get_account_registry().call()
-    assert fetched_account_registry.result.account_registry[0] == str_to_felt(
-        "123")
-    assert fetched_account_registry.result.account_registry[1] == str_to_felt(
-        "456")
+    array_length = await account_registry.get_registry_len().call()
+    fetched_account_registry = await account_registry.get_account_registry(0, array_length.result.len).call()
 
-    isPresent = await account_registry.is_registered_user(str_to_felt("123")).call()
+    assert fetched_account_registry.result.account_registry[0] == 0x12345
+    assert fetched_account_registry.result.account_registry[1] == 0x98765
+
+    isPresent = await account_registry.is_registered_user(0x12345).call()
     assert isPresent.result.present == 1
-    isPresent = await account_registry.is_registered_user(str_to_felt("456")).call()
+    isPresent = await account_registry.is_registered_user(0x98765).call()
     assert isPresent.result.present == 1
 
 
@@ -61,13 +66,25 @@ async def test_add_address_to_account_registry(adminAuth_factory):
 async def test_remove_address_from_account_registry(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
+    await assert_revert(
+        signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [-2])
+    )
+
+    array_length_before = await account_registry.get_registry_len().call()
+
+    await assert_revert(
+        signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [array_length_before.result.len + 1])
+    )
+
     await signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [0])
+    array_length_after = await account_registry.get_registry_len().call()
+    
+    assert array_length_after.result.len == array_length_before.result.len - 1
 
-    fetched_account_registry = await account_registry.get_account_registry().call()
-    assert fetched_account_registry.result.account_registry[0] == str_to_felt(
-        "456")
+    fetched_account_registry = await account_registry.get_account_registry(0, array_length_after.result.len).call()
+    assert fetched_account_registry.result.account_registry[0] == 0x98765
 
-    isPresent = await account_registry.is_registered_user(str_to_felt("123")).call()
+    isPresent = await account_registry.is_registered_user(0x12345).call()
     assert isPresent.result.present == 0
 
 
@@ -75,14 +92,72 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
 async def test__unauthorized_add_address_to_account_registry(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
-    assert_revert(lambda: signer2.send_transaction(
-        admin2, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("1234")]))
+    await assert_revert(signer2.send_transaction(
+        admin2, account_registry.contract_address, 'add_to_account_registry', [0x12345]))
 
 
 @pytest.mark.asyncio
 async def test_add_address_to_account_registry_duplicate(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [str_to_felt("456")])
-    fetched_account_registry = await account_registry.get_account_registry().call()
-    assert fetched_account_registry.result.account_registry == [3421494]
+    array_length_before = await account_registry.get_registry_len().call()
+    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [0x98765])
+    array_length_after = await account_registry.get_registry_len().call()
+
+    assert array_length_after.result.len == array_length_before.result.len 
+    fetched_account_registry = await account_registry.get_account_registry(0, array_length_after.result.len).call()
+    assert fetched_account_registry.result.account_registry == [0x98765]
+
+@pytest.mark.asyncio
+async def test_get_account_registry(adminAuth_factory):
+    adminAuth, account_registry, admin1, admin2 = adminAuth_factory
+    
+    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [0x12345])
+    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [0x67891])
+    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [0x23565])
+    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [0x98383])
+    await signer1.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [0x31231])
+
+    array_length = await account_registry.get_registry_len().call()
+    assert array_length.result.len == 6
+
+    await assert_revert(
+        account_registry.get_account_registry(-1, 1).call()
+    )
+
+    await assert_revert(
+        account_registry.get_account_registry(0, 0).call()
+    )
+
+    await assert_revert(
+        account_registry.get_account_registry(0, -1).call()
+    )
+
+    fetched_account_registry_1 = await account_registry.get_account_registry(0, 1).call()
+    assert fetched_account_registry_1.result.account_registry == [0x98765]
+
+    fetched_account_registry_2 = await account_registry.get_account_registry(1, 1).call()
+    assert fetched_account_registry_2.result.account_registry == [0x12345]
+
+    fetched_account_registry_3 = await account_registry.get_account_registry(1, 3).call()
+    assert fetched_account_registry_3.result.account_registry == [0x12345, 0x67891, 0x23565]
+
+    fetched_account_registry_4 = await account_registry.get_account_registry(3, 3).call()
+    assert fetched_account_registry_4.result.account_registry == [0x23565, 0x98383, 0x31231]
+
+    fetched_account_registry_5 = await account_registry.get_account_registry(5, 1).call()
+    assert fetched_account_registry_5.result.account_registry == [0x31231]
+
+    fetched_account_registry_6 = await account_registry.get_account_registry(0, 6).call()
+    assert fetched_account_registry_6.result.account_registry == [0x98765, 0x12345, 0x67891, 0x23565, 0x98383, 0x31231]
+
+
+
+    
+
+
+
+
+    
+
+
