@@ -4,14 +4,9 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
-
-signer1 = Signer(123456789987654321)
-signer2 = Signer(123456789987654322)
-signer3 = Signer(123456789987654323)
-signer4 = Signer(123456789987654324)
-
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address
+from dummy_signers import signer1, signer2, signer3, signer4
 
 
 @pytest.fixture
@@ -26,74 +21,22 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def emergencyFund_factory():
-    starknet = await Starknet.empty()
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
+async def emergencyFund_factory(starknet_service: StarknetService):
 
-    admin2 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    pytest.user1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    pytest.user2 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer4.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            admin2.contract_address
-        ]
-    )
-
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
-    )
-
-    holding = await starknet.deploy(
-        "contracts/Holding.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    liquidity = await starknet.deploy(
-        "contracts/LiquidityFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    insurance = await starknet.deploy(
-        "contracts/InsuranceFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    emergencyFund = await starknet.deploy(
-        "contracts/EmergencyFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
+    # Deploy accounts
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
+    admin1 = await account_factory.deploy_account(signer1.public_key)
+    admin2 = await account_factory.deploy_account(signer2.public_key)
+    pytest.user1 = await account_factory.deploy_account(signer3.public_key)
+    pytest.user2 = await account_factory.deploy_account(signer4.public_key)
+    
+    # Deploy infrastructure
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    holding = await starknet_service.deploy(ContractType.Holding, [registry.contract_address, 1])
+    liquidity = await starknet_service.deploy(ContractType.LiquidityFund, [registry.contract_address, 1])
+    insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
+    emergencyFund = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
     
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
