@@ -27,32 +27,32 @@ end
 # Storage #
 ###########
 
-# @notice Stores the contract version
+# Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of Authorized Registry contract
+# Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
-# @notice Stores the standard withdraw fee
+# Stores the standard withdraw fee
 @storage_var
 func standard_withdraw_fee() -> (fee : felt):
 end
 
-# @notice Stores the standard withdraw fee collateral id
+# Stores the standard withdraw fee collateral id
 @storage_var
 func standard_withdraw_fee_collateral_id() -> (collateral_id : felt):
 end
 
-# @notice Stores the withdrawal fee charged per asset of each user
+# Stores the withdrawal fee charged per asset of each user
 @storage_var
 func withdrawal_fee_mapping(user_l2_address : felt, collateral_id : felt) -> (fee : felt):
 end
 
-# @notice Stores the total withdrawal fee per asset
+# Stores the total withdrawal fee per asset
 @storage_var
 func total_withdrawal_fee_per_asset(collateral_id : felt) -> (accumulated_fee : felt):
 end
@@ -68,6 +68,11 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
+
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()

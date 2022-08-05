@@ -36,22 +36,22 @@ end
 # Storage #
 ###########
 
-# @notice Stores the contract version
+# Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of AuthorizedRegistry contract
+# Stores the address of AuthorizedRegistry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
-# @notice Mapping between market ID and Market Prices
+# Mapping between market ID and Market Prices
 @storage_var
 func market_prices(id : felt) -> (res : MarketPrice):
 end
 
-# @notice Stores the address of AuthorizedRegistry contract
+# Stores the address of AuthorizedRegistry contract
 @storage_var
 func standard_collateral() -> (collateral_id : felt):
 end
@@ -67,6 +67,11 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
+
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
