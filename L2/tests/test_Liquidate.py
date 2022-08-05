@@ -1036,7 +1036,7 @@ async def test_should_not_allow_non_liquidators(adminAuth_factory):
     ##############################################
     ######## Bob's liquidation result 3 ##########
     ##############################################
-    assert_revert(lambda: charlie_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+    await assert_revert(charlie_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
         bob.contract_address,
         # 2 Position + 2 Collaterals
         4,
