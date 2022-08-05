@@ -20,9 +20,7 @@ end
 
 # Event emitted whenever update_withdrawal_fee_mapping() is called
 @event
-func update_withdrawal_fee_mapping_called(
-    user_l2_address : felt, collateral_id : felt, fee_to_add : felt
-):
+func update_withdrawal_fee_mapping_called(user_l2_address : felt, collateral_id : felt, fee : felt):
 end
 
 ###########
@@ -187,7 +185,7 @@ func update_withdrawal_fee_mapping{
 
     # update_withdrawal_fee_mapping_called event is emitted
     update_withdrawal_fee_mapping_called.emit(
-        user_l2_address=user_l2_address_, collateral_id=collateral_id_, fee_to_add=fee_to_add_
+        user_l2_address=user_l2_address_, collateral_id=collateral_id_, fee=new_fee
     )
 
     return ()

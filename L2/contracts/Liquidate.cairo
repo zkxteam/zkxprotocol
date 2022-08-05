@@ -26,7 +26,7 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IMarketPrices import IMarketPrices
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+from contracts.Math_64x61 import Math64x61_div, Math64x61_mul
 
 ##########
 # Events #
@@ -37,6 +37,16 @@ from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 func check_liquidation_called(
     account_address : felt, liq_result : felt, least_collateral_ratio_position : felt
 ):
+end
+
+# Event emitted whenever check_order_can_be_opened() is called
+@event
+func can_order_be_opened(order : MultipleOrder):
+end
+
+# Event emitted whenever position can be deleveraged
+@event
+func position_to_be_deleveraged(position : felt, amount_to_be_sold : felt):
 end
 
 ###########
@@ -209,6 +219,10 @@ func check_order_can_be_opened{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     order : MultipleOrder, size : felt, execution_price : felt
 ):
     let (prices_len : felt, prices : PriceData*) = get_asset_prices(order.pub_key)
+
+    # can_order_be_opened event is emitted
+    can_order_be_opened.emit(order=order)
+
     if prices_len != 0:
         check_for_risk(order, size, execution_price, prices_len, prices)
         return ()
@@ -521,6 +535,8 @@ func check_deleveraging{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     if can_be_liquidated == TRUE:
         return (0)
     else:
+        # position_to_be_deleveraged event is emitted
+        position_to_be_deleveraged.emit(position=position_, amount_to_be_sold=amount_to_be_sold)
         return (amount_to_be_sold)
     end
 end

@@ -23,7 +23,7 @@ func add_withdrawal_request_called(
 ):
 end
 
-# Event emitted whenever update_withdrawal_request() is called
+# Event emitted whenever update_withdrawal_request() l1 handler is called
 @event
 func update_withdrawal_request_called(
     from_address : felt, user_l2_address : felt, request_id : felt
