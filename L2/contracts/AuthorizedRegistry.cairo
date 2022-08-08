@@ -101,15 +101,12 @@ func update_contract_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     end
 
     let (contract_address) = contract_registry.read(index=index_, version=version_)
-    if contract_address == 0:
-        # Update the registry
-        contract_registry.write(index=index_, version=version_, value=contract_address_)
+    
+    # Update the registry
+    contract_registry.write(index=index_, version=version_, value=contract_address_)
 
-        updated_registry.emit(index=index_, version=version_, address=contract_address_)
-        return()
-    else:
-        return()
-    end
+    updated_registry.emit(index=index_, version=version_, address=contract_address_)
+    return()
 end
 
 

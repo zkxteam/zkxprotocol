@@ -1,7 +1,5 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import assert_in_range, assert_le, assert_not_zero
