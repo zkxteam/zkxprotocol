@@ -2,11 +2,28 @@
 
 %builtins pedersen range_check ecdsa
 
-from contracts.interfaces.IAdminAuth import IAdminAuth
-from contracts.Constants import AdminAuth_INDEX, ManageAuthRegistry_ACTION
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
+from contracts.Constants import AdminAuth_INDEX, ManageAuthRegistry_ACTION
+from contracts.interfaces.IAdminAuth import IAdminAuth
+
 from starkware.starknet.common.syscalls import get_caller_address
+
+##########
+# Events #
+##########
+
+# Event emitted whenever a new address is added to the registry
+@event
+func updated_registry(
+    index : felt, version : felt, address : felt
+):
+end
+
+
+###########
+# Storage #
+###########
 
 # @notice Stores the address for a specific zkx contract corresponding to the version
 # Index - Contract information
@@ -27,15 +44,42 @@ from starkware.starknet.common.syscalls import get_caller_address
 func contract_registry(index : felt, version : felt) -> (address : felt):
 end
 
+###############
+# Constructor #
+###############
+
 # @notice Constructor for the smart-contract
 # @param auth_address_ - Address of the AdminAuth Contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     auth_address_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(auth_address_)
+    end
     contract_registry.write(index=AdminAuth_INDEX, version=1, value=auth_address_)
     return ()
 end
+
+##################
+# View Functions #
+##################
+
+# @notice Function to find whether an address has permission to perform certain action
+# @param address - Address for which permission has to be determined
+# @param action - Action for which permission has to be determined
+# @return allowed - 0 if no access, 1 if access allowed
+@view
+func get_contract_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    index_ : felt, version_ : felt
+) -> (address : felt):
+    let (address) = contract_registry.read(index=index_, version=version_)
+    return (address=address)
+end
+
+######################
+# External Functions #
+######################
 
 # @notice Function to modify trusted contracts registry, only callable by the admins with action access=3
 # @param index_ - Index of the registry that needs to be updated
@@ -45,8 +89,6 @@ end
 func update_contract_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     index_ : felt, version_ : felt, contract_address_ : felt
 ):
-    alloc_locals
-
     # Auth Check
     let (caller) = get_caller_address()
     let (auth_addr) = contract_registry.read(index=AdminAuth_INDEX, version=version_)
@@ -62,26 +104,12 @@ func update_contract_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     if contract_address == 0:
         # Update the registry
         contract_registry.write(index=index_, version=version_, value=contract_address_)
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
+
+        updated_registry.emit(index=index_, version=version_, address=contract_address_)
+        return()
     else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
+        return()
     end
-
-    return ()
 end
 
-# @notice Function to find whether an address has permission to perform certain action
-# @param address - Address for which permission has to be determined
-# @param action - Action for which permission has to be determined
-# @return allowed - 0 if no access, 1 if access allowed
-@view
-func get_contract_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    index_ : felt, version_ : felt
-) -> (address : felt):
-    let (address) = contract_registry.read(index=index_, version=version_)
-    return (address=address)
-end
+

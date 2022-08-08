@@ -62,4 +62,6 @@ const STOP_ORDER = 2
 const LIQUIDATION_ORDER = 3
 const DELEVERAGING_ORDER = 4
 
+const LONG = 1
+const SHORT = 0
 
