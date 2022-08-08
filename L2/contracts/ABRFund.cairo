@@ -1,17 +1,14 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
 from contracts.Constants import (
-    AdminAuth_INDEX,
     ABR_PAYMENT_INDEX,
     ManageFunds_ACTION
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
@@ -50,21 +47,11 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount : felt
 ):
-    alloc_locals
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    # Auth Check
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-
-    assert_not_zero(access)
+    with_attr error_message("Not authorized to manage funds"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     let current_amount : felt = balance_mapping.read(market_id=market_id_)
     balance_mapping.write(market_id=market_id_, value=current_amount + amount)
@@ -79,21 +66,11 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount : felt
 ):
-    alloc_locals
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    # Auth Check
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-
-    assert_not_zero(access)
+    with_attr error_message("Not authorized to manage funds"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
 
     let current_amount : felt = balance_mapping.read(market_id=market_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
