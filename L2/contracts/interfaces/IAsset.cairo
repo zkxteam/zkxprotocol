@@ -5,7 +5,10 @@ from contracts.DataTypes import Asset, AssetWID
 @contract_interface
 namespace IAsset:
 
-    # external functions
+    ######################
+    # External functions #
+    ######################
+    
     func set_L1_zkx_address(l1_zkx_address : felt):
     end
 
@@ -42,7 +45,10 @@ namespace IAsset:
     ):
     end
 
-    # view functions
+    ##################
+    # View functions #
+    ##################
+
     func get_L1_zkx_address() -> (res : felt):
     end
 
