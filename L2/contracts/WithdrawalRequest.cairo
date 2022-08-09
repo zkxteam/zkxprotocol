@@ -5,12 +5,30 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import AccountRegistry_INDEX, L1_ZKX_Address_INDEX, MasterAdmin_ACTION
+from contracts.Constants import AccountRegistry_INDEX, L1_ZKX_Address_INDEX
 from contracts.DataTypes import WithdrawalRequest
 from contracts.interfaces.IAccount import IAccount
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
+
+##########
+# Events #
+##########
+
+# Event emitted whenever add_withdrawal_request() is called
+@event
+func add_withdrawal_request_called(
+    request_id : felt, user_l1_address : felt, ticker : felt, amount : felt
+):
+end
+
+# Event emitted whenever update_withdrawal_request() l1 handler is called
+@event
+func update_withdrawal_request_called(
+    from_address : felt, user_l2_address : felt, request_id : felt
+):
+end
 
 ###########
 # Storage #
@@ -42,6 +60,11 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
+
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
@@ -95,6 +118,12 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 
     # update withdrawal history status field to 1
     IAccount.update_withdrawal_history(contract_address=user_l2_address_, request_id_=request_id_)
+
+    # update_withdrawal_request_called event is emitted
+    update_withdrawal_request_called.emit(
+        from_address=from_address, user_l2_address=user_l2_address_, request_id=request_id_
+    )
+
     return ()
 end
 
@@ -134,5 +163,11 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     )
 
     withdrawal_request_mapping.write(request_id=request_id_, value=new_request)
+
+    # add_withdrawal_request_called event is emitted
+    add_withdrawal_request_called.emit(
+        request_id=request_id_, user_l1_address=user_l1_address_, ticker=ticker_, amount=amount_
+    )
+
     return ()
 end

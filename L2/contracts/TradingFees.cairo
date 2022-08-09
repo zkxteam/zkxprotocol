@@ -3,6 +3,7 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_nn
+
 from contracts.Constants import FeeDiscount_INDEX, ManageFeeDetails_ACTION
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IFeeDiscount import IFeeDiscount
@@ -24,6 +25,20 @@ end
 struct Discount:
     member numberOfTokens : felt
     member discount : felt
+end
+
+##########
+# Events #
+##########
+
+# Event emitted whenever update_base_fees() is called
+@event
+func update_base_fees_called(tier : felt, fee_details : BaseFee):
+end
+
+# Event emitted whenever update_discount() is called
+@event
+func update_discount_called(tier : felt, discount_details : Discount):
 end
 
 ###########
@@ -238,12 +253,15 @@ func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
             assert_lt(upper_tier_fee.takerFee, fee_details.takerFee)
         end
         base_fee_tiers.write(tier=tier_, value=fee_details)
-        return ()
     else:
         max_base_fee_tier.write(value=tier_)
         base_fee_tiers.write(tier=tier_, value=fee_details)
-        return ()
     end
+
+    # update_base_fees_called event is emitted
+    update_base_fees_called.emit(tier=tier_, fee_details=fee_details)
+
+    return ()
 end
 
 # @notice Function to update discount details
@@ -305,12 +323,15 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
             assert_lt(discount_details.discount, upper_tier_discount.discount)
         end
         discount_tiers.write(tier=tier_, value=discount_details)
-        return ()
     else:
         max_discount_tier.write(value=tier_)
         discount_tiers.write(tier=tier_, value=discount_details)
-        return ()
     end
+
+    # update_discount_called event is emitted
+    update_discount_called.emit(tier=tier_, discount_details=discount_details)
+
+    return ()
 end
 
 ######################
