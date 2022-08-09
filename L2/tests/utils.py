@@ -12,6 +12,7 @@ from starkware.starknet.core.os.transaction_hash.transaction_hash import (
     TransactionHashPrefix,
     calculate_transaction_hash_common,
 )
+from starkware.starknet.business_logic.execution.objects import Event
 
 MAX_UINT256 = (2**128 - 1, 2**128 - 1)
 
@@ -151,3 +152,10 @@ async def assert_revert(fun, reverted_with=None):
         _, error = err.args
         if reverted_with is not None:
             assert reverted_with in error['message']
+
+def assert_event_emitted(tx_exec_info, from_address, name, data):
+    assert Event(
+        from_address=from_address,
+        keys=[get_selector_from_name(name)],
+        data=data,
+    ) in tx_exec_info.raw_events

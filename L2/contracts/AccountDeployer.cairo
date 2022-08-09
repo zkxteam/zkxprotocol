@@ -1,6 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.syscalls import deploy
@@ -9,6 +10,27 @@ from contracts.Constants import AccountRegistry_INDEX, MasterAdmin_ACTION
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
+
+###########
+# Events  #
+###########
+
+# this event is emitted whenever the account contract class hash is changed by the admin
+@event
+func class_hash_changed(class_hash: felt):
+end
+
+# this event is emitted whenever a new account is deployed
+@event
+func account_deployed(pubkey: felt, L1_address: felt, account_address: felt):
+end
+
+# this event is emitted whenever the version for this contract is changed by the admin
+@event
+func version_changed(new_version: felt):
+end
+
+
 
 ###########
 # Storage #
@@ -45,8 +67,10 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    assert_not_zero(registry_address_)
-    assert_not_zero(version_)
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
 
     registry_address.write(registry_address_)
     version.write(version_)
@@ -113,12 +137,15 @@ func deploy_account{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (current_registry_address) = registry_address.read()
     let (current_version) = version.read()
 
-    assert_not_zero(hash)
+    with_attr error_message("Class hash cannot be 0"):
+        assert_not_zero(hash)
+    end
+
     let (stored_deployed_address) = pubkey_L1_to_address.read(public_key, L1_address)
 
     # check we havent already deployed this combination of public key and L1 address
     with_attr error_message("Account already exists with given pubkey and L1 address"):
-        assert stored_deployed_address = 0
+        assert stored_deployed_address = FALSE
     end
 
     # prepare constructor calldata for deploy call
@@ -142,9 +169,10 @@ func deploy_account{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         version=current_version,
     )
 
+    # getting a return value from the add_to_account_registry function means that it was successful
     let (res) = IAccountRegistry.add_to_account_registry(account_registry, deployed_address)
-    assert res = 1
 
+    account_deployed.emit(pubkey=public_key, L1_address=L1_address, account_address=deployed_address)
     return ()
 end
 
@@ -158,9 +186,13 @@ func set_account_class_hash{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     let (current_version) = version.read()
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
-    assert_not_zero(class_hash)
+
+    with_attr error_message("Class hash cannot be 0"):
+        assert_not_zero(class_hash)
+    end
 
     account_class_hash.write(class_hash)
+    class_hash_changed.emit(class_hash=class_hash)
 
     return ()
 end
@@ -176,5 +208,6 @@ func set_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
     version.write(new_version)
+    version_changed.emit(new_version=new_version)
     return ()
 end

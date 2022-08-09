@@ -2,29 +2,49 @@
 
 %builtins pedersen range_check ecdsa
 
-from contracts.Constants import Trading_INDEX
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
+from contracts.Constants import Trading_INDEX
+from contracts.interfaces.IAdminAuth import IAdminAuth
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 
-# @notice Stores the contract version
+###########
+# Events  #
+###########
+
+@event
+func fee_mapping_updated(user_address: felt, 
+                 assetID: felt, fee_to_add: felt, prev_user_fee_for_asset: felt, prev_asset_fee: felt):
+end
+
+###########
+# Storage #
+###########
+
+# Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of Authorized Registry contract
+# Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
+# stores <address, assetID> to fee mapping
 @storage_var
 func fee_mapping(address : felt, assetID : felt) -> (fee : felt):
 end
 
+# stores <assetID> to accumulated_fee mapping
 @storage_var
 func total_fee_per_asset(assetID : felt) -> (accumulated_fee : felt):
 end
+
+###############
+# Constructor #
+###############
+
 
 # @notice Constructor of the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
@@ -38,37 +58,9 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-# @notice Function to update fee mapping which stores total fee for a user
-# @param address - address of the user for whom fee is to be updated
-# @param assetID_ - asset ID of the collateral
-# @param fee_to_add - fee value that is to be added
-@external
-func update_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    address : felt, assetID_ : felt, fee_to_add : felt
-):
-    alloc_locals
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
-    )
-
-    with_attr error_message("Access is denied since caller is not trading contract"):
-        assert caller = trading_address
-    end
-
-    let current_fee : felt = fee_mapping.read(address=address, assetID=assetID_)
-    let new_fee : felt = current_fee + fee_to_add
-    fee_mapping.write(address=address, assetID=assetID_, value=new_fee)
-
-    let current_total_fee_per_asset : felt = total_fee_per_asset.read(assetID=assetID_)
-    let new_total_fee_per_asset : felt = current_total_fee_per_asset + fee_to_add
-    total_fee_per_asset.write(assetID=assetID_, value=new_total_fee_per_asset)
-
-    return ()
-end
+##################
+# View Functions #
+##################
 
 # @notice Function to get the total fee accumulated in the system
 # @param assetID_ - asset ID of the collateral
@@ -91,4 +83,48 @@ func get_user_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 ) -> (fee : felt):
     let (fee) = fee_mapping.read(address=address, assetID=assetID_)
     return (fee)
+end
+
+######################
+# External Functions #
+######################
+
+
+# @notice Function to update fee mapping which stores total fee for a user
+# @param address - address of the user for whom fee is to be updated
+# @param assetID_ - asset ID of the collateral
+# @param fee_to_add - fee value that is to be added
+@external
+func update_fee_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    address : felt, assetID_ : felt, fee_to_add : felt
+):
+
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (trading_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Trading_INDEX, version=version
+    )
+
+    with_attr error_message("Access is denied since caller is not trading contract"):
+        assert caller = trading_address
+    end
+
+    let current_fee : felt = fee_mapping.read(address=address, assetID=assetID_)
+    let new_fee : felt = current_fee + fee_to_add
+    fee_mapping.write(address=address, assetID=assetID_, value=new_fee)
+
+    let current_total_fee_per_asset : felt = total_fee_per_asset.read(assetID=assetID_)
+    let new_total_fee_per_asset : felt = current_total_fee_per_asset + fee_to_add
+    total_fee_per_asset.write(assetID=assetID_, value=new_total_fee_per_asset)
+
+    fee_mapping_updated.emit(
+        user_address=address,
+        assetID = assetID_,
+        fee_to_add = fee_to_add,
+        prev_user_fee_for_asset = current_fee,
+        prev_asset_fee = current_total_fee_per_asset
+        )
+        
+    return ()
 end
