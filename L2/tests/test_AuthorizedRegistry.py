@@ -75,4 +75,4 @@ async def test_modify_registry_by_admin_already_updated(adminAuth_factory):
     execution_info = await registry.get_contract_address(1, 1).call()
     result = execution_info.result.address
 
-    assert result == 123
+    assert result == 1234
