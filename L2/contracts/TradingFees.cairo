@@ -1,59 +1,83 @@
 %lang starknet
 
-from contracts.Constants import (
-    FeeDiscount_INDEX,
-    ManageFeeDetails_ACTION
-)
+from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
+from starkware.cairo.common.math_cmp import is_le, is_nn
+
+from contracts.Constants import FeeDiscount_INDEX, ManageFeeDetails_ACTION
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IFeeDiscount import IFeeDiscount
-from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
-from starkware.cairo.common.math_cmp import is_le, is_nn
-from contracts.Math_64x61 import Math64x61_mul
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_mul
 
-# @notice Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
+###########
+# Structs #
+###########
 
-# @notice Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
-# @notice Stores the maximum base fee tier
-@storage_var
-func max_base_fee_tier() -> (value : felt):
-end
-
-# @notice Stores the maximum discount tier
-@storage_var
-func max_discount_tier() -> (value : felt):
-end
-
-# @notice Struct to store base fee percentage for each tier for maker and taker
+# Struct to store base fee percentage for each tier for maker and taker
 struct BaseFee:
     member numberOfTokens : felt
     member makerFee : felt
     member takerFee : felt
 end
 
-# @notice Struct to store discount percentage for each tier
+# Struct to store discount percentage for each tier
 struct Discount:
     member numberOfTokens : felt
     member discount : felt
 end
 
-# @notice Stores base fee percentage for each tier for maker and tker
+##########
+# Events #
+##########
+
+# Event emitted whenever update_base_fees() is called
+@event
+func update_base_fees_called(tier : felt, fee_details : BaseFee):
+end
+
+# Event emitted whenever update_discount() is called
+@event
+func update_discount_called(tier : felt, discount_details : Discount):
+end
+
+###########
+# Storage #
+###########
+
+# Stores the contract version
+@storage_var
+func contract_version() -> (version : felt):
+end
+
+# Stores the address of Authorized Registry contract
+@storage_var
+func registry_address() -> (contract_address : felt):
+end
+
+# Stores the maximum base fee tier
+@storage_var
+func max_base_fee_tier() -> (value : felt):
+end
+
+# Stores the maximum discount tier
+@storage_var
+func max_discount_tier() -> (value : felt):
+end
+
+# Stores base fee percentage for each tier for maker and tker
 @storage_var
 func base_fee_tiers(tier : felt) -> (value : BaseFee):
 end
 
-# @notice Stores discount percentage for each tier
+# Stores discount percentage for each tier
 @storage_var
 func discount_tiers(tier : felt) -> (value : Discount):
 end
+
+###############
+# Constructor #
+###############
 
 # @notice Constructor of the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
@@ -62,112 +86,19 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
+
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
 end
 
-# @notice Function to update base fee details
-# @param tier_ - fee tier
-# @param fee_details - base fee for the current tier
-@external
-func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    tier_ : felt, fee_details : BaseFee
-):
-    alloc_locals
-    # Auth check
-    with_attr error_message("Caller is not authorized to manage fee details"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
-    end
-
-    # Update max base fee tier if new tier is the biggest
-    let (current_max_base_fee_tier) = max_base_fee_tier.read()
-    let (result) = is_le(current_max_base_fee_tier, tier_)
-    if result == 1:
-        max_base_fee_tier.write(value=tier_)
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    end
-
-    # Update the fees
-    base_fee_tiers.write(tier=tier_, value=fee_details)
-    return ()
-end
-
-# @notice Function to update discount details
-# @param tier - Level of Tier to modify
-# @param tier_criteria_- Dicsount for the current tier
-@external
-func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    tier_ : felt, discount_details : Discount
-):
-    alloc_locals
-    # Auth check
-    with_attr error_message("Caller is not authorized to manage fee details"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
-    end
-
-    # Update max discount tier if new tier is the biggest
-    let (current_max_discount_tier) = max_discount_tier.read()
-    let (result) = is_le(current_max_discount_tier, tier_)
-    if result == 1:
-        max_discount_tier.write(value=tier_)
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    end
-
-    # Update the discount
-    discount_tiers.write(tier=tier_, value=discount_details)
-    return ()
-end
-
-# @notice Function to modify max base fee tier
-# @param tier_ - value for max base fee tier
-@external
-func update_max_base_fee_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    tier_ : felt
-):
-    # Auth check
-    with_attr error_message("Caller is not authorized to manage fee details"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
-    end
-
-    max_base_fee_tier.write(value=tier_)
-    return ()
-end
-
-# @notice Function to modify max discount tier
-# @param tier_ - value for max discount tier
-@external
-func update_max_discount_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    tier_ : felt
-):
-    # Auth check
-    with_attr error_message("Caller is not authorized to manage fee details"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
-    end
-
-    max_discount_tier.write(value=tier_)
-    return ()
-end
+##################
+# View Functions #
+##################
 
 # @notice Getter function for base fees
 # @param tier_ - tier level
@@ -211,43 +142,6 @@ func get_max_discount_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     return (value)
 end
 
-# @notice Recursive funtion to find the base fee tier of the user
-# @param  number_of_tokens_ - number of the tokens of the user
-# @param tier_ - tier level
-# @returns base_fee_maker - base fee for the maker for the tier
-# @returns base_fee_maker - base fee for the taker for the tier
-func find_user_base_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    number_of_tokens_ : felt, tier_ : felt
-) -> (base_fee_maker : felt, base_fee_taker : felt):
-    alloc_locals
-    let (fee_details) = base_fee_tiers.read(tier=tier_)
-    let sub_result = number_of_tokens_ - fee_details.numberOfTokens
-    let (result) = is_nn(sub_result)
-    if result == 1:
-        return (base_fee_maker=fee_details.makerFee, base_fee_taker=fee_details.takerFee)
-    else:
-        return find_user_base_fee(number_of_tokens_, tier_ - 1)
-    end
-end
-
-# @notice Recursive funtion to find the discount tier of the user
-# @param  number_of_tokens_ - number of the tokens of the user
-# @param tier_ - tier level
-# @returns discount - discount for the tier
-func find_user_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    number_of_tokens_ : felt, tier_ : felt
-) -> (discount : felt):
-    alloc_locals
-    let (discount_details) = discount_tiers.read(tier=tier_)
-    let sub_result = number_of_tokens_ - discount_details.numberOfTokens
-    let (result) = is_nn(sub_result)
-    if result == 1:
-        return (discount=discount_details.discount)
-    else:
-        return find_user_discount(number_of_tokens_, tier_ - 1)
-    end
-end
-
 # @notice Function which returns discount for a user
 # @param address_ - address of the user
 # @param side_ - 0 if maker, 1 if taker
@@ -285,8 +179,198 @@ func get_user_fee_and_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     end
 
     # Calculate fee after the discount
+    # 64x61(1) = 2305843009213693952
     let non_discount = 2305843009213693952 - discount
     let fee : felt = Math64x61_mul(base_fee, non_discount)
 
     return (fee=fee)
+end
+
+######################
+# External Functions #
+######################
+
+# @notice Function to update base fee details
+# @param tier_ - fee tier
+# @param fee_details - base fee for the current tier
+@external
+func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tier_ : felt, fee_details : BaseFee
+):
+    alloc_locals
+    # Auth check
+    with_attr error_message("Caller is not authorized to manage fee details"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
+    end
+
+    with_attr error_message("Tier and fee details values cannot be negative"):
+        assert_nn(tier_)
+        assert_not_zero(tier_)
+        assert_nn(fee_details.numberOfTokens)
+        assert_nn(fee_details.makerFee)
+        assert_nn(fee_details.takerFee)
+    end
+
+    with_attr error_message("Maker fee and taker fee values should be in 64x61 representation"):
+        Math64x61_assert64x61(fee_details.makerFee)
+        Math64x61_assert64x61(fee_details.takerFee)
+    end
+
+    let (current_max_base_fee_tier) = max_base_fee_tier.read()
+
+    with_attr error_message("Tier should be less than or equal to (current max base fee tier + 1)"):
+        assert_le(tier_, current_max_base_fee_tier + 1)
+    end
+
+    # Verify whether the base fee of the tier being updated/added is correct
+    # with respect to the lower tier, if lower tier exists
+    let (lower_tier_fee) = base_fee_tiers.read(tier=tier_ - 1)
+    if tier_ - 1 != 0:
+        with_attr error_message("New fee details are not valid with respect to lower tier"):
+            assert_lt(lower_tier_fee.numberOfTokens, fee_details.numberOfTokens)
+            assert_lt(fee_details.makerFee, lower_tier_fee.makerFee)
+            assert_lt(fee_details.takerFee, lower_tier_fee.takerFee)
+        end
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
+    # Verify whether the base fee of the tier being updated/added is correct
+    # with respect to the upper tier, if upper tier exists
+    let (upper_tier_fee) = base_fee_tiers.read(tier=tier_ + 1)
+    let (is_max_base_fee_tier) = is_le(current_max_base_fee_tier, tier_)
+    if is_max_base_fee_tier != 1:
+        with_attr error_message("New fee details are not valid with respect to upper tier"):
+            assert_lt(fee_details.numberOfTokens, upper_tier_fee.numberOfTokens)
+            assert_lt(upper_tier_fee.makerFee, fee_details.makerFee)
+            assert_lt(upper_tier_fee.takerFee, fee_details.takerFee)
+        end
+        base_fee_tiers.write(tier=tier_, value=fee_details)
+    else:
+        max_base_fee_tier.write(value=tier_)
+        base_fee_tiers.write(tier=tier_, value=fee_details)
+    end
+
+    # update_base_fees_called event is emitted
+    update_base_fees_called.emit(tier=tier_, fee_details=fee_details)
+
+    return ()
+end
+
+# @notice Function to update discount details
+# @param tier - Level of Tier to modify
+# @param tier_criteria_- Dicsount for the current tier
+@external
+func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tier_ : felt, discount_details : Discount
+):
+    alloc_locals
+    # Auth check
+    with_attr error_message("Caller is not authorized to manage fee details"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
+    end
+
+    with_attr error_message("Tier and discount details values cannot be negative"):
+        assert_nn(tier_)
+        assert_not_zero(tier_)
+        assert_nn(discount_details.numberOfTokens)
+        assert_nn(discount_details.discount)
+    end
+
+    with_attr error_message("Discount should be in 64x61 representation"):
+        Math64x61_assert64x61(discount_details.discount)
+    end
+
+    let (current_max_discount_tier) = max_discount_tier.read()
+
+    with_attr error_message("Tier should be less than or equal to (current max base fee tier + 1)"):
+        assert_le(tier_, current_max_discount_tier + 1)
+    end
+
+    # Verify whether the discount of the tier being updated/added is correct
+    # with respect to the lower tier, if lower tier exists
+    let (lower_tier_discount) = discount_tiers.read(tier=tier_ - 1)
+    if tier_ - 1 != 0:
+        with_attr error_message("New discount details are not valid with respect to lower tier"):
+            assert_lt(lower_tier_discount.numberOfTokens, discount_details.numberOfTokens)
+            assert_lt(lower_tier_discount.discount, discount_details.discount)
+        end
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
+    # Verify whether the discount of the tier being updated/added is correct
+    # with respect to the upper tier, if upper tier exists
+    let (upper_tier_discount) = discount_tiers.read(tier=tier_ + 1)
+    let (is_max_discount_tier) = is_le(current_max_discount_tier, tier_)
+    if is_max_discount_tier != 1:
+        with_attr error_message("New discount details are not valid with respect to upper tier"):
+            assert_lt(discount_details.numberOfTokens, upper_tier_discount.numberOfTokens)
+            assert_lt(discount_details.discount, upper_tier_discount.discount)
+        end
+        discount_tiers.write(tier=tier_, value=discount_details)
+    else:
+        max_discount_tier.write(value=tier_)
+        discount_tiers.write(tier=tier_, value=discount_details)
+    end
+
+    # update_discount_called event is emitted
+    update_discount_called.emit(tier=tier_, discount_details=discount_details)
+
+    return ()
+end
+
+######################
+# Internal Functions #
+######################
+
+# @notice Recursive funtion to find the base fee tier of the user
+# @param  number_of_tokens_ - number of the tokens of the user
+# @param tier_ - tier level
+# @returns base_fee_maker - base fee for the maker for the tier
+# @returns base_fee_maker - base fee for the taker for the tier
+func find_user_base_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    number_of_tokens_ : felt, tier_ : felt
+) -> (base_fee_maker : felt, base_fee_taker : felt):
+    alloc_locals
+    let (fee_details) = base_fee_tiers.read(tier=tier_)
+    let sub_result = number_of_tokens_ - fee_details.numberOfTokens
+    let (result) = is_nn(sub_result)
+    if result == 1:
+        return (base_fee_maker=fee_details.makerFee, base_fee_taker=fee_details.takerFee)
+    else:
+        return find_user_base_fee(number_of_tokens_, tier_ - 1)
+    end
+end
+
+# @notice Recursive funtion to find the discount tier of the user
+# @param  number_of_tokens_ - number of the tokens of the user
+# @param tier_ - tier level
+# @returns discount - discount for the tier
+func find_user_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    number_of_tokens_ : felt, tier_ : felt
+) -> (discount : felt):
+    alloc_locals
+    let (discount_details) = discount_tiers.read(tier=tier_)
+    let sub_result = number_of_tokens_ - discount_details.numberOfTokens
+    let (result) = is_nn(sub_result)
+    if result == 1:
+        return (discount=discount_details.discount)
+    else:
+        return find_user_discount(number_of_tokens_, tier_ - 1)
+    end
 end

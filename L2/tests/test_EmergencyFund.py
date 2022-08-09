@@ -5,7 +5,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 from helpers import StarknetService, ContractType, AccountFactory
-from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3, signer4
 
 
@@ -24,7 +24,7 @@ def event_loop():
 async def emergencyFund_factory(starknet_service: StarknetService):
 
     # Deploy accounts
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1, L1_ZKX_dummy_address)
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
     admin1 = await account_factory.deploy_account(signer1.public_key)
     admin2 = await account_factory.deploy_account(signer2.public_key)
     pytest.user1 = await account_factory.deploy_account(signer3.public_key)
@@ -84,19 +84,19 @@ async def test_fund_holding_through_funding_contract(emergencyFund_factory):
 async def test_fund_holding_unauthorized(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    assert_revert(lambda: signer2.send_transaction(admin2, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10]))
+    await assert_revert(signer2.send_transaction(admin2, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 10]))
 
 @pytest.mark.asyncio
 async def test_defund_holding_more_than_balance(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    assert_revert(lambda: signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 10]))
+    await assert_revert(signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 10]))
 
 @pytest.mark.asyncio
 async def test_fund_holding_more_than_balance(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    assert_revert(lambda: signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 20]))
+    await assert_revert(signer1.send_transaction(admin1, emergencyFund.contract_address, 'fund_holding', [str_to_felt("TSLA"), 20]))
 
 @pytest.mark.asyncio
 async def test_fund_insurance_through_funding_contract(emergencyFund_factory):

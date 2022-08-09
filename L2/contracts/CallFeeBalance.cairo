@@ -3,7 +3,6 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_equal
 from starkware.starknet.common.syscalls import get_caller_address
 
 # @notice Stores the address of FeeBalance contract

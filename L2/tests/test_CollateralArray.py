@@ -20,7 +20,6 @@ DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
 L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
 
 
 @pytest.fixture(scope='module')
@@ -35,8 +34,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         alice_signer.public_key,
         L1_dummy_address,
         0,
-        1,
-        L1_ZKX_dummy_address
+        1
     ])
 
     return alice

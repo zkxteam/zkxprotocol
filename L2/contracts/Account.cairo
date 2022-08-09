@@ -1,8 +1,9 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa bitwise
+%builtins pedersen range_check ecdsa 
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.hash_state import (
     hash_finalize,
@@ -13,7 +14,6 @@ from starkware.cairo.common.hash_state import (
 from starkware.cairo.common.math import (
     abs_value,
     assert_le,
-    assert_lt,
     assert_nn,
     assert_not_equal,
     assert_not_zero,
@@ -32,19 +32,20 @@ from starkware.starknet.common.syscalls import (
 )
 
 from contracts.Constants import (
-    ABR_FUNDS_INDEX,
-    ABR_INDEX,
     ABR_PAYMENT_INDEX,
-    AccountRegistry_INDEX,
     Asset_INDEX,
-    FeeBalance_INDEX,
-    Holding_INDEX,
-    InsuranceFund_INDEX,
+    DELEVERAGING_ORDER,
+    L1_ZKX_Address_INDEX,
     Liquidate_INDEX,
-    LiquidityFund_INDEX,
-    Market_INDEX,
+    LIQUIDATION_ORDER,
+    ORDER_CLOSED_PARTIALLY,
+    ORDER_CLOSED,
+    ORDER_LIQUIDATED,
+    ORDER_OPENED_PARTIALLY,
+    ORDER_OPENED,
+    ORDER_TO_BE_DELEVERAGED,
+    ORDER_TO_BE_LIQUIDATED,
     Trading_INDEX,
-    TradingFees_INDEX,
     WithdrawalFeeBalance_INDEX,
     WithdrawalRequest_INDEX,
 )
@@ -52,7 +53,6 @@ from contracts.DataTypes import (
     Asset,
     CollateralBalance,
     Message,
-    MultipleOrder,
     OrderDetails,
     OrderDetailsWithIDs,
     OrderRequest,
@@ -60,8 +60,8 @@ from contracts.DataTypes import (
     WithdrawalHistory,
     WithdrawalRequestForHashing,
 )
+
 from contracts.interfaces.IAccount import IAccount
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
@@ -70,11 +70,63 @@ from contracts.Math_64x61 import (
     Math64x61_div,
     Math64x61_fromFelt,
     Math64x61_mul,
-    Math64x61_sub,
     Math64x61_toFelt,
 )
 
+#############
+# Constants #
+#############
 const MESSAGE_WITHDRAW = 3
+
+##########
+# Events #
+##########
+
+# Event emitted whenever collateral is transferred from account by trading
+@event
+func transferred_from(
+    asset_id : felt, amount : felt
+):
+end
+
+# Event emitted whenever collateral is transferred to account by trading
+@event
+func transferred(
+    asset_id : felt, amount : felt
+):
+end
+
+# Event emitted whenever collateral is transferred to account by abr payment
+@event
+func transferred_abr(
+    asset_id : felt, market_id : felt, amount : felt
+):
+end
+
+# Event emitted whenever collateral is transferred from account by abr payment
+@event
+func transferred_from_abr(
+    asset_id : felt, market_id : felt, amount : felt
+):
+end
+
+# Event emitted whenver a new withdrawal request is made
+@event
+func withdrawal_request(
+    collateral_id : felt, amount : felt, node_operator_l2 : felt
+):
+end
+
+# Event emitted whenever a position is marked to be liquidated/deleveraged
+@event
+func liquidate_deleverage(position_id : felt, amount : felt):
+end
+
+# Event emitted whenever asset deposited in into account
+@event
+func deposited(asset_id : felt, amount : felt):
+end
+
 
 ###########
 # Storage #
@@ -118,11 +170,6 @@ end
 # Stores L1 address associated with the account
 @storage_var
 func L1_address() -> (res : felt):
-end
-
-# Stores L1 ZKX Contract address
-@storage_var
-func L1_ZKX_address() -> (res : felt):
 end
 
 # Stores all positions held by the user
@@ -171,21 +218,16 @@ end
 
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    public_key_ : felt,
-    L1_address_ : felt,
-    registry_address_ : felt,
-    version_ : felt,
-    L1_ZKX_address_ : felt,
+    public_key_ : felt, L1_address_ : felt, registry_address_ : felt, version_ : felt
 ):
-    assert_not_zero(public_key_)
-    assert_not_zero(L1_address_)
-    assert_not_zero(L1_ZKX_address_)
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(version_)
+    end
 
     public_key.write(public_key_)
     L1_address.write(L1_address_)
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
-    L1_ZKX_address.write(value=L1_ZKX_address_)
     return ()
 end
 
@@ -197,7 +239,9 @@ end
 func assert_only_self{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
     let (self) = get_contract_address()
     let (caller) = get_caller_address()
-    assert self = caller
+    with_attr error_message("The function can only be called the user"):
+        assert self = caller
+    end
     return ()
 end
 
@@ -262,10 +306,6 @@ func is_valid_signature_order{
     local pub_key
 
     if liquidator_address_ != 0:
-        let (caller) = get_caller_address()
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-
         # To-Do Verify whether call came from node operator
 
         let (_public_key) = IAccount.get_public_key(contract_address=liquidator_address_)
@@ -338,23 +378,14 @@ end
 func get_deleveraged_or_liquidatable_position{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }() -> (order_id : felt, amount_to_be_sold : felt):
-    alloc_locals
     let (order_id_) = deleveraged_or_liquidatable_position.read()
     let (order_details) = get_order_data(order_id_)
-    local amount_to_be_sold_
-    if order_details.status == 5:
+    if order_details.status == ORDER_TO_BE_DELEVERAGED:
         let (amount) = amount_to_be_sold.read(order_id=order_id_)
-        assert amount_to_be_sold_ = amount
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
+        return (order_id=order_id_, amount_to_be_sold=amount)
     else:
-        assert amount_to_be_sold_ = 0
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
+        return (order_id=order_id_, amount_to_be_sold=0)
     end
-    return (order_id=order_id_, amount_to_be_sold=amount_to_be_sold_)
 end
 
 # @notice view function to get all the open positions
@@ -363,8 +394,6 @@ end
 @view
 func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-    alloc_locals
-
     let (array_list : OrderDetailsWithIDs*) = alloc()
     return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
 end
@@ -375,8 +404,6 @@ end
 @view
 func return_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ) -> (array_list_len : felt, array_list : CollateralBalance*):
-    alloc_locals
-
     let (array_list : CollateralBalance*) = alloc()
     return populate_array_collaterals(0, array_list)
 end
@@ -387,8 +414,6 @@ end
 @view
 func get_withdrawal_history{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ) -> (withdrawal_list_len : felt, withdrawal_list : WithdrawalHistory*):
-    alloc_locals
-
     let (withdrawal_list : WithdrawalHistory*) = alloc()
     return populate_withdrawals_array(0, withdrawal_list)
 end
@@ -426,25 +451,33 @@ end
 @l1_handler
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt, user : felt, amount : felt, assetID_ : felt
-):
+):  
     alloc_locals
-    # Make sure the message was sent by the intended L1 contract.
-    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
-    assert from_address = L1_ZKX_contract_address
-
-    let (stored_L1_address) = L1_address.read()
-
-    assert stored_L1_address = user
-
-    # Reading token decimal field of an asset
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
+
+    # Get L1 ZKX contract address
+    let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
+    )
+
+    # Make sure the message was sent by the intended L1 contract
+    with_attr error_message("Message must be sent by approved ZKX address"):
+        assert from_address = L1_ZKX_contract_address
+    end
+
+    let (stored_L1_address) = L1_address.read()
+
+    with_attr error_message("Only the user can initiate deposits"):
+        assert stored_L1_address = user
+    end
 
     # Get asset contract address
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
+    # Reading token decimal field of an asset
     let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_)
     tempvar decimal = asset.token_decimal
 
@@ -475,6 +508,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tempvar new_balance = balance_collateral + amount_in_decimal_representation
     balance.write(assetID=assetID_, value=new_balance)
 
+    deposited.emit(asset_id = assetID_, amount = amount_in_decimal_representation)
     return ()
 end
 
@@ -488,8 +522,6 @@ end
 func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     assetID_ : felt, amount : felt
 ) -> ():
-    alloc_locals
-
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -505,6 +537,8 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     end
 
     balance.write(assetID=assetID_, value=balance_ - amount)
+
+    transferred_from.emit(asset_id = assetID_, amount = amount)
     return ()
 end
 
@@ -515,8 +549,6 @@ end
 func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     assetID_ : felt, marketID_ : felt, amount : felt
 ):
-    alloc_locals
-
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -537,6 +569,8 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
     last_updated.write(market_id=marketID_, value=block_timestamp)
+
+    transferred_from_abr.emit(asset_id = assetID_, market_id = marketID_, amount = amount)
     return ()
 end
 
@@ -547,8 +581,6 @@ end
 func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     assetID_ : felt, marketID_ : felt, amount : felt
 ):
-    alloc_locals
-
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -569,6 +601,7 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     let (block_timestamp) = get_block_timestamp()
     last_updated.write(market_id=marketID_, value=block_timestamp)
 
+    transferred_abr.emit(asset_id = assetID_, market_id = marketID_, amount = amount)
     return ()
 end
 
@@ -579,8 +612,6 @@ end
 func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     assetID_ : felt, amount : felt
 ) -> ():
-    alloc_locals
-
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -599,6 +630,8 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 
     let (balance_) = balance.read(assetID=assetID_)
     balance.write(assetID=assetID_, value=balance_ + amount)
+
+    transferred.emit(asset_id = assetID_, amount = amount)
     return ()
 end
 
@@ -659,17 +692,12 @@ func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     balance.write(assetID=assetID_, value=amount_)
     let (array_len) = collateral_array_len.read()
 
-    tempvar syscall_ptr = syscall_ptr
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-    tempvar range_check_ptr = range_check_ptr
     if curr_balance == 0:
         add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
+        return()
+    else:
+        return()
     end
-
-    return ()
 end
 
 # @notice External function called to remove a fully closed position
@@ -691,7 +719,7 @@ func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     let (posDetails : OrderDetails) = order_mapping.read(orderID=pos_id)
 
     with_attr error_message("The order is not fully closed yet."):
-        assert posDetails.status = 4
+        assert posDetails.status = ORDER_CLOSED
     end
 
     let (arr_len) = position_array_len.read()
@@ -753,12 +781,12 @@ func execute_order{
         # If it's a new order
         if orderDetails.assetID == 0:
             # Create if the order is being fully opened
-            # status_ == 1, partially opened
-            # status_ == 2, fully opened
+            # status_ == 1, partially opened; ORDER_OPENED_PARTIALLY
+            # status_ == 2, fully opened; ORDER_OPENED
             if request.positionSize == size:
-                assert status_ = 2
+                assert status_ = ORDER_OPENED
             else:
-                assert status_ = 1
+                assert status_ = ORDER_OPENED_PARTIALLY
             end
 
             # Create a new struct with the updated details
@@ -794,18 +822,18 @@ func execute_order{
             end
 
             # Check if the order is in the process of being closed or if it was deleveraged
-            if orderDetails.status == 5:
+            if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
                 tempvar range_check_ptr = range_check_ptr
             else:
-                assert_le(orderDetails.status, 3)
+                assert_le(orderDetails.status, ORDER_CLOSED_PARTIALLY)
                 tempvar range_check_ptr = range_check_ptr
             end
 
             # Check if the order is fully filled by executing the current one
             if request.positionSize == size + orderDetails.portionExecuted:
-                status_ = 2
+                status_ = ORDER_OPENED
             else:
-                status_ = 1
+                status_ = ORDER_OPENED_PARTIALLY
             end
 
             # Create a new struct with the updated details
@@ -839,14 +867,21 @@ func execute_order{
         let (orderDetails) = order_mapping.read(orderID=request.parentOrder)
 
         # Assert that it's the reverse direction of the current position
-        assert_not_equal(request.direction, orderDetails.direction)
+        with_attr error_message("The close order must have opposite direction of open order"):
+            assert_not_equal(request.direction, orderDetails.direction)
+        end
 
         # Assert that the order exists
-        assert_not_zero(orderDetails.positionSize)
-        assert_nn(orderDetails.portionExecuted - size)
+        with_attr error_message("The open order doesn't exist"):
+            assert_not_zero(orderDetails.positionSize)
+        end
+
+        with_attr error_message("The size of close order is more than the portionExecuted"):
+            assert_nn(orderDetails.portionExecuted - size)
+        end
 
         local new_leverage
-        if request.orderType == 4:
+        if request.orderType == DELEVERAGING_ORDER:
             let total_value = margin_amount + borrowed_amount
             let (leverage_) = Math64x61_div(total_value, margin_amount)
             new_leverage = leverage_
@@ -856,38 +891,38 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr
 
         # Check if the order is fully closed or not
-        # status_ == 4, fully closed
-        # status_ == 3, partially closed
-        # status_ == 5, toBeDeleveraged
-        # status_ == 6, toBeLiquidated
-        # status_ == 7, fullyLiquidated
+        # status_ == 4, fully closed; ORDER_CLOSED
+        # status_ == 3, partially closed; ORDER_CLOSED_PARTIALLY
+        # status_ == 5, toBeDeleveraged; ORDER_TO_BE_DELEVERAGED
+        # status_ == 6, toBeLiquidated; ORDER_TO_BE_LIQUIDATED
+        # status_ == 7, fullyLiquidated; ORDER_LIQUIDATED
         if orderDetails.portionExecuted - size == 0:
-            if request.orderType == 3:
-                assert status_ = 7
+            if request.orderType == LIQUIDATION_ORDER:
+                assert status_ = ORDER_LIQUIDATED
             else:
-                assert status_ = 4
+                assert status_ = ORDER_CLOSED
             end
         else:
-            if request.orderType == 4:
-                assert status_ = 5
+            if request.orderType == DELEVERAGING_ORDER:
+                assert status_ = ORDER_TO_BE_DELEVERAGED
             else:
-                if request.orderType == 3:
-                    assert status_ = 6
+                if request.orderType == LIQUIDATION_ORDER:
+                    assert status_ = ORDER_TO_BE_LIQUIDATED
                 else:
-                    assert status_ = 3
+                    assert status_ = ORDER_CLOSED_PARTIALLY
                 end
             end
         end
 
         # Update the amount to be sold after deleveraging
-        if orderDetails.status == 5:
+        if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
             let (amount) = amount_to_be_sold.read(order_id=request.parentOrder)
             let updated_amount = amount - size
             let (positive_updated_amount) = abs_value(updated_amount)
             # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
             let (result) = is_le(updated_amount, 230584300)
             local amount_to_be_updated
-            if result == 1:
+            if result == TRUE:
                 amount_to_be_updated = 0
             else:
                 amount_to_be_updated = updated_amount
@@ -1049,7 +1084,7 @@ func withdraw{
 
     # Compute current balance
     let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id)
-    with_attr error_message("Fee amount should be less than fee collateral balance"):
+    with_attr error_message("Fee amount should be less than or equal to the fee collateral balance"):
         assert_le(standard_fee, fee_collateral_balance)
     end
     tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee
@@ -1108,7 +1143,9 @@ func withdraw{
     )
 
     # Get L1 ZKX contract address
-    let (L1_ZKX_contract_address) = L1_ZKX_address.read()
+    let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
+    )
 
     # Create a withdrawal history object
     local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
@@ -1136,6 +1173,7 @@ func withdraw{
     # Send Message to L1
     send_message_to_l1(to_address=L1_ZKX_contract_address, payload_size=5, payload=message_payload)
 
+    withdrawal_request.emit(collateral_id = collateral_id_, amount = amount_, node_operator_l2 = node_operator_L2_address_)
     return ()
 end
 
@@ -1153,7 +1191,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     with_attr error_message("Amount to be sold cannot be negative"):
         assert_nn(amount_to_be_sold_)
     end
-    with_attr error_message("Amount to be sold should be less than portion executed"):
+    with_attr error_message("Amount to be sold should be less than or equal to the portion executed"):
         assert_le(amount_to_be_sold_, order_details.portionExecuted)
     end
 
@@ -1171,9 +1209,9 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
 
     local status_
     if amount_to_be_sold_ == 0:
-        status_ = 6
+        status_ = ORDER_TO_BE_LIQUIDATED
     else:
-        status_ = 5
+        status_ = ORDER_TO_BE_DELEVERAGED
     end
 
     # Create a new struct with the updated details by setting toBeLiquidated flag to true
@@ -1198,6 +1236,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     # Update amount_to_be_sold storage variable
     amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
 
+    liquidate_deleverage.emit(position_id = id_, amount = amount_to_be_sold_)
     return ()
 end
 
@@ -1213,7 +1252,6 @@ end
 func populate_withdrawals_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     withdrawal_list_len_ : felt, withdrawal_list_ : WithdrawalHistory*
 ) -> (withdrawal_list_len : felt, withdrawal_list : WithdrawalHistory*):
-    alloc_locals
     let (withdrawal_history) = withdrawal_history_array.read(index=withdrawal_list_len_)
 
     if withdrawal_history.collateral_id == 0:
@@ -1232,7 +1270,6 @@ end
 func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     array_list_len_ : felt, array_list_ : CollateralBalance*
 ) -> (array_list_len : felt, array_list : CollateralBalance*):
-    alloc_locals
     let (collateral_id) = collateral_array.read(index=array_list_len_)
 
     if collateral_id == 0:
@@ -1257,7 +1294,6 @@ end
 func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
 ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-    alloc_locals
     let (pos) = position_array.read(index=iterator)
 
     if pos == 0:
@@ -1280,10 +1316,10 @@ func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
         borrowedAmount=pos_details.borrowedAmount,
     )
 
-    if pos_details.status == 4:
+    if pos_details.status == ORDER_CLOSED:
         return populate_array_positions(iterator + 1, array_list_len, array_list)
     else:
-        if pos_details.status == 7:
+        if pos_details.status == ORDER_LIQUIDATED:
             return populate_array_positions(iterator + 1, array_list_len, array_list)
         else:
             assert array_list[array_list_len] = order_details_w_id
@@ -1334,8 +1370,6 @@ end
 # @param orderRequest - Struct of order request to hash
 # @param res - Hash of the details
 func hash_order{pedersen_ptr : HashBuiltin*}(orderRequest : OrderRequest*) -> (res : felt):
-    alloc_locals
-
     let hash_ptr = pedersen_ptr
     with hash_ptr:
         let (hash_state_ptr) = hash_init()
@@ -1352,8 +1386,6 @@ end
 func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(
     withdrawal_request_ : WithdrawalRequestForHashing*
 ) -> (res : felt):
-    alloc_locals
-
     let hash_ptr = pedersen_ptr
     with hash_ptr:
         let (hash_state_ptr) = hash_init()
@@ -1406,8 +1438,6 @@ end
 func find_index_to_be_updated_recurse{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }(request_id_ : felt, arr_len_ : felt) -> (index : felt):
-    alloc_locals
-
     if arr_len_ == 0:
         return (-1)
     end
@@ -1427,8 +1457,6 @@ end
 func check_for_withdrawal_replay{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     request_id_ : felt, arr_len_ : felt
 ) -> (index : felt):
-    alloc_locals
-
     if arr_len_ == 0:
         return (1)
     end

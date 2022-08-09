@@ -14,7 +14,6 @@ admin2_signer = Signer(123456789987654322)
 alice_signer = Signer(123456789987654323)
 
 L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -24,7 +23,7 @@ def event_loop():
 @pytest.fixture(scope='module')
 async def abr_factory(starknet_service: StarknetService):
 
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1, L1_ZKX_dummy_address)
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
     admin1 = await account_factory.deploy_account(admin1_signer.public_key)
     admin2 = await account_factory.deploy_account(admin2_signer.public_key)
     alice = await account_factory.deploy_account(alice_signer.public_key)

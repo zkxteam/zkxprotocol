@@ -3,9 +3,9 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, str_to_felt
+from utils import Signer, assert_event_emitted, uint, str_to_felt, MAX_UINT256, assert_revert, str_to_felt, assert_event_emitted
 from helpers import StarknetService, ContractType, AccountFactory
-from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3, signer4
 
 
@@ -27,7 +27,7 @@ def event_loop():
 async def feeBalance_factory(starknet_service: StarknetService):
 
     # Deploy accounts
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1, L1_ZKX_dummy_address)
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
     admin1 = await account_factory.deploy_account(signer1.public_key)
     admin2 = await account_factory.deploy_account(signer2.public_key)
     pytest.user1 = await account_factory.deploy_account(signer3.public_key)
@@ -58,19 +58,33 @@ async def test_update_fee_mapping_invalid(feeBalance_factory):
 async def test_update_fee_mapping(feeBalance_factory):
     feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
 
-    await signer1.send_transaction(admin1, callFeeBalance.contract_address, 'update', [pytest.user1.contract_address, asset_ID, 10])
+    tx_exec_info=await signer1.send_transaction(admin1, callFeeBalance.contract_address, 'update', [pytest.user1.contract_address, asset_ID, 10])
+
 
     execution_info = await feeBalance.get_total_fee(asset_ID).call()
     assert execution_info.result.fee == 10
 
     execution_info = await feeBalance.get_user_fee(pytest.user1.contract_address, asset_ID).call()
     assert execution_info.result.fee == 10
+
+    assert_event_emitted(
+        tx_exec_info,
+        from_address = feeBalance.contract_address,
+        name = 'fee_mapping_updated',
+        data=[
+            pytest.user1.contract_address,
+            asset_ID,
+            10,
+            0,
+            0
+        ]
+    )
 
 
 @pytest.mark.asyncio
 async def test_update_fee_mapping_different_user(feeBalance_factory):
     feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
-    await signer1.send_transaction(admin1, callFeeBalance.contract_address, 'update', [pytest.user1.contract_address, asset_ID, 10])
+    tx_exec_info=await signer1.send_transaction(admin1, callFeeBalance.contract_address, 'update', [pytest.user1.contract_address, asset_ID, 10])
 
     execution_info = await feeBalance.get_total_fee(asset_ID).call()
     assert execution_info.result.fee == 20
@@ -78,7 +92,20 @@ async def test_update_fee_mapping_different_user(feeBalance_factory):
     execution_info = await feeBalance.get_user_fee(pytest.user1.contract_address, asset_ID).call()
     assert execution_info.result.fee == 20
 
-    await signer1.send_transaction(admin1, callFeeBalance.contract_address, 'update', [pytest.user2.contract_address, asset_ID, 10])
+    assert_event_emitted(
+        tx_exec_info,
+        from_address = feeBalance.contract_address,
+        name = 'fee_mapping_updated',
+        data=[
+            pytest.user1.contract_address,
+            asset_ID,
+            10,
+            10,
+            10
+        ]
+    )
+
+    tx_exec_info=await signer1.send_transaction(admin1, callFeeBalance.contract_address, 'update', [pytest.user2.contract_address, asset_ID, 10])
 
     execution_info = await feeBalance.get_total_fee(asset_ID).call()
     assert execution_info.result.fee == 30
@@ -88,3 +115,16 @@ async def test_update_fee_mapping_different_user(feeBalance_factory):
 
     execution_info = await feeBalance.get_user_fee(pytest.user2.contract_address, asset_ID).call()
     assert execution_info.result.fee == 10
+
+    assert_event_emitted(
+        tx_exec_info,
+        from_address = feeBalance.contract_address,
+        name = 'fee_mapping_updated',
+        data=[
+            pytest.user2.contract_address,
+            asset_ID,
+            10,
+            0,
+            20
+        ]
+    )

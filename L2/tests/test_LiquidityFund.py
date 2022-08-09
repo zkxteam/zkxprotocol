@@ -5,7 +5,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 from helpers import StarknetService, ContractType, AccountFactory
-from dummy_addresses import L1_dummy_address, L1_ZKX_dummy_address
+from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
 
 
@@ -23,7 +23,7 @@ def event_loop():
 async def holding_factory(starknet_service: StarknetService):
 
     # Deploy accounts
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1, L1_ZKX_dummy_address)
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
     admin1 = await account_factory.deploy_account(signer1.public_key)
     admin2 = await account_factory.deploy_account(signer2.public_key)
     pytest.user1 = await account_factory.deploy_account(signer3.public_key)
@@ -53,7 +53,7 @@ async def test_fund_admin(holding_factory):
 async def test_fund_reject(holding_factory):
     _, liquidity, _, _ = holding_factory
 
-    assert_revert(lambda: signer3.send_transaction(
+    await assert_revert(signer3.send_transaction(
         pytest.user1, liquidity.contract_address, 'fund', [str_to_felt("USDC"), 100]))
 
 
@@ -71,5 +71,5 @@ async def test_defund_admin(holding_factory):
 async def test_defund_reject(holding_factory):
     _, liquidity, _, _ = holding_factory
 
-    assert_revert(lambda: signer3.send_transaction(
+    await assert_revert(signer3.send_transaction(
         pytest.user1, liquidity.contract_address, 'defund', [str_to_felt("USDC"), 100]))

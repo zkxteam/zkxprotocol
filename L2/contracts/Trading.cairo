@@ -1,64 +1,82 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
-from contracts.DataTypes import OrderRequest, OrderDetails, Signature, Market, MultipleOrder, Asset, MarketPrice
-from contracts.Constants import (
-    Asset_INDEX,
-    Market_INDEX,
-    TradingFees_INDEX,
-    Holding_INDEX,
-    FeeBalance_INDEX,
-    LiquidityFund_INDEX,
-    InsuranceFund_INDEX,
-    MarketPrices_INDEX,
-    Liquidate_INDEX,
-    AccountRegistry_INDEX
-)
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAccount import IAccount
-from contracts.interfaces.ITradingFees import ITradingFees
-from contracts.interfaces.IAsset import IAsset
-from contracts.interfaces.IHolding import IHolding
-from contracts.interfaces.IFeeBalance import IFeeBalance
-from contracts.interfaces.IMarkets import IMarkets
-from contracts.interfaces.ILiquidate import ILiquidate
-from contracts.interfaces.ILiquidityFund import ILiquidityFund
-from contracts.interfaces.IInsuranceFund import IInsuranceFund
-from contracts.interfaces.IMarketPrices import IMarketPrices
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
-from contracts.Constants import AdminAuth_INDEX
-from starkware.cairo.common.registers import get_fp_and_pc
-from starkware.cairo.common.math import assert_not_zero, assert_le, assert_in_range
-from starkware.cairo.common.math import abs_value
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
+from starkware.cairo.common.math import assert_in_range, assert_le, assert_not_zero
+from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.math_cmp import is_le
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_block_timestamp
 
-# @notice Stores the contract version
+from contracts.Constants import (
+    AccountRegistry_INDEX,
+    AdminAuth_INDEX,
+    Asset_INDEX,
+    DELEVERAGING_ORDER,
+    FeeBalance_INDEX,
+    Holding_INDEX,
+    InsuranceFund_INDEX,
+    LIMIT_ORDER,
+    Liquidate_INDEX,
+    LiquidityFund_INDEX,
+    LONG,
+    Market_INDEX,
+    MarketPrices_INDEX,
+    ORDER_CLOSED_PARTIALLY,
+    ORDER_TO_BE_DELEVERAGED,
+    ORDER_TO_BE_LIQUIDATED,
+    SHORT,
+    STOP_ORDER,
+    TradingFees_INDEX,
+)
+from contracts.DataTypes import Asset, Market, MarketPrice, MultipleOrder, OrderDetails, OrderRequest, Signature
+from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.interfaces.IAsset import IAsset
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IFeeBalance import IFeeBalance
+from contracts.interfaces.IHolding import IHolding
+from contracts.interfaces.IInsuranceFund import IInsuranceFund
+from contracts.interfaces.ILiquidate import ILiquidate
+from contracts.interfaces.ILiquidityFund import ILiquidityFund
+from contracts.interfaces.IMarketPrices import IMarketPrices
+from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.ITradingFees import ITradingFees
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+
+##########
+# Events #
+##########
+
+# Event emitted whenever a new market is added
+@event
+func trade_execution(
+    address : felt, request : OrderRequest, market_id : felt, execution_price : felt
+):
+end
+###########
+# Storage #
+###########
+
+# Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of Authorized Registry contract
+# Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
+# Temporary variable used for debugging
+# TODO: Remove it before production
 @storage_var
 func net_acc() -> (res : felt):
 end
 
-###
-@view
-func return_net_acc{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
-):
-    let (net_acc_) = net_acc.read()
-    return (res=net_acc_)
-end
-####
+###############
+# Constructor #
+###############
 
 # @notice Constructor of the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
@@ -66,11 +84,119 @@ end
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
-):
+):  
+
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
+    
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
 end
+
+##################
+# View Functions #
+##################
+
+# @notice view function to debug
+# TODO: Remove it before production
+@view
+func return_net_acc{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    res : felt
+):
+    let (net_acc_) = net_acc.read()
+    return (res=net_acc_)
+end
+
+######################
+# External Functions #
+######################
+
+# @notice Function to execute multiple orders in a batch
+# @param size - Size of the order to be executed
+# @param execution_price - Price at which the orders must be executed
+# @param request_list_len - No of orders in the batch
+# @param request_list - The batch of the orders
+# @returns res - 1 if executed correctly
+@external
+func execute_batch{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
+}(
+    size : felt,
+    execution_price : felt,
+    marketID : felt,
+    request_list_len : felt,
+    request_list : MultipleOrder*,
+) -> (res : felt):
+    alloc_locals
+
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Calculate the timestamp
+    let (current_timestamp) = get_block_timestamp()
+
+    # Get market contract address
+    let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    )
+
+    # Get Market from the corresponding Id
+    let (market : Market) = IMarkets.getMarket(
+        contract_address=market_contract_address,
+        id=marketID
+    )
+
+    tempvar ttl = market.ttl
+
+    # Get market prices contract address
+    let (market_prices_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=MarketPrices_INDEX, version=version
+    )
+
+    # Get Market price for the corresponding market Id
+    let (market_prices : MarketPrice) = IMarketPrices.get_market_price(
+        contract_address=market_prices_contract_address,
+        id=marketID
+    )
+
+    tempvar timestamp = market_prices.timestamp
+    tempvar time_difference = current_timestamp - timestamp
+    let (status) = is_le(time_difference, ttl)
+
+    # update market price
+    if status == FALSE:
+        IMarketPrices.update_market_price(
+            contract_address=market_prices_contract_address,
+            id=marketID,
+            price=execution_price
+        )
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    else:
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+    end
+
+    # Recursively loop through the orders in the batch
+    let (result) = check_and_execute(
+        size, 0, 0, marketID, execution_price, request_list_len, request_list, 0
+    )
+
+    # Check if every order has a counter order
+    with_attr error_message("check and execute returned non zero integer."):
+        assert result = 0
+    end
+    return (1)
+end
+
+######################
+# Internal Functions #
+######################
 
 # @notice Internal function called by execute_batch
 # @param size - Size of the order to be executed
@@ -182,23 +308,32 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     tempvar range_check_ptr = range_check_ptr
 
     # Check if the execution_price is correct
-
-    if temp_order.orderType == 2:
+    if temp_order.orderType == STOP_ORDER:
         # if stop order
         
-        if temp_order.direction == 1:
+        if temp_order.direction == LONG:
             # if long stop order
             # check that stop_price <= execution_price <= limit_price
-            assert_le(temp_order.stopPrice, execution_price)
+            with_attr error_message("Stop price should be less than or equal to the execution price for long orders"):
+                assert_le(temp_order.stopPrice, execution_price)
+            end
             tempvar range_check_ptr = range_check_ptr
-            assert_le(execution_price, temp_order.price)
-             tempvar range_check_ptr = range_check_ptr
+
+            with_attr error_message("Execution price should be less than or equal to the order price for long orders"):
+                assert_le(execution_price, temp_order.price)
+            end
+            tempvar range_check_ptr = range_check_ptr
         else:
             # if short stop order
             # check that limit_price <= execution_price <= stop_price
-            assert_le(temp_order.price, execution_price)
+            with_attr error_message("Order price should be less than or equal to the execution price for short orders"):
+                assert_le(temp_order.price, execution_price)
+            end
             tempvar range_check_ptr = range_check_ptr
-            assert_le(execution_price, temp_order.stopPrice)
+
+            with_attr error_message("Execution price should be less than or equal to the stop price for short orders"):
+                assert_le(execution_price, temp_order.stopPrice)
+            end
             tempvar range_check_ptr = range_check_ptr
         end
 
@@ -207,9 +342,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
     #tempvar range_check_ptr = range_check_ptr
 
-    if temp_order.orderType == 1:
+    if temp_order.orderType == LIMIT_ORDER:
         # if it's a limit order
-        if temp_order.direction == 1:
+        if temp_order.direction == LONG:
             # if it's a long order
             with_attr error_message(
                     "limit-long order execution price should be less than limit price."):
@@ -252,7 +387,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     local sum_temp
 
-    if temp_order.direction == 1:
+    if temp_order.direction == LONG:
         assert sum_temp = sum + order_size
     else:
         assert sum_temp = sum - order_size
@@ -262,7 +397,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         contract_address=registry, index=Holding_INDEX, version=version
     )
     # If the order is to be opened
-    if temp_order.closeOrder == 0:
+    if temp_order.closeOrder == FALSE:
         
         # Get the fees from Trading Fee contract
         let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
@@ -353,7 +488,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         # Deduct the amount from liquidity funds if order is leveraged
         let (is_non_leveraged) = is_le(temp_order.leverage, 2305843009213693952)
 
-        if is_non_leveraged == 0:
+        if is_non_leveraged == FALSE:
             let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
                 contract_address=registry, index=LiquidityFund_INDEX, version=version
             )
@@ -407,7 +542,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         local actual_execution_price
 
         # current order is short order
-        if temp_order.direction == 0:
+        if temp_order.direction == SHORT:
             # Open order was a long order
             actual_execution_price = execution_price
             diff = execution_price - order_details.executionPrice
@@ -430,7 +565,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order)
 
         # Calculate new values for margin and borrowed amounts
-        if temp_order.orderType == 4:
+        if temp_order.orderType == DELEVERAGING_ORDER:
             borrowed_amount_ = borrowed_amount - leveraged_amount_out
             margin_amount_ = margin_amount
         else:
@@ -439,10 +574,10 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         end
 
         # Check if the position is to be liquidated
-        let (not_liquidation) = is_le(order_details.status, 3)
+        let (not_liquidation) = is_le(order_details.status, ORDER_CLOSED_PARTIALLY)
 
         # If it's just a close order
-        if not_liquidation == 1:
+        if not_liquidation == TRUE:
             # Deduct funds from holding contract
             IHolding.withdraw(
                 contract_address=holding_address,
@@ -477,7 +612,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             # Check if the position is underwater
             let (is_loss) = is_le(net_acc_value, 0)
 
-            if is_loss == 1:
+            if is_loss == TRUE:
                 # If yes, deduct the difference from user's balance, can go negative
                 IAccount.transfer_from(
                     contract_address=temp_order.pub_key,
@@ -500,7 +635,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             end
         else:
             # Liquidation order
-            if order_details.status == 6:
+            if order_details.status == ORDER_TO_BE_LIQUIDATED:
                 let (insurance_fund_address) = IAuthorizedRegistry.get_contract_address(
                     contract_address=registry, index=InsuranceFund_INDEX, version=version
                 )
@@ -527,7 +662,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 # Check if the account value for the position is negative
                 let (is_negative) = is_le(net_acc_value, 0)
 
-                if is_negative == 1:
+                if is_negative == TRUE:
                     # Absolute value of the acc value
                     let (deficit) = abs_value(net_acc_value)
 
@@ -539,7 +674,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     # Check if the user's balance can cover the deficit
                     let (is_payable) = is_le(deficit, user_balance)
 
-                    if is_payable == 1:
+                    if is_payable == TRUE:
                         # Transfer the full amount from the user
                         IAccount.transfer_from(
                             contract_address=temp_order.pub_key,
@@ -583,7 +718,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 end
             else:
                 # Deleveraging order
-                if order_details.status == 5:
+                if order_details.status == ORDER_TO_BE_DELEVERAGED:
                     # Withdraw the position from holding fund
                     let (holding_address) = IAuthorizedRegistry.get_contract_address(
                         contract_address=registry, index=Holding_INDEX, version=version
@@ -658,6 +793,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         borrowed_amount=borrowed_amount_,
     )
 
+    trade_execution.emit(address=temp_order.pub_key, request=temp_order_request, market_id=marketID, execution_price=average_execution_price)
+
     # If it's the first order in the array
     if assetID == 0:
         # Recursive call with the ticker and price to compare against
@@ -696,82 +833,3 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     )
 end
 
-# @notice Function to execute multiple orders in a batch
-# @param size - Size of the order to be executed
-# @param execution_price - Price at which the orders must be executed
-# @param request_list_len - No of orders in the batch
-# @param request_list - The batch of the orders
-# @returns res - 1 if executed correctly
-@external
-func execute_batch{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
-}(
-    size : felt,
-    execution_price : felt,
-    marketID : felt,
-    request_list_len : felt,
-    request_list : MultipleOrder*,
-) -> (res : felt):
-    alloc_locals
-
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    # Calculate the timestamp
-    let (current_timestamp) = get_block_timestamp()
-
-    # Get market contract address
-    let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Market_INDEX, version=version
-    )
-
-    # Get Market from the corresponding Id
-    let (market : Market) = IMarkets.getMarket(
-        contract_address=market_contract_address,
-        id=marketID
-    )
-
-    tempvar ttl = market.ttl
-
-    # Get market prices contract address
-    let (market_prices_contract_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=MarketPrices_INDEX, version=version
-    )
-
-    # Get Market price for the corresponding market Id
-    let (market_prices : MarketPrice) = IMarketPrices.get_market_price(
-        contract_address=market_prices_contract_address,
-        id=marketID
-    )
-
-    tempvar timestamp = market_prices.timestamp
-    tempvar time_difference = current_timestamp - timestamp
-    let (status) = is_le(time_difference, ttl)
-
-    # update market price
-    if status == 0:
-        IMarketPrices.update_market_price(
-            contract_address=market_prices_contract_address,
-            id=marketID,
-            price=execution_price
-        )
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    end
-
-    # Recursively loop through the orders in the batch
-    let (result) = check_and_execute(
-        size, 0, 0, marketID, execution_price, request_list_len, request_list, 0
-    )
-
-    # Check if every order has a counter order
-    with_attr error_message("check and execute returned non zero integer."):
-        assert result = 0
-    end
-    return (1)
-end
