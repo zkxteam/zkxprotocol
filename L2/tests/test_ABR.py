@@ -4,6 +4,7 @@ import ABR_data
 import time
 import calculate_abr
 from starkware.starknet.testing.starknet import Starknet
+from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, from64x61, to64x61, assert_revert, convertTo64x61
 from helpers import StarknetService, ContractType, AccountFactory
@@ -38,7 +39,8 @@ async def abr_factory(starknet_service: StarknetService):
         block_number=1, 
         block_timestamp=timestamp, 
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
     )
 
     btc_perp_spot_64x61 = convertTo64x61(ABR_data.btc_perp_spot)
@@ -120,7 +122,8 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
 
     starknet.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp, gas_price=starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet.state.state.block_info.sequencer_address
+        sequencer_address=starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
     )
 
     arguments = [1282193, 480] + btc_spot + [480]+btc_perp

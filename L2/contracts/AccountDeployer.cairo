@@ -158,7 +158,10 @@ func deploy_account{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 
     # using a constant value for salt means redeploying with same public_key would not override the account address
     # in any case we now check that re-deployment cannot happen with same (pubkey, L1 address) so salt does not matter
-    let (deployed_address) = deploy(hash, 0, 4, calldata)
+    # If 'deploy_from_zero' (5th arg) is 1, the contract address is not affected by the deployer's address
+    # we make it so that only a change in the Account contract hash or constructor calldata will lead to change in contract
+    # address deployed
+    let (deployed_address) = deploy(hash, 0, 4, calldata, 1)
 
     pubkey_L1_to_address.write(public_key, L1_address, deployed_address)
 
