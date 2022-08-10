@@ -1,11 +1,11 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.bool import TRUE, FALSE
 
 from contracts.Constants import AdminAuth_INDEX, L1_ZKX_Address_INDEX, ManageAssets_ACTION
 from contracts.DataTypes import Asset, AssetWID
