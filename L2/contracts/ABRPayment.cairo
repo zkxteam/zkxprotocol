@@ -45,41 +45,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-func user_pays{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    account_address : felt, abr_funding : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
-):
-    IAccount.transfer_from_abr(
-        contract_address=account_address,
-        assetID_=collateral_id,
-        marketID_=market_id,
-        amount=abs_payment_amount,
-    )
-    IABRFund.deposit(
-        contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-    )
-
-    return()
-end
-
-func user_receives{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    account_address : felt, abr_funding : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
-):
-    IABRFund.withdraw(
-        contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-    )
-
-    IAccount.transfer_abr(
-        contract_address=account_address,
-        assetID_=collateral_id,
-        marketID_=market_id,
-        amount=abs_payment_amount,
-    )
-
-    return()
-end
-
-
-
 # @notice Internal function called by pay_abr_users to iterate throught the positions of the account
 # @param account_address - Address of the user of whom the positions are passed
 # @param positions_len - Length of the positions array of the user
@@ -139,20 +104,73 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     if is_negative == 1:
         if [positions].direction == 0:
             # user pays
-            user_pays(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
+            IAccount.transfer_from_abr(
+                contract_address=account_address,
+                assetID_=[positions].collateralID,
+                marketID_=market_id,
+                amount=abs_payment_amount,
+            )
+            IABRFund.deposit(
+                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
+            )
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         else:
             # user receives
-            user_receives(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
+            IABRFund.withdraw(
+                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
+            )
+
+            IAccount.transfer_abr(
+                contract_address=account_address,
+                assetID_=[positions].collateralID,
+                marketID_=market_id,
+                amount=abs_payment_amount,
+            )
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
-    # If the abr is positive
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+        # If the abr is positive
     else:
         if [positions].direction == 0:
             # user receives
-            user_receives(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
+            IABRFund.withdraw(
+                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
+            )
+
+            IAccount.transfer_abr(
+                contract_address=account_address,
+                assetID_=[positions].collateralID,
+                marketID_=market_id,
+                amount=abs_payment_amount,
+            )
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         else:
             # user pays
-            user_pays(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
+            IAccount.transfer_from_abr(
+                contract_address=account_address,
+                assetID_=[positions].collateralID,
+                marketID_=market_id,
+                amount=abs_payment_amount,
+            )
+
+            IABRFund.deposit(
+                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
+            )
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
     end
 
     return pay_abr_users_positions(
