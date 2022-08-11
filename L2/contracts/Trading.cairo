@@ -30,7 +30,7 @@ from contracts.Constants import (
     TradingFees_INDEX,
 )
 from contracts.DataTypes import Asset, Market, MarketPrice, MultipleOrder, OrderDetails, OrderRequest, Signature
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccounts import IAccount
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry

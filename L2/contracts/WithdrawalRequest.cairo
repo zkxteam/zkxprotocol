@@ -7,7 +7,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountRegistry_INDEX, Asset_INDEX, L1_ZKX_Address_INDEX
 from contracts.DataTypes import WithdrawalRequest
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccounts import IAccount
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry

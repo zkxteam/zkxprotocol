@@ -22,7 +22,7 @@ from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccounts import IAccount
 from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import Market_INDEX, ABR_INDEX, ABR_FUNDS_INDEX, AccountRegistry_INDEX
 from contracts.DataTypes import OrderDetailsWithIDs

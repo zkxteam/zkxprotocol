@@ -61,7 +61,7 @@ from contracts.DataTypes import (
     WithdrawalRequestForHashing,
 )
 
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccounts import IAccount
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
@@ -681,6 +681,11 @@ func execute{
     )
 
     return (response_len=response.retdata_size, response=response.retdata)
+end
+
+@external
+func __execute__():
+    return ()
 end
 
 # #### TODO: Remove; Only for testing purposes #####

@@ -19,7 +19,7 @@ from contracts.DataTypes import (
     OrderDetailsWithIDs,
     PriceData,
 )
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccounts import IAccount
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
