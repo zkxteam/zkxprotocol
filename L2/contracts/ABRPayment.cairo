@@ -3,29 +3,24 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.math import abs_value, assert_not_zero
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
+from starkware.cairo.common.math import abs_value, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 from contracts.Math_64x61 import (
-    Math64x61_add,
-    Math64x61_sub,
-    Math64x61_mul,
-    Math64x61_div,
-    Math64x61_fromFelt,
-    Math64x61_sqrt,
-    Math64x61_ln,
+    Math64x61_mul
 )
-from starkware.starknet.common.syscalls import get_block_timestamp
-from contracts.interfaces.IMarkets import IMarkets
+from contracts.Constants import ABR_FUNDS_INDEX, ABR_INDEX, AccountRegistry_INDEX, Market_INDEX, SHORT
+from contracts.DataTypes import OrderDetailsWithIDs
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IABRFund import IABRFund
-from contracts.interfaces.IAdminAuth import IAdminAuth
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAccount import IAccount
-from starkware.starknet.common.syscalls import get_caller_address
-from contracts.Constants import Market_INDEX, ABR_INDEX, ABR_FUNDS_INDEX, AccountRegistry_INDEX, SHORT
-from contracts.DataTypes import OrderDetailsWithIDs
+from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IMarkets import IMarkets
+
+###########
+# Storage #
+###########
 
 @storage_var
 func registry_address() -> (contract_address : felt):
@@ -35,16 +30,80 @@ end
 func contract_version() -> (version : felt):
 end
 
+###############
+# Constructor #
+###############
+
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, contract_version_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(contract_version_)
+        assert_not_zero(registry_address_)
+    end
+
     registry_address.write(registry_address_)
     contract_version.write(contract_version_)
 
     return ()
 end
 
+######################
+# External Functions #
+######################
+
+# @notice Function to be called by the node
+# @param account_addresses_len - Length of thee account_addresses array being passed
+# @param account_addresses - Account addresses array
+@external
+func pay_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    account_addresses_len : felt, account_addresses : felt*
+):
+    # ## Signature checks go here ####
+
+    # Get the account registry smart-contract
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (account_registry) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AccountRegistry_INDEX, version=version
+    )
+
+    # Get the market smart-contract
+    let (market_contract) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    )
+
+    # Get the ABR smart-contract
+    let (abr_contract) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=ABR_INDEX, version=version
+    )
+
+    # Get the ABR-funding smart-contract
+    let (abr_funding_contract) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=ABR_FUNDS_INDEX, version=version
+    )
+
+    return pay_abr_users(
+        account_addresses_len,
+        account_addresses,
+        account_registry,
+        market_contract,
+        abr_contract,
+        abr_funding_contract,
+    )
+end
+
+######################
+# Internal Functions #
+######################
+
+# @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
+# @param account_address - Address of the user of whom the positions are passed
+# @param abr_funding - Address of the ABR Fund contract
+# @param collateral_id - Collateral id of the position
+# @param market_id - Market id of the position
+# @param abs_payment_amount - Absolute value of ABR payment 
 func user_pays{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address : felt, abr_funding : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
 ):
@@ -61,6 +120,12 @@ func user_pays{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     return()
 end
 
+# @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
+# @param account_address - Address of the user of whom the positions are passed
+# @param abr_funding - Address of the ABR Fund contract
+# @param collateral_id - Collateral id of the position
+# @param market_id - Market id of the position
+# @param abs_payment_amount - Absolute value of ABR payment 
 func user_receives{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address : felt, abr_funding : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
 ):
@@ -226,43 +291,3 @@ func pay_abr_users{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     )
 end
 
-# @notice Function to be called by the node
-# @param account_addresses_len - Length of thee account_addresses array being passed
-# @param account_addresses - Account addresses array
-@external
-func pay_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    account_addresses_len : felt, account_addresses : felt*
-):
-    # ## Signature checks go here ####
-
-    # Get the account registry smart-contract
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (account_registry) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AccountRegistry_INDEX, version=version
-    )
-
-    # Get the market smart-contract
-    let (market_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Market_INDEX, version=version
-    )
-
-    # Get the ABR smart-contract
-    let (abr_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_INDEX, version=version
-    )
-
-    # Get the ABR-funding smart-contract
-    let (abr_funding_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_FUNDS_INDEX, version=version
-    )
-
-    return pay_abr_users(
-        account_addresses_len,
-        account_addresses,
-        account_registry,
-        market_contract,
-        abr_contract,
-        abr_funding_contract,
-    )
-end
