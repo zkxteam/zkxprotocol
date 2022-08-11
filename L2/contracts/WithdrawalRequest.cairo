@@ -134,12 +134,11 @@ end
 
 # @notice function to add withdrawal request to the withdrawal request array
 # @param request_id_ ID of the withdrawal Request
-# @param user_l1_address_ User's L1 wallet address
 # @param ticker_ collateral for the requested withdrawal
 # @param amount_ Amount to be withdrawn
 @external
 func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    request_id_ : felt, user_l1_address_ : felt, ticker_ : felt, amount_ : felt
+    request_id_ : felt, ticker_ : felt, amount_ : felt
 ):
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -181,21 +180,20 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     let (user_l1_address) = IAccount.get_L1_address(contract_address=caller)
 
     with_attr error_message(
-            "User's L1 address should be the L1 address of the caller and it should be non zero "):
-        assert user_l1_address = user_l1_address_
-        assert_not_zero(user_l1_address_)
+            "User's L1 address should be non zero "):
+        assert_not_zero(user_l1_address)
     end
 
     # Create a struct with the withdrawal Request
     let new_request = WithdrawalRequest(
-        user_l1_address=user_l1_address_, user_l2_address=caller, ticker=ticker_, amount=amount_
+        user_l1_address=user_l1_address, user_l2_address=caller, ticker=ticker_, amount=amount_
     )
 
     withdrawal_request_mapping.write(request_id=request_id_, value=new_request)
 
     # add_withdrawal_request_called event is emitted
     add_withdrawal_request_called.emit(
-        request_id=request_id_, user_l1_address=user_l1_address_, ticker=ticker_, amount=amount_
+        request_id=request_id_, user_l1_address=user_l1_address, ticker=ticker_, amount=amount_
     )
 
     return ()

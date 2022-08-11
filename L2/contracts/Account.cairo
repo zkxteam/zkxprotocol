@@ -1142,7 +1142,6 @@ func withdraw{
     IWithdrawalRequest.add_withdrawal_request(
         contract_address=withdrawal_request_address,
         request_id_=request_id_,
-        user_l1_address_=user_l1_address,
         ticker_=ticker,
         amount_=amount_in_felt,
     )
