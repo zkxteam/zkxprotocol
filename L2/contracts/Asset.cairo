@@ -5,7 +5,7 @@ from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.messages import send_message_to_l1
-from starkware.starknet.common.syscalls import get_caller_address
+from starkware.starknet.common.syscalls import get_caller_address, get_contract_address
 
 from contracts.Constants import AdminAuth_INDEX, L1_ZKX_Address_INDEX, ManageAssets_ACTION
 from contracts.DataTypes import Asset, AssetWID
@@ -13,8 +13,51 @@ from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
 
+#############
+# Constants #
+#############
+
 const ADD_ASSET = 1
 const REMOVE_ASSET = 2
+
+##########
+# Events #
+##########
+
+# Event emitted on Asset contract deployment
+@event
+func Asset_Contract_Created(
+    contract_address : felt, registry_address : felt, version : felt, caller_address : felt
+):
+end
+
+# Event emitted whenever new asset is added
+@event
+func Asset_Added(
+    asset_id : felt, ticker : felt, caller_address : felt
+):
+end
+
+# Event emitted whenever asset is removed
+@event
+func Asset_Removed(
+    asset_id : felt, ticker : felt, caller_address : felt
+):
+end
+
+# Event emitted whenever asset core settings are updated
+@event
+func Asset_Core_Settings_Update(
+    asset_id : felt, ticker : felt, caller_address : felt
+):
+end
+
+# Event emitted whenever asset trade settings are updated
+@event
+func Asset_Trade_Settings_Update(
+    asset_id : felt, ticker : felt, new_contract_version : felt, new_asset_version : felt, caller_address : felt
+):
+end
 
 ###########
 # Storage #
@@ -76,12 +119,26 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
+    # Validate arguments
     with_attr error_message("Registry address or version used for Asset deployment is 0"):
         assert_not_zero(registry_address_)
         assert_not_zero(version_)
     end
+
+    # Initialize storage
     registry_address.write(registry_address_)
     contract_version.write(version_)
+
+    # Emit event
+    let (contract_address) = get_contract_address()
+    let (caller_address) = get_caller_address()
+    Asset_Contract_Created.emit(
+        contract_address, 
+        registry_address_, 
+        version_,
+        caller_address
+    )
+
     return ()
 end
 
@@ -174,6 +231,14 @@ func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
         ticker=new_asset.ticker, 
         action=ADD_ASSET
     )
+
+    # Emit event
+    let (caller_address) = get_caller_address()
+    Asset_Added.emit(
+        asset_id=id, 
+        ticker=new_asset.ticker, 
+        caller_address=caller_address
+    )
     
     return ()
 end
@@ -240,6 +305,14 @@ func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
         action=REMOVE_ASSET
     )
 
+    # Emit event
+    let (caller_address) = get_caller_address()
+    Asset_Removed.emit(
+        asset_id=id_to_remove,
+        ticker=ticker_to_remove, 
+        caller_address=caller_address
+    )
+
     return ()
 end
 
@@ -292,6 +365,14 @@ func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
     # Validate and save updated asset
     _validate_asset_properties(updated_asset)
     asset_by_id.write(id, updated_asset)
+
+    # Emit event
+    let (caller_address) = get_caller_address()
+    Asset_Core_Settings_Update.emit(
+        asset_id=id,
+        ticker=updated_asset.ticker,
+        caller_address=caller_address
+    )
 
     return ()
 end
@@ -361,8 +442,18 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     asset_by_id.write(id, updated_asset)
 
     # Bump version
-    let (curr_ver) = version.read()
+    let (local curr_ver) = version.read()
     version.write(curr_ver + 1)
+
+    # Emit event
+    let (caller_address) = get_caller_address()
+    Asset_Trade_Settings_Update.emit(
+        asset_id=id,
+        ticker=updated_asset.ticker,
+        new_contract_version=curr_ver + 1,
+        new_asset_version=updated_asset.asset_version,
+        caller_address=caller_address
+    )
 
     return ()
 end
