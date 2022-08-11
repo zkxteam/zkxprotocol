@@ -24,7 +24,7 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAccount import IAccount
 from starkware.starknet.common.syscalls import get_caller_address
-from contracts.Constants import Market_INDEX, ABR_INDEX, ABR_FUNDS_INDEX, AccountRegistry_INDEX
+from contracts.Constants import Market_INDEX, ABR_INDEX, ABR_FUNDS_INDEX, AccountRegistry_INDEX, SHORT
 from contracts.DataTypes import OrderDetailsWithIDs
 
 @storage_var
@@ -137,7 +137,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
 
     # If the abr is negative
     if is_negative == 1:
-        if [positions].direction == 0:
+        if [positions].direction == SHORT:
             # user pays
             user_pays(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
         else:
@@ -146,7 +146,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         end
     # If the abr is positive
     else:
-        if [positions].direction == 0:
+        if [positions].direction == SHORT:
             # user receives
             user_receives(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
         else:
