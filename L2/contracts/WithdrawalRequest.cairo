@@ -2,13 +2,14 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import AccountRegistry_INDEX, L1_ZKX_Address_INDEX
+from contracts.Constants import AccountRegistry_INDEX, Asset_INDEX, L1_ZKX_Address_INDEX
 from contracts.DataTypes import WithdrawalRequest
 from contracts.interfaces.IAccount import IAccount
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
 
@@ -155,6 +156,34 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
 
     with_attr error_message("Called account contract is not registered"):
         assert_not_zero(present)
+    end
+
+    # fetch asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    )
+    
+    let (asset_id) = IAsset.get_asset_id_from_ticker(
+            contract_address=asset_address, ticker=ticker_
+    )
+
+    # check whether user has enough balance
+    let (user_balance) = IAccount.get_balance(
+            contract_address=caller, assetID_=asset_id
+    )
+
+    with_attr error_message(
+            "Amount to be withdrawan should be less than or equal to the user balance"):
+        assert_le(amount_, user_balance)
+    end
+
+    # Validate if the user_l1_address_ is really the counterpart address of the caller
+    let (user_l1_address) = IAccount.get_L1_address(contract_address=caller)
+
+    with_attr error_message(
+            "User's L1 address should be the L1 address of the caller and it should be non zero "):
+        assert user_l1_address = user_l1_address_
+        assert_not_zero(user_l1_address_)
     end
 
     # Create a struct with the withdrawal Request

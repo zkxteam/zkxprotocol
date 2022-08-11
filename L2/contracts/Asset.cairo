@@ -65,6 +65,11 @@ end
 func asset_ticker_exists(ticker : felt) -> (res : felt):
 end
 
+# Stores ticker to asset ID mapping
+@storage_var
+func asset_ticker_to_asset_id(ticker : felt) -> (asset_id : felt):
+end
+
 ###############
 # Constructor #
 ###############
@@ -135,6 +140,18 @@ func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     return _populate_asset_list(0, final_len, asset_list)
 end
 
+# @notice View function for getting asset ID from ticker
+# @param ticker_ - asset ticker
+# @return asset_id - Returns asset ID of the requested ticker
+@view
+func get_asset_id_from_ticker{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ticker_ : felt
+) -> (asset_id : felt):
+    _verify_ticker_exists(ticker_, should_exist=TRUE)
+    let (id : felt) = asset_ticker_to_asset_id.read(ticker_)
+    return (asset_id=id)
+end
+
 ######################
 # External functions #
 ######################
@@ -167,6 +184,9 @@ func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 
     # Save new_asset struct
     asset_by_id.write(id, new_asset)
+
+    # update ticker to id mapping
+    asset_ticker_to_asset_id.write(new_asset.ticker, id)
 
     # Trigger asset update on L1
     _update_asset_on_L1(
@@ -209,6 +229,9 @@ func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     # Mark id & ticker as non-existing
     asset_id_exists.write(id_to_remove, FALSE)
     asset_ticker_exists.write(ticker_to_remove, FALSE)
+
+    # update ticker to id mapping
+    asset_ticker_to_asset_id.write(ticker_to_remove, 0)
 
     # Delete asset struct
     asset_by_id.write(id_to_remove, Asset(

@@ -63,6 +63,9 @@ namespace IAsset:
 
     func returnAllAssets() -> (array_list_len : felt, array_list : AssetWID*):
     end
+
+    func get_asset_id_from_ticker(ticker : felt) -> (asset_id : felt):
+    end
 end
 
     

@@ -46,6 +46,9 @@ namespace IAccount:
     func get_public_key() -> (res : felt):
     end
 
+    func get_L1_address() -> (res : felt):
+    end
+
     func return_array_collaterals() -> (array_list_len : felt, array_list : CollateralBalance*):
     end
 
