@@ -102,6 +102,10 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount_ : felt
 ):
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_le(0, amount_)
+    end
+
     with_attr error_message("Not authorized to manage funds"):
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
@@ -127,6 +131,10 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount_ : felt
 ):
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_le(0, amount_)
+    end
+
     with_attr error_message("Not authorized to manage funds"):
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
@@ -155,7 +163,11 @@ end
 @external
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount_ : felt
-):
+):  
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_le(0, amount_)
+    end
+
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -187,7 +199,11 @@ end
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount_ : felt
-):
+):  
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_le(0, amount_)
+    end
+
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
