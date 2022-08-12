@@ -2,9 +2,9 @@
 
 @contract_interface
 namespace IABRFund:
-    func withdraw(market_id_ : felt, amount : felt):
+    func withdraw(order_id_ : felt, market_id_ : felt, amount : felt):
     end
 
-    func deposit(market_id_ : felt, amount : felt):
+    func deposit(order_id_ : felt, market_id_ : felt, amount : felt):
     end
 end

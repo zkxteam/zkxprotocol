@@ -6,9 +6,8 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import abs_value, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
-from contracts.Math_64x61 import (
-    Math64x61_mul
-)
+from starkware.starknet.common.syscalls import get_block_timestamp
+from contracts.Math_64x61 import Math64x61_mul
 from contracts.Constants import ABR_FUNDS_INDEX, ABR_INDEX, AccountRegistry_INDEX, Market_INDEX, SHORT
 from contracts.DataTypes import OrderDetailsWithIDs
 from contracts.interfaces.IABR import IABR
@@ -18,14 +17,27 @@ from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 
+##########
+# Events #
+##########
+
+# Event emitted when abr payment called for a position
+@event
+func abr_payment_called_user_position(
+    position_id : felt, account_address : felt, timestamp : felt
+):
+end
+
 ###########
 # Storage #
 ###########
 
+# Stores the authregistry address
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
+# Stores tbe contract version 
 @storage_var
 func contract_version() -> (version : felt):
 end
@@ -33,7 +45,9 @@ end
 ###############
 # Constructor #
 ###############
-
+# @notice
+# @param registry_address_ - Address of the auth registry
+# @param contract_version_ Version of the contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, contract_version_ : felt
@@ -105,16 +119,17 @@ end
 # @param market_id - Market id of the position
 # @param abs_payment_amount - Absolute value of ABR payment 
 func user_pays{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    account_address : felt, abr_funding : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
+    account_address : felt, abr_funding : felt, order_id : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
 ):
     IAccount.transfer_from_abr(
         contract_address=account_address,
+        orderID_=order_id,
         assetID_=collateral_id,
         marketID_=market_id,
         amount=abs_payment_amount,
     )
     IABRFund.deposit(
-        contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
+        contract_address=abr_funding, order_id_=order_id, market_id_=market_id, amount=abs_payment_amount
     )
 
     return()
@@ -127,14 +142,15 @@ end
 # @param market_id - Market id of the position
 # @param abs_payment_amount - Absolute value of ABR payment 
 func user_receives{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    account_address : felt, abr_funding : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
+    account_address : felt, abr_funding : felt, order_id : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
 ):
     IABRFund.withdraw(
-        contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
+        contract_address=abr_funding, order_id_=order_id, market_id_=market_id, amount=abs_payment_amount
     )
 
     IAccount.transfer_abr(
         contract_address=account_address,
+        orderID_=order_id,
         assetID_=collateral_id,
         marketID_=market_id,
         amount=abs_payment_amount,
@@ -204,21 +220,26 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     if is_negative == 1:
         if [positions].direction == SHORT:
             # user pays
-            user_pays(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
+            user_pays(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
         else:
             # user receives
-            user_receives(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
+            user_receives(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
         end
     # If the abr is positive
     else:
         if [positions].direction == SHORT:
             # user receives
-            user_receives(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
+            user_receives(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
         else:
             # user pays
-            user_pays(account_address, abr_funding, [positions].collateralID, market_id, abs_payment_amount)
+            user_pays(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
         end
     end
+
+    # Get the latest block
+    let (block_timestamp) = get_block_timestamp()
+
+    abr_payment_called_user_position.emit(position_id = [positions].orderID, account_address = account_address, timestamp = block_timestamp)
 
     return pay_abr_users_positions(
         account_address,
