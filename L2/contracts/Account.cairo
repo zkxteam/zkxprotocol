@@ -162,9 +162,9 @@ end
 func order_mapping(orderID : felt) -> (res : OrderDetails):
 end
 
-# Mapping of marketID to the timestamp of last updated value
+# Mapping of orderID to the timestamp of last updated value
 @storage_var
-func last_updated(market_id) -> (value : felt):
+func last_updated(order_id) -> (value : felt):
 end
 
 # Stores L1 address associated with the account
@@ -423,14 +423,14 @@ end
 # @return res - true if it is complete, else false
 @view
 func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    market_id : felt
+    orderID_ : felt
 ) -> (is_eight_hours : felt):
     alloc_locals
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
 
     # Fetch the last updated time
-    let (last_call) = last_updated.read(market_id=market_id)
+    let (last_call) = last_updated.read(order_id=orderID_)
 
     # Minimum time before the second call
     let min_time = last_call + 28800
@@ -571,7 +571,7 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(market_id=marketID_, value=block_timestamp)
+    last_updated.write(order_id = orderID_, value=block_timestamp)
 
     transferred_from_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
     return ()
@@ -604,7 +604,7 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(market_id=marketID_, value=block_timestamp)
+    last_updated.write(order_id = orderID_, value=block_timestamp)
 
     transferred_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
     return ()

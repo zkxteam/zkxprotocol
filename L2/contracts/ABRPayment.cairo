@@ -193,7 +193,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
 
     # Check if abr already collected
     let (is_called) = IAccount.timestamp_check(
-        contract_address=account_address, market_id=market_id
+        contract_address=account_address, orderID_=[positions].orderID
     )
 
     if is_called == 1:
