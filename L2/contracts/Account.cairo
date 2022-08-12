@@ -517,6 +517,7 @@ end
 ######################
 
 # @notice External function called by the Trading Contract
+# @param assetID_ - asset ID of the collateral that needs to be transferred
 # @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(

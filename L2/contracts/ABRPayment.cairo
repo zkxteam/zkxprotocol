@@ -115,6 +115,7 @@ end
 # @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
 # @param account_address - Address of the user of whom the positions are passed
 # @param abr_funding - Address of the ABR Fund contract
+# @param order_id - Order id of the position
 # @param collateral_id - Collateral id of the position
 # @param market_id - Market id of the position
 # @param abs_payment_amount - Absolute value of ABR payment 
@@ -138,6 +139,7 @@ end
 # @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
 # @param account_address - Address of the user of whom the positions are passed
 # @param abr_funding - Address of the ABR Fund contract
+# @param order_id - Order id of the position
 # @param collateral_id - Collateral id of the position
 # @param market_id - Market id of the position
 # @param abs_payment_amount - Absolute value of ABR payment 
