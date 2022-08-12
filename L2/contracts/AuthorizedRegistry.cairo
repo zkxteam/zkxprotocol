@@ -15,11 +15,8 @@ from starkware.starknet.common.syscalls import get_caller_address
 
 # Event emitted whenever a new address is added to the registry
 @event
-func updated_registry(
-    index : felt, version : felt, address : felt
-):
+func updated_registry(index : felt, version : felt, address : felt):
 end
-
 
 ###########
 # Storage #
@@ -94,19 +91,15 @@ func update_contract_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     let (auth_addr) = contract_registry.read(index=AdminAuth_INDEX, version=version_)
     let (access) = IAdminAuth.get_admin_mapping(
         contract_address=auth_addr, address=caller, action=ManageAuthRegistry_ACTION
-    )    
+    )
 
     with_attr error_message("Caller does not have permission to update contract registry"):
         assert_not_zero(access)
     end
 
-    let (contract_address) = contract_registry.read(index=index_, version=version_)
-    
     # Update the registry
     contract_registry.write(index=index_, version=version_, value=contract_address_)
 
     updated_registry.emit(index=index_, version=version_, address=contract_address_)
-    return()
+    return ()
 end
-
-
