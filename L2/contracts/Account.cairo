@@ -540,10 +540,6 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         with_attr error_message("Caller is not authorized to deduct balance"):
             assert caller = withdrawal_request_address
         end
-    else:
-        with_attr error_message("Caller is not authorized to deduct balance"):
-            assert caller = trading_address
-        end
     end
 
     balance.write(assetID=assetID_, value=balance_ - amount)
