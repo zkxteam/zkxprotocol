@@ -73,10 +73,6 @@ from contracts.Math_64x61 import (
     Math64x61_toFelt,
 )
 
-#############
-# Constants #
-#############
-const MESSAGE_WITHDRAW = 3
 
 ##########
 # Events #
@@ -1142,11 +1138,6 @@ func withdraw{
         amount_=amount_in_felt,
     )
 
-    # Get L1 ZKX contract address
-    let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
-    )
-
     # Create a withdrawal history object
     local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
         request_id=request_id_,
@@ -1161,17 +1152,6 @@ func withdraw{
     let (array_len) = withdrawal_history_array_len.read()
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_)
     withdrawal_history_array_len.write(array_len + 1)
-
-    # Send the withdrawal message.
-    let (message_payload : felt*) = alloc()
-    assert message_payload[0] = MESSAGE_WITHDRAW
-    assert message_payload[1] = user_l1_address
-    assert message_payload[2] = ticker
-    assert message_payload[3] = amount_in_felt
-    assert message_payload[4] = request_id_
-
-    # Send Message to L1
-    send_message_to_l1(to_address=L1_ZKX_contract_address, payload_size=5, payload=message_payload)
 
     withdrawal_request.emit(collateral_id = collateral_id_, amount = amount_, node_operator_l2 = node_operator_L2_address_)
     return ()
