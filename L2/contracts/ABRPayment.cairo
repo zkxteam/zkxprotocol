@@ -3,6 +3,7 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import abs_value, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
@@ -219,7 +220,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     let (is_negative) = is_le(abr, 0)
 
     # If the abr is negative
-    if is_negative == 1:
+    if is_negative == TRUE:
         if [positions].direction == SHORT:
             # user pays
             user_pays(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
@@ -278,7 +279,7 @@ func pay_abr_users{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     )
 
     # If not, skip the current iteration
-    if is_registered_user == 0:
+    if is_registered_user == FALSE:
         return pay_abr_users(
             account_addresses_len - 1,
             account_addresses + 1,
