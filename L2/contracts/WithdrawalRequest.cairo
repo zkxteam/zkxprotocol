@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountRegistry_INDEX, Asset_INDEX, L1_ZKX_Address_INDEX
@@ -172,8 +172,9 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     )
 
     with_attr error_message(
-            "Amount to be withdrawan should be less than or equal to the user balance"):
+            "Amount to be withdrawan should be less than or equal to the user balance and it should be non negative"):
         assert_le(amount_, user_balance)
+        assert_nn(amount_)
     end
 
     IAccount.transfer_from(
