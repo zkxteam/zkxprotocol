@@ -516,7 +516,7 @@ end
 # External Functions #
 ######################
 
-# @notice External function called by the Trading Contract
+# @notice External function called by the Trading Contract or withdrawal request contract
 # @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -531,9 +531,19 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
     )
+    
+    let (withdrawal_request_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=WithdrawalRequest_INDEX, version=version
+    )
 
-    with_attr error_message("Caller is not authorized to do transferFrom in account contract."):
-        assert caller = trading_address
+    if caller != trading_address:
+        with_attr error_message("Caller is not authorized to deduct balance"):
+            assert caller = withdrawal_request_address
+        end
+    else:
+        with_attr error_message("Caller is not authorized to deduct balance"):
+            assert caller = trading_address
+        end
     end
 
     balance.write(assetID=assetID_, value=balance_ - amount)
@@ -1103,16 +1113,6 @@ func withdraw{
         collateral_id_=fee_collateral_id,
         fee_to_add_=standard_fee,
     )
-
-    # Compute current balance
-    let (current_balance) = balance.read(assetID=collateral_id_)
-    with_attr error_message("Withdrawal amount requested should be less than balance"):
-        assert_le(amount_, current_balance)
-    end
-    tempvar new_balance = current_balance - amount_
-
-    # Update the new balance
-    balance.write(assetID=collateral_id_, value=new_balance)
 
     # Calculate the timestamp
     let (timestamp_) = get_block_timestamp()

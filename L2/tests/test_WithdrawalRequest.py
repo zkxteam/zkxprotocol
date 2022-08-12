@@ -56,7 +56,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     ### Deploy infrastructure (Part 2)
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
     withdrawal_request = await starknet_service.deploy(ContractType.WithdrawalRequest, [registry.contract_address, 1])
-
+    trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
+    
     # Access 3 allows adding trusted contracts to the registry and 1 for adding assets
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -67,6 +68,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [5, 1, trading.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [16, 1, withdrawal_request.contract_address])
 
     await admin1_signer.send_transaction(
         admin1, account_registry.contract_address, 'add_to_account_registry',[admin1.contract_address])
@@ -95,7 +98,7 @@ async def test_revert_unregistered_user_access(adminAuth_factory):
     amount_1 = to64x61(10)
 
     await assert_revert(charlie_signer.send_transaction(alice, withdrawal_request.contract_address, 'add_withdrawal_request', [request_id_1, ticker_1, amount_1]))
-    
+
 @pytest.mark.asyncio
 async def test_revert_withdrawal_request_due_to_insufficient_balance(adminAuth_factory):
     adminAuth, admin1, admin2, alice, bob, charlie, account_registry, asset, withdrawal_request = adminAuth_factory

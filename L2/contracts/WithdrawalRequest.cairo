@@ -163,18 +163,24 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     )
     
     let (asset_id) = IAsset.get_asset_id_from_ticker(
-            contract_address=asset_address, ticker=ticker_
+        contract_address=asset_address, ticker=ticker_
     )
 
     # check whether user has enough balance
     let (user_balance) = IAccount.get_balance(
-            contract_address=caller, assetID_=asset_id
+        contract_address=caller, assetID_=asset_id
     )
 
     with_attr error_message(
             "Amount to be withdrawan should be less than or equal to the user balance"):
         assert_le(amount_, user_balance)
     end
+
+    IAccount.transfer_from(
+        contract_address=caller,
+        assetID_=asset_id,
+        amount=amount_,
+    )
 
     # Validate if the user_l1_address_ is really the counterpart address of the caller
     let (user_l1_address) = IAccount.get_L1_address(contract_address=caller)
