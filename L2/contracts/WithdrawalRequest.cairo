@@ -26,7 +26,7 @@ const MESSAGE_WITHDRAW = 3
 # Event emitted whenever add_withdrawal_request() is called
 @event
 func add_withdrawal_request_called(
-    request_id : felt, user_l1_address : felt, ticker : felt, amount : felt
+    request_id : felt, user_l1_address : felt, ticker : felt, amount : felt, user_l2_address: felt
 ):
 end
 
@@ -188,7 +188,7 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
 
     # add_withdrawal_request_called event is emitted
     add_withdrawal_request_called.emit(
-        request_id=request_id_, user_l1_address=user_l1_address_, ticker=ticker_, amount=amount_
+        request_id=request_id_, user_l1_address=user_l1_address_, ticker=ticker_, amount=amount_, user_l2_address=caller
     )
 
     return ()
