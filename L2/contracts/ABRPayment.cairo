@@ -131,7 +131,7 @@ func user_pays{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
         amount=abs_payment_amount,
     )
     IABRFund.deposit(
-        contract_address=abr_funding, order_id_=order_id, market_id_=market_id, amount=abs_payment_amount
+        contract_address=abr_funding, order_id_=order_id, account_address_ = account_address, market_id_=market_id, amount=abs_payment_amount
     )
 
     return()
@@ -148,7 +148,7 @@ func user_receives{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     account_address : felt, abr_funding : felt, order_id : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
 ):
     IABRFund.withdraw(
-        contract_address=abr_funding, order_id_=order_id, market_id_=market_id, amount=abs_payment_amount
+        contract_address=abr_funding, order_id_=order_id, account_address_ = account_address, market_id_=market_id, amount=abs_payment_amount
     )
 
     IAccount.transfer_abr(
