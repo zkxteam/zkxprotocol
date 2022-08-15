@@ -76,6 +76,7 @@ from contracts.Math_64x61 import (
 #############
 # Constants #
 #############
+
 const MESSAGE_WITHDRAW = 3
 
 ##########
