@@ -129,11 +129,6 @@ async def test_update_withdrawal_fee_mapping_different_user(adminAuth_factory):
     assert execution_info.result.fee == 30
 
 @pytest.mark.asyncio
-async def test_revert_Unauthorized_Tx(adminAuth_factory):
-    adminAuth, admin1, admin2, alice, bob, dave, account_registry, withdrawFeeBalance = adminAuth_factory
-    await assert_revert(dave_signer.send_transaction(dave, withdrawFeeBalance.contract_address, 'update_withdrawal_fee_mapping', [USDC_ID, 10]))
-
-@pytest.mark.asyncio
 async def test_set_standard_fee(adminAuth_factory):
     adminAuth, admin1, admin2, alice, bob, dave, account_registry, withdrawFeeBalance = adminAuth_factory
     tx_exec_info=await admin1_signer.send_transaction(admin1, withdrawFeeBalance.contract_address, 'set_standard_withdraw_fee', [46116860184273880, USDC_ID])
@@ -165,7 +160,7 @@ async def test_withdraw(adminAuth_factory):
     assert_event_emitted(
         tx_exec_info,
         from_address = withdrawFeeBalance.contract_address,
-        name = 'withdraw_WithdrawalFeeBalance_called',
+        name = 'WithdrawalFeeBalance_withdraw_called',
         data=[
             USDC_ID,
             10

@@ -28,7 +28,7 @@ end
 
 # Event emitted whenever withdraw() is called
 @event
-func withdraw_WithdrawalFeeBalance_called(collateral_id : felt, fee_withdrawn : felt):
+func WithdrawalFeeBalance_withdraw_called(collateral_id : felt, fee_withdrawn : felt):
 end
 
 ###########
@@ -188,6 +188,11 @@ func update_withdrawal_fee_mapping{
         collateral_id=collateral_id_
     )
     let new_total_fee_per_asset : felt = current_total_fee_per_asset + fee_to_add_
+
+    with_attr error_message("Total fee must be in 64x61 range"):
+        Math64x61_assert64x61(new_total_fee_per_asset)
+    end
+
     total_withdrawal_fee_per_asset.write(
         collateral_id=collateral_id_, value=new_total_fee_per_asset
     )
@@ -200,7 +205,7 @@ end
 
 # @notice Function to withdraw amount from this contract
 # @param collateral_id_ - collateral to be withdrawn
-# @param amount_to_withdraw_ - withdrawal fee value that is to be added
+# @param amount_to_withdraw_ - amount to be withdrawn
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     collateral_id_ : felt, amount_to_withdraw_ : felt
@@ -213,7 +218,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
         verify_caller_authority(registry, version, MasterAdmin_ACTION)
     end
 
-    with_attr error_message("Fee should be non negative"):
+    with_attr error_message("Amount to be withdrawn should be greater than 0"):
         assert_lt(0, amount_to_withdraw_)
     end
 
@@ -234,7 +239,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     )
 
     # update_withdrawal_fee_mapping_called event is emitted
-    withdraw_WithdrawalFeeBalance_called.emit(
+    WithdrawalFeeBalance_withdraw_called.emit(
         collateral_id=collateral_id_, fee_withdrawn=amount_to_withdraw_
     )
 
