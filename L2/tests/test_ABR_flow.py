@@ -35,8 +35,14 @@ async def abr_factory(starknet_service: StarknetService):
 
     admin1 = await starknet_service.deploy(
         ContractType.Account, 
-        [admin1_signer.public_key, L1_dummy_address, 0, 1]
+        [admin1_signer.public_key]
     )
+
+    admin2 = await starknet_service.deploy(
+        ContractType.Account, 
+        [admin2_signer.public_key]
+    )
+
     adminAuth = await starknet_service.deploy(
         ContractType.AdminAuth, 
         [admin1.contract_address, 0x0]
@@ -53,8 +59,8 @@ async def abr_factory(starknet_service: StarknetService):
         1
     )
 
-    alice = await account_factory.deploy_account(alice_signer.public_key)
-    bob = await account_factory.deploy_account(bob_signer.public_key)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
 
     fees = await starknet_service.deploy(
         ContractType.TradingFees, 
@@ -203,7 +209,7 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_USD_ID, to64x61(1000000)])
 
     # Set the balance of admin1 and admin2
-    await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    #await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
 
     btc_perp_spot_64x61 = convertTo64x61(ABR_data.btc_perp_spot)
     btc_perp_64x61 = convertTo64x61(ABR_data.btc_perp)
@@ -212,20 +218,21 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [alice.contract_address])
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [bob.contract_address])
 
-    return starknet_service.starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_perp_spot_64x61, btc_perp_64x61, timestamp
+    return (starknet_service.starknet, admin1, trading, fixed_math, alice, 
+        bob, abr, abr_fund, abr_payment, btc_perp_spot_64x61, btc_perp_64x61, timestamp, admin2)
 
 @pytest.mark.asyncio
 async def test_fund_called_by_non_authorized_address(abr_factory):
-    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp = abr_factory
+    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp, admin2 = abr_factory
 
     amount = to64x61(1000000)
     await assert_revert(
-        alice_signer.send_transaction(alice, abr_fund.contract_address, "fund", [BTC_USD_ID, amount])
+        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "fund", [BTC_USD_ID, amount])
     )
 
 @pytest.mark.asyncio
 async def test_fund_called_by_authorized_address(abr_factory):
-    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp = abr_factory
+    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp, admin2 = abr_factory
 
     amount = to64x61(1000000)
     abr_fund_balance_before = await abr_fund.balance(BTC_USD_ID).call()
@@ -246,12 +253,12 @@ async def test_fund_called_by_authorized_address(abr_factory):
 
 @pytest.mark.asyncio
 async def test_defund_called_by_non_authorized_address(abr_factory):
-    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp = abr_factory
+    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp, admin2 = abr_factory
 
     amount = to64x61(500000)
     abr_fund_balance_before = await abr_fund.balance(BTC_USD_ID).call()
     await assert_revert(
-        alice_signer.send_transaction(alice, abr_fund.contract_address, "defund", [BTC_USD_ID, amount])
+        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "defund", [BTC_USD_ID, amount])
     )
 
     abr_fund_balance = await abr_fund.balance(BTC_USD_ID).call()
@@ -259,7 +266,7 @@ async def test_defund_called_by_non_authorized_address(abr_factory):
 
 @pytest.mark.asyncio
 async def test_defund_called_by_authorized_address(abr_factory):
-    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp = abr_factory
+    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp, admin2 = abr_factory
 
     amount = to64x61(500000)
     abr_fund_balance_before = await abr_fund.balance(BTC_USD_ID).call()
@@ -281,7 +288,7 @@ async def test_defund_called_by_authorized_address(abr_factory):
 
 @pytest.mark.asyncio
 async def test_abr_payments(abr_factory):
-    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp = abr_factory
+    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp, admin2 = abr_factory
 
     alice_balance = to64x61(50000)
     bob_balance = to64x61(50000)
@@ -439,7 +446,7 @@ async def test_abr_payments(abr_factory):
 
 @pytest.mark.asyncio
 async def test_will_not_charge_abr_twice_under_8_hours(abr_factory):
-    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp = abr_factory
+    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp, admin2 = abr_factory
 
     alice_balance_before = await alice.get_balance(USDC_ID).call()
     bob_balance_before = await bob.get_balance(USDC_ID).call()
@@ -455,7 +462,7 @@ async def test_will_not_charge_abr_twice_under_8_hours(abr_factory):
 
 @pytest.mark.asyncio
 async def test_will_charge_abr_after_8_hours(abr_factory):
-    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp = abr_factory
+    starknet, admin1, trading, fixed_math, alice, bob, abr, abr_fund, abr_payment, btc_spot, btc_perp, initial_timestamp, admin2 = abr_factory
 
     timestamp = int(time.time()) + 28810
 

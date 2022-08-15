@@ -27,7 +27,7 @@ def event_loop():
 async def adminAuth_factory(starknet_service: StarknetService):
 
     # a contract definition has to be declared before we can use class hash
-    dec_class = await starknet_service.declare(ContractType.Account)
+    dec_class = await starknet_service.declare(ContractType.AccountManager)
 
     global class_hash
     class_hash=dec_class.class_hash
@@ -112,14 +112,14 @@ async def test_deploy_account_contract(adminAuth_factory):
     # check whether newly deployed contract address is present in the account registry
     assert result.result.present == 1
 
-    abi = get_contract_class(source="contracts/Account.cairo").abi
+    abi = get_contract_class(source="contracts/AccountManager.cairo").abi
 
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi, 
                                             contract_address=deployed_address,
                                             deploy_execution_info=None)
 
-    # check that the account contract is deployed with the public key used in the deploy call
+    # check that the account manager contract is deployed with the public key used in the deploy call
     result = await new_account_contract.get_public_key().call()
 
     #print(result)

@@ -8,7 +8,8 @@ from starkware.starknet.testing.state import StarknetState
 from starkware.starknet.services.api.contract_class import ContractClass
 
 class ContractType(Enum):
-    Account = "contracts/Account.cairo"
+    Account = "tests/contracts/Account.cairo"
+    AccountManager = "contracts/AccountManager.cairo"
     AccountDeployer = "contracts/AccountDeployer.cairo"
     AdminAuth = "contracts/AdminAuth.cairo"
     AuthorizedRegistry = "contracts/AuthorizedRegistry.cairo"
@@ -99,6 +100,11 @@ class AccountFactory:
 
     async def deploy_account(self, public_key) -> StarknetContract:
         return await self.starknet_service.deploy(ContractType.Account, [
+            public_key
+        ])
+
+    async def deploy_ZKX_account(self, public_key) -> StarknetContract:
+        return await self.starknet_service.deploy(ContractType.AccountManager, [
             public_key,
             self.L1_user_address,
             self.registry_address,

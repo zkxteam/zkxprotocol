@@ -8,6 +8,7 @@ from utils import Signer, str_to_felt, MAX_UINT256, from64x61, to64x61
 from helpers import StarknetService, ContractType
 
 alice_signer = Signer(123456789987654323)
+signer1 = Signer(12345)
 
 BTC_ID = str_to_felt("32f0406jz7qj8")
 ETH_ID = str_to_felt("65ksgn23nv")
@@ -30,25 +31,30 @@ def event_loop():
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
     
-    alice = await starknet_service.deploy(ContractType.Account, [
+    alice = await starknet_service.deploy(ContractType.AccountManager, [
         alice_signer.public_key,
         L1_dummy_address,
         0,
         1
     ])
 
-    return alice
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        signer1.public_key,
+        
+    ])
+
+    return alice, admin1
 
 
 @pytest.mark.asyncio
 async def test_should_set_collaterals(adminAuth_factory):
-    alice = adminAuth_factory
+    alice, admin1 = adminAuth_factory
 
     alice_balance_usdc = to64x61(5500)
     alice_balance_ust = to64x61(100)
 
-    await alice_signer.send_transaction(alice, alice.contract_address, 'set_balance', [USDC_ID, alice_balance_usdc])
-    await alice_signer.send_transaction(alice, alice.contract_address, 'set_balance', [UST_ID, alice_balance_ust])
+    await signer1.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance_usdc])
+    await signer1.send_transaction(admin1, alice.contract_address, 'set_balance', [UST_ID, alice_balance_ust])
 
     alice_curr_balance_usdc_before = await alice.get_balance(USDC_ID).call()
     alice_curr_balance_ust_before = await alice.get_balance(UST_ID).call()
