@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_nn, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero 
 from starkware.starknet.common.syscalls import get_caller_address, get_block_timestamp
 
 from contracts.Constants import ABR_PAYMENT_INDEX, ManageFunds_ACTION
@@ -102,6 +102,10 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount_ : felt
 ):
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Not authorized to manage funds"):
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
@@ -127,6 +131,10 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount_ : felt
 ):
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Not authorized to manage funds"):
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
@@ -155,7 +163,11 @@ end
 @external
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_id_ : felt, account_address_ : felt, market_id_ : felt, amount_ : felt
-):
+):  
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -189,7 +201,11 @@ end
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_id_ : felt, account_address_ : felt, market_id_ : felt, amount_ : felt
-):
+):  
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()

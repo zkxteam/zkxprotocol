@@ -162,8 +162,6 @@ func user_receives{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     return()
 end
 
-
-
 # @notice Internal function called by pay_abr_users to iterate throught the positions of the account
 # @param account_address - Address of the user of whom the positions are passed
 # @param positions_len - Length of the positions array of the user
@@ -314,4 +312,3 @@ func pay_abr_users{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         abr_funding_contract,
     )
 end
-
