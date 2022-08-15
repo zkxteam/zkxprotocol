@@ -73,7 +73,6 @@ from contracts.Math_64x61 import (
     Math64x61_toFelt,
 )
 
-
 ##########
 # Events #
 ##########
@@ -95,14 +94,14 @@ end
 # Event emitted whenever collateral is transferred to account by abr payment
 @event
 func transferred_abr(
-    asset_id : felt, market_id : felt, amount : felt
+    order_id : felt, asset_id : felt, market_id : felt, amount : felt, timestamp : felt
 ):
 end
 
 # Event emitted whenever collateral is transferred from account by abr payment
 @event
 func transferred_from_abr(
-    asset_id : felt, market_id : felt, amount : felt
+    order_id : felt, asset_id : felt, market_id : felt, amount : felt, timestamp : felt
 ):
 end
 
@@ -158,9 +157,9 @@ end
 func order_mapping(orderID : felt) -> (res : OrderDetails):
 end
 
-# Mapping of marketID to the timestamp of last updated value
+# Mapping of orderID to the timestamp of last updated value
 @storage_var
-func last_updated(market_id) -> (value : felt):
+func last_updated(order_id) -> (value : felt):
 end
 
 # Stores L1 address associated with the account
@@ -419,14 +418,14 @@ end
 # @return res - true if it is complete, else false
 @view
 func timestamp_check{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    market_id : felt
+    orderID_ : felt
 ) -> (is_eight_hours : felt):
     alloc_locals
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
 
     # Fetch the last updated time
-    let (last_call) = last_updated.read(market_id=market_id)
+    let (last_call) = last_updated.read(order_id=orderID_)
 
     # Minimum time before the second call
     let min_time = last_call + 28800
@@ -513,6 +512,7 @@ end
 ######################
 
 # @notice External function called by the Trading Contract
+# @param assetID_ - asset ID of the collateral that needs to be transferred
 # @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
@@ -539,13 +539,15 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 end
 
 # @notice External function called by the ABR Payment contract
+# @param orderID_ - Order Id of the position
 # @param assetID_ - asset ID of the collateral that needs to be transferred
+# @param marketID_ - market ID of the position
 # @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    assetID_ : felt, marketID_ : felt, amount : felt
+    orderID_ : felt, assetID_ : felt, marketID_ : felt, amount : felt
 ):
-    # Check if the caller is trading contract
+    # Check if the caller is ABR Payment
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -564,18 +566,20 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(market_id=marketID_, value=block_timestamp)
+    last_updated.write(order_id = orderID_, value=block_timestamp)
 
-    transferred_from_abr.emit(asset_id = assetID_, market_id = marketID_, amount = amount)
+    transferred_from_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
     return ()
 end
 
 # @notice External function called by the ABR Payment contract
+# @param orderID_ - Order Id of the position
 # @param assetID_ - asset ID of the collateral that needs to be transferred
-# @param amount - Amount of funds to transfer to this contract
+# @param marketID_ - market ID of the position
+# @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    assetID_ : felt, marketID_ : felt, amount : felt
+    orderID_ : felt, assetID_ : felt, marketID_ : felt, amount : felt
 ):
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
@@ -595,9 +599,9 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(market_id=marketID_, value=block_timestamp)
+    last_updated.write(order_id = orderID_, value=block_timestamp)
 
-    transferred_abr.emit(asset_id = assetID_, market_id = marketID_, amount = amount)
+    transferred_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
     return ()
 end
 

@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -91,7 +91,17 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    assert_event_emitted(
+        add_asset_tx,
+        from_address=asset.contract_address,
+        name="Asset_Added",
+        data=[
+            asset_id,
+            asset_ticker,
+            admin1.contract_address
+        ]
+    )
 
     execution_info = await asset.getAsset(asset_id).call()
     fetched_asset = execution_info.result.currAsset
@@ -166,7 +176,7 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
     new_token_decimal = 10
     new_metadata_id = 1
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'modify_core_settings', [
+    modify_tx = await signer1.send_transaction(admin1, asset.contract_address, 'modify_core_settings', [
         asset_id,
         new_asset_name,
         new_tradable_status,
@@ -174,6 +184,16 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
         new_token_decimal,
         new_metadata_id
     ])
+    assert_event_emitted(
+        modify_tx,
+        from_address=asset.contract_address,
+        name="Asset_Core_Settings_Update",
+        data=[
+            asset_id,
+            asset_ticker,
+            admin1.contract_address
+        ]
+    )
 
     execution_info = await asset.getAsset(asset_id).call()
     fetched_asset = execution_info.result.currAsset
@@ -229,7 +249,8 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
     new_baseline_position_size = 2000
     new_maximum_position_size = 20000
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'modify_trade_settings', [
+    version_before = (await asset.get_version().call()).result.version
+    modify_tx = await signer1.send_transaction(admin1, asset.contract_address, 'modify_trade_settings', [
         asset_id, 
         new_tick_size, 
         new_step_size, 
@@ -244,6 +265,18 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
         new_baseline_position_size, 
         new_maximum_position_size
     ])
+    assert_event_emitted(
+        modify_tx,
+        from_address=asset.contract_address,
+        name="Asset_Trade_Settings_Update",
+        data=[
+            asset_id,
+            asset_ticker,
+            version_before + 1, # new_contract_version
+            1, # new_asset_version
+            admin1.contract_address
+        ]
+    )
 
     execution_info = await asset.getAsset(asset_id).call()
     fetched_asset = execution_info.result.currAsset
@@ -296,7 +329,17 @@ async def test_removing_asset_by_admin(adminAuth_factory):
 
     await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
+    remove_tx = await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
+    assert_event_emitted(
+        remove_tx,
+        from_address=asset.contract_address,
+        name="Asset_Removed",
+        data=[
+            asset_id,
+            asset_ticker,
+            admin1.contract_address
+        ]
+    )
 
     await assert_revert(
         asset.getAsset(asset_id).call()
