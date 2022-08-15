@@ -63,7 +63,7 @@ async def test_modify_registry_by_admin(adminAuth_factory):
 async def test_modify_registry_by_unauthorized(adminAuth_factory):
     adminAuth, registry, admin1, admin2, user1 = adminAuth_factory
 
-    assert_revert(lambda: signer3.send_transaction(
+    await assert_revert(signer3.send_transaction(
         user1, registry.contract_address, 'update_contract_registry', [2, 1, 123]))
 
 @pytest.mark.asyncio
