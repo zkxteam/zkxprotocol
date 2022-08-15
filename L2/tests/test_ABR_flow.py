@@ -21,6 +21,9 @@ BTC_ID = str_to_felt("32f0406jz7qj8")
 USDC_ID = str_to_felt("fghj3am52qpzsib")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -32,7 +35,7 @@ async def abr_factory(starknet_service: StarknetService):
 
     admin1 = await starknet_service.deploy(
         ContractType.Account, 
-        [admin1_signer.public_key, 0, 1, 0]
+        [admin1_signer.public_key, L1_dummy_address, 1, L1_ZKX_dummy_address]
     )
     adminAuth = await starknet_service.deploy(
         ContractType.AdminAuth, 
@@ -42,16 +45,14 @@ async def abr_factory(starknet_service: StarknetService):
         ContractType.AuthorizedRegistry, 
         [adminAuth.contract_address]
     )
-
     alice = await starknet_service.deploy(
         ContractType.Account, 
-        [alice_signer.public_key, registry.contract_address, 1, 0]
+        [alice_signer.public_key, L1_dummy_address, registry.contract_address, 1, L1_ZKX_dummy_address]
     )
     bob = await starknet_service.deploy(
         ContractType.Account, 
-        [bob_signer.public_key, registry.contract_address, 1, 0]
+        [bob_signer.public_key, L1_dummy_address, registry.contract_address, 1, L1_ZKX_dummy_address]
     )
-
     fees = await starknet_service.deploy(
         ContractType.TradingFees, 
         [registry.contract_address, 1]

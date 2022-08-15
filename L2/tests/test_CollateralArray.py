@@ -18,6 +18,9 @@ TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -32,9 +35,10 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             alice_signer.public_key,
+            L1_dummy_address,
             0,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 

@@ -20,6 +20,9 @@ BTC_ID = str_to_felt("32f0406jz7qj8")
 USDC_ID = str_to_felt("fghj3am52qpzsib")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -32,7 +35,7 @@ async def abr_factory():
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, 0, 1, 0]
+        constructor_calldata=[admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     adminAuth = await starknet.deploy(
@@ -70,9 +73,10 @@ async def abr_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             alice_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 
@@ -80,12 +84,12 @@ async def abr_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             bob_signer.public_key,
+            L1_dummy_address,
             registry.contract_address,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
-
     fixed_math = await starknet.deploy(
         "contracts/Math_64x61.cairo",
         constructor_calldata=[

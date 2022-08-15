@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0.
-pragma solidity ^0.8.7;
+pragma solidity 0.8.14;
 
-uint256 constant WITHDRAWAL_INDEX = 0;
 uint256 constant ADD_ASSET_INDEX = 1;
 uint256 constant REMOVE_ASSET_INDEX = 2;
+uint256 constant WITHDRAWAL_INDEX = 3;
 
 uint256 constant ETH_TICKER = 4543560;
 

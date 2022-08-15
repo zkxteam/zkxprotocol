@@ -31,6 +31,8 @@ TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -43,11 +45,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
     ### Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(
         ContractType.Account, 
-        [admin1_signer.public_key, 0, 1, 0]
+        [admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
     admin2 = await starknet_service.deploy(
         ContractType.Account, 
-        [admin2_signer.public_key, 0, 1, 0]
+        [admin2_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
     adminAuth = await starknet_service.deploy(
         ContractType.AdminAuth, 
@@ -73,23 +75,23 @@ async def adminAuth_factory(starknet_service: StarknetService):
     ### Deploy user accounts
     alice = await starknet_service.deploy(
         ContractType.Account, 
-        [alice_signer.public_key, registry.contract_address, 1, 0]
+        [alice_signer.public_key, L1_dummy_address, registry.contract_address, 1, L1_ZKX_dummy_address]
     )
     bob = await starknet_service.deploy(
         ContractType.Account, 
-        [bob_signer.public_key, registry.contract_address, 1, 0]
+        [bob_signer.public_key, L1_dummy_address, registry.contract_address, 1, L1_ZKX_dummy_address]
     )
     charlie = await starknet_service.deploy(
         ContractType.Account, 
-        [charlie_signer.public_key, registry.contract_address, 1, 0]
+        [charlie_signer.public_key, L1_dummy_address, registry.contract_address, 1, L1_ZKX_dummy_address]
     )
     daniel = await starknet_service.deploy(
         ContractType.Account, 
-        [daniel_signer.public_key, registry.contract_address, 1, 0]
+        [daniel_signer.public_key, L1_dummy_address, registry.contract_address, 1, L1_ZKX_dummy_address]
     )
     eduard = await starknet_service.deploy(
         ContractType.Account, 
-        [eduard_signer.public_key, registry.contract_address, 1, 0]
+        [eduard_signer.public_key, L1_dummy_address, registry.contract_address, 1, L1_ZKX_dummy_address]
     )
     liquidator = await starknet_service.deploy(
         ContractType.Account, 
