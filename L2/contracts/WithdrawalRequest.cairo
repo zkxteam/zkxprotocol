@@ -3,6 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
+from starkware.starknet.common.messages import send_message_to_l1
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountRegistry_INDEX, L1_ZKX_Address_INDEX
@@ -12,6 +13,12 @@ from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
 
+#############
+# Constants #
+#############
+const MESSAGE_WITHDRAW = 3
+
+
 ##########
 # Events #
 ##########
@@ -19,7 +26,7 @@ from contracts.libraries.Utils import verify_caller_authority
 # Event emitted whenever add_withdrawal_request() is called
 @event
 func add_withdrawal_request_called(
-    request_id : felt, user_l1_address : felt, ticker : felt, amount : felt
+    request_id : felt, user_l1_address : felt, ticker : felt, amount : felt, user_l2_address: felt
 ):
 end
 
@@ -164,9 +171,24 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
 
     withdrawal_request_mapping.write(request_id=request_id_, value=new_request)
 
+    # Get L1 ZKX contract address
+    let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
+    )
+     # Send the withdrawal message.
+    let (message_payload : felt*) = alloc()
+    assert message_payload[0] = MESSAGE_WITHDRAW
+    assert message_payload[1] = user_l1_address_
+    assert message_payload[2] = ticker_
+    assert message_payload[3] = amount_
+    assert message_payload[4] = request_id_
+
+    # Send Message to L1
+    send_message_to_l1(to_address=L1_ZKX_contract_address, payload_size=5, payload=message_payload)
+
     # add_withdrawal_request_called event is emitted
     add_withdrawal_request_called.emit(
-        request_id=request_id_, user_l1_address=user_l1_address_, ticker=ticker_, amount=amount_
+        request_id=request_id_, user_l1_address=user_l1_address_, ticker=ticker_, amount=amount_, user_l2_address=caller
     )
 
     return ()
