@@ -1,5 +1,4 @@
 %lang starknet
-%builtins pedersen range_check ecdsa
 
 from contracts.DataTypes import MarketPrice, Market
 from contracts.interfaces.IMarkets import IMarkets
@@ -12,6 +11,7 @@ from contracts.Constants import (
     ManageMarkets_ACTION, 
     MasterAdmin_ACTION 
 )
+from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address, get_block_timestamp
@@ -66,20 +66,13 @@ end
 @external
 func set_standard_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     collateral_id_ : felt
-):
-    alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
- 
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=MasterAdmin_ACTION
-    )
-    assert_not_zero(access)
+):  
+    # Check auth
+    with_attr error_message("Caller is not authorized to set collateral price"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, MasterAdmin_ACTION)
+    end
  
     standard_collateral.write(value=collateral_id_)
     return ()

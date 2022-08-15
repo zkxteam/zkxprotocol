@@ -5,7 +5,7 @@ import time
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, assert_revert
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, assert_revert, convertTo64x61
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -27,13 +27,6 @@ L1_ZKX_dummy_address = 0x98765432100123456789
 @pytest.fixture(scope='module')
 def event_loop():
     return asyncio.new_event_loop()
-
-
-def convertTo64x61(nums):
-    for i in range(len(nums)):
-        nums[i] = to64x61(nums[i])
-
-    return nums
 
 
 @pytest.fixture(scope='module')
