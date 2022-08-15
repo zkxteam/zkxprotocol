@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import (
@@ -121,6 +121,11 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
 
     if access == FALSE:
         # Get EmergencyFund address from registry
@@ -132,9 +137,9 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
             assert caller = emergency_fund_address
         end
 
-        balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+        balance_mapping.write(asset_id=asset_id_, value=updated_amount)
     else:
-        balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+        balance_mapping.write(asset_id=asset_id_, value=updated_amount)
     end
 
     fund_Holding_called.emit(asset_id=asset_id_, amount=amount_)
@@ -212,12 +217,21 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         assert caller = trading_address
     end
 
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Amount should be in 64x61 representation"):
         Math64x61_assert64x61(amount_)
     end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
 
     deposit_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 

@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import (
@@ -133,12 +133,21 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         verify_caller_authority(registry, version, ManageFunds_ACTION)
     end
 
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Amount should be in 64x61 representation"):
         Math64x61_assert64x61(amount_)
     end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
 
     fund_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -186,6 +195,10 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
         verify_caller_authority(registry, version, ManageFunds_ACTION)
     end
 
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Amount should be in 64x61 representation"):
         Math64x61_assert64x61(amount_)
     end
@@ -221,6 +234,10 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         verify_caller_authority(registry, version, ManageFunds_ACTION)
     end
 
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Amount should be in 64x61 representation"):
         Math64x61_assert64x61(amount_)
     end
@@ -254,6 +271,10 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (version) = contract_version.read()
     with_attr error_message("Caller is not authorized to manage funds"):
         verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
+
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
     end
 
     with_attr error_message("Amount should be in 64x61 representation"):
@@ -303,7 +324,12 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     IHolding.defund(contract_address=holding_address, asset_id_=asset_id_, amount=amount_)
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
 
     defund_Holding_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -335,7 +361,12 @@ func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     ILiquidityFund.defund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount_)
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
 
     defund_Liquidity_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -368,7 +399,11 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     IInsuranceFund.defund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount_)
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+    let updated_amount : felt = current_amount + amount_
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
 
     defund_Insurance_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 

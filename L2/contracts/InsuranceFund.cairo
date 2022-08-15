@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import (
@@ -138,6 +138,11 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         contract_address=auth_address, address=caller, action=ManageFunds_ACTION
     )
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
 
     if access == FALSE:
         let (emergency_address) = IAuthorizedRegistry.get_contract_address(
@@ -148,9 +153,9 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
             assert caller = emergency_address
         end
 
-        balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+        balance_mapping.write(asset_id=asset_id_, value=updated_amount)
     else:
-        balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+        balance_mapping.write(asset_id=asset_id_, value=updated_amount)
     end
 
     fund_Insurance_called.emit(asset_id=asset_id_, amount=amount_)
@@ -224,18 +229,34 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         assert caller = trading_address
     end
 
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Amount should be in 64x61 representation"):
         Math64x61_assert64x61(amount_)
     end
 
     let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+
+    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
 
     let current_liq_amount : felt = asset_liq_position.read(
         asset_id=asset_id_, position_id=position_id_
     )
+    let updated_liq_amount : felt = current_liq_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_liq_amount)
+    end
+
     asset_liq_position.write(
-        asset_id=asset_id_, position_id=position_id_, value=current_liq_amount + amount_
+        asset_id=asset_id_, position_id=position_id_, value=updated_liq_amount
     )
 
     deposit_Insurance_called.emit(asset_id=asset_id_, amount=amount_, position_id=position_id_)
@@ -276,6 +297,9 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let current_liq_amount : felt = asset_liq_position.read(
         asset_id=asset_id_, position_id=position_id_
     )
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount_, current_liq_amount)
+    end
     asset_liq_position.write(
         asset_id=asset_id_, position_id=position_id_, value=current_liq_amount - amount_
     )

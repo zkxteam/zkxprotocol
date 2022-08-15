@@ -117,7 +117,13 @@ func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     end
 
     let current_amount : felt = balance_mapping.read(market_id=market_id_)
-    balance_mapping.write(market_id=market_id_, value=current_amount + amount_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+
+    balance_mapping.write(market_id=market_id_, value=updated_amount)
 
     fund_ABR_called.emit(market_id=market_id_, amount=amount_)
 
@@ -185,7 +191,13 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     end
 
     let current_amount : felt = balance_mapping.read(market_id=market_id_)
-    balance_mapping.write(market_id=market_id_, value=current_amount + amount_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+
+    balance_mapping.write(market_id=market_id_, value=updated_amount)
 
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
