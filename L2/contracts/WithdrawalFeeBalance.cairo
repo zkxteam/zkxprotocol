@@ -176,7 +176,7 @@ func update_withdrawal_fee_mapping{
     end
 
     with_attr error_message("Fee should be non negative"):
-        assert_lt(0, fee_to_add_)
+        assert_nn(fee_to_add_)
     end
 
     with_attr error_message("Amount should be in 64x61 representation"):
