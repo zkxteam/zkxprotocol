@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_lt, assert_nn, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountRegistry_INDEX, Asset_INDEX, MasterAdmin_ACTION
@@ -231,7 +231,7 @@ func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
         collateral_id=collateral_id_
     )
     with_attr error_message("Amount to withdraw is more than balance available"):
-        assert_lt(amount_to_withdraw_, current_total_fee_per_asset)
+        assert_le(amount_to_withdraw_, current_total_fee_per_asset)
     end
     let new_total_fee_per_asset : felt = current_total_fee_per_asset - amount_to_withdraw_
     total_withdrawal_fee_per_asset.write(

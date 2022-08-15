@@ -50,7 +50,7 @@ async def feeBalance_factory(starknet_service: StarknetService):
 async def test_update_fee_mapping_invalid(feeBalance_factory):
     feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
 
-    assert_revert(lambda: signer3.send_transaction(admin1, feeBalance.contract_address,
+    await assert_revert(signer3.send_transaction(admin1, feeBalance.contract_address,
                   'update_fee_mapping', [pytest.user1.contract_address, 10]))
 
 
@@ -128,3 +128,37 @@ async def test_update_fee_mapping_different_user(feeBalance_factory):
             20
         ]
     )
+
+@pytest.mark.asyncio
+async def test_withdraw(feeBalance_factory):
+    feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
+    tx_exec_info=await signer1.send_transaction(admin1, feeBalance.contract_address, 'withdraw', [asset_ID, 10])
+
+    execution_info = await feeBalance.get_total_fee(asset_ID).call()
+    assert execution_info.result.fee == 20
+
+    assert_event_emitted(
+        tx_exec_info,
+        from_address = feeBalance.contract_address,
+        name = 'FeeBalance_withdraw_called',
+        data=[
+            asset_ID,
+            10,
+            30
+        ]
+    )
+
+@pytest.mark.asyncio
+async def test_withdraw_unauthorized(feeBalance_factory):
+    feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
+    await assert_revert(signer3.send_transaction(pytest.user1, feeBalance.contract_address, 'withdraw', [asset_ID, 10]))
+
+@pytest.mark.asyncio
+async def test_withdraw_0(feeBalance_factory):
+    feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
+    await assert_revert(signer1.send_transaction(admin1, feeBalance.contract_address, 'withdraw', [asset_ID, 0]))
+
+@pytest.mark.asyncio
+async def test_withdraw_more_than_balance(feeBalance_factory):
+    feeBalance, callFeeBalance, admin1, _ = feeBalance_factory
+    await assert_revert(signer1.send_transaction(admin1, feeBalance.contract_address, 'withdraw', [asset_ID, 100]))
