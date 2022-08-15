@@ -3,46 +3,163 @@
 %builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.math import abs_value, assert_not_zero
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
+from starkware.cairo.common.math import abs_value, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
-from contracts.Math_64x61 import (
-    Math64x61_add,
-    Math64x61_sub,
-    Math64x61_mul,
-    Math64x61_div,
-    Math64x61_fromFelt,
-    Math64x61_sqrt,
-    Math64x61_ln,
-)
 from starkware.starknet.common.syscalls import get_block_timestamp
-from contracts.interfaces.IMarkets import IMarkets
+from contracts.Math_64x61 import Math64x61_mul
+from contracts.Constants import ABR_FUNDS_INDEX, ABR_INDEX, AccountRegistry_INDEX, Market_INDEX, SHORT
+from contracts.DataTypes import OrderDetailsWithIDs
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IABRFund import IABRFund
-from contracts.interfaces.IAdminAuth import IAdminAuth
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAccount import IAccount
-from starkware.starknet.common.syscalls import get_caller_address
-from contracts.Constants import Market_INDEX, ABR_INDEX, ABR_FUNDS_INDEX, AccountRegistry_INDEX
-from contracts.DataTypes import OrderDetailsWithIDs
+from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IMarkets import IMarkets
 
+##########
+# Events #
+##########
+
+# Event emitted when abr payment called for a position
+@event
+func abr_payment_called_user_position(
+    position_id : felt, account_address : felt, timestamp : felt
+):
+end
+
+###########
+# Storage #
+###########
+
+# Stores the authregistry address
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
+# Stores tbe contract version 
 @storage_var
 func contract_version() -> (version : felt):
 end
 
+###############
+# Constructor #
+###############
+# @notice
+# @param registry_address_ - Address of the auth registry
+# @param contract_version_ Version of the contract
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, contract_version_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(contract_version_)
+        assert_not_zero(registry_address_)
+    end
+
     registry_address.write(registry_address_)
     contract_version.write(contract_version_)
 
     return ()
+end
+
+######################
+# External Functions #
+######################
+
+# @notice Function to be called by the node
+# @param account_addresses_len - Length of thee account_addresses array being passed
+# @param account_addresses - Account addresses array
+@external
+func pay_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    account_addresses_len : felt, account_addresses : felt*
+):
+    # ## Signature checks go here ####
+
+    # Get the account registry smart-contract
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (account_registry) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AccountRegistry_INDEX, version=version
+    )
+
+    # Get the market smart-contract
+    let (market_contract) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    )
+
+    # Get the ABR smart-contract
+    let (abr_contract) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=ABR_INDEX, version=version
+    )
+
+    # Get the ABR-funding smart-contract
+    let (abr_funding_contract) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=ABR_FUNDS_INDEX, version=version
+    )
+
+    return pay_abr_users(
+        account_addresses_len,
+        account_addresses,
+        account_registry,
+        market_contract,
+        abr_contract,
+        abr_funding_contract,
+    )
+end
+
+######################
+# Internal Functions #
+######################
+
+# @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
+# @param account_address - Address of the user of whom the positions are passed
+# @param abr_funding - Address of the ABR Fund contract
+# @param order_id - Order id of the position
+# @param collateral_id - Collateral id of the position
+# @param market_id - Market id of the position
+# @param abs_payment_amount - Absolute value of ABR payment 
+func user_pays{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    account_address : felt, abr_funding : felt, order_id : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
+):
+    IAccount.transfer_from_abr(
+        contract_address=account_address,
+        orderID_=order_id,
+        assetID_=collateral_id,
+        marketID_=market_id,
+        amount=abs_payment_amount,
+    )
+    IABRFund.deposit(
+        contract_address=abr_funding, order_id_=order_id, account_address_ = account_address, market_id_=market_id, amount=abs_payment_amount
+    )
+
+    return()
+end
+
+# @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
+# @param account_address - Address of the user of whom the positions are passed
+# @param abr_funding - Address of the ABR Fund contract
+# @param order_id - Order id of the position
+# @param collateral_id - Collateral id of the position
+# @param market_id - Market id of the position
+# @param abs_payment_amount - Absolute value of ABR payment 
+func user_receives{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    account_address : felt, abr_funding : felt, order_id : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
+):
+    IABRFund.withdraw(
+        contract_address=abr_funding, order_id_=order_id, account_address_ = account_address, market_id_=market_id, amount=abs_payment_amount
+    )
+
+    IAccount.transfer_abr(
+        contract_address=account_address,
+        orderID_=order_id,
+        assetID_=collateral_id,
+        marketID_=market_id,
+        amount=abs_payment_amount,
+    )
+
+    return()
 end
 
 # @notice Internal function called by pay_abr_users to iterate throught the positions of the account
@@ -75,7 +192,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
 
     # Check if abr already collected
     let (is_called) = IAccount.timestamp_check(
-        contract_address=account_address, market_id=market_id
+        contract_address=account_address, orderID_=[positions].orderID
     )
 
     if is_called == 1:
@@ -101,77 +218,29 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     let (is_negative) = is_le(abr, 0)
 
     # If the abr is negative
-    if is_negative == 1:
-        if [positions].direction == 0:
+    if is_negative == TRUE:
+        if [positions].direction == SHORT:
             # user pays
-            IAccount.transfer_from_abr(
-                contract_address=account_address,
-                assetID_=[positions].collateralID,
-                marketID_=market_id,
-                amount=abs_payment_amount,
-            )
-            IABRFund.deposit(
-                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-            )
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
+            user_pays(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
         else:
             # user receives
-            IABRFund.withdraw(
-                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-            )
-
-            IAccount.transfer_abr(
-                contract_address=account_address,
-                assetID_=[positions].collateralID,
-                marketID_=market_id,
-                amount=abs_payment_amount,
-            )
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
+            user_receives(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
         end
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-        # If the abr is positive
+    # If the abr is positive
     else:
-        if [positions].direction == 0:
+        if [positions].direction == SHORT:
             # user receives
-            IABRFund.withdraw(
-                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-            )
-
-            IAccount.transfer_abr(
-                contract_address=account_address,
-                assetID_=[positions].collateralID,
-                marketID_=market_id,
-                amount=abs_payment_amount,
-            )
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
+            user_receives(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
         else:
             # user pays
-            IAccount.transfer_from_abr(
-                contract_address=account_address,
-                assetID_=[positions].collateralID,
-                marketID_=market_id,
-                amount=abs_payment_amount,
-            )
-
-            IABRFund.deposit(
-                contract_address=abr_funding, market_id_=market_id, amount=abs_payment_amount
-            )
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
+            user_pays(account_address, abr_funding, [positions].orderID, [positions].collateralID, market_id, abs_payment_amount)
         end
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
     end
+
+    # Get the latest block
+    let (block_timestamp) = get_block_timestamp()
+
+    abr_payment_called_user_position.emit(position_id = [positions].orderID, account_address = account_address, timestamp = block_timestamp)
 
     return pay_abr_users_positions(
         account_address,
@@ -208,7 +277,7 @@ func pay_abr_users{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     )
 
     # If not, skip the current iteration
-    if is_registered_user == 0:
+    if is_registered_user == FALSE:
         return pay_abr_users(
             account_addresses_len - 1,
             account_addresses + 1,
@@ -237,47 +306,6 @@ func pay_abr_users{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     return pay_abr_users(
         account_addresses_len - 1,
         account_addresses + 1,
-        account_registry,
-        market_contract,
-        abr_contract,
-        abr_funding_contract,
-    )
-end
-
-# @notice Function to be called by the node
-# @param account_addresses_len - Length of thee account_addresses array being passed
-# @param account_addresses - Account addresses array
-@external
-func pay_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    account_addresses_len : felt, account_addresses : felt*
-):
-    # ## Signature checks go here ####
-
-    # Get the account registry smart-contract
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (account_registry) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AccountRegistry_INDEX, version=version
-    )
-
-    # Get the market smart-contract
-    let (market_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Market_INDEX, version=version
-    )
-
-    # Get the ABR smart-contract
-    let (abr_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_INDEX, version=version
-    )
-
-    # Get the ABR-funding smart-contract
-    let (abr_funding_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_FUNDS_INDEX, version=version
-    )
-
-    return pay_abr_users(
-        account_addresses_len,
-        account_addresses,
         account_registry,
         market_contract,
         abr_contract,
