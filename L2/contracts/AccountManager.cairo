@@ -61,7 +61,7 @@ from contracts.DataTypes import (
     WithdrawalRequestForHashing,
 )
 
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
@@ -303,7 +303,7 @@ func is_valid_signature_order{
     if liquidator_address_ != 0:
         # To-Do Verify whether call came from node operator
 
-        let (_public_key) = IAccount.get_public_key(contract_address=liquidator_address_)
+        let (_public_key) = IAccountManager.get_public_key(contract_address=liquidator_address_)
         pub_key = _public_key
 
         tempvar syscall_ptr = syscall_ptr
@@ -633,54 +633,6 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 
     transferred.emit(asset_id = assetID_, amount = amount)
     return ()
-end
-
-# @notice Function to execute transactions signed by this account
-# @param to - Contract address to which to send the transaction
-# @param selector - Function selector of the function to call
-# @param calldata_len - Length of the paramaters to be passed to the function
-# @param calldata - Array of parameters
-# @param nonce - (Currently not used)
-# @return response_len - Length of the return values from the function
-# @return response - Array of return values
-@external
-func execute{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
-}(to : felt, selector : felt, calldata_len : felt, calldata : felt*, nonce : felt) -> (
-    response_len : felt, response : felt*
-):
-    alloc_locals
-
-    let (__fp__, _) = get_fp_and_pc()
-    let (_address) = get_contract_address()
-    let (_current_nonce) = current_nonce.read()
-
-    local message : Message = Message(
-        _address,
-        to,
-        selector,
-        calldata,
-        calldata_size=calldata_len,
-        _current_nonce
-        )
-
-    # validate transaction
-    let (hash) = hash_message(&message)
-    let (signature_len, signature) = get_tx_signature()
-    is_valid_signature(hash, signature_len, signature)
-
-    # bump nonce
-    current_nonce.write(_current_nonce + 1)
-
-    # execute call
-    let response = call_contract(
-        contract_address=message.to,
-        function_selector=message.selector,
-        calldata_size=message.calldata_size,
-        calldata=message.calldata,
-    )
-
-    return (response_len=response.retdata_size, response=response.retdata)
 end
 
 # #### TODO: Remove; Only for testing purposes #####

@@ -8,7 +8,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountRegistry_INDEX, L1_ZKX_Address_INDEX
 from contracts.DataTypes import WithdrawalRequest
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
@@ -124,7 +124,7 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     withdrawal_request_mapping.write(request_id=request_id_, value=updated_request)
 
     # update withdrawal history status field to 1
-    IAccount.update_withdrawal_history(contract_address=user_l2_address_, request_id_=request_id_)
+    IAccountManager.update_withdrawal_history(contract_address=user_l2_address_, request_id_=request_id_)
 
     # update_withdrawal_request_called event is emitted
     update_withdrawal_request_called.emit(
