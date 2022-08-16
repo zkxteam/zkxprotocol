@@ -167,6 +167,10 @@ func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         verify_caller_authority(registry, version, ManageFunds_ACTION)
     end
 
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Amount should be in 64x61 representation"):
         Math64x61_assert64x61(amount_)
     end
@@ -312,6 +316,10 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         verify_caller_authority(registry, version, ManageFunds_ACTION)
     end
 
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Amount should be in 64x61 representation"):
         Math64x61_assert64x61(amount_)
     end
@@ -350,6 +358,10 @@ func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         verify_caller_authority(registry, version, ManageFunds_ACTION)
     end
 
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
     with_attr error_message("Amount should be in 64x61 representation"):
         Math64x61_assert64x61(amount_)
     end
@@ -385,6 +397,10 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     let (version) = contract_version.read()
     with_attr error_message("Caller is not authorized to manage funds"):
         verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
+
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
     end
 
     with_attr error_message("Amount should be in 64x61 representation"):
