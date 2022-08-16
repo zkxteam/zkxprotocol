@@ -170,13 +170,11 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     /// @dev function to withdraw funds from an L2 Account contract
     /// @param userL1Address_ - User's L1 Account address
-    /// @param userL2Address_ - User's L2 Account address
     /// @param ticker_ - felt representation of the ticker
     /// @param amount_ - The amount of tokens to be withdrawn
     /// @param requestId_ - ID of the withdrawal request
     function withdraw(
         address userL1Address_,
-        uint256 userL2Address_,
         uint256 ticker_,
         uint256 amount_,
         uint256 requestId_
@@ -190,7 +188,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
         // Consume call will revert if no matching message exists
         starknetCore.consumeMessageFromL2(
-            userL2Address_,
+            withdrawalRequestContractAddress,
             withdrawalMessagePayload(
                 uint256(uint160(userL1Address_)),
                 ticker_,
@@ -200,9 +198,8 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         );
 
         // Construct update withdrawal request message payload
-        uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
-        updateWithdrawalRequestPayload[0] = userL2Address_;
-        updateWithdrawalRequestPayload[1] = requestId_;
+        uint256[] memory updateWithdrawalRequestPayload = new uint256[](1);
+        updateWithdrawalRequestPayload[0] = requestId_;
 
         // Send the message to the StarkNet core contract
         bytes32 msgHash = starknetCore.sendMessageToL2(
@@ -224,12 +221,10 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     /// @dev function to withdraw funds from an L2 Account contract
     /// @param userL1Address_ - User's L1 Account address
-    /// @param userL2Address_ - User's L2 Account address
     /// @param amount_ - The amount of tokens to be withdrawn
     /// @param requestId_ - ID of the withdrawal request
     function withdrawEth(
         address userL1Address_,
-        uint256 userL2Address_,
         uint256 amount_,
         uint256 requestId_
     ) external nonReentrant {
@@ -240,7 +235,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
         // Consume call will revert if no matching message exists
         starknetCore.consumeMessageFromL2(
-            userL2Address_,
+            withdrawalRequestContractAddress,
             withdrawalMessagePayload(
                 uint256(uint160(userL1Address_)),
                 ETH_TICKER,
@@ -250,9 +245,8 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         );
 
         // Construct update withdrawal request message payload
-        uint256[] memory updateWithdrawalRequestPayload = new uint256[](2);
-        updateWithdrawalRequestPayload[0] = userL2Address_;
-        updateWithdrawalRequestPayload[1] = requestId_;
+        uint256[] memory updateWithdrawalRequestPayload = new uint256[](1);
+        updateWithdrawalRequestPayload[0] = requestId_;
 
         // Send the message to the StarkNet core contract
         bytes32 msgHash = starknetCore.sendMessageToL2(
