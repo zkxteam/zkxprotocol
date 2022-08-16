@@ -67,7 +67,7 @@ func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 end
 
 ######################
-# External Functions #
+# Internal Functions #
 ######################
 
 # @notice add amount to asset_id's balance
@@ -171,7 +171,6 @@ end
 # @notice Deposit amount for a asset_id by an order
 # @param asset_id_ - target asset_id
 # @param amount_ - value to deduct from asset_id's balance
-@external
 func deposit_to_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
@@ -210,7 +209,6 @@ end
 # @notice Withdraw amount for a asset_id by an order
 # @param asset_id_ - target asset_id
 # @param amount_ - value to deduct from asset_id's balance
-@external
 func withdraw_from_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
