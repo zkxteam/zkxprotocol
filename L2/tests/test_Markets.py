@@ -267,6 +267,30 @@ async def test_remove_market(adminAuth_factory):
     assert fetched_market.assetCollateral == 0
     assert fetched_market.leverage == 0
 
+@pytest.mark.asyncio
+async def test_change_leverage_unauthorized(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_leverage', [to64x61(100)]))
+
+@pytest.mark.asyncio
+async def test_change_ttl_unauthorized(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_ttl_leverage', [to64x61(7200)]))
+
+
+@pytest.mark.asyncio
+async def test_change_leverage_authorized(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'change_max_leverage', [to64x61(100)])
+
+@pytest.mark.asyncio
+async def test_change_ttl_authorized(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'change_max_ttl', [7200])
 
 @pytest.mark.asyncio
 async def test_retrieve_markets(adminAuth_factory):
@@ -274,7 +298,7 @@ async def test_retrieve_markets(adminAuth_factory):
 
     markets = await market.returnAllMarkets().call()
 
-    await signer1.send_transaction(admin1, market.contract_address, 'addMarket', [str_to_felt("2dsyfdj289fdj"), str_to_felt("32f0406jz7qj12"), str_to_felt("32f0406jz7qj10"), to64x61(5), 1, 60])
+    await signer1.send_transaction(admin1, market.contract_address, 'addMarket', [str_to_felt("2dsyfdj289fdj"), str_to_felt("32f0406jz7qj12"), str_to_felt("32f0406jz7qj10"), to64x61(50), 1, 3610])
 
 
     execution_info = await market.getMarket(str_to_felt("32f0406jz7qk5")).call()
