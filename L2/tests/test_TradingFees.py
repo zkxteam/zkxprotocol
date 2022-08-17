@@ -26,7 +26,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
-    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
 
@@ -36,6 +36,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 6, 1])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [3, 1, feeDiscount.contract_address])
 
     await signer1.send_transaction(admin1, feeDiscount.contract_address, 'add_user_tokens', [user1.contract_address, 100])
