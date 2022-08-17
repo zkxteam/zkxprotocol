@@ -55,7 +55,7 @@ end
 # @param asset_id_ - Target asset_id
 # @return amount - Balance amount corresponding to the asset_id
 @view
-func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt
 ) -> (amount : felt):
     let (amount) = balance_mapping.read(id=asset_id_)

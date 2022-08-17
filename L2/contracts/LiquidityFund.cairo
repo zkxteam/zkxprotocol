@@ -8,7 +8,7 @@ from contracts.libraries.FundLibrary import (
     defund_contract,
     deposit_to_contract,
     fund_contract,
-    get_balance,
+    balance,
     initialize,
     withdraw_from_contract,
 )
@@ -65,17 +65,6 @@ end
 ##################
 # View Functions #
 ##################
-
-# @notice Gets the amount of the balance for the assetID(asset)
-# @param asset_id_ - Target assetID
-# @return amount - Balance amount corresponding to the assetID
-@view
-func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt
-) -> (amount : felt):
-    let (amount) = get_balance(asset_id_)
-    return (amount)
-end
 
 # @notice Gets the amount owed to liquidity fund by each position
 # @param asset_id_ - Target assetID

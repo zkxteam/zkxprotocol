@@ -8,7 +8,7 @@ from contracts.libraries.FundLibrary import (
     defund_abr_or_emergency,
     deposit_to_contract,
     fund_abr_or_emergency,
-    get_balance,
+    balance,
     initialize,
     withdraw_from_contract,
 )
@@ -54,21 +54,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 ):
     initialize(registry_address_, version_)
     return ()
-end
-
-##################
-# View Functions #
-##################
-
-# @notice Gets the amount of the balance for the market_id(asset)
-# @param market_id_ - Target market_id
-# @return amount - Balance amount corresponding to the market_id
-@view
-func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    market_id_ : felt
-) -> (amount : felt):
-    let (amount) = get_balance(market_id_)
-    return (amount)
 end
 
 ######################

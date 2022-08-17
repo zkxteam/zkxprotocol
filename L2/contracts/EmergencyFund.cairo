@@ -19,7 +19,7 @@ from contracts.libraries.FundLibrary import (
     contract_version,
     defund_abr_or_emergency,
     fund_abr_or_emergency,
-    get_balance,
+    balance,
     initialize,
     registry_address,
 )
@@ -83,21 +83,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 ):
     initialize(registry_address_, version_)
     return ()
-end
-
-##################
-# View Functions #
-##################
-
-# @notice Gets the amount of the balance for the asset_id (asset)
-# @param asset_id - Target asset_id
-# @returns amount - Balance of the corresponding asset
-@view
-func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt
-) -> (amount : felt):
-    let (amount) = get_balance(asset_id_)
-    return (amount)
 end
 
 ######################
