@@ -5,14 +5,10 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import (
-    AdminAuth_INDEX,
-    EmergencyFund_INDEX,
-    ManageFunds_ACTION,
-    Trading_INDEX,
-)
+from contracts.Constants import AdminAuth_INDEX, EmergencyFund_INDEX, ManageFunds_ACTION
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
 ###########
@@ -29,9 +25,10 @@ end
 func registry_address() -> (contract_address : felt):
 end
 
-# Stores the mapping from asset_id to its balance
+# Stores the mapping from market_id to its balance for ABR fund contract and
+# asset_id to balance for other fund contracts
 @storage_var
-func balance_mapping(asset_id : felt) -> (amount : felt):
+func balance_mapping(id : felt) -> (amount : felt):
 end
 
 # @notice function to initialize registry address and contract version
@@ -50,7 +47,6 @@ func initialize{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_pt
     return ()
 end
 
-
 ##################
 # View Functions #
 ##################
@@ -62,7 +58,7 @@ end
 func get_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt
 ) -> (amount : felt):
-    let (amount) = balance_mapping.read(asset_id=asset_id_)
+    let (amount) = balance_mapping.read(id=asset_id_)
     return (amount)
 end
 
@@ -96,7 +92,7 @@ func fund_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         Math64x61_assert64x61(amount_)
     end
 
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=asset_id_)
     let updated_amount : felt = current_amount + amount_
 
     with_attr error_message("updated amount must be in 64x61 range"):
@@ -112,9 +108,9 @@ func fund_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
             assert caller = emergency_address
         end
 
-        balance_mapping.write(asset_id=asset_id_, value=updated_amount)
+        balance_mapping.write(id=asset_id_, value=updated_amount)
     else:
-        balance_mapping.write(asset_id=asset_id_, value=updated_amount)
+        balance_mapping.write(id=asset_id_, value=updated_amount)
     end
 
     return ()
@@ -146,7 +142,7 @@ func defund_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
         Math64x61_assert64x61(amount_)
     end
 
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
@@ -160,30 +156,31 @@ func defund_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
             assert caller = emergency_address
         end
 
-        balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
+        balance_mapping.write(id=asset_id_, value=current_amount - amount_)
     else:
-        balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
+        balance_mapping.write(id=asset_id_, value=current_amount - amount_)
     end
 
     return ()
 end
 
-# @notice Deposit amount for a asset_id by an order
-# @param asset_id_ - target asset_id
-# @param amount_ - value to deduct from asset_id's balance
+# @notice Deposit amount for an id by an order
+# @param id_ - market_id for ABR fund contract and asset_id for other fund contracts
+# @param amount_ - value to be added to asset_id's or market_id's balance
+# @param index_ - ABR_PAYMENT_INDEX for ABR fund contract and Trading_INDEX for other fund contracts
 func deposit_to_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt, amount_ : felt
+    id_ : felt, amount_ : felt, index_ : felt
 ):
     # Auth Check
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
+    let (contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=index_, version=version
     )
 
-    with_attr error_message("Caller is not authorized to do perform deposit"):
-        assert caller = trading_address
+    with_attr error_message("Caller is not authorized to perform deposit"):
+        assert caller = contract_address
     end
 
     with_attr error_message("Amount cannot be 0 or negative"):
@@ -194,34 +191,35 @@ func deposit_to_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
         Math64x61_assert64x61(amount_)
     end
 
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=id_)
     let updated_amount : felt = current_amount + amount_
 
     with_attr error_message("updated amount must be in 64x61 range"):
         Math64x61_assert64x61(updated_amount)
     end
 
-    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
+    balance_mapping.write(id=id_, value=updated_amount)
 
     return ()
 end
 
-# @notice Withdraw amount for a asset_id by an order
-# @param asset_id_ - target asset_id
-# @param amount_ - value to deduct from asset_id's balance
+# @notice Withdraw amount for an id by an order
+# @param id_ - market_id for ABR fund contract and asset_id for other fund contracts
+# @param amount_ - value to deduct from asset_id's or market_id's balance
+# @param index_ - ABR_PAYMENT_INDEX for ABR fund contract and Trading_INDEX for other fund contracts
 func withdraw_from_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt, amount_ : felt
+    id_ : felt, amount_ : felt, index_ : felt
 ):
     # Auth Check
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
+    let (contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=index_, version=version
     )
 
-    with_attr error_message("Caller is not authorized to do perform deposit"):
-        assert caller = trading_address
+    with_attr error_message("Caller is not authorized to perform withdraw"):
+        assert caller = contract_address
     end
 
     with_attr error_message("Amount cannot be 0 or negative"):
@@ -232,11 +230,72 @@ func withdraw_from_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
         Math64x61_assert64x61(amount_)
     end
 
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
-    balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
+    balance_mapping.write(id=id_, value=current_amount - amount_)
+
+    return ()
+end
+
+# @notice Manually add amount to id's balance
+# @param id_ - market_id for ABR fund contract and asset_id for emergency fund contract
+# @param amount_ - value to add to market_id's or asset_id's balance
+func fund_abr_or_emergency{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    id_ : felt, amount_ : felt
+):
+    with_attr error_message("Not authorized to manage funds"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
+
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
+    with_attr error_message("Amount should be in 64x61 representation"):
+        Math64x61_assert64x61(amount_)
+    end
+
+    let current_amount : felt = balance_mapping.read(id=id_)
+    let updated_amount : felt = current_amount + amount_
+
+    with_attr error_message("updated amount must be in 64x61 range"):
+        Math64x61_assert64x61(updated_amount)
+    end
+
+    balance_mapping.write(id=id_, value=updated_amount)
+
+    return ()
+end
+
+# @notice Manually deduct amount from id's balance
+# @param id_ - market_id for ABR fund contract and asset_id for emergency fund contract
+# @param amount_ - value to deduct from market_id's or asset_id's balance
+func defund_abr_or_emergency{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    id_ : felt, amount_ : felt
+):
+    with_attr error_message("Not authorized to manage funds"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFunds_ACTION)
+    end
+
+    with_attr error_message("Amount cannot be 0 or negative"):
+        assert_lt(0, amount_)
+    end
+
+    with_attr error_message("Amount should be in 64x61 representation"):
+        Math64x61_assert64x61(amount_)
+    end
+
+    let current_amount : felt = balance_mapping.read(id=id_)
+    with_attr error_message("Amount to be deducted is more than asset's balance"):
+        assert_le(amount_, current_amount)
+    end
+    balance_mapping.write(id=id_, value=current_amount - amount_)
 
     return ()
 end

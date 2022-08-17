@@ -14,6 +14,15 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
+from contracts.libraries.FundLibrary import (
+    balance_mapping,
+    contract_version,
+    defund_abr_or_emergency,
+    fund_abr_or_emergency,
+    get_balance,
+    initialize,
+    registry_address,
+)
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
@@ -61,25 +70,6 @@ end
 func defund_Insurance_from_Emergency_called(asset_id : felt, amount : felt):
 end
 
-###########
-# Storage #
-###########
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
-# Stores the mapping from asset_id to its balance
-@storage_var
-func balance_mapping(asset_id : felt) -> (amount : felt):
-end
-
 ###############
 # Constructor #
 ###############
@@ -91,13 +81,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    initialize(registry_address_, version_)
     return ()
 end
 
@@ -112,7 +96,7 @@ end
 func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt
 ) -> (amount : felt):
-    let (amount) = balance_mapping.read(asset_id=asset_id_)
+    let (amount) = get_balance(asset_id_)
     return (amount)
 end
 
@@ -127,28 +111,7 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    with_attr error_message("Caller is not authorized to manage funds"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageFunds_ACTION)
-    end
-
-    with_attr error_message("Amount cannot be 0 or negative"):
-        assert_lt(0, amount_)
-    end
-
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    let updated_amount : felt = current_amount + amount_
-
-    with_attr error_message("updated amount must be in 64x61 range"):
-        Math64x61_assert64x61(updated_amount)
-    end
-    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
-
+    fund_abr_or_emergency(asset_id_, amount_)
     fund_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -161,26 +124,7 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    with_attr error_message("Caller is not authorized to manage funds"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageFunds_ACTION)
-    end
-
-    with_attr error_message("Amount cannot be 0 or negative"):
-        assert_lt(0, amount_)
-    end
-
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    with_attr error_message("Amount to be deducted is more than asset's balance"):
-        assert_le(amount_, current_amount)
-    end
-    balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
-
+    defund_abr_or_emergency(asset_id_, amount_)
     defund_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -211,11 +155,11 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Holding_INDEX, version=version
     )
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
-    balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
+    balance_mapping.write(id=asset_id_, value=current_amount - amount_)
 
     IHolding.fund(contract_address=holding_address, asset_id_=asset_id_, amount=amount_)
 
@@ -250,11 +194,11 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (liquidity_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=LiquidityFund_INDEX, version=version
     )
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
-    balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
+    balance_mapping.write(id=asset_id_, value=current_amount - amount_)
 
     ILiquidityFund.fund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount_)
 
@@ -289,11 +233,11 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (insurance_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=InsuranceFund_INDEX, version=version
     )
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
-    balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
+    balance_mapping.write(id=asset_id_, value=current_amount - amount_)
 
     IInsuranceFund.fund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount_)
 
@@ -331,13 +275,13 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 
     IHolding.defund(contract_address=holding_address, asset_id_=asset_id_, amount=amount_)
 
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=asset_id_)
     let updated_amount : felt = current_amount + amount_
 
     with_attr error_message("updated amount must be in 64x61 range"):
         Math64x61_assert64x61(updated_amount)
     end
-    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
+    balance_mapping.write(id=asset_id_, value=updated_amount)
 
     defund_Holding_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -372,13 +316,13 @@ func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     )
     ILiquidityFund.defund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount_)
 
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=asset_id_)
     let updated_amount : felt = current_amount + amount_
 
     with_attr error_message("updated amount must be in 64x61 range"):
         Math64x61_assert64x61(updated_amount)
     end
-    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
+    balance_mapping.write(id=asset_id_, value=updated_amount)
 
     defund_Liquidity_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -414,12 +358,12 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 
     IInsuranceFund.defund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount_)
 
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
+    let current_amount : felt = balance_mapping.read(id=asset_id_)
     let updated_amount : felt = current_amount + amount_
     with_attr error_message("updated amount must be in 64x61 range"):
         Math64x61_assert64x61(updated_amount)
     end
-    balance_mapping.write(asset_id=asset_id_, value=updated_amount)
+    balance_mapping.write(id=asset_id_, value=updated_amount)
 
     defund_Insurance_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
