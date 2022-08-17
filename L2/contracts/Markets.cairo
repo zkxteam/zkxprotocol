@@ -158,7 +158,8 @@ func returnAllMarkets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     alloc_locals
 
     let (array_list : MarketWID*) = alloc()
-    return populate_markets(array_list_len=0, array_list=array_list)
+    let (array_list_len) = markets_array_len.read()
+    return populate_markets(iterator=0, array_list_len = array_list_len, array_list=array_list)
 end
 
 # @notice Getter function for Markets
@@ -215,6 +216,7 @@ func addMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
     market_id_by_index.write(curr_len, id)
     market_index_by_id.write(id, curr_len)
     markets_array_len.write(curr_len + 1)
+    market_mapping.write(asset_id = newMarket.asset, collateral_id = newMarket.assetCollateral, value = id)
 
     # Update id & market pair existence
     market_id_exists.write(id, TRUE)
@@ -255,6 +257,7 @@ func removeMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     # Mark id & ticker as non-existing
     market_id_exists.write(id_to_remove, FALSE)
     market_pair_exists.write(market_to_remove.asset, market_to_remove.assetCollateral, FALSE)
+    market_mapping.write(asset_id = market_to_remove.asset, collateral_id = market_to_remove.assetCollateral, value = 0)
 
     # Delete market struct
     market_by_id.write(market_id=id_to_remove, value=Market(asset=0, assetCollateral=0, leverage=0, tradable=0, ttl=0))
@@ -338,20 +341,22 @@ end
 ######################
 
 # @notice Internal Function called by returnAllMarkets to recursively add assets to the array and return it
+# @param iterator - Current index being populated
 # @param array_list_len - Stores the current length of the populated array
 # @param array_list - Array of MarketWID filled up to the index
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of MarketWID
 func populate_markets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    array_list_len : felt, array_list : MarketWID*
+    iterator : felt, array_list_len : felt, array_list : MarketWID*
 ) -> (array_list_len : felt, array_list : MarketWID*):
     alloc_locals
-    let (market_id) = market_id_by_index.read(index=array_list_len)
-    
-    if market_id == 0:
+
+    if iterator == array_list_len:
         return (array_list_len, array_list)
     end
 
+    let (market_id) = market_id_by_index.read(index=iterator)
+    
     let (market_details : Market) = market_by_id.read(market_id=market_id)
     let market_details_w_id = MarketWID(
         id=market_id,
@@ -361,9 +366,9 @@ func populate_markets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         tradable=market_details.tradable,
         ttl=market_details.ttl
     )
-    assert array_list[array_list_len] = market_details_w_id
+    assert array_list[iterator] = market_details_w_id
 
-    return populate_markets(array_list_len + 1, array_list)
+    return populate_markets(iterator + 1, array_list_len, array_list)
 end
 
 # @notice Internal function to check authorization
