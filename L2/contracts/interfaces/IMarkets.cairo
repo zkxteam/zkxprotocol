@@ -17,6 +17,11 @@ namespace IMarkets:
     func modifyTradable(id : felt, tradable : felt):
     end
 
+    func change_max_ttl(new_max_ttl : felt):
+    end
+
+    func change_max_leverage(new_max_leverage : felt):
+    end
     # view functions
     func getMarket(id : felt) -> (currMarket : Market):
     end
@@ -26,4 +31,6 @@ namespace IMarkets:
 
     func returnAllMarkets() -> (array_list_len : felt, array_list : MarketWID*):
     end
+
+    
 end
