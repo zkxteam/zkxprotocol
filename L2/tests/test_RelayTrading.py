@@ -76,7 +76,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
     emergency = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
     trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
-    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     marketPrices = await starknet_service.deploy(ContractType.MarketPrices, [registry.contract_address, 1])
     liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
 

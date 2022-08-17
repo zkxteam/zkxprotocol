@@ -92,7 +92,7 @@ func increment_governance_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     # Auth check
-    with_attr error_message("Caller is not authorized to manage fee details"):
+    with_attr error_message("Caller is not authorized to manage governance tokens"):
         verify_caller_authority(registry, version, ManageGovernanceToken_ACTION)
     end
 

@@ -125,7 +125,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
     feeDiscount = await starknet_service.deploy(
         ContractType.FeeDiscount, 
-        []
+        [registry.contract_address, 1]
     )
     marketPrices = await starknet_service.deploy(
         ContractType.MarketPrices, 

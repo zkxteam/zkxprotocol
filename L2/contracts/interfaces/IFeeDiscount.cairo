@@ -2,15 +2,14 @@
 
 @contract_interface
 namespace IFeeDiscount:
-
-    #external functions
-    func add_user_tokens(address : felt, value : felt):
+    # external functions
+    func increment_governance_tokens(address : felt, value : felt):
     end
 
-    func remove_user_tokens(address : felt, value : felt):
+    func decrement_governance_tokens(address : felt, value : felt):
     end
 
-    #view functions
+    # view functions
     func get_user_tokens(address : felt) -> (value : felt):
     end
 end

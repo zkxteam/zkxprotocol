@@ -39,7 +39,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 6, 1])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [3, 1, feeDiscount.contract_address])
 
-    await signer1.send_transaction(admin1, feeDiscount.contract_address, 'add_user_tokens', [user1.contract_address, 100])
+    await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 100])
 
     return adminAuth, fees, admin1, admin2, user1, feeDiscount
 
@@ -147,7 +147,7 @@ async def test_get_fee1(adminAuth_factory):
 async def test_get_fee2(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await signer1.send_transaction(admin1, feeDiscount.contract_address, 'add_user_tokens', [user1.contract_address, 1000])
+    await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 1000])
 
     execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 0).call()
     result = execution_info.result

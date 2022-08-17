@@ -26,7 +26,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
-    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
 
@@ -37,6 +37,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 6, 1])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [3, 1, feeDiscount.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [4, 1, fees.contract_address])
 
@@ -56,7 +57,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Give appripritae permissions to relays
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_feeDiscount.contract_address, 4, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_fees.contract_address, 4, 1])
-    await signer1.send_transaction(admin1, relay_feeDiscount.contract_address, 'add_user_tokens', [user1.contract_address, 100])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_feeDiscount.contract_address, 6, 1])
+    await signer1.send_transaction(admin1, relay_feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 100])
 
     # Passing relay versions of fees and feeDiscount to verify they dont break existing logic
     return adminAuth, relay_fees, admin1, admin2, user1, relay_feeDiscount
@@ -162,7 +164,7 @@ async def test_get_fee1(adminAuth_factory):
 async def test_get_fee2(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await signer1.send_transaction(admin1, feeDiscount.contract_address, 'add_user_tokens', [user1.contract_address, 1000])
+    await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 1000])
 
     execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 0).call()
     result = execution_info.result
