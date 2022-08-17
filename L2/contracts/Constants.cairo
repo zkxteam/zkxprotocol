@@ -46,7 +46,7 @@ const ManageMarkets_ACTION = 2
 const ManageAuthRegistry_ACTION = 3
 const ManageFeeDetails_ACTION = 4
 const ManageFunds_ACTION = 5
-const ManageVgs_ACTION = 6
+const ManageGovernanceToken_ACTION = 6
 
 const ORDER_INITIATED = 0
 const ORDER_OPENED_PARTIALLY = 1

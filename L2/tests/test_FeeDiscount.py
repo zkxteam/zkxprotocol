@@ -38,7 +38,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
 async def test_add_token(adminAuth_factory):
     adminAuth, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    tx_exec_info=await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_user_tokens', [user1.contract_address, 10])
+    tx_exec_info=await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 10])
 
     execution_info = await feeDiscount.get_user_tokens(user1.contract_address).call()
     result = execution_info.result.value
@@ -59,13 +59,13 @@ async def test_add_token(adminAuth_factory):
 async def test_add_token_unauthorized(adminAuth_factory):
     adminAuth, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await assert_revert(signer2.send_transaction(admin2, feeDiscount.contract_address, 'increment_user_tokens', [user1.contract_address, 10]))
+    await assert_revert(signer2.send_transaction(admin2, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 10]))
 
 @pytest.mark.asyncio
 async def test_remove_token(adminAuth_factory):
     adminAuth, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    tx_exec_info=await signer1.send_transaction(admin1, feeDiscount.contract_address, 'decrement_user_tokens', [user1.contract_address, 5])
+    tx_exec_info=await signer1.send_transaction(admin1, feeDiscount.contract_address, 'decrement_governance_tokens', [user1.contract_address, 5])
 
     execution_info = await feeDiscount.get_user_tokens(user1.contract_address).call()
     result = execution_info.result.value
@@ -86,10 +86,10 @@ async def test_remove_token(adminAuth_factory):
 async def test_remove_token_unauthorized(adminAuth_factory):
     adminAuth, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await assert_revert(signer2.send_transaction(admin2, feeDiscount.contract_address, 'decrement_user_tokens', [user1.contract_address, 10]))
+    await assert_revert(signer2.send_transaction(admin2, feeDiscount.contract_address, 'decrement_governance_tokens', [user1.contract_address, 10]))
 
 @pytest.mark.asyncio
 async def test_remove_token_more_than_balance(adminAuth_factory):
     adminAuth, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await assert_revert(signer1.send_transaction(admin1, feeDiscount.contract_address, 'decrement_user_tokens', [user1.contract_address, 20]))
+    await assert_revert(signer1.send_transaction(admin1, feeDiscount.contract_address, 'decrement_governance_tokens', [user1.contract_address, 20]))

@@ -5,7 +5,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_lt, assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import ManageVgs_ACTION
+from contracts.Constants import ManageGovernanceToken_ACTION
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
@@ -86,14 +86,14 @@ end
 # @param address - Address of the user
 # @param value - Number of tokens to be added
 @external
-func increment_user_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+func increment_governance_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address : felt, value : felt
 ):
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     # Auth check
     with_attr error_message("Caller is not authorized to manage fee details"):
-        verify_caller_authority(registry, version, ManageVgs_ACTION)
+        verify_caller_authority(registry, version, ManageGovernanceToken_ACTION)
     end
 
     with_attr error_message("Value should be greater than 0"):
@@ -115,14 +115,14 @@ end
 # @param address - Address of the user
 # @param action - Number of tokens to be removed
 @external
-func decrement_user_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+func decrement_governance_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address : felt, value : felt
 ):
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
     # Auth check
     with_attr error_message("Caller is not authorized to manage fee details"):
-        verify_caller_authority(registry, version, ManageVgs_ACTION)
+        verify_caller_authority(registry, version, ManageGovernanceToken_ACTION)
     end
 
     with_attr error_message("Value should be greater than 0"):
