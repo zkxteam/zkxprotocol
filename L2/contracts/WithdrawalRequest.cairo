@@ -98,11 +98,10 @@ end
 
 # @notice Function to handle status updates on withdrawal requests
 # @param from_address - The address from where update withdrawal request function is called from
-# @param user_l2_address_ - Uers's L2 account contract address
 # @param request_id_ - ID of the withdrawal Request
 @l1_handler
 func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    from_address : felt, user_l2_address_ : felt, request_id_ : felt
+    from_address : felt, request_id_ : felt
 ):
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
@@ -117,6 +116,12 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         assert from_address = l1_zkx_address
     end
 
+    # get current withdrawal request object according to request_id_
+    let current_request: WithdrawalRequest = withdrawal_request_mapping.read(request_id_)
+
+    # get user_l2_address to be used for updating withdrawal history in AccountManager
+    let user_l2_address = current_request.user_l2_address
+    assert_not_zero(user_l2_address)
     # Create a struct with the withdrawal Request
     let updated_request = WithdrawalRequest(
         user_l1_address=0, user_l2_address=0, ticker=0, amount=0
@@ -124,11 +129,11 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     withdrawal_request_mapping.write(request_id=request_id_, value=updated_request)
 
     # update withdrawal history status field to 1
-    IAccountManager.update_withdrawal_history(contract_address=user_l2_address_, request_id_=request_id_)
+    IAccountManager.update_withdrawal_history(contract_address=user_l2_address, request_id_=request_id_)
 
     # update_withdrawal_request_called event is emitted
     update_withdrawal_request_called.emit(
-        from_address=from_address, user_l2_address=user_l2_address_, request_id=request_id_
+        from_address=from_address, user_l2_address=user_l2_address, request_id=request_id_
     )
 
     return ()
