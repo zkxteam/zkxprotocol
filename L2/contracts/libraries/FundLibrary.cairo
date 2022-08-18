@@ -9,7 +9,7 @@ from contracts.Constants import AdminAuth_INDEX, EmergencyFund_INDEX, ManageFund
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
-from contracts.Math_64x61 import Math64x61_assert64x61
+from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
 ###########
 # Storage #
@@ -118,16 +118,8 @@ func fund_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         assert_lt(0, amount_)
     end
 
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
     let current_amount : felt = balance_mapping.read(id=asset_id_)
-    let updated_amount : felt = current_amount + amount_
-
-    with_attr error_message("updated amount must be in 64x61 range"):
-        Math64x61_assert64x61(updated_amount)
-    end
+    let updated_amount : felt = Math64x61_add(current_amount, amount_)
 
     if access == FALSE:
         let (emergency_address) = IAuthorizedRegistry.get_contract_address(
@@ -168,14 +160,11 @@ func defund_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
         assert_lt(0, amount_)
     end
 
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
     let current_amount : felt = balance_mapping.read(id=asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
+    let updated_amount : felt = Math64x61_sub(current_amount, amount_)
 
     if access == FALSE:
         let (emergency_address) = IAuthorizedRegistry.get_contract_address(
@@ -186,9 +175,9 @@ func defund_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
             assert caller = emergency_address
         end
 
-        balance_mapping.write(id=asset_id_, value=current_amount - amount_)
+        balance_mapping.write(id=asset_id_, value=updated_amount)
     else:
-        balance_mapping.write(id=asset_id_, value=current_amount - amount_)
+        balance_mapping.write(id=asset_id_, value=updated_amount)
     end
 
     return ()
@@ -217,16 +206,8 @@ func deposit_to_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
         assert_lt(0, amount_)
     end
 
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
     let current_amount : felt = balance_mapping.read(id=id_)
-    let updated_amount : felt = current_amount + amount_
-
-    with_attr error_message("updated amount must be in 64x61 range"):
-        Math64x61_assert64x61(updated_amount)
-    end
+    let updated_amount : felt = Math64x61_add(current_amount, amount_)
 
     balance_mapping.write(id=id_, value=updated_amount)
 
@@ -256,15 +237,13 @@ func withdraw_from_contract{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
         assert_lt(0, amount_)
     end
 
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
     let current_amount : felt = balance_mapping.read(id=id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
-    balance_mapping.write(id=id_, value=current_amount - amount_)
+    let updated_amount : felt = Math64x61_sub(current_amount, amount_)
+
+    balance_mapping.write(id=id_, value=updated_amount)
 
     return ()
 end
@@ -285,16 +264,8 @@ func fund_abr_or_emergency{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
         assert_lt(0, amount_)
     end
 
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
     let current_amount : felt = balance_mapping.read(id=id_)
-    let updated_amount : felt = current_amount + amount_
-
-    with_attr error_message("updated amount must be in 64x61 range"):
-        Math64x61_assert64x61(updated_amount)
-    end
+    let updated_amount : felt = Math64x61_add(current_amount, amount_)
 
     balance_mapping.write(id=id_, value=updated_amount)
 
@@ -317,15 +288,12 @@ func defund_abr_or_emergency{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         assert_lt(0, amount_)
     end
 
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
     let current_amount : felt = balance_mapping.read(id=id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
-    balance_mapping.write(id=id_, value=current_amount - amount_)
+    let updated_amount : felt = Math64x61_sub(current_amount, amount_)
+    balance_mapping.write(id=id_, value=updated_amount)
 
     return ()
 end
