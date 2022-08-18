@@ -43,16 +43,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     ### Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
-        admin1_signer.public_key, 
-        L1_dummy_address, 
-        0, 
-        1
+        admin1_signer.public_key
     ])
     admin2 = await starknet_service.deploy(ContractType.Account, [
-        admin2_signer.public_key, 
-        L1_dummy_address, 
-        0, 
-        1
+        admin2_signer.public_key
     ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
@@ -68,9 +62,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
         1
     )
 
-    alice = await account_factory.deploy_account(alice_signer.public_key)
-    bob = await account_factory.deploy_account(bob_signer.public_key)
-    charlie = await account_factory.deploy_account(charlie_signer.public_key)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
+    charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
     dave = await account_factory.deploy_account(dave_signer.public_key)
 
     ### Deploy infrastructure (Part 2)
@@ -230,8 +224,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
     # Set the balance of admin1 and admin2
-    await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
-    await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    #await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    #await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
 
     # return relay versions of asset, trading, holding, feeBalance to test underlying contract logic
     return starknet_service.starknet, adminAuth, fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, dave, fixed_math, relay_holding, relay_feeBalance
@@ -303,7 +297,7 @@ async def test_revert_balance_low(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    assert_revert(lambda: dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+    await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size1,
         execution_price1,
         marketID_1,
@@ -861,7 +855,7 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    assert_revert(lambda: dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+    await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size,
         execution_price1,
         marketID_1,

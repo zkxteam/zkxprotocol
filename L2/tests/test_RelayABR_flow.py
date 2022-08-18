@@ -34,10 +34,8 @@ async def abr_factory(starknet_service: StarknetService):
 
     # Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
-        admin1_signer.public_key,
-        L1_dummy_address,
-        0,
-        1
+        admin1_signer.public_key
+       
     ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, 0x0])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
@@ -47,8 +45,8 @@ async def abr_factory(starknet_service: StarknetService):
 
     # Deploy accounts
     account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
-    alice = await account_factory.deploy_account(alice_signer.public_key)
-    bob = await account_factory.deploy_account(bob_signer.public_key)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
 
     # Deploy infrastructure (Part 2)
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
@@ -157,7 +155,7 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_USD_ID, to64x61(1000000)])
 
     # Set the balance of admin1 and admin2
-    await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    # await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
 
     btc_perp_spot_64x61 = convertTo64x61(ABR_data.btc_perp_spot)
     btc_perp_64x61 = convertTo64x61(ABR_data.btc_perp)

@@ -3,7 +3,7 @@
 from contracts.DataTypes import OrderRequest, OrderDetails, Signature, OrderDetailsWithIDs, CollateralBalance
 
 @contract_interface
-namespace IAccount:
+namespace IAccountManager:
     func execute_order(
         request : OrderRequest,
         signature : Signature,

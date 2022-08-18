@@ -27,9 +27,9 @@ async def abr_factory(starknet_service: StarknetService):
     account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
     admin1 = await account_factory.deploy_account(admin1_signer.public_key)
     admin2 = await account_factory.deploy_account(admin2_signer.public_key)
-    alice = await account_factory.deploy_account(alice_signer.public_key)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
 
-    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, 0x0])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     abr = await starknet_service.deploy(ContractType.ABR, [registry.contract_address, 1])
 
@@ -49,12 +49,12 @@ async def abr_factory(starknet_service: StarknetService):
     eth_perp_spot_64x61 = convertTo64x61(ABR_data.eth_perp_spot)
     eth_perp_64x61 = convertTo64x61(ABR_data.eth_perp)
 
-    return starknet_service.starknet, abr, admin1, alice, btc_perp_spot_64x61, btc_perp_64x61, eth_perp_spot_64x61, eth_perp_64x61
+    return starknet_service.starknet, abr, admin1, alice, btc_perp_spot_64x61, btc_perp_64x61, eth_perp_spot_64x61, eth_perp_64x61,admin2
 
 
 @pytest.mark.asyncio
 async def test_should_revert_if_wrong_number_of_arguments_passed_for_BTC(abr_factory):
-    _, abr, admin1, _, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, _, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     arguments = [1282193, 479] + btc_spot + [480]+btc_perp
 
@@ -64,25 +64,25 @@ async def test_should_revert_if_wrong_number_of_arguments_passed_for_BTC(abr_fac
 
 @pytest.mark.asyncio
 async def test_should_revert_if_non_admin_changed_bollinger_width(abr_factory):
-    _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     new_boll_width = to64x61(1.5)
 
-    await assert_revert(alice_signer.send_transaction(alice, abr.contract_address, 'modify_bollinger_width', [new_boll_width]))
+    await assert_revert(admin2_signer.send_transaction(admin2, abr.contract_address, 'modify_bollinger_width', [new_boll_width]))
 
 
 @ pytest.mark.asyncio
 async def test_should_revert_if_non_admin_changed_base_abr(abr_factory):
-    _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     new_base_abr = to64x61(0.000025)
     await assert_revert(
-        alice_signer.send_transaction(alice, abr.contract_address, 'modify_base_abr', [new_base_abr]))
+        admin2_signer.send_transaction(admin2, abr.contract_address, 'modify_base_abr', [new_base_abr]))
 
 
 @ pytest.mark.asyncio
 async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
-    _, abr, admin1, _, btc_spot, btc_perp, eth_spot, eth_perp = abr_factory
+    _, abr, admin1, _, btc_spot, btc_perp, eth_spot, eth_perp, admin2 = abr_factory
 
     arguments = [1282193, 480] + btc_spot + [480] + btc_perp
 
@@ -106,7 +106,7 @@ async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
 
 @ pytest.mark.asyncio
 async def test_should_revert_if_called_before_8_hours(abr_factory):
-    _, abr, admin1, _, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, _, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     arguments = [1282193, 480] + btc_spot + [480]+btc_perp
 
@@ -116,7 +116,7 @@ async def test_should_revert_if_called_before_8_hours(abr_factory):
 
 @ pytest.mark.asyncio
 async def test_should_pass_if_called_after_8_hours(abr_factory):
-    starknet, abr, admin1, _, btc_spot, btc_perp, _, _ = abr_factory
+    starknet, abr, admin1, _, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     timestamp = int(time.time()) + 28810
 
@@ -149,7 +149,7 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
 
 @ pytest.mark.asyncio
 async def test_should_pass_if_admin_changed_base_abr(abr_factory):
-    _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     new_base_abr = to64x61(0.000025)
     await admin1_signer.send_transaction(admin1, abr.contract_address, 'modify_base_abr', [new_base_abr])
@@ -157,7 +157,7 @@ async def test_should_pass_if_admin_changed_base_abr(abr_factory):
 
 @ pytest.mark.asyncio
 async def test_should_pass_if_admin_changed_bollinger_width(abr_factory):
-    _, abr, admin1, alice, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     new_boll_width = to64x61(1.5)
     await admin1_signer.send_transaction(admin1, abr.contract_address, 'modify_bollinger_width', [new_boll_width])
@@ -165,7 +165,7 @@ async def test_should_pass_if_admin_changed_bollinger_width(abr_factory):
 
 @ pytest.mark.asyncio
 async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
-    _, abr, admin1, _, _, _, eth_spot, eth_perp = abr_factory
+    _, abr, admin1, _, _, _, eth_spot, eth_perp, admin2 = abr_factory
 
     arguments = [1282198, 480] + eth_spot + [480] + eth_perp
 
