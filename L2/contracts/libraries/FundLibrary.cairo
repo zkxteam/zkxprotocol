@@ -33,17 +33,17 @@ end
 
 # @notice function to initialize registry address and contract version
 # @param resgitry_address_ Address of the AuthorizedRegistry contract
-# @param version_ Version of this contract
+# @param contract_version_ Version of this contract
 func initialize{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    registry_address_ : felt, version_ : felt
+    registry_address_ : felt, contract_version_ : felt
 ):
     with_attr error_message("Registry address and version cannot be 0"):
         assert_not_zero(registry_address_)
-        assert_not_zero(version_)
+        assert_not_zero(contract_version_)
     end
 
     registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    contract_version.write(value=contract_version_)
     return ()
 end
 
@@ -62,9 +62,39 @@ func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     return (amount)
 end
 
+# @notice view function to get the address of Authorized registry contract
+# @return address - Address of Authorized registry contract
+@view
+func get_registry_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    address : felt
+):
+    let (current_registry_address) = registry_address.read()
+    return (current_registry_address)
+end
+
+# @notice view function to get current contract version
+# @return contract_version - version of the contract
+@view
+func get_contract_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    contract_version : felt
+):
+    let (version) = contract_version.read()
+    return (version)
+end
+
 ######################
 # Internal Functions #
 ######################
+
+# @notice function to set balance
+# @param asset_id_ - target asset_id
+# @param amount_ - value to add to asset_id's balance in insurance
+func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    asset_id_ : felt, amount_ : felt
+):
+    balance_mapping.write(id=asset_id_, value=amount_)
+    return ()
+end
 
 # @notice add amount to asset_id's balance
 # @param asset_id_ - target asset_id
