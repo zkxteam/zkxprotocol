@@ -14,15 +14,7 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
-from contracts.libraries.FundLibrary import (
-    defund_abr_or_emergency,
-    fund_abr_or_emergency,
-    get_contract_version,
-    get_registry_address,
-    balance,
-    initialize,
-    set_balance
-)
+from contracts.libraries.FundLibrary import FundLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
@@ -81,7 +73,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    initialize(registry_address_, version_)
+    FundLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -96,7 +88,7 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    fund_abr_or_emergency(asset_id_, amount_)
+    FundLib.fund_abr_or_emergency(asset_id_, amount_)
     fund_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -109,7 +101,7 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    defund_abr_or_emergency(asset_id_, amount_)
+    FundLib.defund_abr_or_emergency(asset_id_, amount_)
     defund_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -122,8 +114,8 @@ end
 func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    let (registry) = get_registry_address()
-    let (version) = get_contract_version()
+    let (registry) = FundLib.get_registry_address()
+    let (version) = FundLib.get_contract_version()
 
     with_attr error_message("Caller is not authorized to manage funds"):
         verify_caller_authority(registry, version, ManageFunds_ACTION)
@@ -137,13 +129,13 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Holding_INDEX, version=version
     )
-    
-    let current_amount : felt = balance(asset_id_)
+
+    let current_amount : felt = FundLib.balance(asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
     let updated_amount : felt = Math64x61_sub(current_amount, amount_)
-    set_balance(asset_id_, updated_amount)
+    FundLib.set_balance(asset_id_, updated_amount)
 
     IHolding.fund(contract_address=holding_address, asset_id_=asset_id_, amount=amount_)
 
@@ -160,8 +152,8 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     asset_id_ : felt, amount_ : felt
 ):
     # Verify auth
-    let (registry) = get_registry_address()
-    let (version) = get_contract_version()
+    let (registry) = FundLib.get_registry_address()
+    let (version) = FundLib.get_contract_version()
 
     with_attr error_message("Caller is not authorized to manage funds"):
         verify_caller_authority(registry, version, ManageFunds_ACTION)
@@ -176,12 +168,12 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         contract_address=registry, index=LiquidityFund_INDEX, version=version
     )
 
-    let current_amount : felt = balance(asset_id_)
+    let current_amount : felt = FundLib.balance(asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
     let updated_amount : felt = Math64x61_sub(current_amount, amount_)
-    set_balance(asset_id_, updated_amount)
+    FundLib.set_balance(asset_id_, updated_amount)
 
     ILiquidityFund.fund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount_)
 
@@ -198,8 +190,8 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     asset_id_ : felt, amount_ : felt
 ):
     # Verify auth
-    let (registry) = get_registry_address()
-    let (version) = get_contract_version()
+    let (registry) = FundLib.get_registry_address()
+    let (version) = FundLib.get_contract_version()
 
     with_attr error_message("Caller is not authorized to manage funds"):
         verify_caller_authority(registry, version, ManageFunds_ACTION)
@@ -214,12 +206,12 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         contract_address=registry, index=InsuranceFund_INDEX, version=version
     )
 
-    let current_amount : felt = balance(asset_id_)
+    let current_amount : felt = FundLib.balance(asset_id_)
     with_attr error_message("Amount to be deducted is more than asset's balance"):
         assert_le(amount_, current_amount)
     end
     let updated_amount : felt = Math64x61_sub(current_amount, amount_)
-    set_balance(asset_id_, updated_amount)
+    FundLib.set_balance(asset_id_, updated_amount)
 
     IInsuranceFund.fund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount_)
 
@@ -236,8 +228,8 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     asset_id_ : felt, amount_ : felt
 ):
     # Verify auth
-    let (registry) = get_registry_address()
-    let (version) = get_contract_version()
+    let (registry) = FundLib.get_registry_address()
+    let (version) = FundLib.get_contract_version()
 
     with_attr error_message("Caller is not authorized to manage funds"):
         verify_caller_authority(registry, version, ManageFunds_ACTION)
@@ -253,9 +245,9 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
     IHolding.defund(contract_address=holding_address, asset_id_=asset_id_, amount=amount_)
 
-    let current_amount : felt = balance(asset_id_)
+    let current_amount : felt = FundLib.balance(asset_id_)
     let updated_amount : felt = Math64x61_add(current_amount, amount_)
-    set_balance(asset_id_, updated_amount)
+    FundLib.set_balance(asset_id_, updated_amount)
 
     defund_Holding_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -270,8 +262,8 @@ func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     asset_id_ : felt, amount_ : felt
 ):
     # Verify auth
-    let (registry) = get_registry_address()
-    let (version) = get_contract_version()
+    let (registry) = FundLib.get_registry_address()
+    let (version) = FundLib.get_contract_version()
 
     with_attr error_message("Caller is not authorized to manage funds"):
         verify_caller_authority(registry, version, ManageFunds_ACTION)
@@ -287,9 +279,9 @@ func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     )
     ILiquidityFund.defund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount_)
 
-    let current_amount : felt = balance(asset_id_)
+    let current_amount : felt = FundLib.balance(asset_id_)
     let updated_amount : felt = Math64x61_add(current_amount, amount_)
-    set_balance(asset_id_, updated_amount)
+    FundLib.set_balance(asset_id_, updated_amount)
 
     defund_Liquidity_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -304,8 +296,8 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     asset_id_ : felt, amount_ : felt
 ):
     # Verify auth
-    let (registry) = get_registry_address()
-    let (version) = get_contract_version()
+    let (registry) = FundLib.get_registry_address()
+    let (version) = FundLib.get_contract_version()
 
     with_attr error_message("Caller is not authorized to manage funds"):
         verify_caller_authority(registry, version, ManageFunds_ACTION)
@@ -321,9 +313,9 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     )
     IInsuranceFund.defund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount_)
 
-    let current_amount : felt = balance(asset_id_)
+    let current_amount : felt = FundLib.balance(asset_id_)
     let updated_amount : felt = Math64x61_add(current_amount, amount_)
-    set_balance(asset_id_, updated_amount)
+    FundLib.set_balance(asset_id_, updated_amount)
 
     defund_Insurance_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 

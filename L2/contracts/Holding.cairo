@@ -3,14 +3,7 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 from contracts.Constants import Trading_INDEX
-from contracts.libraries.FundLibrary import (
-    defund_contract,
-    deposit_to_contract,
-    fund_contract,
-    balance,
-    initialize,
-    withdraw_from_contract,
-)
+from contracts.libraries.FundLibrary import FundLib
 
 ##########
 # Events #
@@ -47,7 +40,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    initialize(registry_address_, version_)
+    FundLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -62,7 +55,7 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    fund_contract(asset_id_, amount_)
+    FundLib.fund_contract(asset_id_, amount_)
     fund_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -75,7 +68,7 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    defund_contract(asset_id_, amount_)
+    FundLib.defund_contract(asset_id_, amount_)
     defund_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -88,7 +81,7 @@ end
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    deposit_to_contract(asset_id_, amount_, Trading_INDEX)
+    FundLib.deposit_to_contract(asset_id_, amount_, Trading_INDEX)
     deposit_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -101,7 +94,7 @@ end
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    withdraw_from_contract(asset_id_, amount_, Trading_INDEX)
+    FundLib.withdraw_from_contract(asset_id_, amount_, Trading_INDEX)
     withdraw_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()

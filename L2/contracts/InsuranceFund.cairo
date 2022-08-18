@@ -4,14 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le
 
 from contracts.Constants import Trading_INDEX
-from contracts.libraries.FundLibrary import (
-    defund_contract,
-    deposit_to_contract,
-    fund_contract,
-    balance,
-    initialize,
-    withdraw_from_contract,
-)
+from contracts.libraries.FundLibrary import FundLib
 from contracts.Math_64x61 import Math64x61_assert64x61
 
 ##########
@@ -58,7 +51,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    initialize(registry_address_, version_)
+    FundLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -89,7 +82,7 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    fund_contract(asset_id_, amount_)
+    FundLib.fund_contract(asset_id_, amount_)
     fund_Insurance_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -102,7 +95,7 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    defund_contract(asset_id_, amount_)
+    FundLib.defund_contract(asset_id_, amount_)
     defund_Insurance_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -116,7 +109,7 @@ end
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt, position_id_ : felt
 ):
-    deposit_to_contract(asset_id_, amount_, Trading_INDEX)
+    FundLib.deposit_to_contract(asset_id_, amount_, Trading_INDEX)
 
     let current_liq_amount : felt = asset_liq_position.read(
         asset_id=asset_id_, position_id=position_id_
@@ -142,7 +135,7 @@ end
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt, position_id_ : felt
 ):
-    withdraw_from_contract(asset_id_, amount_, Trading_INDEX)
+    FundLib.withdraw_from_contract(asset_id_, amount_, Trading_INDEX)
 
     let current_liq_amount : felt = asset_liq_position.read(
         asset_id=asset_id_, position_id=position_id_

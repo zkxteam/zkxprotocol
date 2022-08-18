@@ -4,14 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_block_timestamp
 
 from contracts.Constants import ABR_PAYMENT_INDEX
-from contracts.libraries.FundLibrary import (
-    defund_abr_or_emergency,
-    deposit_to_contract,
-    fund_abr_or_emergency,
-    balance,
-    initialize,
-    withdraw_from_contract,
-)
+from contracts.libraries.FundLibrary import FundLib
 
 ##########
 # Events #
@@ -52,7 +45,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    initialize(registry_address_, version_)
+    FundLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -67,7 +60,7 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount_ : felt
 ):
-    fund_abr_or_emergency(market_id_, amount_)
+    FundLib.fund_abr_or_emergency(market_id_, amount_)
     fund_ABR_called.emit(market_id=market_id_, amount=amount_)
 
     return ()
@@ -80,7 +73,7 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, amount_ : felt
 ):
-    defund_abr_or_emergency(market_id_, amount_)
+    FundLib.defund_abr_or_emergency(market_id_, amount_)
     defund_ABR_called.emit(market_id=market_id_, amount=amount_)
 
     return ()
@@ -94,7 +87,7 @@ end
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_id_ : felt, account_address_ : felt, market_id_ : felt, amount_ : felt
 ):
-    deposit_to_contract(market_id_, amount_, ABR_PAYMENT_INDEX)
+    FundLib.deposit_to_contract(market_id_, amount_, ABR_PAYMENT_INDEX)
 
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
@@ -117,7 +110,7 @@ end
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_id_ : felt, account_address_ : felt, market_id_ : felt, amount_ : felt
 ):
-    withdraw_from_contract(market_id_, amount_, ABR_PAYMENT_INDEX)
+    FundLib.withdraw_from_contract(market_id_, amount_, ABR_PAYMENT_INDEX)
 
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
