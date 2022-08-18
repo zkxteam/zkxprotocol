@@ -14,7 +14,7 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
-from contracts.libraries.FundLibrary import FundLib
+from contracts.libraries.FundLibrary import FundLib, FundLib_balance_by_id
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
@@ -135,7 +135,7 @@ func fund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
         assert_le(amount_, current_amount)
     end
     let updated_amount : felt = Math64x61_sub(current_amount, amount_)
-    FundLib.set_balance(asset_id_, updated_amount)
+    FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
 
     IHolding.fund(contract_address=holding_address, asset_id_=asset_id_, amount=amount_)
 
@@ -173,7 +173,7 @@ func fund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         assert_le(amount_, current_amount)
     end
     let updated_amount : felt = Math64x61_sub(current_amount, amount_)
-    FundLib.set_balance(asset_id_, updated_amount)
+    FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
 
     ILiquidityFund.fund(contract_address=liquidity_address, asset_id_=asset_id_, amount=amount_)
 
@@ -211,7 +211,7 @@ func fund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         assert_le(amount_, current_amount)
     end
     let updated_amount : felt = Math64x61_sub(current_amount, amount_)
-    FundLib.set_balance(asset_id_, updated_amount)
+    FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
 
     IInsuranceFund.fund(contract_address=insurance_address, asset_id_=asset_id_, amount=amount_)
 
@@ -247,7 +247,7 @@ func defund_holding{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 
     let current_amount : felt = FundLib.balance(asset_id_)
     let updated_amount : felt = Math64x61_add(current_amount, amount_)
-    FundLib.set_balance(asset_id_, updated_amount)
+    FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
 
     defund_Holding_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -281,7 +281,7 @@ func defund_liquidity{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 
     let current_amount : felt = FundLib.balance(asset_id_)
     let updated_amount : felt = Math64x61_add(current_amount, amount_)
-    FundLib.set_balance(asset_id_, updated_amount)
+    FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
 
     defund_Liquidity_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 
@@ -315,7 +315,7 @@ func defund_insurance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 
     let current_amount : felt = FundLib.balance(asset_id_)
     let updated_amount : felt = Math64x61_add(current_amount, amount_)
-    FundLib.set_balance(asset_id_, updated_amount)
+    FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
 
     defund_Insurance_from_Emergency_called.emit(asset_id=asset_id_, amount=amount_)
 

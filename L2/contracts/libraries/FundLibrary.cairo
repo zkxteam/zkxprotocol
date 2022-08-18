@@ -28,7 +28,7 @@ end
 # Stores the mapping from market_id to its balance for ABR fund contract and
 # asset_id to balance for other fund contracts
 @storage_var
-func FundLib_balance_mapping(id : felt) -> (amount : felt):
+func FundLib_balance_by_id(id : felt) -> (amount : felt):
 end
 
 namespace FundLib:
@@ -59,7 +59,7 @@ namespace FundLib:
     func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         asset_id_ : felt
     ) -> (amount : felt):
-        let (amount) = FundLib_balance_mapping.read(id=asset_id_)
+        let (amount) = FundLib_balance_by_id.read(id=asset_id_)
         return (amount)
     end
 
@@ -85,16 +85,6 @@ namespace FundLib:
     # Internal Functions #
     ######################
 
-    # @notice function to set balance
-    # @param asset_id_ - target asset_id
-    # @param amount_ - value to add to asset_id's balance in insurance
-    func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        asset_id_ : felt, amount_ : felt
-    ):
-        FundLib_balance_mapping.write(id=asset_id_, value=amount_)
-        return ()
-    end
-
     # @notice add amount to asset_id's balance
     # @param asset_id_ - target asset_id
     # @param amount_ - value to add to asset_id's balance
@@ -117,7 +107,7 @@ namespace FundLib:
             assert_lt(0, amount_)
         end
 
-        let current_amount : felt = FundLib_balance_mapping.read(id=asset_id_)
+        let current_amount : felt = FundLib_balance_by_id.read(id=asset_id_)
         let updated_amount : felt = Math64x61_add(current_amount, amount_)
 
         if access == FALSE:
@@ -129,9 +119,9 @@ namespace FundLib:
                 assert caller = emergency_address
             end
 
-            FundLib_balance_mapping.write(id=asset_id_, value=updated_amount)
+            FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
         else:
-            FundLib_balance_mapping.write(id=asset_id_, value=updated_amount)
+            FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
         end
 
         return ()
@@ -159,7 +149,7 @@ namespace FundLib:
             assert_lt(0, amount_)
         end
 
-        let current_amount : felt = FundLib_balance_mapping.read(id=asset_id_)
+        let current_amount : felt = FundLib_balance_by_id.read(id=asset_id_)
         with_attr error_message("Amount to be deducted is more than asset's balance"):
             assert_le(amount_, current_amount)
         end
@@ -174,9 +164,9 @@ namespace FundLib:
                 assert caller = emergency_address
             end
 
-            FundLib_balance_mapping.write(id=asset_id_, value=updated_amount)
+            FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
         else:
-            FundLib_balance_mapping.write(id=asset_id_, value=updated_amount)
+            FundLib_balance_by_id.write(id=asset_id_, value=updated_amount)
         end
 
         return ()
@@ -205,10 +195,10 @@ namespace FundLib:
             assert_lt(0, amount_)
         end
 
-        let current_amount : felt = FundLib_balance_mapping.read(id=id_)
+        let current_amount : felt = FundLib_balance_by_id.read(id=id_)
         let updated_amount : felt = Math64x61_add(current_amount, amount_)
 
-        FundLib_balance_mapping.write(id=id_, value=updated_amount)
+        FundLib_balance_by_id.write(id=id_, value=updated_amount)
 
         return ()
     end
@@ -236,13 +226,13 @@ namespace FundLib:
             assert_lt(0, amount_)
         end
 
-        let current_amount : felt = FundLib_balance_mapping.read(id=id_)
+        let current_amount : felt = FundLib_balance_by_id.read(id=id_)
         with_attr error_message("Amount to be deducted is more than asset's balance"):
             assert_le(amount_, current_amount)
         end
         let updated_amount : felt = Math64x61_sub(current_amount, amount_)
 
-        FundLib_balance_mapping.write(id=id_, value=updated_amount)
+        FundLib_balance_by_id.write(id=id_, value=updated_amount)
 
         return ()
     end
@@ -263,10 +253,10 @@ namespace FundLib:
             assert_lt(0, amount_)
         end
 
-        let current_amount : felt = FundLib_balance_mapping.read(id=id_)
+        let current_amount : felt = FundLib_balance_by_id.read(id=id_)
         let updated_amount : felt = Math64x61_add(current_amount, amount_)
 
-        FundLib_balance_mapping.write(id=id_, value=updated_amount)
+        FundLib_balance_by_id.write(id=id_, value=updated_amount)
 
         return ()
     end
@@ -287,12 +277,12 @@ namespace FundLib:
             assert_lt(0, amount_)
         end
 
-        let current_amount : felt = FundLib_balance_mapping.read(id=id_)
+        let current_amount : felt = FundLib_balance_by_id.read(id=id_)
         with_attr error_message("Amount to be deducted is more than asset's balance"):
             assert_le(amount_, current_amount)
         end
         let updated_amount : felt = Math64x61_sub(current_amount, amount_)
-        FundLib_balance_mapping.write(id=id_, value=updated_amount)
+        FundLib_balance_by_id.write(id=id_, value=updated_amount)
 
         return ()
     end
