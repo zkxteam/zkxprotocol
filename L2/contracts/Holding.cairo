@@ -1,19 +1,9 @@
 %lang starknet
 
-from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_not_zero
-from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import (
-    AdminAuth_INDEX,
-    EmergencyFund_INDEX,
-    ManageFunds_ACTION,
-    Trading_INDEX,
-)
-from contracts.interfaces.IAdminAuth import IAdminAuth
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.Math_64x61 import Math64x61_assert64x61
+from contracts.Constants import Trading_INDEX
+from contracts.libraries.FundLibrary import FundLib
 
 ##########
 # Events #
@@ -39,25 +29,6 @@ end
 func withdraw_Holding_called(asset_id : felt, amount : felt):
 end
 
-###########
-# Storage #
-###########
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
-# Stores the mapping from asset_id to its balance
-@storage_var
-func balance_mapping(asset_id : felt) -> (amount : felt):
-end
-
 ###############
 # Constructor #
 ###############
@@ -69,29 +40,8 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    FundLib.initialize(registry_address_, version_)
     return ()
-end
-
-##################
-# View Functions #
-##################
-
-# @notice Gets the amount of the balance for the asset_id(asset)
-# @param asset_id_ - Target asset_id
-# @return amount - Balance amount corresponding to the asset_id
-@view
-func balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt
-) -> (amount : felt):
-    let (amount) = balance_mapping.read(asset_id=asset_id_)
-    return (amount)
 end
 
 ######################
@@ -105,38 +55,7 @@ end
 func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-
-    if access == FALSE:
-        # Get EmergencyFund address from registry
-        let (emergency_fund_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=EmergencyFund_INDEX, version=version
-        )
-
-        with_attr error_message("Caller is not authorized to do the transfer"):
-            assert caller = emergency_fund_address
-        end
-
-        balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
-    else:
-        balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
-    end
-
+    FundLib.fund_contract(asset_id_, amount_)
     fund_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -149,42 +68,7 @@ end
 func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    with_attr error_message("Amount to be deducted is more than asset's balance"):
-        assert_le(amount_, current_amount)
-    end
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-
-    # Auth Check
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFunds_ACTION
-    )
-
-    if access == FALSE:
-        # Get EmergencyFund address from registry
-        let (emergency_fund_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=EmergencyFund_INDEX, version=version
-        )
-
-        with_attr error_message("Caller is not authorized to do the transfer"):
-            assert caller = emergency_fund_address
-        end
-
-        balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
-    else:
-        balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
-    end
-
+    FundLib.defund_contract(asset_id_, amount_)
     defund_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -197,28 +81,7 @@ end
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    alloc_locals
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    # Get trading contract address
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
-    )
-
-    with_attr error_message("Caller is not authorized to do the transfer"):
-        assert caller = trading_address
-    end
-
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    balance_mapping.write(asset_id=asset_id_, value=current_amount + amount_)
-
+    FundLib.deposit_to_contract(asset_id_, amount_, Trading_INDEX)
     deposit_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
@@ -231,31 +94,7 @@ end
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id_ : felt, amount_ : felt
 ):
-    alloc_locals
-
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-
-    # Get trading contract address
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
-    )
-
-    with_attr error_message("Caller is not authorized to do the transfer"):
-        assert caller = trading_address
-    end
-
-    with_attr error_message("Amount should be in 64x61 representation"):
-        Math64x61_assert64x61(amount_)
-    end
-
-    let current_amount : felt = balance_mapping.read(asset_id=asset_id_)
-    with_attr error_message("Amount to be deducted is more than asset's balance"):
-        assert_le(amount_, current_amount)
-    end
-    balance_mapping.write(asset_id=asset_id_, value=current_amount - amount_)
-
+    FundLib.withdraw_from_contract(asset_id_, amount_, Trading_INDEX)
     withdraw_Holding_called.emit(asset_id=asset_id_, amount=amount_)
 
     return ()
