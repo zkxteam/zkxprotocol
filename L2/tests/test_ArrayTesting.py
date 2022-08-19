@@ -7,7 +7,7 @@ from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 from helpers import StarknetService, ContractType
 
 signer1 = Signer(123456789987654321)
-
+signer2= Signer(12345)
 L1_dummy_address = 0x01234567899876543210
 
 @pytest.fixture(scope='module')
@@ -20,14 +20,19 @@ async def contract_factory(starknet_service: StarknetService):
     
     admin1 = await starknet_service.deploy(ContractType.Account, [
         signer1.public_key,
+    ])
+
+    admin2 = await starknet_service.deploy(ContractType.AccountManager, [
+        signer2.public_key,
         L1_dummy_address,
         0,
         1
     ])
 
+
     arrayTesting = await starknet_service.deploy(ContractType.ArrayTesting, [])
 
-    return arrayTesting, admin1
+    return arrayTesting, admin1, admin2
 
 
 @pytest.mark.asyncio
@@ -38,7 +43,7 @@ async def create_positions(contract, account):
 
 @pytest.mark.asyncio
 async def test_get_admin_mapping(contract_factory):
-    arrayTesting, admin1 = contract_factory
+    arrayTesting, admin1, admin2 = contract_factory
 
     await create_positions(arrayTesting, admin1)
 

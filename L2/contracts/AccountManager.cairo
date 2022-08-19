@@ -61,7 +61,7 @@ from contracts.DataTypes import (
     WithdrawalRequestForHashing,
 )
 
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
@@ -135,11 +135,6 @@ end
 # Stores the address of Authorized Registry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
-end
-
-# Stores current nonce
-@storage_var
-func current_nonce() -> (res : felt):
 end
 
 # Stores public key associated with an account
@@ -226,20 +221,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-##########
-# Guards #
-##########
-
-@view
-func assert_only_self{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
-    let (self) = get_contract_address()
-    let (caller) = get_caller_address()
-    with_attr error_message("The function can only be called the user"):
-        assert self = caller
-    end
-    return ()
-end
-
 ##################
 # View Functions #
 ##################
@@ -251,14 +232,6 @@ func get_public_key{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     res : felt
 ):
     let (res) = public_key.read()
-    return (res=res)
-end
-
-# @notice view function to get current nonce
-# @return res - nonce
-@view
-func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (res : felt):
-    let (res) = current_nonce.read()
     return (res=res)
 end
 
@@ -303,7 +276,7 @@ func is_valid_signature_order{
     if liquidator_address_ != 0:
         # To-Do Verify whether call came from node operator
 
-        let (_public_key) = IAccount.get_public_key(contract_address=liquidator_address_)
+        let (_public_key) = IAccountManager.get_public_key(contract_address=liquidator_address_)
         pub_key = _public_key
 
         tempvar syscall_ptr = syscall_ptr
@@ -633,54 +606,6 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 
     transferred.emit(asset_id = assetID_, amount = amount)
     return ()
-end
-
-# @notice Function to execute transactions signed by this account
-# @param to - Contract address to which to send the transaction
-# @param selector - Function selector of the function to call
-# @param calldata_len - Length of the paramaters to be passed to the function
-# @param calldata - Array of parameters
-# @param nonce - (Currently not used)
-# @return response_len - Length of the return values from the function
-# @return response - Array of return values
-@external
-func execute{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
-}(to : felt, selector : felt, calldata_len : felt, calldata : felt*, nonce : felt) -> (
-    response_len : felt, response : felt*
-):
-    alloc_locals
-
-    let (__fp__, _) = get_fp_and_pc()
-    let (_address) = get_contract_address()
-    let (_current_nonce) = current_nonce.read()
-
-    local message : Message = Message(
-        _address,
-        to,
-        selector,
-        calldata,
-        calldata_size=calldata_len,
-        _current_nonce
-        )
-
-    # validate transaction
-    let (hash) = hash_message(&message)
-    let (signature_len, signature) = get_tx_signature()
-    is_valid_signature(hash, signature_len, signature)
-
-    # bump nonce
-    current_nonce.write(_current_nonce + 1)
-
-    # execute call
-    let response = call_contract(
-        contract_address=message.to,
-        function_selector=message.selector,
-        calldata_size=message.calldata_size,
-        calldata=message.calldata,
-    )
-
-    return (response_len=response.retdata_size, response=response.retdata)
 end
 
 # #### TODO: Remove; Only for testing purposes #####
@@ -1309,44 +1234,6 @@ func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
             assert array_list[array_list_len] = order_details_w_id
             return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
         end
-    end
-end
-
-# @notice internal function to hash the transaction parameters
-# @param message - Struct of details to hash
-# @param res - Hash of the parameters
-func hash_message{pedersen_ptr : HashBuiltin*}(message : Message*) -> (res : felt):
-    alloc_locals
-    # we need to make `res_calldata` local
-    # to prevent the reference from being revoked
-    let (local res_calldata) = hash_calldata(message.calldata, message.calldata_size)
-    let hash_ptr = pedersen_ptr
-    with hash_ptr:
-        let (hash_state_ptr) = hash_init()
-        # first three iterations are 'sender', 'to', and 'selector'
-        let (hash_state_ptr) = hash_update(hash_state_ptr, message, 3)
-        let (hash_state_ptr) = hash_update_single(hash_state_ptr, res_calldata)
-        let (hash_state_ptr) = hash_update_single(hash_state_ptr, message.nonce)
-        let (res) = hash_finalize(hash_state_ptr)
-        let pedersen_ptr = hash_ptr
-        return (res=res)
-    end
-end
-
-# @notice Internal function to hash the calldata
-# @param calldata - Array of params
-# @param calldata_size - Length of the params
-# @return res - hash of the calldata
-func hash_calldata{pedersen_ptr : HashBuiltin*}(calldata : felt*, calldata_size : felt) -> (
-    res : felt
-):
-    let hash_ptr = pedersen_ptr
-    with hash_ptr:
-        let (hash_state_ptr) = hash_init()
-        let (hash_state_ptr) = hash_update(hash_state_ptr, calldata, calldata_size)
-        let (res) = hash_finalize(hash_state_ptr)
-        let pedersen_ptr = hash_ptr
-        return (res=res)
     end
 end
 

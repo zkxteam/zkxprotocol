@@ -19,7 +19,7 @@ from contracts.DataTypes import (
     OrderDetailsWithIDs,
     PriceData,
 )
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
@@ -153,7 +153,7 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
+    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
         contract_address=account_address
     )
 
@@ -189,7 +189,7 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             least_collateral_ratio_position_collateral_price,
             least_collateral_ratio_position_asset_price,
         )
-        IAccount.liquidate_position(
+        IAccountManager.liquidate_position(
             contract_address=account_address,
             id=least_collateral_ratio_position,
             amount=amount_to_be_sold,
@@ -335,7 +335,7 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         # Fetch all the collaterals that the user holds
         let (
             collaterals_len : felt, collaterals : CollateralBalance*
-        ) = IAccount.return_array_collaterals(contract_address=account_address)
+        ) = IAccountManager.return_array_collaterals(contract_address=account_address)
 
         # Calculate the value of all the collaterals in usd
         let (user_balance) = find_collateral_balance(
@@ -492,7 +492,7 @@ func check_deleveraging{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     alloc_locals
 
     # Get order details
-    let (order_details : OrderDetails) = IAccount.get_order_data(
+    let (order_details : OrderDetails) = IAccountManager.get_order_data(
         contract_address=account_address_, order_ID=position_
     )
 
@@ -568,7 +568,7 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     end
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
+    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
         contract_address=order.pub_key
     )
 
@@ -915,7 +915,7 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     )
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
+    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
         contract_address=account_address
     )
 
@@ -941,7 +941,7 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     # Fetch all the collaterals that the user holds
     let (
         collaterals_len : felt, collaterals : CollateralBalance*
-    ) = IAccount.return_array_collaterals(contract_address=account_address)
+    ) = IAccountManager.return_array_collaterals(contract_address=account_address)
 
     if collaterals_len == 0:
         let (empty_collateral_array : PriceData*) = alloc()

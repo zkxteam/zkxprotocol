@@ -141,13 +141,7 @@ async function prepareToRemove(
   );
 }
 
-async function prepareToWithdraw(
-  asset,
-  recipient,
-  L2Address,
-  amount,
-  requestID
-) {
+async function prepareToWithdraw(asset, recipient, amount, requestID) {
   const payload = [
     INDEX.WITHDRAWAL,
     recipient.address,
@@ -156,7 +150,7 @@ async function prepareToWithdraw(
     requestID,
   ];
   await starknetCoreMock.addL2ToL1Message(
-    L2Address,
+    L2_WITHDRAWAL_ADDRESS,
     L1ZKXContract.address,
     payload
   );
@@ -819,41 +813,20 @@ describe("Deposits", function () {
 
     // Prepare mock for withdrawal
     const requestID = 42;
-    await prepareToWithdraw(
-      ETH_ASSET,
-      alice,
-      ALICE_L2_ADDRESS,
-      amount,
-      requestID
-    );
+    await prepareToWithdraw(ETH_ASSET, alice, amount, requestID);
     await starknetCoreMock.resetCounters();
 
     // Rogue can't withdraw Alice's funds
     const rogueContract = L1ZKXContract.connect(rogue);
     await expect(
-      rogueContract.withdrawEth(
-        rogue.address,
-        ROGUE_L2_ADDRESS,
-        amount,
-        requestID
-      )
+      rogueContract.withdrawEth(rogue.address, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
     await expect(
-      rogueContract.withdrawEth(
-        rogue.address,
-        ALICE_L2_ADDRESS,
-        amount,
-        requestID
-      )
+      rogueContract.withdrawEth(rogue.address, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
 
     // Alice successfully withdraws funds
-    await aliceContract.withdrawEth(
-      alice.address,
-      ALICE_L2_ADDRESS,
-      amount,
-      requestID
-    );
+    await aliceContract.withdrawEth(alice.address, amount, requestID);
     // Withdrawal should consume 1 message from L2
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(
       1
@@ -952,40 +925,21 @@ describe("Deposits", function () {
 
     // Prepare withdrawal details
     const requestID = 42;
-    await prepareToWithdraw(
-      ZKX_ASSET,
-      alice,
-      ALICE_L2_ADDRESS,
-      amount,
-      requestID
-    );
+    await prepareToWithdraw(ZKX_ASSET, alice, amount, requestID);
     await starknetCoreMock.resetCounters();
 
     // Rogue can't withdraw Alice's funds
     await expect(
-      rogueContract.withdraw(
-        rogue.address,
-        ROGUE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
-        amount,
-        requestID
-      )
+      rogueContract.withdraw(rogue.address, ZKX_ASSET.ticker, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
 
     await expect(
-      rogueContract.withdraw(
-        rogue.address,
-        ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
-        amount,
-        requestID
-      )
+      rogueContract.withdraw(rogue.address, ZKX_ASSET.ticker, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
 
     // Alice successfully withdraws funds
     await aliceContract.withdraw(
       alice.address,
-      ALICE_L2_ADDRESS,
       ZKX_ASSET.ticker,
       amount,
       requestID

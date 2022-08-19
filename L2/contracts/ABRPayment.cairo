@@ -13,7 +13,7 @@ from contracts.Constants import ABR_FUNDS_INDEX, ABR_INDEX, AccountRegistry_INDE
 from contracts.DataTypes import OrderDetailsWithIDs
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IABRFund import IABRFund
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
@@ -123,7 +123,7 @@ end
 func user_pays{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address : felt, abr_funding : felt, order_id : felt, collateral_id : felt, market_id : felt, abs_payment_amount : felt
 ):
-    IAccount.transfer_from_abr(
+    IAccountManager.transfer_from_abr(
         contract_address=account_address,
         orderID_=order_id,
         assetID_=collateral_id,
@@ -151,7 +151,7 @@ func user_receives{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
         contract_address=abr_funding, order_id_=order_id, account_address_ = account_address, market_id_=market_id, amount=abs_payment_amount
     )
 
-    IAccount.transfer_abr(
+    IAccountManager.transfer_abr(
         contract_address=account_address,
         orderID_=order_id,
         assetID_=collateral_id,
@@ -191,7 +191,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     )
 
     # Check if abr already collected
-    let (is_called) = IAccount.timestamp_check(
+    let (is_called) = IAccountManager.timestamp_check(
         contract_address=account_address, orderID_=[positions].orderID
     )
 
@@ -289,7 +289,7 @@ func pay_abr_users{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     end
 
     # Get all the open positions of the user
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccount.return_array_positions(
+    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
         contract_address=[account_addresses]
     )
 

@@ -20,7 +20,7 @@ charlie_signer = Signer(123456789987654325)
 liquidator_signer = Signer(123456789987654326)
 daniel_signer = Signer(123456789987654327)
 eduard_signer = Signer(123456789987654328)
-
+admin3_signer = Signer(12345)
 maker_trading_fees = to64x61(0.0002 * 0.97)
 taker_trading_fees = to64x61(0.0005 * 0.97)
 
@@ -45,16 +45,14 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     ### Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
-        admin1_signer.public_key, 
-        L1_dummy_address, 
-        0, 
-        1
+        admin1_signer.public_key
     ])
     admin2 = await starknet_service.deploy(ContractType.Account, [
-        admin2_signer.public_key, 
-        L1_dummy_address, 
-        0, 
-        1
+        admin2_signer.public_key
+    ])
+
+    admin3 = await starknet_service.deploy(ContractType.Account, [
+        admin3_signer.public_key
     ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
@@ -73,11 +71,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
         1
     )
 
-    alice = await account_factory.deploy_account(alice_signer.public_key)
-    bob = await account_factory.deploy_account(bob_signer.public_key)
-    charlie = await account_factory.deploy_account(charlie_signer.public_key)
-    daniel = await account_factory.deploy_account(daniel_signer.public_key)
-    eduard = await account_factory.deploy_account(eduard_signer.public_key)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
+    charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
+    daniel = await account_factory.deploy_ZKX_account(daniel_signer.public_key)
+    eduard = await account_factory.deploy_ZKX_account(eduard_signer.public_key)
     liquidator = await account_factory.deploy_account(liquidator_signer.public_key)
 
     ### Deploy infrastructure (Part 2)
@@ -89,7 +87,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
     liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
     insuranceFund = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
-    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     marketPrices = await starknet_service.deploy(
         ContractType.MarketPrices, 
         [registry.contract_address, 1]
@@ -246,8 +244,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     assert call_counter.result.count == 4
 
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1, 10])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, 0, 1, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 60])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 60])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, relay_holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
@@ -258,17 +256,19 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
     # Set the balance of admin1 and admin2
-    await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
-    await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    #await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    #await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
 
     # return relay versions of fees, asset, trading, holding, feeBalance, liquidate
-    return adminAuth, relay_fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, relay_holding, relay_feeBalance, relay_liquidate, insuranceFund
+    return (adminAuth, relay_fees, admin1, admin2, relay_asset, 
+            relay_trading, alice, bob, charlie, daniel, eduard, liquidator, 
+            fixed_math, relay_holding, relay_feeBalance, relay_liquidate, insuranceFund, admin3)
 
 
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
 
     alice_usdc = to64x61(5500)
     alice_ust = to64x61(1000)
@@ -665,7 +665,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
     ##############################################
     ######## Alice's liquidation result 3 ##########
     ##############################################
@@ -720,7 +720,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_liquidation_flow(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
 
     charlie_usdc = to64x61(8000)
     await admin2_signer.send_transaction(admin2, charlie.contract_address, 'set_balance', [USDC_ID, charlie_usdc])
@@ -845,7 +845,7 @@ async def test_liquidation_flow(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_liquidation_flow_underwater(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
 
     ##############################################
     ######## Charlie's liquidation result 1 ##########
@@ -1009,11 +1009,11 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_should_not_allow_non_liquidators(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
     ##############################################
     ######## Bob's liquidation result 3 ##########
     ##############################################
-    assert_revert(lambda: charlie_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+    await (admin3_signer.send_transaction(admin3, liquidate.contract_address, "check_liquidation", [
         bob.contract_address,
         # 2 Position + 2 Collaterals
         4,
@@ -1043,7 +1043,7 @@ async def test_should_not_allow_non_liquidators(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_deleveraging_flow(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
 
     await admin1_signer.send_transaction(admin1, insuranceFund.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
     
@@ -1337,7 +1337,7 @@ async def test_deleveraging_flow(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
 
     await admin1_signer.send_transaction(admin1, insuranceFund.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
 

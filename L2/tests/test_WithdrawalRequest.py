@@ -25,16 +25,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     ### Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
-        admin1_signer.public_key, 
-        L1_dummy_address, 
-        0, 
-        1
+        admin1_signer.public_key
     ])
     admin2 = await starknet_service.deploy(ContractType.Account, [
-        admin2_signer.public_key, 
-        L1_dummy_address, 
-        0, 
-        1
+        admin2_signer.public_key
     ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])

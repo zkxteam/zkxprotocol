@@ -45,16 +45,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     ### Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
-        admin1_signer.public_key, 
-        L1_dummy_address, 
-        0, 
-        1
+        admin1_signer.public_key
     ])
     admin2 = await starknet_service.deploy(ContractType.Account, [
-        admin2_signer.public_key, 
-        L1_dummy_address, 
-        0, 
-        1
+        admin2_signer.public_key
     ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
@@ -69,9 +63,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
         registry.contract_address,
         1
     )
-    alice = await account_factory.deploy_account(alice_signer.public_key)
-    bob = await account_factory.deploy_account(bob_signer.public_key)
-    charlie = await account_factory.deploy_account(charlie_signer.public_key)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
+    charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
     dave = await account_factory.deploy_account(dave_signer.public_key)
 
     ### Deploy infrastructure (Part 2)
@@ -83,7 +77,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
     emergency = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
     trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
-    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     marketPrices = await starknet_service.deploy(ContractType.MarketPrices, [registry.contract_address, 1])
     liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
 
@@ -155,16 +149,16 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [ETH_ID, 0, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [UST_ID, 0, str_to_felt("UST"), str_to_felt("UST"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [UST_ID, 0, str_to_felt("UST"), str_to_felt("UST"), 1, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [DOGE_ID, 0, str_to_felt("DOGE"), str_to_felt("DOGECOIN"), 0, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [TSLA_ID, 0, str_to_felt("TESLA"), str_to_felt("TESLA MOTORS"), 1, 0, 0, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1, 10])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_UST_ID, BTC_ID, UST_ID, 0, 1, 10])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, 0, 1, 10])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [TSLA_USD_ID, TSLA_ID, USDC_ID, 0, 0, 10])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [UST_USDC_ID, UST_ID, USDC_ID, 0, 0, 10000])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 60])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 60])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 60])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [TSLA_USD_ID, TSLA_ID, USDC_ID, to64x61(10), 2, 60])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [UST_USDC_ID, UST_ID, USDC_ID, to64x61(10), 1, 60])
 
     # Set standard collateral
     await admin1_signer.send_transaction(admin1, marketPrices.contract_address, 'set_standard_collateral', [USDC_ID])
@@ -181,8 +175,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
     # Set the balance of admin1 and admin2
-    await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
-    await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    # await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    # await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
     return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance
 
 
@@ -252,7 +246,7 @@ async def test_revert_balance_low(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    assert_revert(lambda: dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+    await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size1,
         execution_price1,
         marketID_1,
@@ -748,7 +742,7 @@ async def test_revert_wrong_signature(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    assert_revert(lambda: dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+    await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size,
         execution_price1,
         marketID_1,
@@ -810,7 +804,7 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    assert_revert(lambda: dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+    await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size,
         execution_price1,
         marketID_1,
@@ -2479,7 +2473,7 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     signed_message3 = alice_signer.sign(hash_computed3)
     signed_message4 = bob_signer.sign(hash_computed4)
 
-    assert_revert(lambda: dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+    await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size2,
         execution_price2,
         marketID_2,

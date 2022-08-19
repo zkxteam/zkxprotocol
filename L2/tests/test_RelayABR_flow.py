@@ -34,10 +34,8 @@ async def abr_factory(starknet_service: StarknetService):
 
     # Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
-        admin1_signer.public_key,
-        L1_dummy_address,
-        0,
-        1
+        admin1_signer.public_key
+       
     ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, 0x0])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
@@ -47,8 +45,8 @@ async def abr_factory(starknet_service: StarknetService):
 
     # Deploy accounts
     account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
-    alice = await account_factory.deploy_account(alice_signer.public_key)
-    bob = await account_factory.deploy_account(bob_signer.public_key)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
 
     # Deploy infrastructure (Part 2)
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
@@ -59,7 +57,7 @@ async def abr_factory(starknet_service: StarknetService):
     insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
     emergency = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
     trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
-    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     accountRegistry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
     abr = await starknet_service.deploy(ContractType.ABR, [registry.contract_address, 1])
     abr_fund = await starknet_service.deploy(ContractType.ABRFund, [registry.contract_address, 1])
@@ -141,11 +139,11 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 1, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 10])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
@@ -157,7 +155,7 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_USD_ID, to64x61(1000000)])
 
     # Set the balance of admin1 and admin2
-    await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    # await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
 
     btc_perp_spot_64x61 = convertTo64x61(ABR_data.btc_perp_spot)
     btc_perp_64x61 = convertTo64x61(ABR_data.btc_perp)

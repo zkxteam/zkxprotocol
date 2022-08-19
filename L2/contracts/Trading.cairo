@@ -30,7 +30,7 @@ from contracts.Constants import (
     TradingFees_INDEX,
 )
 from contracts.DataTypes import Asset, Market, MarketPrice, MultipleOrder, OrderDetails, OrderRequest, Signature
-from contracts.interfaces.IAccount import IAccount
+from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -411,7 +411,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
 
         # Get order details
-        let (order_details : OrderDetails) = IAccount.get_order_data(
+        let (order_details : OrderDetails) = IAccountManager.get_order_data(
             contract_address=temp_order.pub_key, order_ID=temp_order.orderID
         )
         let margin_amount = order_details.marginAmount
@@ -441,7 +441,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         margin_amount_ = margin_amount + total_position_value
         borrowed_amount_ = borrowed_amount + amount_to_be_borrowed
 
-        let (user_balance) = IAccount.get_balance(
+        let (user_balance) = IAccountManager.get_balance(
             contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
         )
 
@@ -468,7 +468,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
         
         # Deduct the amount from account contract
-        IAccount.transfer_from(
+        IAccountManager.transfer_from(
             contract_address=temp_order.pub_key,
             assetID_=temp_order.collateralID,
             amount=total_amount,
@@ -526,7 +526,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         end
 
         # Get order details
-        let (order_details : OrderDetails) = IAccount.get_order_data(
+        let (order_details : OrderDetails) = IAccountManager.get_order_data(
             contract_address=temp_order.pub_key, order_ID=temp_order.parentOrder
         )
 
@@ -614,7 +614,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
             if is_loss == TRUE:
                 # If yes, deduct the difference from user's balance, can go negative
-                IAccount.transfer_from(
+                IAccountManager.transfer_from(
                     contract_address=temp_order.pub_key,
                     assetID_=temp_order.collateralID,
                     amount=leveraged_amount_out - value_to_be_returned,
@@ -624,7 +624,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar range_check_ptr = range_check_ptr
             else:
                 # If not, transfer the remaining to user
-                IAccount.transfer(
+                IAccountManager.transfer(
                     contract_address=temp_order.pub_key,
                     assetID_=temp_order.collateralID,
                     amount=leveraged_amount_out - value_to_be_returned,
@@ -667,7 +667,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                     let (deficit) = abs_value(net_acc_value)
 
                     # Get the user balance
-                    let (user_balance) = IAccount.get_balance(
+                    let (user_balance) = IAccountManager.get_balance(
                         contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
                     )
 
@@ -676,7 +676,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
                     if is_payable == TRUE:
                         # Transfer the full amount from the user
-                        IAccount.transfer_from(
+                        IAccountManager.transfer_from(
                             contract_address=temp_order.pub_key,
                             assetID_=temp_order.collateralID,
                             amount=deficit,
@@ -686,7 +686,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                         tempvar range_check_ptr = range_check_ptr
                     else:
                         # Transfer the partial amount from the user
-                        IAccount.transfer_from(
+                        IAccountManager.transfer_from(
                             contract_address=temp_order.pub_key,
                             assetID_=temp_order.collateralID,
                             amount=user_balance,
@@ -783,7 +783,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     tempvar range_check_ptr = range_check_ptr
 
     # Call the account contract to initialize the order
-    IAccount.execute_order(
+    IAccountManager.execute_order(
         contract_address=temp_order.pub_key,
         request=temp_order_request,
         signature=temp_signature,
