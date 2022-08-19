@@ -21,7 +21,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
     admin1 = await account_factory.deploy_account(signer1.public_key)
     admin2 = await account_factory.deploy_account(signer2.public_key)
-    user1 = await account_factory.deploy_account(signer3.public_key)
+    user1 = await account_factory.deploy_ZKX_account(signer3.public_key)
     
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
