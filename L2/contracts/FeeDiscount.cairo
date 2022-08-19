@@ -1,13 +1,11 @@
 %lang starknet
 
-from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_lt, assert_nn, assert_not_zero
-from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import ManageGovernanceToken_ACTION
 from contracts.libraries.Utils import verify_caller_authority
-from contracts.Math_64x61 import Math64x61_add, Math64x61_assert64x61, Math64x61_sub
+from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
 ###########
 # Events  #
