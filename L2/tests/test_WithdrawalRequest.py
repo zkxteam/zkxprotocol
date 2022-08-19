@@ -56,11 +56,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
 
-    await admin1_signer.send_transaction(
-        admin1, account_registry.contract_address, 'add_to_account_registry',[admin1.contract_address])
+    #await admin1_signer.send_transaction(
+    #    admin1, account_registry.contract_address, 'add_to_account_registry',[admin1.contract_address])
     
-    await admin1_signer.send_transaction(
-        admin1, account_registry.contract_address, 'add_to_account_registry',[admin2.contract_address])
+    #await admin1_signer.send_transaction(
+    #    admin1, account_registry.contract_address, 'add_to_account_registry',[admin2.contract_address])
     
     await admin1_signer.send_transaction(
         admin1, account_registry.contract_address, 'add_to_account_registry',[alice.contract_address])
@@ -95,6 +95,7 @@ async def test_add_to_withdrawal_request(adminAuth_factory):
     assert res1.user_l1_address == alice.contract_address
     assert res1.ticker == collateral_id_1
     assert res1.amount == amount_1
+    assert res1.user_l2_address == alice.contract_address
 
     fetched_withdrawal_request_2 = await withdrawal_request.get_withdrawal_request_data(request_id_2).call()
     print(fetched_withdrawal_request_2.result.withdrawal_request)
@@ -103,3 +104,4 @@ async def test_add_to_withdrawal_request(adminAuth_factory):
     assert res2.user_l1_address == bob.contract_address
     assert res2.ticker == collateral_id_2
     assert res2.amount == amount_2
+    assert res2.user_l2_address == bob.contract_address
