@@ -57,7 +57,7 @@ async def abr_factory(starknet_service: StarknetService):
     insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
     emergency = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
     trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
-    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     accountRegistry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
     abr = await starknet_service.deploy(ContractType.ABR, [registry.contract_address, 1])
     abr_fund = await starknet_service.deploy(ContractType.ABRFund, [registry.contract_address, 1])

@@ -104,7 +104,7 @@ async def abr_factory(starknet_service: StarknetService):
     )
     feeDiscount = await starknet_service.deploy(
         ContractType.FeeDiscount, 
-        []
+        [registry.contract_address, 1]
     )
     accountRegistry = await starknet_service.deploy(
         ContractType.AccountRegistry, 
