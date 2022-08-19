@@ -835,9 +835,6 @@ async def test_liquidation_flow(adminAuth_factory):
     alice_curr_balance = await alice.get_balance(USDC_ID).call()
     print("alice balance after", from64x61(alice_curr_balance.result.res))
 
-    account_value = await trading.return_net_acc().call()
-    print("account value:", from64x61(account_value.result.res))
-
     assert from64x61(insurance_balance.result.amount) == from64x61(
         net_acc_value)
     assert alice_curr_balance.result.res == alice_curr_balance_before.result.res
@@ -999,9 +996,6 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
 
     charlie_curr_balance = await charlie.get_balance(USDC_ID).call()
     print("charlie balance after", from64x61(charlie_curr_balance.result.res))
-
-    account_value = await trading.return_net_acc().call()
-    print("account value:", from64x61(account_value.result.res))
 
     assert charlie_curr_balance.result.res == to64x61(0)
 
@@ -1495,6 +1489,3 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
 
     eduard_curr_balance = await eduard.get_balance(USDC_ID).call()
     print("eduard balance after", from64x61(eduard_curr_balance.result.res))
-
-    account_value = await trading.return_net_acc().call()
-    print("account value after:", from64x61(account_value.result.res))

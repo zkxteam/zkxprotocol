@@ -9,7 +9,7 @@ from starkware.starknet.services.api.contract_class import ContractClass
 
 class ContractType(Enum):
     Account = "tests/contracts/Account.cairo"
-    AccountManager = "contracts/AccountManager.cairo"
+    AccountManager = "contracts/test_contracts/TestAccountManager.cairo"
     AccountDeployer = "contracts/AccountDeployer.cairo"
     AdminAuth = "contracts/AdminAuth.cairo"
     AuthorizedRegistry = "contracts/AuthorizedRegistry.cairo"
@@ -29,7 +29,7 @@ class ContractType(Enum):
     ABRFund = "contracts/ABRFund.cairo"
     ABRPayment = "contracts/ABRPayment.cairo"
     MarketPrices = "contracts/MarketPrices.cairo"
-    Liquidate = "contracts/Liquidate.cairo"
+    Liquidate = "contracts/test_contracts/TestLiquidate.cairo"
     CallFeeBalance = "contracts/CallFeeBalance.cairo"
     DepositDataManager = "contracts/DepositDataManager.cairo"
     WithdrawalFeeBalance = "contracts/WithdrawalFeeBalance.cairo"
@@ -48,7 +48,7 @@ class ContractType(Enum):
     RelayFeeDiscount = "contracts/relay_contracts/RelayFeeDiscount.cairo"
     WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
     # Test-helping contracts
-    ArrayTesting = "contracts/ArrayTesting.cairo"
+    ArrayTesting = "contracts/test_contracts/TestArrayTesting.cairo"
 
 class OptimizedStarknetState(StarknetState):
 

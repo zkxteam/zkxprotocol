@@ -608,6 +608,22 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     return ()
 end
 
+# #### TODO: Remove; Only for testing purposes #####
+@external
+func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt, amount_ : felt
+):
+    let (curr_balance) = get_balance(assetID_)
+    balance.write(assetID=assetID_, value=amount_)
+    let (array_len) = collateral_array_len.read()
+
+    if curr_balance == 0:
+        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
+        return()
+    else:
+        return()
+    end
+end
 
 # @notice External function called to remove a fully closed position
 # @param id_ - Index of the element in the array

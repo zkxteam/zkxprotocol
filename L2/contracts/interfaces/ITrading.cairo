@@ -15,9 +15,4 @@ namespace ITrading:
     request_list : MultipleOrder*,
     ) -> (res : felt):
     end
-
-    # view functions
-    func return_net_acc() -> (res : felt):
-    end
-
 end
