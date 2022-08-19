@@ -9,15 +9,16 @@ from contracts.Math_64x61 import (
     Math64x61_sub,
     Math64x61_mul,
     Math64x61_div,
-    Math64x61_fromFelt,
     Math64x61_sqrt,
     Math64x61_ln,
 )
+
 from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.Constants import MasterAdmin_ACTION
+from contracts.libraries.Math64x61 import Math64x61
 from contracts.libraries.Utils import verify_caller_authority
 
 const NUM_1 = 2305843009213693952
@@ -262,7 +263,8 @@ func movavg{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 
     if is_boundary == 1:
         # Calculate the mean of the window
-        let (curr_window_size) = Math64x61_fromFelt(iterator + 1)
+        
+        let (curr_window_size) = Math64x61.from_int_felt(iterator + 1)
         let (window_sum) = find_window_sum(tail_window_len, tail_window, iterator + 1, 0)
         let (mean_window) = Math64x61_div(window_sum, curr_window_size)
 
@@ -282,7 +284,7 @@ func movavg{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         )
     else:
         # Calculate the mean of the window
-        let (curr_window_size) = Math64x61_fromFelt(window_size)
+        let (curr_window_size) = Math64x61.from_int_felt(window_size)
         let (window_sum) = find_window_sum(tail_window_len, tail_window, window_size, 0)
         let (mean_window) = Math64x61_div(window_sum, curr_window_size)
 
@@ -345,7 +347,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 
     if is_boundary == 1:
         # Calculate the std deviation of the window
-        let (curr_window_size) = Math64x61_fromFelt(iterator + 1)
+        let (curr_window_size) = Math64x61.from_int_felt(iterator + 1)
         let (std_deviation) = find_std(tail_window_len, tail_window, mean, iterator + 1, 0)
 
         local curr_window
@@ -382,7 +384,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
         )
     else:
         # Calculate the std deviation of the window
-        let (curr_window_size) = Math64x61_fromFelt(window_size)
+        let (curr_window_size) = Math64x61.from_int_felt(window_size)
         let (std_deviation) = find_std(tail_window_len, tail_window, mean, window_size, 0)
 
         let (curr_size) = Math64x61_sub(curr_window_size, NUM_1)
@@ -600,7 +602,7 @@ func reduce_values{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     # If the iterator reaches the window
     if iterator == window - 1:
         # Calculate the 64x61 value of the window
-        let (window_size) = Math64x61_fromFelt(window)
+        let (window_size) = Math64x61.from_int_felt(window)
 
         # Calculate the mean value of index and mark prices
         let (index_mean) = Math64x61_div(curr_index_sum, window_size)
@@ -767,7 +769,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (base_abr_) = base_abr.read()
     let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0, base_abr_)
 
-    let (array_size) = Math64x61_fromFelt(ABRdyn_jump_len)
+    let (array_size) = Math64x61.from_int_felt(ABRdyn_jump_len)
     let (rate) = Math64x61_div(rate_sum, array_size)
 
     # Store the result and the timestamp in their storage vars

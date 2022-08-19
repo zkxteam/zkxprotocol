@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_not_zero
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.starknet.common.syscalls import get_caller_address, get_contract_address
 
@@ -12,6 +12,8 @@ from contracts.DataTypes import Asset, AssetWID
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.libraries.Math64x61 import Math64x61
+from contracts.libraries.validation import assert_bool
 
 #############
 # Constants #
@@ -26,35 +28,35 @@ const REMOVE_ASSET = 2
 
 # Event emitted on Asset contract deployment
 @event
-func Asset_Contract_Created(
+func asset_contract_created(
     contract_address : felt, registry_address : felt, version : felt, caller_address : felt
 ):
 end
 
 # Event emitted whenever new asset is added
 @event
-func Asset_Added(
+func asset_added(
     asset_id : felt, ticker : felt, caller_address : felt
 ):
 end
 
 # Event emitted whenever asset is removed
 @event
-func Asset_Removed(
+func asset_removed(
     asset_id : felt, ticker : felt, caller_address : felt
 ):
 end
 
 # Event emitted whenever asset core settings are updated
 @event
-func Asset_Core_Settings_Update(
+func asset_core_settings_update(
     asset_id : felt, ticker : felt, caller_address : felt
 ):
 end
 
 # Event emitted whenever asset trade settings are updated
 @event
-func Asset_Trade_Settings_Update(
+func asset_trade_settings_update(
     asset_id : felt, ticker : felt, new_contract_version : felt, new_asset_version : felt, caller_address : felt
 ):
 end
@@ -120,7 +122,7 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     registry_address_ : felt, version_ : felt
 ):
     # Validate arguments
-    with_attr error_message("Registry address or version used for Asset deployment is 0"):
+    with_attr error_message("Asset: Registry address or version used for Asset deployment is 0"):
         assert_not_zero(registry_address_)
         assert_not_zero(version_)
     end
@@ -132,7 +134,7 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     # Emit event
     let (contract_address) = get_contract_address()
     let (caller_address) = get_caller_address()
-    Asset_Contract_Created.emit(
+    asset_contract_created.emit(
         contract_address, 
         registry_address_, 
         version_,
@@ -234,7 +236,7 @@ func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 
     # Emit event
     let (caller_address) = get_caller_address()
-    Asset_Added.emit(
+    asset_added.emit(
         asset_id=id, 
         ticker=new_asset.ticker, 
         caller_address=caller_address
@@ -307,7 +309,7 @@ func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 
     # Emit event
     let (caller_address) = get_caller_address()
-    Asset_Removed.emit(
+    asset_removed.emit(
         asset_id=id_to_remove,
         ticker=ticker_to_remove, 
         caller_address=caller_address
@@ -368,7 +370,7 @@ func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
 
     # Emit event
     let (caller_address) = get_caller_address()
-    Asset_Core_Settings_Update.emit(
+    asset_core_settings_update.emit(
         asset_id=id,
         ticker=updated_asset.ticker,
         caller_address=caller_address
@@ -447,7 +449,7 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
 
     # Emit event
     let (caller_address) = get_caller_address()
-    Asset_Trade_Settings_Update.emit(
+    asset_trade_settings_update.emit(
         asset_id=id,
         ticker=updated_asset.ticker,
         new_contract_version=curr_ver + 1,
@@ -527,7 +529,7 @@ func _populate_asset_list{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
 end
 
 func _verify_caller_authority{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
-    with_attr error_message("Caller not authorized to manage assets"):
+    with_attr error_message("Asset: Caller not authorized to manage assets"):
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
         verify_caller_authority(registry, version, ManageAssets_ACTION)
@@ -538,7 +540,7 @@ end
 func _verify_asset_id_exists{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_id : felt, should_exist : felt
 ):
-    with_attr error_message("asset_id existence mismatch"):
+    with_attr error_message("Asset: asset_id existence mismatch"):
         let (id_exists) = asset_id_exists.read(asset_id)
         assert id_exists = should_exist
     end
@@ -548,7 +550,7 @@ end
 func _verify_ticker_exists{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ticker : felt, should_exist : felt
 ):
-    with_attr error_message("ticker existence mismatch"):
+    with_attr error_message("Asset: ticker existence mismatch"):
         let (ticker_exists) = asset_ticker_exists.read(ticker)
         assert ticker_exists = should_exist
     end
@@ -558,6 +560,37 @@ end
 func _validate_asset_properties{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset : Asset
 ):  
-    # TODO: add asset properties validation https://thalidao.atlassian.net/browse/ZKX-623
+    with_attr error_message("Asset: Invalid core settings"):
+        assert_bool(asset.collateral)
+        assert_bool(asset.tradable)
+        assert_le(1, asset.token_decimal)
+        assert_le(asset.token_decimal, 18)
+    end
+    with_attr error_message("Asset: Invalid trade settings"):
+        Math64x61.assert_positive_64x61(asset.tick_size)
+        Math64x61.assert_positive_64x61(asset.step_size)
+        Math64x61.assert_positive_64x61(asset.minimum_order_size)
+        Math64x61.assert_positive_64x61(asset.maintenance_margin_fraction)
+        Math64x61.assert_positive_64x61(asset.initial_margin_fraction)
+        Math64x61.assert_positive_64x61(asset.incremental_initial_margin_fraction)
+    end
+    with_attr error_message("Asset: Invalid min leverage"):
+        Math64x61.assert_positive_64x61(asset.minimum_leverage)
+    end
+    with_attr error_message("Asset: Invalid max leverage"):
+        Math64x61.assert_positive_64x61(asset.maximum_leverage)
+        assert_le(asset.minimum_leverage, asset.maximum_leverage)
+    end
+    with_attr error_message("Asset: Invalid currently allowed leverage"):
+        Math64x61.assert_positive_64x61(asset.currently_allowed_leverage)
+        assert_le(asset.minimum_leverage, asset.currently_allowed_leverage)
+        assert_le(asset.currently_allowed_leverage, asset.maximum_leverage)
+    end
+    with_attr error_message("Asset: Invalid position size settings"):
+        Math64x61.assert_positive_64x61(asset.incremental_position_size)
+        Math64x61.assert_positive_64x61(asset.baseline_position_size)
+        Math64x61.assert_positive_64x61(asset.maximum_position_size)
+        assert_le(asset.baseline_position_size, asset.maximum_position_size)
+    end
     return ()
 end

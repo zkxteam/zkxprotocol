@@ -31,7 +31,7 @@ namespace Math64x61:
     # 0x002000000000000000 or 2305843009213693952
     const ONE = 1 * FRACT_PART
 
-    # 0.000'000'000'000'000'001 or from_felt(1, 18)
+    # 0.000'000'000'000'000'001 or from_decimal_felt(1, 18)
     const MIN_FRACTION = 2
 
     # E (~2.7182) * ONE (2305843009213693952)
@@ -58,14 +58,21 @@ namespace Math64x61:
     ##############
 
     # Converts a felt to a fixed point value ensuring no overflow occurs
-    func from_felt {range_check_ptr} (x : felt, decimals : felt) -> (res : felt):
+    func from_decimal_felt {range_check_ptr} (x : felt, decimals : felt) -> (res : felt):
         let (ten_power_decimals) = pow(10, decimals)
         let (res) = div(x, ten_power_decimals)
         return (res)
     end
 
+    # Converts an integer felt value with has no decimals to a fixed point value (window_size, iterator etc.)
+    func from_int_felt {range_check_ptr} (x : felt) -> (res : felt):
+        assert_in_range(x, -INT_PART, INT_PART)
+        let (res) = x * FRACT_PART
+        return (res)
+    end
+
     # Converts a fixed point value to a felt, truncating the fractional component
-    func to_felt {range_check_ptr} (x : felt, decimals : felt) -> (res : felt):
+    func to_decimal_felt {range_check_ptr} (x : felt, decimals : felt) -> (res : felt):
         let (ten_power_decimals) = pow(10, decimals)
         let (res) = mul(x, ten_power_decimals)
         return (res)
@@ -277,7 +284,7 @@ namespace Math64x61:
         let (r2) = mul(r3 + a2, norm)
         local norm_res = r2 + a1
 
-        let (int_part) = from_felt(b, 0)
+        let (int_part) = from_int_felt(b)
         local res = int_part + norm_res
         assert_64x61(res)
         return (res)

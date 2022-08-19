@@ -68,10 +68,9 @@ from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
 from contracts.Math_64x61 import (
     Math64x61_div,
-    Math64x61_fromFelt,
-    Math64x61_mul,
-    Math64x61_toFelt,
+    Math64x61_mul
 )
+from contracts.libraries.Math64x61 import Math64x61
 
 ##########
 # Events #
@@ -447,15 +446,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     )
     # Reading token decimal field of an asset
     let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_)
-    tempvar decimal = asset.token_decimal
-
-    let (ten_power_decimal) = pow(10, decimal)
-    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
-
-    let (amount_in_64x61_format) = Math64x61_fromFelt(amount)
-    let (amount_in_decimal_representation) = Math64x61_div(
-        amount_in_64x61_format, decimal_in_64x61_format
-    )
+    let (amount_in_decimal_representation) = Math64x61.from_decimal_felt(amount, decimals=asset.token_decimal)
 
     let (array_len) = collateral_array_len.read()
     # Read the current balance.
@@ -922,15 +913,7 @@ func update_withdrawal_history{
         let (asset : Asset) = IAsset.getAsset(
             contract_address=asset_address, id=history.collateral_id
         )
-        tempvar decimal = asset.token_decimal
-
-        let (ten_power_decimal) = pow(10, decimal)
-        let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
-
-        let (temp_amount_in_64x61_format) = Math64x61_fromFelt(history.amount)
-        let (amount_in_64x61_format) = Math64x61_div(
-            temp_amount_in_64x61_format, decimal_in_64x61_format
-        )
+        let (amount_in_64x61_format) = Math64x61.from_decimal_felt(history.amount, decimals=asset.token_decimal)
 
         let updated_history = WithdrawalHistory(
             request_id=history.request_id,
@@ -1041,16 +1024,10 @@ func withdraw{
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
-    # Reading token decimal field of an asset
+    # Converting amount to felt representation
     let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
-    tempvar decimal = asset.token_decimal
+    let (amount_in_felt) = Math64x61.to_decimal_felt(amount_, decimals=asset.token_decimal)
     tempvar ticker = asset.ticker
-
-    let (ten_power_decimal) = pow(10, decimal)
-    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
-
-    let (amount_times_ten_power_decimal) = Math64x61_mul(amount_, decimal_in_64x61_format)
-    let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal)
 
     # Get the L1 wallet address of the user
     let (user_l1_address) = L1_address.read()
