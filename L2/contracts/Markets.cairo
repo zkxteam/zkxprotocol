@@ -5,17 +5,17 @@ from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_le_felt, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
+
+from contracts.Constants import (
+    Asset_INDEX,
+    ManageMarkets_ACTION,
+)
+from contracts.DataTypes import Asset, Market, MarketWID
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
-
-from contracts.DataTypes import Asset, Market, MarketWID
-from contracts.Constants import (
-    Asset_INDEX,
-    ManageMarkets_ACTION,
-)
 
 #############
 # Constants #

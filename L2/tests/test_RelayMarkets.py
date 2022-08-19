@@ -230,7 +230,6 @@ async def test_modify_tradable_unauthorized_user(adminAuth_factory):
 
     await assert_revert(signer3.send_transaction(user1, market.contract_address, 'modifyTradable', [str_to_felt("32f0406jz7qk1"), 0]))
 
-
 @pytest.mark.asyncio
 async def test_modify_tradable(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
@@ -244,13 +243,6 @@ async def test_modify_tradable(adminAuth_factory):
     assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == to64x61(5)
     assert fetched_market.tradable == 0
-
-@pytest.mark.asyncio
-async def test_modify_non_admin_tradable(adminAuth_factory):
-    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
-
-    await assert_revert(
-        signer3.send_transaction(user1, market.contract_address, 'modifyTradable', [str_to_felt("32f0406jz7qk1"), 1]))
 
 
 @pytest.mark.asyncio
@@ -295,6 +287,7 @@ async def test_change_leverage_unauthorized(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_leverage', [to64x61(100)]))
+
 
 @pytest.mark.asyncio
 async def test_change_ttl_unauthorized(adminAuth_factory):
