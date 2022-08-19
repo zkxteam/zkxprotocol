@@ -7,7 +7,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import ManageGovernanceToken_ACTION
 from contracts.libraries.Utils import verify_caller_authority
-from contracts.Math_64x61 import Math64x61_assert64x61
+from contracts.Math_64x61 import Math64x61_add, Math64x61_assert64x61, Math64x61_sub
 
 ###########
 # Events  #
@@ -101,12 +101,9 @@ func increment_governance_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin
     end
 
     let number_of_tokens : felt = user_tokens.read(address=address)
+    let (new_number_of_tokens) = Math64x61_add(number_of_tokens, value)
 
-    with_attr error_message("Total number of tokens should in 64x61 range"):
-        Math64x61_assert64x61(number_of_tokens + value)
-    end
-
-    user_tokens.write(address=address, value=number_of_tokens + value)
+    user_tokens.write(address=address, value=new_number_of_tokens)
     tokens_added.emit(user_address=address, value_added=value, prev_value=number_of_tokens)
     return ()
 end
@@ -135,7 +132,9 @@ func decrement_governance_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin
         assert_nn(number_of_tokens - value)
     end
 
-    user_tokens.write(address=address, value=number_of_tokens - value)
+    let (new_number_of_tokens) = Math64x61_sub(number_of_tokens, value)
+
+    user_tokens.write(address=address, value=new_number_of_tokens)
     tokens_removed.emit(user_address=address, value_removed=value, prev_value=number_of_tokens)
     return ()
 end
