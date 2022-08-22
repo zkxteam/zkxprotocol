@@ -201,6 +201,7 @@ struct WithdrawalHistory:
     member amount : felt
     member timestamp : felt
     member node_operator_L2_address : felt
+    member fee : felt
     member status : felt
 end
 
