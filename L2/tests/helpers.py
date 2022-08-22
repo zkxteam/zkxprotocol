@@ -9,7 +9,7 @@ from starkware.starknet.services.api.contract_class import ContractClass
 
 class ContractType(Enum):
     Account = "tests/contracts/Account.cairo"
-    AccountManager = "contracts/AccountManager.cairo"
+    AccountManager = "tests/testable/TestAccountManager.cairo"
     AccountDeployer = "contracts/AccountDeployer.cairo"
     AdminAuth = "contracts/AdminAuth.cairo"
     AuthorizedRegistry = "contracts/AuthorizedRegistry.cairo"
