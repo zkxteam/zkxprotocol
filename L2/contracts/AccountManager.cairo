@@ -72,6 +72,7 @@ from contracts.Math_64x61 import (
     Math64x61_mul,
     Math64x61_toFelt,
 )
+from tests.testable.TestAccountManager import set_balance
 
 ##########
 # Events #
