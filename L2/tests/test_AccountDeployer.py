@@ -112,7 +112,7 @@ async def test_deploy_account_contract(adminAuth_factory):
     # check whether newly deployed contract address is present in the account registry
     assert result.result.present == 1
 
-    abi = get_contract_class(source="contracts/AccountManager.cairo").abi
+    abi = get_contract_class(source="tests/testable/TestAccountManager.cairo").abi
 
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi, 
