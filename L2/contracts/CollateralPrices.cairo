@@ -4,7 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.syscalls import get_block_timestamp
 
-from contracts.Constants import MasterAdmin_ACTION
+from contracts.Constants import MasterAdmin_ACTION, ManageCollateralPrices_ACTION
 from contracts.DataTypes import CollateralPrice
 from contracts.libraries.Utils import verify_caller_authority
 
@@ -91,8 +91,8 @@ func update_collateral_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     let (version) = contract_version.read()
 
     # Auth check
-    with_attr error_message("Caller is not Master Admin"):
-        verify_caller_authority(registry, version, MasterAdmin_ACTION)
+    with_attr error_message("Caller is not authorized to update collateral prices"):
+        verify_caller_authority(registry, version, ManageCollateralPrices_ACTION)
     end
 
     # Calculate the timestamp

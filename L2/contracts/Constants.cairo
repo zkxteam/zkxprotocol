@@ -47,6 +47,7 @@ const ManageAuthRegistry_ACTION = 3
 const ManageFeeDetails_ACTION = 4
 const ManageFunds_ACTION = 5
 const ManageGovernanceToken_ACTION = 6
+const ManageCollateralPrices_ACTION = 7
 
 const ORDER_INITIATED = 0
 const ORDER_OPENED_PARTIALLY = 1
