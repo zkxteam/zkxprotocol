@@ -22,11 +22,6 @@ from contracts.libraries.Utils import verify_caller_authority
 # Events #
 ##########
 
-# Event emitted whenever set_standard_collateral() is called
-@event
-func set_standard_collateral_called(collateral_id : felt):
-end
-
 # Event emitted whenever update_market_price() is called
 @event
 func update_market_price_called(market_id : felt, price : felt):
@@ -49,11 +44,6 @@ end
 # Mapping between market ID and Market Prices
 @storage_var
 func market_prices(id : felt) -> (res : MarketPrice):
-end
-
-# Stores the address of AuthorizedRegistry contract
-@storage_var
-func standard_collateral() -> (collateral_id : felt):
 end
 
 ###############
@@ -91,39 +81,9 @@ func get_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     return (market_price=res)
 end
 
-# @notice function to get standard collateral
-# return collateral_id - standard collateral's collateral_id
-@view
-func get_standard_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ) -> (collateral_id : felt):
-    let (res) = standard_collateral.read()
-    return (collateral_id=res)
-end
-
 ######################
 # External Functions #
 ######################
-
-# @notice function to set standard collateral
-# @param collateral_id_ - standard collateral's collateral_id in the system
-@external
-func set_standard_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    collateral_id_ : felt
-):
-    # Check auth
-    with_attr error_message("Caller is not authorized to set collateral price"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, MasterAdmin_ACTION)
-    end
-
-    standard_collateral.write(value=collateral_id_)
-
-    # set_standard_collateral_called event is emitted
-    set_standard_collateral_called.emit(collateral_id=collateral_id_)
-
-    return ()
-end
 
 # @notice function to update market price
 # @param market_id_ - Id of the market
