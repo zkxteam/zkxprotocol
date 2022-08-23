@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, str_to_felt, MAX_UINT256, assert_revert, to64x61
+from utils import Signer, str_to_felt, MAX_UINT256, assert_revert, to64x61, assert_event_emitted
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -62,8 +62,29 @@ async def test_update_negative_collateral_price(adminAuth_factory):
 async def test_update_collateral_price(adminAuth_factory):
     adminAuth, collateral_prices, admin1, admin2 = adminAuth_factory
 
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, 500])
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDT_ID, 1000])
+    tx_exec_info_1 = await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, 500])
+
+    assert_event_emitted(
+        tx_exec_info_1,
+        from_address = collateral_prices.contract_address,
+        name = 'update_collateral_price_called',
+        data=[
+            USDC_ID,
+            500
+        ]
+    )
+
+    tx_exec_info_2 = await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDT_ID, 1000])
+
+    assert_event_emitted(
+        tx_exec_info_2,
+        from_address = collateral_prices.contract_address,
+        name = 'update_collateral_price_called',
+        data=[
+            USDT_ID,
+            1000
+        ]
+    )
 
     fetched_collateral_prices1 = await collateral_prices.get_collateral_price(USDC_ID).call()
     assert fetched_collateral_prices1.result.collateral_price.price_in_usd == 500
