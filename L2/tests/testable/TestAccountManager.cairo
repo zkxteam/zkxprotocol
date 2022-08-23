@@ -913,31 +913,14 @@ func update_withdrawal_history{
     local index_to_be_updated = index
     if index_to_be_updated != -1:
         let (history) = withdrawal_history_array.read(index=index_to_be_updated)
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        # Get asset contract address
-        let (asset_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=Asset_INDEX, version=version
-        )
-        let (asset : Asset) = IAsset.getAsset(
-            contract_address=asset_address, id=history.collateral_id
-        )
-        tempvar decimal = asset.token_decimal
-
-        let (ten_power_decimal) = pow(10, decimal)
-        let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
-
-        let (temp_amount_in_64x61_format) = Math64x61_fromFelt(history.amount)
-        let (amount_in_64x61_format) = Math64x61_div(
-            temp_amount_in_64x61_format, decimal_in_64x61_format
-        )
-
+       
         let updated_history = WithdrawalHistory(
             request_id=history.request_id,
             collateral_id=history.collateral_id,
-            amount=amount_in_64x61_format,
+            amount=history.amount,
             timestamp=history.timestamp,
             node_operator_L2_address=history.node_operator_L2_address,
+            fee=history.fee,
             status=1,
         )
         withdrawal_history_array.write(index=index_to_be_updated, value=updated_history)
@@ -1071,9 +1054,10 @@ func withdraw{
     local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
         request_id=request_id_,
         collateral_id=collateral_id_,
-        amount=amount_in_felt,
+        amount=amount_,
         timestamp=timestamp_,
         node_operator_L2_address=node_operator_L2_address_,
+        fee=standard_fee,
         status=0
         )
 
