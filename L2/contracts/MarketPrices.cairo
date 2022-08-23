@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import (
@@ -17,6 +17,7 @@ from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.Math_64x61 import Math64x61_assert64x61
 
 ##########
 # Events #
@@ -139,6 +140,18 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     let (market : Market) = IMarkets.getMarket(
         contract_address=market_contract_address, id=market_id_
     )
+
+    with_attr error_message("price cannot be negative"):
+        assert_nn(price_)
+    end
+
+    with_attr error_message("price should be within 64x61 range"):
+        Math64x61_assert64x61(price_)
+    end
+
+    with_attr error_message("Market is not existing"):
+        assert_not_zero(market.asset)
+    end
 
     # Create a struct object for the market prices
     tempvar new_market_price : MarketPrice = MarketPrice(
