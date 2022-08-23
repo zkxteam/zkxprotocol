@@ -43,13 +43,3 @@ func execute_batch{
     let (res)=ITrading.execute_batch(inner_address, size, execution_price, marketID, request_list_len, request_list)
     return(res)
 end
-
-
-@view
-func return_net_acc{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
-):
-    let (inner_address)=get_inner_contract()
-    let (res)=ITrading.return_net_acc(inner_address)
-    return(res)
-end

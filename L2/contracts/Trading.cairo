@@ -68,12 +68,6 @@ end
 func registry_address() -> (contract_address : felt):
 end
 
-# Temporary variable used for debugging
-# TODO: Remove it before production
-@storage_var
-func net_acc() -> (res : felt):
-end
-
 ###############
 # Constructor #
 ###############
@@ -94,20 +88,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
-end
-
-##################
-# View Functions #
-##################
-
-# @notice view function to debug
-# TODO: Remove it before production
-@view
-func return_net_acc{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
-):
-    let (net_acc_) = net_acc.read()
-    return (res=net_acc_)
 end
 
 ######################
