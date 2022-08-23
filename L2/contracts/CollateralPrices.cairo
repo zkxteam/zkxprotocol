@@ -1,12 +1,15 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_block_timestamp
 
-from contracts.Constants import MasterAdmin_ACTION, ManageCollateralPrices_ACTION
-from contracts.DataTypes import CollateralPrice
+from contracts.Constants import Asset_INDEX, MasterAdmin_ACTION, ManageCollateralPrices_ACTION
+from contracts.DataTypes import Asset, CollateralPrice
+from contracts.interfaces.IAsset import IAsset
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.Math_64x61 import Math64x61_assert64x61
 
 ##########
 # Events #
@@ -93,6 +96,28 @@ func update_collateral_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     # Auth check
     with_attr error_message("Caller is not authorized to update collateral prices"):
         verify_caller_authority(registry, version, ManageCollateralPrices_ACTION)
+    end
+
+    with_attr error_message("price cannot be negative"):
+        assert_nn(price_)
+    end
+
+    with_attr error_message("price should within 64x61 range"):
+        Math64x61_assert64x61(price_)
+    end
+
+    # Get asset contract address
+    let (asset_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    )
+
+    # Get Asset for the corresponding Id
+    let (asset : Asset) = IAsset.getAsset(
+        contract_address=asset_contract_address, id=collateral_id_
+    )
+
+    with_attr error_message("Asset is not existing"):
+        assert_not_zero(asset.ticker)
     end
 
     # Calculate the timestamp
