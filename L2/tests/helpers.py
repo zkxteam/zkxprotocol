@@ -33,6 +33,7 @@ class ContractType(Enum):
     CallFeeBalance = "contracts/CallFeeBalance.cairo"
     DepositDataManager = "contracts/DepositDataManager.cairo"
     WithdrawalFeeBalance = "contracts/WithdrawalFeeBalance.cairo"
+    CollateralPrices = "contracts/CollateralPrices.cairo"
     # Relay contracts
     RelayABR = "contracts/relay_contracts/RelayABR.cairo"
     RelayABRPayment = "contracts/relay_contracts/RelayABRPayment.cairo"
