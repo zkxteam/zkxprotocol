@@ -21,6 +21,7 @@ from contracts.Constants import (
     LiquidityFund_INDEX,
     LONG,
     Market_INDEX,
+    MARKET_ORDER,
     MarketPrices_INDEX,
     ORDER_CLOSED_PARTIALLY,
     ORDER_TO_BE_DELEVERAGED,
@@ -29,7 +30,7 @@ from contracts.Constants import (
     STOP_ORDER,
     TradingFees_INDEX,
 )
-from contracts.DataTypes import Asset, Market, MarketPrice, MultipleOrder, OrderDetails, OrderRequest, Signature
+from contracts.DataTypes import Asset, Market, MarketPrice, MultipleOrder, PositionDetails, OrderRequest, Signature
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
@@ -43,6 +44,12 @@ from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+
+#############
+# Constants #
+#############
+const TWO_PERCENT = 46116860184273879
+const LEVERAGE_ONE = 2305843009213693952
 
 ##########
 # Events #
@@ -225,7 +232,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         closeOrder=[request_list].closeOrder,
         leverage=[request_list].leverage,
         liquidatorAddress=[request_list].liquidatorAddress,
-        parentOrder=[request_list].parentOrder,
+        parentPosition=[request_list].parentPosition,
         side=[request_list].side
     )
 
@@ -320,7 +327,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     else:
         tempvar range_check_ptr = range_check_ptr
     end
-    #tempvar range_check_ptr = range_check_ptr
 
     if temp_order.orderType == LIMIT_ORDER:
         # if it's a limit order
@@ -340,14 +346,27 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             tempvar range_check_ptr = range_check_ptr
         end
         tempvar range_check_ptr = range_check_ptr
-    else:
-        # if it's a market order, it must be within 2% of the index price
-        let (two_percent) = Math64x61_mul(temp_order.price, 46116860184273879)
-        tempvar lowerLimit = temp_order.price - two_percent
-        tempvar upperLimit = temp_order.price + two_percent
+    end
 
-        with_attr error_message("Execution price is not in range."):
-            assert_in_range(execution_price, lowerLimit, upperLimit)
+    if temp_order.orderType == MARKET_ORDER:
+        # if it's a market order
+
+        # Calculate 2% of the order price
+        let (two_percent) = Math64x61_mul(temp_order.price, 46116860184273879)
+        if temp_order.direction == LONG:
+            # if it's a long order
+            tempvar upperLimit = temp_order.price + two_percent
+
+            with_attr error_message("Execution price is 2% above the user defined price"):
+                assert_le(execution_price, upperLimit)
+            end
+        else:
+            # if it's a short order
+            tempvar lowerLimit = temp_order.price - two_percent
+
+            with_attr error_message("Execution price is 2% below the user defined price"):
+                assert_in_range(lowerLimit, execution_price)
+            end
         end
         tempvar range_check_ptr = range_check_ptr
     end
@@ -376,6 +395,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Holding_INDEX, version=version
     )
+
     # If the order is to be opened
     if temp_order.closeOrder == FALSE:
         
@@ -391,19 +411,19 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
 
         # Get order details
-        let (order_details : OrderDetails) = IAccountManager.get_order_data(
-            contract_address=temp_order.pub_key, order_ID=temp_order.orderID
+        let (order_details : PositionDetails) = IAccountManager.get_position_data(
+            contract_address=temp_order.pub_key, market_id_=marketID, direction_=temp_order.direction
         )
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
 
         # calculate avg execution price
-        if order_details.executionPrice == 0:
+        if order_details.positionSize == 0:
             assert average_execution_price = execution_price
             tempvar range_check_ptr = range_check_ptr
         else:
             let (portion_executed_value) = Math64x61_mul(
-                order_details.portionExecuted, order_details.executionPrice
+                order_details.positionSize, order_details.avgExecutionPrice
             )
             let (current_order_value) = Math64x61_mul(order_size, execution_price)
             let cumulative_order_value = portion_executed_value + current_order_value
@@ -466,7 +486,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
 
         # Deduct the amount from liquidity funds if order is leveraged
-        let (is_non_leveraged) = is_le(temp_order.leverage, 2305843009213693952)
+        let (is_non_leveraged) = is_le(temp_order.leverage, LEVERAGE_ONE)
 
         if is_non_leveraged == FALSE:
             let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
@@ -501,22 +521,23 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     else:
         # If it's a close order or a liquidation order or deleveraging order
         with_attr error_message(
-                "parentOrder field of closing order request is zero in trading contract."):
-            assert_not_zero(temp_order.parentOrder)
+                "parentPosition field of closing order request is either 0 or 1"):
+            assert_nn(temp_order.parentPosition)
+            assert_le(temp_order.parentPosition, 1)
         end
 
         # Get order details
-        let (order_details : OrderDetails) = IAccountManager.get_order_data(
-            contract_address=temp_order.pub_key, order_ID=temp_order.parentOrder
+        let (order_details : PositionDetails) = IAccountManager.get_position_data(
+            contract_address=temp_order.pub_key, market_id_=marketID, direction_=temp_order.parentPosition
         )
 
-        with_attr error_message("parentOrder doesn't exist"):
-            assert_not_zero(order_details.assetID)
+        with_attr error_message("The parentPosition size cannot be 0"):
+            assert_not_zero(order_details.positionSize)
         end
 
         let margin_amount = order_details.marginAmount
         let borrowed_amount = order_details.borrowedAmount
-        average_execution_price = order_details.executionPrice
+        average_execution_price = order_details.avgExecutionPrice
 
         local diff
         local actual_execution_price
@@ -525,22 +546,22 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         if temp_order.direction == SHORT:
             # Open order was a long order
             actual_execution_price = execution_price
-            diff = execution_price - order_details.executionPrice
+            diff = execution_price - order_details.avgExecutionPrice
         else:
             # Open order was a short order
-            diff = order_details.executionPrice - execution_price
-            actual_execution_price = order_details.executionPrice + diff
+            diff = order_details.avgExecutionPrice - execution_price
+            actual_execution_price = order_details.avgExecutionPrice + diff
         end
 
         # Calculate pnl and net account value
-        let (pnl) = Math64x61_mul(order_details.portionExecuted, diff)
+        let (pnl) = Math64x61_mul(order_details.positionSize, diff)
         tempvar net_acc_value = margin_amount + pnl
 
         # Total value of the asset at current price
         let (leveraged_amount_out) = Math64x61_mul(order_size, actual_execution_price)
 
         # Calculate the amount that needs to be returned to liquidity fund
-        let (percent_of_order) = Math64x61_div(order_size, order_details.portionExecuted)
+        let (percent_of_order) = Math64x61_div(order_size, order_details.positionSize)
         let (value_to_be_returned) = Math64x61_mul(borrowed_amount, percent_of_order)
         let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order)
 
@@ -752,7 +773,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         closeOrder=temp_order.closeOrder,
         leverage=temp_order.leverage,
         liquidatorAddress=temp_order.liquidatorAddress,
-        parentOrder=temp_order.parentOrder,
+        parentPosition=temp_order.parentPosition,
     )
 
     # Create a temporary signature object
@@ -771,6 +792,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         execution_price=average_execution_price,
         margin_amount=margin_amount_,
         borrowed_amount=borrowed_amount_,
+        market_id=marketID
     )
 
     trade_execution.emit(address=temp_order.pub_key, request=temp_order_request, market_id=marketID, execution_price=average_execution_price)

@@ -95,7 +95,7 @@ struct MultipleOrder:
     member closeOrder : felt
     member leverage : felt
     member liquidatorAddress : felt
-    member parentOrder : felt
+    member parentPosition : felt
     member side : felt
 end
 
@@ -120,19 +120,13 @@ struct OrderRequest:
     member closeOrder : felt
     member leverage : felt
     member liquidatorAddress : felt
-    member parentOrder : felt
+    member parentPosition : felt
 end
 
 # @notice struct for storing the order data to Account Contract
-struct OrderDetails:
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
+struct PositionDetails:
+    member avgExecutionPrice : felt
     member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
     member status : felt
     member marginAmount : felt
     member borrowedAmount : felt
@@ -171,19 +165,14 @@ end
 # status 5: toBeDeleveraged
 # status 6: toBeLiquidated
 # status 7: fullyLiquidated
-struct OrderDetailsWithIDs:
+struct PositionDetailsWithIDs:
     member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
+    member avgExecutionPrice : felt
     member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
     member status : felt
     member marginAmount : felt
     member borrowedAmount : felt
+    member leverage : felt
 end
 
 # Struct to store collateral balances

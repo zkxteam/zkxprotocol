@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.DataTypes import OrderRequest, OrderDetails, Signature, OrderDetailsWithIDs, CollateralBalance
+from contracts.DataTypes import OrderRequest, PositionDetails, Signature, PositionDetailsWithIDs, CollateralBalance
 
 @contract_interface
 namespace IAccountManager:
@@ -22,7 +22,7 @@ namespace IAccountManager:
     func transfer_from(assetID_ : felt, amount : felt) -> ():
     end
 
-    func get_order_data(order_ID : felt) -> (res : OrderDetails):
+    func get_order_data(order_ID : felt) -> (res : PositionDetails):
     end
 
     func transfer(assetID_ : felt, amount : felt) -> ():
@@ -31,7 +31,7 @@ namespace IAccountManager:
     func get_balance(assetID_ : felt) -> (res : felt):
     end
 
-    func return_array_positions() -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    func return_array_positions() -> (array_list_len : felt, array_list : PositionDetailsWithIDs*):
     end
 
     func transfer_from_abr(orderID_ : felt, assetID_ : felt, marketID_ : felt, amount : felt):

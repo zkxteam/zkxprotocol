@@ -53,8 +53,8 @@ from contracts.DataTypes import (
     Asset,
     CollateralBalance,
     Message,
-    OrderDetails,
-    OrderDetailsWithIDs,
+    PositionDetails,
+    PositionDetailsWithIDs,
     OrderRequest,
     Signature,
     WithdrawalHistory,
@@ -147,9 +147,14 @@ end
 func balance(assetID : felt) -> (res : felt):
 end
 
-# Mapping of orderID to the order details
+# Mapping of marketID, direction to OrderDetails struct
 @storage_var
-func order_mapping(orderID : felt) -> (res : OrderDetails):
+func position_mapping(marketID : felt, direction : felt) -> (res : OrderDetails):
+end
+
+# Mapping of orderID to portionExecuted of that order
+@storage_var
+func portion_executed(orderID : felt) -> (res : felt):
 end
 
 # Mapping of orderID to the timestamp of last updated value
@@ -312,10 +317,10 @@ end
 # @param orderID_ - ID of an order
 # @return res - Order details corresponding to an order
 @view
-func get_order_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    orderID_ : felt
-) -> (res : OrderDetails):
-    let (res) = order_mapping.read(orderID=orderID_)
+func get_position_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id_ : felt, direction_ : felt
+) -> (res : PositionDetails):
+    let (res) = position_mapping.read(marketID = market_id_, direction = direction_)
     return (res=res)
 end
 
@@ -608,6 +613,22 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     return ()
 end
 
+# #### TODO: Remove; Only for testing purposes #####
+@external
+func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    assetID_ : felt, amount_ : felt
+):
+    let (curr_balance) = get_balance(assetID_)
+    balance.write(assetID=assetID_, value=amount_)
+    let (array_len) = collateral_array_len.read()
+
+    if curr_balance == 0:
+        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
+        return()
+    else:
+        return()
+    end
+end
 
 # @notice External function called to remove a fully closed position
 # @param id_ - Index of the element in the array
@@ -658,6 +679,7 @@ func execute_order{
     execution_price : felt,
     margin_amount : felt,
     borrowed_amount : felt,
+    market_id : felt
 ) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
@@ -682,11 +704,28 @@ func execute_order{
     is_valid_signature_order(hash, signature, request.liquidatorAddress)
 
     local status_
+
+    # Create a new struct with the updated details
+    let new_order = OrderDetails(
+        assetID=request.assetID,
+        collateralID=request.collateralID,
+        price=request.price,
+        executionPrice=execution_price,
+        positionSize=request.positionSize,
+        orderType=request.orderType,
+        direction=request.direction,
+        portionExecuted=size,
+        status=status_,
+        marginAmount=margin_amount,
+        borrowedAmount=borrowed_amount,
+        leverage=request.leverage,
+    )
+
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
         # Get the order details if already exists
-        let (orderDetails) = order_mapping.read(orderID=request.orderID)
+        let (orderDetails) = order_mapping.read(marketID=market_id, direction=direction)
         # If it's a new order
         if orderDetails.assetID == 0:
             # Create if the order is being fully opened
@@ -698,21 +737,6 @@ func execute_order{
                 assert status_ = ORDER_OPENED_PARTIALLY
             end
 
-            # Create a new struct with the updated details
-            let new_order = OrderDetails(
-                assetID=request.assetID,
-                collateralID=request.collateralID,
-                price=request.price,
-                executionPrice=execution_price,
-                positionSize=request.positionSize,
-                orderType=request.orderType,
-                direction=request.direction,
-                portionExecuted=size,
-                status=status_,
-                marginAmount=margin_amount,
-                borrowedAmount=borrowed_amount,
-                leverage=request.leverage,
-            )
             # Write to the mapping
             order_mapping.write(orderID=request.orderID, value=new_order)
 
@@ -897,14 +921,31 @@ func update_withdrawal_history{
     local index_to_be_updated = index
     if index_to_be_updated != -1:
         let (history) = withdrawal_history_array.read(index=index_to_be_updated)
-        
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        # Get asset contract address
+        let (asset_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=Asset_INDEX, version=version
+        )
+        let (asset : Asset) = IAsset.getAsset(
+            contract_address=asset_address, id=history.collateral_id
+        )
+        tempvar decimal = asset.token_decimal
+
+        let (ten_power_decimal) = pow(10, decimal)
+        let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal)
+
+        let (temp_amount_in_64x61_format) = Math64x61_fromFelt(history.amount)
+        let (amount_in_64x61_format) = Math64x61_div(
+            temp_amount_in_64x61_format, decimal_in_64x61_format
+        )
+
         let updated_history = WithdrawalHistory(
             request_id=history.request_id,
             collateral_id=history.collateral_id,
-            amount=history.amount,
+            amount=amount_in_64x61_format,
             timestamp=history.timestamp,
             node_operator_L2_address=history.node_operator_L2_address,
-            fee=history.fee,
             status=1,
         )
         withdrawal_history_array.write(index=index_to_be_updated, value=updated_history)
@@ -1038,10 +1079,9 @@ func withdraw{
     local withdrawal_history_ : WithdrawalHistory = WithdrawalHistory(
         request_id=request_id_,
         collateral_id=collateral_id_,
-        amount=amount_,
+        amount=amount_in_felt,
         timestamp=timestamp_,
         node_operator_L2_address=node_operator_L2_address_,
-        fee=standard_fee,
         status=0
         )
 
