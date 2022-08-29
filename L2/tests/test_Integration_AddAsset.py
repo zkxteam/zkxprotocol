@@ -5,7 +5,7 @@ import os
 from starkware.starknet.testing.starknet import Starknet
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted
 from helpers import StarknetService, ContractType, AccountFactory
-from eth_test_utils import EthTestUtils, eth_reverts
+from starkware.eth.eth_test_utils import EthTestUtils, eth_reverts
 from starkware.starknet.testing.contracts import MockStarknetMessaging
 from starkware.starknet.testing.postman import Postman
 from starkware.starknet.testing.contract_utils import get_contract_class
