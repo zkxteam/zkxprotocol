@@ -163,13 +163,17 @@ async def test_deposit_positive_flow(adminAuth_factory):
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
     assert token_balance==100*(10**18)
 
+    
+
     token_contract.approve.transact(l1_zkx_contract.address, 2*(10**18))
     l1_zkx_contract.depositToL1.transact(
         deployed_address, asset_ticker, 2*(10**18))
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
     assert token_balance==98*(10**18)
 
-    
+    token_balance=token_contract.balanceOf.call(l1_zkx_contract.address)
+    assert token_balance==2*(10**18)
+
     abi = get_contract_class(
         source="tests/testable/TestAccountManager.cairo").abi
     new_account_contract = StarknetContract(state=account_registry.state,
@@ -180,10 +184,6 @@ async def test_deposit_positive_flow(adminAuth_factory):
     result = await new_account_contract.get_balance(asset_id).call()
     assert result.result.res==0
 
-    #for event in postman.message_to_l2_filter.get_all_entries():
-    #    print(event)
-    #    print(event.args)
-
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
             fromBlock=LATEST_BLOCK_ID
         )
@@ -192,8 +192,8 @@ async def test_deposit_positive_flow(adminAuth_factory):
         nonce=event.args["nonce"]
     await postman.flush()
    
-  
-
+    
+    # balance should be updated after message is sent to L2 and L1_handler is called
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==2
 
@@ -224,6 +224,9 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
     
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
     assert token_balance==96*(10**18)
+
+    token_balance=token_contract.balanceOf.call(l1_zkx_contract.address)
+    assert token_balance==4*(10**18)
     
     abi = get_contract_class(
         source="tests/testable/TestAccountManager.cairo").abi
@@ -242,6 +245,7 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
     for event in message_to_l2_filter.get_all_entries():
         nonce=event.args["nonce"]
 
+    # this should revert since it will call l1_handler on L2 and that function will revert
     await assert_revert(postman.flush())
 
 
@@ -317,6 +321,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
         nonce=event.args["nonce"]
         message_event=event
     
+    # this should revert since it will call l1_handler on L2 and that function will revert
     await assert_revert(postman.flush())
 
 
@@ -333,6 +338,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
 
     msg_hash = message_deposit_event.args["msgHash"]
 
+    # check that msg hash still is available in starknet core waiting to be consumed
     msg_count = postman.mock_starknet_messaging_contract.l1ToL2Messages.call(msg_hash)
     
     assert msg_count > 0
@@ -378,6 +384,7 @@ async def test_deposit_incorrect_L1_address(adminAuth_factory):
     for event in message_to_l2_filter.get_all_entries():
         nonce=event.args["nonce"]
 
+    # this should revert since it will call l1_handler on L2 and that function will revert
     await assert_revert(postman.flush())
 
 
