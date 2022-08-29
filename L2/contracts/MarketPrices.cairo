@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import (
@@ -17,15 +17,11 @@ from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.Math_64x61 import Math64x61_assert64x61
 
 ##########
 # Events #
 ##########
-
-# Event emitted whenever set_standard_collateral() is called
-@event
-func set_standard_collateral_called(collateral_id : felt):
-end
 
 # Event emitted whenever update_market_price() is called
 @event
@@ -49,11 +45,6 @@ end
 # Mapping between market ID and Market Prices
 @storage_var
 func market_prices(id : felt) -> (res : MarketPrice):
-end
-
-# Stores the address of AuthorizedRegistry contract
-@storage_var
-func standard_collateral() -> (collateral_id : felt):
 end
 
 ###############
@@ -91,39 +82,9 @@ func get_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     return (market_price=res)
 end
 
-# @notice function to get standard collateral
-# return collateral_id - standard collateral's collateral_id
-@view
-func get_standard_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ) -> (collateral_id : felt):
-    let (res) = standard_collateral.read()
-    return (collateral_id=res)
-end
-
 ######################
 # External Functions #
 ######################
-
-# @notice function to set standard collateral
-# @param collateral_id_ - standard collateral's collateral_id in the system
-@external
-func set_standard_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    collateral_id_ : felt
-):
-    # Check auth
-    with_attr error_message("Caller is not authorized to set collateral price"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, MasterAdmin_ACTION)
-    end
-
-    standard_collateral.write(value=collateral_id_)
-
-    # set_standard_collateral_called event is emitted
-    set_standard_collateral_called.emit(collateral_id=collateral_id_)
-
-    return ()
-end
 
 # @notice function to update market price
 # @param market_id_ - Id of the market
@@ -179,6 +140,18 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     let (market : Market) = IMarkets.getMarket(
         contract_address=market_contract_address, id=market_id_
     )
+
+    with_attr error_message("price cannot be negative"):
+        assert_nn(price_)
+    end
+
+    with_attr error_message("price should be within 64x61 range"):
+        Math64x61_assert64x61(price_)
+    end
+
+    with_attr error_message("Market is not existing"):
+        assert_not_zero(market.asset)
+    end
 
     # Create a struct object for the market prices
     tempvar new_market_price : MarketPrice = MarketPrice(
