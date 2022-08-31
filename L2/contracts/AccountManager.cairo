@@ -361,16 +361,6 @@ end
 #     end
 # end
 
-# @notice view function to get all the open positions
-# @return array_list_len - Length of the array_list
-# @return array_list - Fully populated list of OrderDetails
-# @view
-# func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-#     ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-#     let (array_list : OrderDetailsWithIDs*) = alloc()
-#     return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
-# end
-
 # @notice view function to get all use collaterals
 # @return array_list_len - Length of the array_list
 # @return array_list - Fully populated list of CollateralBalance
@@ -613,6 +603,7 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     return ()
 end
 
+
 # # @notice External function called to remove a fully closed position
 # # @param id_ - Index of the element in the array
 # # @return 1 - If successfully removed
@@ -695,7 +686,7 @@ func execute_order{
 
     # Return if the position size after the executing the current order is more than the order's positionSize
     with_attr error_message(
-        "portion executed + size should be less than position in account contract."):
+         "portion executed + size should be less than position in account contract."):
             assert_le(new_position_executed, request.positionSize)
     end
     
@@ -1110,49 +1101,6 @@ func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*
     assert array_list_[array_list_len_] = collateral_balance_struct
     return populate_array_collaterals(array_list_len_ + 1, array_list_)
 end
-
-# @notice Internal Function called by return array to recursively add positions to the array and return it
-# @param iterator - Index of the position_array currently pointing to
-# @param array_list_len - Stores the current length of the populated array
-# @param array_list - Array of OrderRequests filled up to the index
-# @return array_list_len - Length of the array_list
-# @return array_list - Fully populated list of OrderDetails
-# func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-#     iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
-# ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-#     let (pos) = position_array.read(index=iterator)
-
-#     if pos == 0:
-#         return (array_list_len, array_list)
-#     end
-
-#     let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
-#     let order_details_w_id = OrderDetailsWithIDs(
-#         orderID=pos,
-#         assetID=pos_details.assetID,
-#         collateralID=pos_details.collateralID,
-#         price=pos_details.price,
-#         executionPrice=pos_details.executionPrice,
-#         positionSize=pos_details.positionSize,
-#         orderType=pos_details.orderType,
-#         direction=pos_details.direction,
-#         portionExecuted=pos_details.portionExecuted,
-#         status=pos_details.status,
-#         marginAmount=pos_details.marginAmount,
-#         borrowedAmount=pos_details.borrowedAmount,
-#     )
-
-#     if pos_details.status == ORDER_CLOSED:
-#         return populate_array_positions(iterator + 1, array_list_len, array_list)
-#     else:
-#         if pos_details.status == ORDER_LIQUIDATED:
-#             return populate_array_positions(iterator + 1, array_list_len, array_list)
-#         else:
-#             assert array_list[array_list_len] = order_details_w_id
-#             return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
-#         end
-#     end
-# end
 
 # @notice Internal function to hash the order parameters
 # @param orderRequest - Struct of order request to hash

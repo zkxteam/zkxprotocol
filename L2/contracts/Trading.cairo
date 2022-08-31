@@ -130,14 +130,12 @@ func execute_batch{
     let (current_timestamp) = get_block_timestamp()
 
     # Get market contract address
-    let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Market_INDEX, version=version
     )
 
     # Get Market from the corresponding Id
-    let (market : Market) = IMarkets.getMarket(
-        contract_address=market_contract_address, id=marketID
-    )
+    let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
 
     tempvar ttl = market.ttl
 
@@ -169,9 +167,38 @@ func execute_batch{
         tempvar range_check_ptr = range_check_ptr
     end
 
+    # Get all the addresses from the auth registry
+    let (
+        account_registry_address : felt,
+        asset_address : felt,
+        holding_address : felt,
+        trading_fees_address : felt,
+        fees_balance_address : felt,
+        liquidate_address : felt,
+        liquidity_fund_address : felt,
+        insurance_fund_address : felt,
+    ) = get_registry_addresses()
+
     # Recursively loop through the orders in the batch
     let (result) = check_and_execute(
-        size, 0, 0, marketID, execution_price, request_list_len, request_list, 0
+        size,
+        0,
+        0,
+        marketID,
+        execution_price,
+        request_list_len,
+        request_list,
+        0,
+        account_registry_address,
+        asset_address,
+        market_address,
+        holding_address,
+        trading_fees_address,
+        fees_balance_address,
+        liquidate_address,
+        liquidity_fund_address,
+        insurance_fund_address,
+        0,
     )
 
     # Check if every order has a counter order
@@ -184,6 +211,73 @@ end
 ######################
 # Internal Functions #
 ######################
+
+func get_registry_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (
+    account_registry_address : felt,
+    asset_address : felt,
+    holding_address : felt,
+    trading_fees_address : felt,
+    fees_balance_address : felt,
+    liquidity_fund_address : felt,
+    insurance_fund_address : felt,
+    liquidate_address : felt,
+):
+    # Read the registry and version
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+
+    # Get ccount Registry address
+    let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AccountRegistry_INDEX, version=version
+    )
+
+    # Get asset address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    )
+
+    # Get holding address
+    let (holding_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Holding_INDEX, version=version
+    )
+
+    # Get Trading fees address
+    let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingFees_INDEX, version=version
+    )
+
+    # Get Fee balalnce address
+    let (fees_balance_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=FeeBalance_INDEX, version=version
+    )
+
+    # Get Liquidate address
+    let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Liquidate_INDEX, version=version
+    )
+
+    # Get Liquidity Fund address
+    let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=LiquidityFund_INDEX, version=version
+    )
+
+    # Get Insurance fund address
+    let (insurance_fund_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=InsuranceFund_INDEX, version=version
+    )
+
+    return (
+        account_registry_address,
+        asset_address,
+        holding_address,
+        trading_fees_address,
+        fees_balance_address,
+        liquidate_address,
+        liquidity_fund_address,
+        insurance_fund_address,
+    )
+end
 
 # @notice Internal function called by execute_batch
 # @param size - Size of the order to be executed
@@ -201,11 +295,18 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     request_list_len : felt,
     request_list : MultipleOrder*,
     sum : felt,
+    account_registry_address : felt,
+    asset_address : felt,
+    market_address : felt,
+    holding_address : felt,
+    trading_fees_address : felt,
+    fees_balance_address : felt,
+    liquidate_address : felt,
+    liquidity_fund_address : felt,
+    insurance_fund_address : felt,
+    max_leverage : felt,
 ) -> (res : felt):
     alloc_locals
-
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
 
     # Check if the list is empty, if yes return 1
     if request_list_len == 0:
@@ -235,65 +336,14 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         side=[request_list].side
         )
 
-    # check that the user account is present in account registry (and thus that it was deployed by us)
-
-    let (account_registry) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AccountRegistry_INDEX, version=version
-    )
-
+    # check that the user account is present in account registry (and thus that it was deployed by zkx)
     let (is_registered) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry, address_=temp_order.pub_key
+        contract_address=account_registry_address, address_=temp_order.pub_key
     )
 
     with_attr error_message("User account not registered"):
         assert_not_zero(is_registered)
     end
-
-    # Get asset and market addresses
-    let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Asset_INDEX, version=version
-    )
-    let (market_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Market_INDEX, version=version
-    )
-
-    # If it's the first order in the array
-    if assetID == 0:
-        # Check if the asset is tradable
-        let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order.assetID)
-        let (collateral : Asset) = IAsset.getAsset(
-            contract_address=asset_address, id=temp_order.collateralID
-        )
-        let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
-
-        with_attr error_message("asset is non tradable in trading contract."):
-            assert_not_zero(asset.tradable)
-        end
-
-        with_attr error_message("asset is non collaterable in trading contract."):
-            assert_not_zero(collateral.collateral)
-        end
-
-        with_attr error_message("market is non tradable in trading contract."):
-            assert_not_zero(market.tradable)
-        end
-
-        with_attr error_message(
-                "leverage is not less than currently allowed leverage of the asset"):
-            assert_le(temp_order.leverage, asset.currently_allowed_leverage)
-        end
-
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    else:
-        tempvar syscall_ptr = syscall_ptr
-        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        tempvar range_check_ptr = range_check_ptr
-    end
-    tempvar syscall_ptr = syscall_ptr
-    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-    tempvar range_check_ptr = range_check_ptr
 
     # Check if the execution_price is correct
     if temp_order.orderType == STOP_ORDER:
@@ -397,17 +447,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assert sum_temp = sum - order_size
     end
 
-    let (holding_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Holding_INDEX, version=version
-    )
-
     # If the order is to be opened
     if temp_order.closeOrder == FALSE:
         # Get the fees from Trading Fee contract
-        let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=TradingFees_INDEX, version=version
-        )
-
         let (fees_rate) = ITradingFees.get_user_fee_and_discount(
             contract_address=trading_fees_address,
             address_=temp_order.pub_key,
@@ -463,15 +505,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             assert_le(total_amount, user_balance)
         end
 
-        let (liquidate_contract_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=Liquidate_INDEX, version=version
-        )
-        ILiquidate.check_order_can_be_opened(
-            contract_address=liquidate_contract_address,
-            order=temp_order,
-            size=order_size,
-            execution_price=execution_price,
-        )
+        # TODO : Modify Liquidate contract and uncomment this check
+        # ILiquidate.check_order_can_be_opened(
+        #     contract_address=liquidate_address,
+        #     order=temp_order,
+        #     size=order_size,
+        #     execution_price=execution_price,
+        # )
 
         # Deduct the amount from account contract
         IAccountManager.transfer_from(
@@ -481,9 +521,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
 
         # Update the fees to be paid by user in fee balance contract
-        let (fees_balance_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=FeeBalance_INDEX, version=version
-        )
         IFeeBalance.update_fee_mapping(
             contract_address=fees_balance_address,
             address=temp_order.pub_key,
@@ -495,9 +532,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         let (is_non_leveraged) = is_le(temp_order.leverage, LEVERAGE_ONE)
 
         if is_non_leveraged == FALSE:
-            let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-                contract_address=registry, index=LiquidityFund_INDEX, version=version
-            )
             ILiquidityFund.withdraw(
                 contract_address=liquidity_fund_address,
                 asset_id_=temp_order.collateralID,
@@ -602,9 +636,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
             else:
-                let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-                    contract_address=registry, index=LiquidityFund_INDEX, version=version
-                )
                 ILiquidityFund.deposit(
                     contract_address=liquidity_fund_address,
                     asset_id_=temp_order.collateralID,
@@ -646,21 +677,12 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         else:
             # # Liquidation order
             # if parent_position.status == ORDER_TO_BE_LIQUIDATED:
-            #     let (insurance_fund_address) = IAuthorizedRegistry.get_contract_address(
-            #         contract_address=registry, index=InsuranceFund_INDEX, version=version
-            #     )
-
             # # Withdraw the position from holding fund
             #     IHolding.withdraw(
             #         contract_address=holding_address,
             #         asset_id_=temp_order.collateralID,
             #         amount=leveraged_amount_out,
             #     )
-
-            # let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-            #         contract_address=registry, index=LiquidityFund_INDEX, version=version
-            #     )
-
             # # Return the borrowed fund to the Liquidity fund
             #     ILiquidityFund.deposit(
             #         contract_address=liquidity_fund_address,
@@ -730,20 +752,11 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             #     # Deleveraging order
             #     if parent_position.status == ORDER_TO_BE_DELEVERAGED:
             #         # Withdraw the position from holding fund
-            #         let (holding_address) = IAuthorizedRegistry.get_contract_address(
-            #             contract_address=registry, index=Holding_INDEX, version=version
-            #         )
-
             # IHolding.withdraw(
             #             contract_address=holding_address,
             #             asset_id_=temp_order.collateralID,
             #             amount=leveraged_amount_out,
             #         )
-
-            # let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
-            #             contract_address=registry, index=LiquidityFund_INDEX, version=version
-            #         )
-
             # # Return the borrowed fund to the Liquidity fund
             #         ILiquidityFund.deposit(
             #             contract_address=liquidity_fund_address,
@@ -811,6 +824,30 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # If it's the first order in the array
     if assetID == 0:
+        # Check if the asset is tradable
+        let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order.assetID)
+        let (collateral : Asset) = IAsset.getAsset(
+            contract_address=asset_address, id=temp_order.collateralID
+        )
+        let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
+
+        with_attr error_message("asset is non tradable in trading contract."):
+            assert_not_zero(asset.tradable)
+        end
+
+        with_attr error_message("asset is non collaterable in trading contract."):
+            assert_not_zero(collateral.collateral)
+        end
+
+        with_attr error_message("market is non tradable in trading contract."):
+            assert_not_zero(market.tradable)
+        end
+
+        with_attr error_message(
+                "leverage is not less than currently allowed leverage of the asset"):
+            assert_le(temp_order.leverage, asset.currently_allowed_leverage)
+        end
+
         # Recursive call with the ticker and price to compare against
         return check_and_execute(
             size,
@@ -821,6 +858,16 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             request_list_len - 1,
             request_list + MultipleOrder.SIZE,
             sum_temp,
+            account_registry_address,
+            asset_address,
+            market_address,
+            holding_address,
+            trading_fees_address,
+            fees_balance_address,
+            liquidate_address,
+            liquidity_fund_address,
+            insurance_fund_address,
+            asset.currently_allowed_leverage,
         )
     end
 
@@ -834,6 +881,10 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assert collateralID = temp_order.collateralID
     end
 
+    with_attr error_message("leverage is not less than currently allowed leverage of the asset"):
+        assert_le(temp_order.leverage, max_leverage)
+    end
+
     # Recursive Call
     return check_and_execute(
         size,
@@ -844,5 +895,15 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         request_list_len - 1,
         request_list + MultipleOrder.SIZE,
         sum_temp,
+        account_registry_address,
+        asset_address,
+        market_address,
+        holding_address,
+        trading_fees_address,
+        fees_balance_address,
+        liquidate_address,
+        liquidity_fund_address,
+        insurance_fund_address,
+        max_leverage,
     )
 end
