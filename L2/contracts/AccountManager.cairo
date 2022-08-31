@@ -38,13 +38,11 @@ from contracts.Constants import (
     L1_ZKX_Address_INDEX,
     Liquidate_INDEX,
     LIQUIDATION_ORDER,
-    ORDER_CLOSED_PARTIALLY,
-    ORDER_CLOSED,
-    ORDER_LIQUIDATED,
-    ORDER_OPENED_PARTIALLY,
-    ORDER_OPENED,
-    ORDER_TO_BE_DELEVERAGED,
-    ORDER_TO_BE_LIQUIDATED,
+    LONG,
+    POSITION_OPENED,
+    POSITION_TO_BE_DELEVERAGED,
+    POSITION_TO_BE_LIQUIDATED,
+    SHORT,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
     WithdrawalRequest_INDEX,
@@ -67,9 +65,11 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
 from contracts.Math_64x61 import (
+    Math64x61_add,
     Math64x61_div,
     Math64x61_fromFelt,
     Math64x61_mul,
+    Math64x61_sub,
     Math64x61_toFelt,
 )
 
@@ -147,9 +147,9 @@ end
 func balance(assetID : felt) -> (res : felt):
 end
 
-# Mapping of marketID, direction to OrderDetails struct
+# Mapping of marketID, direction to PositionDetails struct
 @storage_var
-func position_mapping(marketID : felt, direction : felt) -> (res : OrderDetails):
+func position_mapping(marketID : felt, direction : felt) -> (res : PositionDetails):
 end
 
 # Mapping of orderID to portionExecuted of that order
@@ -347,29 +347,29 @@ end
 
 # @notice view function to get deleveraged or liquidatable position
 # @return order_id - Id of an order, amount_to_be_sold - amount to be sold in a position
-@view
-func get_deleveraged_or_liquidatable_position{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}() -> (order_id : felt, amount_to_be_sold : felt):
-    let (order_id_) = deleveraged_or_liquidatable_position.read()
-    let (order_details) = get_order_data(order_id_)
-    if order_details.status == ORDER_TO_BE_DELEVERAGED:
-        let (amount) = amount_to_be_sold.read(order_id=order_id_)
-        return (order_id=order_id_, amount_to_be_sold=amount)
-    else:
-        return (order_id=order_id_, amount_to_be_sold=0)
-    end
-end
+# @view
+# func get_deleveraged_or_liquidatable_position{
+#     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+# }() -> (order_id : felt, amount_to_be_sold : felt):
+#     let (order_id_) = deleveraged_or_liquidatable_position.read()
+#     let (order_details) = get_order_data(order_id_)
+#     if order_details.status == POSITION_TO_BE_DELEVERAGED:
+#         let (amount) = amount_to_be_sold.read(order_id=order_id_)
+#         return (order_id=order_id_, amount_to_be_sold=amount)
+#     else:
+#         return (order_id=order_id_, amount_to_be_sold=0)
+#     end
+# end
 
 # @notice view function to get all the open positions
 # @return array_list_len - Length of the array_list
 # @return array_list - Fully populated list of OrderDetails
-@view
-func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-    let (array_list : OrderDetailsWithIDs*) = alloc()
-    return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
-end
+# @view
+# func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+#     ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+#     let (array_list : OrderDetailsWithIDs*) = alloc()
+#     return populate_array_positions(iterator=0, array_list_len=0, array_list=array_list)
+# end
 
 # @notice view function to get all use collaterals
 # @return array_list_len - Length of the array_list
@@ -630,37 +630,37 @@ func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     end
 end
 
-# @notice External function called to remove a fully closed position
-# @param id_ - Index of the element in the array
-# @return 1 - If successfully removed
-@external
-func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id_ : felt
-) -> (res : felt):
-    alloc_locals
+# # @notice External function called to remove a fully closed position
+# # @param id_ - Index of the element in the array
+# # @return 1 - If successfully removed
+# @external
+# func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+#     id_ : felt
+# ) -> (res : felt):
+#     alloc_locals
 
-    let (pos_id) = position_array.read(index=id_)
-    if pos_id == 0:
-        with_attr error_message("No order exists in that index"):
-            assert 1 = 0
-        end
-    end
+#     let (pos_id) = position_array.read(index=id_)
+#     if pos_id == 0:
+#         with_attr error_message("No order exists in that index"):
+#             assert 1 = 0
+#         end
+#     end
 
-    let (posDetails : OrderDetails) = order_mapping.read(orderID=pos_id)
+#     let (posDetails : PositionDetails) = order_mapping.read(orderID=pos_id)
 
-    with_attr error_message("The order is not fully closed yet."):
-        assert posDetails.status = ORDER_CLOSED
-    end
+#     with_attr error_message("The order is not fully closed yet."):
+#         assert posDetails.status = POSITION_CLOSED
+#     end
 
-    let (arr_len) = position_array_len.read()
-    let (last_id) = position_array.read(index=arr_len - 1)
+#     let (arr_len) = position_array_len.read()
+#     let (last_id) = position_array.read(index=arr_len - 1)
 
-    position_array.write(index=id_, value=last_id)
-    position_array.write(index=arr_len - 1, value=0)
+#     position_array.write(index=id_, value=last_id)
+#     position_array.write(index=arr_len - 1, value=0)
 
-    position_array_len.write(arr_len - 1)
-    return (1)
-end
+#     position_array_len.write(arr_len - 1)
+#     return (1)
+# end
 
 # @notice Function called by Trading Contract
 # @param request - Details of the order to be executed
@@ -703,191 +703,115 @@ func execute_order{
     # check if signed by the user/liquidator
     is_valid_signature_order(hash, signature, request.liquidatorAddress)
 
-    local status_
+    # Get the details of the position
+    let (position_details) = position_mapping.read(marketID = market_id, direction = request.direction)
 
-    # Create a new struct with the updated details
-    let new_order = OrderDetails(
-        assetID=request.assetID,
-        collateralID=request.collateralID,
-        price=request.price,
-        executionPrice=execution_price,
-        positionSize=request.positionSize,
-        orderType=request.orderType,
-        direction=request.direction,
-        portionExecuted=size,
-        status=status_,
-        marginAmount=margin_amount,
-        borrowedAmount=borrowed_amount,
-        leverage=request.leverage,
-    )
+    # Get the portion executed details if already exists
+    let (order_portion_executed) = portion_executed.read(orderID=request.orderID)
+    let (new_position_executed) = Math64x61_add(order_portion_executed, size)
+
+    # Return if the position size after the executing the current order is more than the order's positionSize
+    with_attr error_message(
+        "portion executed + size should be less than position in account contract."):
+            assert_le(new_position_executed, request.positionSize)
+    end
+    
+    # Update the portion executed
+    portion_executed.write(orderID=request.orderID, value=new_position_executed)
 
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
-        # Get the order details if already exists
-        let (orderDetails) = order_mapping.read(marketID=market_id, direction=direction)
-        # If it's a new order
-        if orderDetails.assetID == 0:
-            # Create if the order is being fully opened
-            # status_ == 1, partially opened; ORDER_OPENED_PARTIALLY
-            # status_ == 2, fully opened; ORDER_OPENED
-            if request.positionSize == size:
-                assert status_ = ORDER_OPENED
-            else:
-                assert status_ = ORDER_OPENED_PARTIALLY
-            end
+        # New position size
+        let (new_positionSize) = Math64x61_add(position_details.positionSize, size)
+        
+        # New leverage
+        let total_value = margin_amount + borrowed_amount
+        let (new_leverage) = Math64x61_div(total_value, margin_amount)
+ 
+        # Create a new struct with the updated details
+        let updated_position = PositionDetails(
+            avgExecutionPrice=execution_price,
+            positionSize=new_positionSize,
+            marginAmount=margin_amount,
+            borrowedAmount=borrowed_amount,
+            leverage=new_leverage
+        )
 
-            # Write to the mapping
-            order_mapping.write(orderID=request.orderID, value=new_order)
-
-            add_to_array(request.orderID)
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-            tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
-            # If it's an existing order
-        else:
-            # Return if the position size after the executing the current order is more than the order's positionSize
-            let (size_by_leverage) = Math64x61_mul(size, request.leverage)
-            with_attr error_message(
-                    "Paritally executed + remaining should be less than position in account contract."):
-                assert_le(size + orderDetails.portionExecuted, request.positionSize)
-            end
-
-            # Check if the order is in the process of being closed or if it was deleveraged
-            if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
-                tempvar range_check_ptr = range_check_ptr
-            else:
-                assert_le(orderDetails.status, ORDER_CLOSED_PARTIALLY)
-                tempvar range_check_ptr = range_check_ptr
-            end
-
-            # Check if the order is fully filled by executing the current one
-            if request.positionSize == size + orderDetails.portionExecuted:
-                status_ = ORDER_OPENED
-            else:
-                status_ = ORDER_OPENED_PARTIALLY
-            end
-
-            # Create a new struct with the updated details
-            let updated_order = OrderDetails(
-                assetID=orderDetails.assetID,
-                collateralID=orderDetails.collateralID,
-                price=orderDetails.price,
-                executionPrice=execution_price,
-                positionSize=orderDetails.positionSize,
-                orderType=request.orderType,
-                direction=orderDetails.direction,
-                portionExecuted=orderDetails.portionExecuted + size,
-                status=status_,
-                marginAmount=margin_amount,
-                borrowedAmount=borrowed_amount,
-                leverage=request.leverage,
-            )
-            # Write to the mapping
-            order_mapping.write(orderID=request.orderID, value=updated_order)
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-            tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
-        end
+        # Write to the mapping
+        position_mapping.write(marketID=market_id, direction=request.direction, value=updated_position)
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
         tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     else:
-        # Get the order details
-        let (orderDetails) = order_mapping.read(orderID=request.parentOrder)
+        local parent_direction
 
-        # Assert that it's the reverse direction of the current position
-        with_attr error_message("The close order must have opposite direction of open order"):
-            assert_not_equal(request.direction, orderDetails.direction)
+        if request.direction == LONG:
+            assert parent_direction = SHORT
+        else:
+            assert parent_direction = LONG
+        end
+        
+        # Get the parent position details
+        let (parent_position_details) = position_mapping.read(marketID = market_id, direction = parent_direction)
+        let (new_positionSize) = Math64x61_sub(parent_position_details.positionSize, size)
+
+        # Assert that the parent position is open
+        with_attr error_message("The parent position size is 0"):
+            assert_not_zero(parent_position_details.positionSize)
         end
 
-        # Assert that the order exists
-        with_attr error_message("The open order doesn't exist"):
-            assert_not_zero(orderDetails.positionSize)
-        end
-
+        # Assert that the size amount can be closed from the parent position
         with_attr error_message("The size of close order is more than the portionExecuted"):
-            assert_nn(orderDetails.portionExecuted - size)
+            assert_nn(new_positionSize)
         end
 
+        # Calculate the new leverage if it's a deleveraging order
         local new_leverage
         if request.orderType == DELEVERAGING_ORDER:
             let total_value = margin_amount + borrowed_amount
             let (leverage_) = Math64x61_div(total_value, margin_amount)
             new_leverage = leverage_
         else:
-            new_leverage = request.leverage
+            new_leverage = parent_position_details.leverage
         end
         tempvar range_check_ptr = range_check_ptr
 
-        # Check if the order is fully closed or not
-        # status_ == 4, fully closed; ORDER_CLOSED
-        # status_ == 3, partially closed; ORDER_CLOSED_PARTIALLY
-        # status_ == 5, toBeDeleveraged; ORDER_TO_BE_DELEVERAGED
-        # status_ == 6, toBeLiquidated; ORDER_TO_BE_LIQUIDATED
-        # status_ == 7, fullyLiquidated; ORDER_LIQUIDATED
-        if orderDetails.portionExecuted - size == 0:
-            if request.orderType == LIQUIDATION_ORDER:
-                assert status_ = ORDER_LIQUIDATED
-            else:
-                assert status_ = ORDER_CLOSED
-            end
-        else:
-            if request.orderType == DELEVERAGING_ORDER:
-                assert status_ = ORDER_TO_BE_DELEVERAGED
-            else:
-                if request.orderType == LIQUIDATION_ORDER:
-                    assert status_ = ORDER_TO_BE_LIQUIDATED
-                else:
-                    assert status_ = ORDER_CLOSED_PARTIALLY
-                end
-            end
-        end
-
-        # Update the amount to be sold after deleveraging
-        if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
-            let (amount) = amount_to_be_sold.read(order_id=request.parentOrder)
-            let updated_amount = amount - size
-            let (positive_updated_amount) = abs_value(updated_amount)
-            # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
-            let (result) = is_le(updated_amount, 230584300)
-            local amount_to_be_updated
-            if result == TRUE:
-                amount_to_be_updated = 0
-            else:
-                amount_to_be_updated = updated_amount
-            end
-            amount_to_be_sold.write(order_id=request.parentOrder, value=amount_to_be_updated)
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        else:
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
-        end
+        # # Update the amount to be sold after deleveraging
+        # if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
+        #     let (amount) = amount_to_be_sold.read(order_id=request.parentOrder)
+        #     let updated_amount = amount - size
+        #     let (positive_updated_amount) = abs_value(updated_amount)
+        #     # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
+        #     let (result) = is_le(updated_amount, 230584300)
+        #     local amount_to_be_updated
+        #     if result == TRUE:
+        #         amount_to_be_updated = 0
+        #     else:
+        #         amount_to_be_updated = updated_amount
+        #     end
+        #     amount_to_be_sold.write(order_id=request.parentOrder, value=amount_to_be_updated)
+        #     tempvar syscall_ptr = syscall_ptr
+        #     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        #     tempvar range_check_ptr = range_check_ptr
+        # else:
+        #     tempvar syscall_ptr = syscall_ptr
+        #     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        #     tempvar range_check_ptr = range_check_ptr
+        # end
 
         # Create a new struct with the updated details
-        let updated_order = OrderDetails(
-            assetID=orderDetails.assetID,
-            collateralID=orderDetails.collateralID,
-            price=orderDetails.price,
-            executionPrice=orderDetails.executionPrice,
-            positionSize=orderDetails.positionSize - size,
-            orderType=orderDetails.orderType,
-            direction=orderDetails.direction,
-            portionExecuted=orderDetails.portionExecuted - size,
-            status=status_,
+        let updated_position = PositionDetails(
+            avgExecutionPrice=execution_price,
+            positionSize=new_positionSize,
             marginAmount=margin_amount,
             borrowedAmount=borrowed_amount,
-            leverage=new_leverage,
+            leverage=new_leverage
         )
 
         # Write to the mapping
-        order_mapping.write(orderID=request.parentOrder, value=updated_order)
+        position_mapping.write(marketID=market_id, direction=parent_direction, value=updated_position)
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
@@ -946,6 +870,7 @@ func update_withdrawal_history{
             amount=amount_in_64x61_format,
             timestamp=history.timestamp,
             node_operator_L2_address=history.node_operator_L2_address,
+            fee=history.fee,
             status=1,
         )
         withdrawal_history_array.write(index=index_to_be_updated, value=updated_history)
@@ -1082,8 +1007,9 @@ func withdraw{
         amount=amount_in_felt,
         timestamp=timestamp_,
         node_operator_L2_address=node_operator_L2_address_,
+        fee=standard_fee,
         status=0
-        )
+    )
 
     # Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read()
@@ -1097,65 +1023,65 @@ end
 # @notice Function called by liquidate contract to mark the position as liquidated/deleveraged
 # @param id_ - Order Id of the position to be marked
 # @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
-@external
-func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id_ : felt, amount_to_be_sold_ : felt
-):
-    alloc_locals
+# @external
+# func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+#     id_ : felt, amount_to_be_sold_ : felt
+# ):
+#     alloc_locals
 
-    let (order_details : OrderDetails) = order_mapping.read(orderID=id_)
+#     let (order_details : OrderDetails) = order_mapping.read(orderID=id_)
 
-    with_attr error_message("Amount to be sold cannot be negative"):
-        assert_nn(amount_to_be_sold_)
-    end
-    with_attr error_message("Amount to be sold should be less than or equal to the portion executed"):
-        assert_le(amount_to_be_sold_, order_details.portionExecuted)
-    end
+#     with_attr error_message("Amount to be sold cannot be negative"):
+#         assert_nn(amount_to_be_sold_)
+#     end
+#     with_attr error_message("Amount to be sold should be less than or equal to the portion executed"):
+#         assert_le(amount_to_be_sold_, order_details.portionExecuted)
+#     end
 
-    # Check if the caller is the liquidator contract
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Liquidate_INDEX, version=version
-    )
+#     # Check if the caller is the liquidator contract
+#     let (caller) = get_caller_address()
+#     let (registry) = registry_address.read()
+#     let (version) = contract_version.read()
+#     let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
+#         contract_address=registry, index=Liquidate_INDEX, version=version
+#     )
 
-    with_attr error_message("Only liquidate contract is allowed to call for liquidation"):
-        assert caller = liquidate_address
-    end
+#     with_attr error_message("Only liquidate contract is allowed to call for liquidation"):
+#         assert caller = liquidate_address
+#     end
 
-    local status_
-    if amount_to_be_sold_ == 0:
-        status_ = ORDER_TO_BE_LIQUIDATED
-    else:
-        status_ = ORDER_TO_BE_DELEVERAGED
-    end
+#     local status_
+#     if amount_to_be_sold_ == 0:
+#         status_ = ORDER_TO_BE_LIQUIDATED
+#     else:
+#         status_ = ORDER_TO_BE_DELEVERAGED
+#     end
 
-    # Create a new struct with the updated details by setting toBeLiquidated flag to true
-    let updated_order = OrderDetails(
-        assetID=order_details.assetID,
-        collateralID=order_details.collateralID,
-        price=order_details.price,
-        executionPrice=order_details.executionPrice,
-        positionSize=order_details.positionSize,
-        orderType=order_details.orderType,
-        direction=order_details.direction,
-        portionExecuted=order_details.portionExecuted,
-        status=status_,
-        marginAmount=order_details.marginAmount,
-        borrowedAmount=order_details.borrowedAmount,
-        leverage=order_details.leverage,
-    )
-    # Write to the mapping
-    order_mapping.write(orderID=id_, value=updated_order)
-    # Update deleveraged or liquidatable position
-    deleveraged_or_liquidatable_position.write(value=id_)
-    # Update amount_to_be_sold storage variable
-    amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
+#     # Create a new struct with the updated details by setting toBeLiquidated flag to true
+#     let updated_order = OrderDetails(
+#         assetID=order_details.assetID,
+#         collateralID=order_details.collateralID,
+#         price=order_details.price,
+#         executionPrice=order_details.executionPrice,
+#         positionSize=order_details.positionSize,
+#         orderType=order_details.orderType,
+#         direction=order_details.direction,
+#         portionExecuted=order_details.portionExecuted,
+#         status=status_,
+#         marginAmount=order_details.marginAmount,
+#         borrowedAmount=order_details.borrowedAmount,
+#         leverage=order_details.leverage,
+#     )
+#     # Write to the mapping
+#     order_mapping.write(orderID=id_, value=updated_order)
+#     # Update deleveraged or liquidatable position
+#     deleveraged_or_liquidatable_position.write(value=id_)
+#     # Update amount_to_be_sold storage variable
+#     amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
 
-    liquidate_deleverage.emit(position_id = id_, amount = amount_to_be_sold_)
-    return ()
-end
+#     liquidate_deleverage.emit(position_id = id_, amount = amount_to_be_sold_)
+#     return ()
+# end
 
 ######################
 # Internal Functions #
@@ -1208,42 +1134,42 @@ end
 # @param array_list - Array of OrderRequests filled up to the index
 # @return array_list_len - Length of the array_list
 # @return array_list - Fully populated list of OrderDetails
-func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
-) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
-    let (pos) = position_array.read(index=iterator)
+# func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+#     iterator : felt, array_list_len : felt, array_list : OrderDetailsWithIDs*
+# ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+#     let (pos) = position_array.read(index=iterator)
 
-    if pos == 0:
-        return (array_list_len, array_list)
-    end
+#     if pos == 0:
+#         return (array_list_len, array_list)
+#     end
 
-    let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
-    let order_details_w_id = OrderDetailsWithIDs(
-        orderID=pos,
-        assetID=pos_details.assetID,
-        collateralID=pos_details.collateralID,
-        price=pos_details.price,
-        executionPrice=pos_details.executionPrice,
-        positionSize=pos_details.positionSize,
-        orderType=pos_details.orderType,
-        direction=pos_details.direction,
-        portionExecuted=pos_details.portionExecuted,
-        status=pos_details.status,
-        marginAmount=pos_details.marginAmount,
-        borrowedAmount=pos_details.borrowedAmount,
-    )
+#     let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
+#     let order_details_w_id = OrderDetailsWithIDs(
+#         orderID=pos,
+#         assetID=pos_details.assetID,
+#         collateralID=pos_details.collateralID,
+#         price=pos_details.price,
+#         executionPrice=pos_details.executionPrice,
+#         positionSize=pos_details.positionSize,
+#         orderType=pos_details.orderType,
+#         direction=pos_details.direction,
+#         portionExecuted=pos_details.portionExecuted,
+#         status=pos_details.status,
+#         marginAmount=pos_details.marginAmount,
+#         borrowedAmount=pos_details.borrowedAmount,
+#     )
 
-    if pos_details.status == ORDER_CLOSED:
-        return populate_array_positions(iterator + 1, array_list_len, array_list)
-    else:
-        if pos_details.status == ORDER_LIQUIDATED:
-            return populate_array_positions(iterator + 1, array_list_len, array_list)
-        else:
-            assert array_list[array_list_len] = order_details_w_id
-            return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
-        end
-    end
-end
+#     if pos_details.status == ORDER_CLOSED:
+#         return populate_array_positions(iterator + 1, array_list_len, array_list)
+#     else:
+#         if pos_details.status == ORDER_LIQUIDATED:
+#             return populate_array_positions(iterator + 1, array_list_len, array_list)
+#         else:
+#             assert array_list[array_list_len] = order_details_w_id
+#             return populate_array_positions(iterator + 1, array_list_len + 1, array_list)
+#         end
+#     end
+# end
 
 # @notice Internal function to hash the order parameters
 # @param orderRequest - Struct of order request to hash

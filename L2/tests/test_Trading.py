@@ -252,9 +252,9 @@ async def test_revert_balance_low(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 @pytest.mark.asyncio
@@ -313,9 +313,9 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 
@@ -375,9 +375,9 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1,  orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1,  orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 
@@ -437,9 +437,9 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 
@@ -499,9 +499,9 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ]))
 
 
@@ -561,9 +561,9 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 
@@ -624,9 +624,9 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ]))
 
 
@@ -686,9 +686,9 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ]))
 
 
@@ -748,9 +748,9 @@ async def test_revert_wrong_signature(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message1[0], signed_message1[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress1, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress1, 0,
     ]))
 
 
@@ -810,9 +810,9 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ]))
 
 @pytest.mark.asyncio
@@ -887,9 +887,9 @@ async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ]))
 
 @pytest.mark.asyncio
@@ -964,42 +964,28 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
         position1,
-        orderType1,
-        direction1,
-        size,
-        2,
         to64x61(5000),
         to64x61(0),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        size,
-        2,
         to64x61(5000),
         to64x61(0),
         leverage2
@@ -1077,42 +1063,28 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 0,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 1,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
     ])
 
-    orderState3 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState3 = await alice.get_position_data(market_id_=marketID_2, direction_=direction1).call()
     res3 = list(orderState3.result.res)
 
     assert res3 == [
-        assetID_3,
-        collateralID_3,
-        price1,
         execution_price1,
         0,
-        orderType1,
-        direction1,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage3
     ]
 
-    orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState4 = await bob.get_position_data(market_id_=marketID_2, direction_=direction2).call()
     res4 = list(orderState4.result.res)
 
     assert res4 == [
-        assetID_4,
-        collateralID_4,
-        price2,
         execution_price1,
         0,
-        orderType2,
-        direction2,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage4
@@ -1231,50 +1203,36 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         marketID_1,
         3,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
         charlie.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 0,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
         position1,
-        orderType1,
-        direction1,
-        size1,
-        1,
         to64x61(37300),
         to64x61(0),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        position2,
-        2,
         to64x61(27975),
         to64x61(0),
         leverage2
     ]
 
-    orderState3 = await charlie.get_order_data(orderID_=order_id_3).call()
+    orderState3 = await charlie.get_position_data(market_id_=marketID_1, direction_=direction3).call()
     res3 = list(orderState3.result.res)
 
     assert res3 == [
@@ -1381,59 +1339,38 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         marketID_2,
         3,
         alice.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 1,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
         bob.contract_address, signed_message5[0], signed_message5[
-            1], order_id_5, assetID_5, collateralID_5, price5, stopPrice5, orderType5, position5, direction5, closeOrder5, leverage5, liquidatorAddress5, parentOrder5, 0,
+            1], order_id_5, assetID_5, collateralID_5, price5, stopPrice5, orderType5, position5, direction5, closeOrder5, leverage5, liquidatorAddress5, 0,
         charlie.contract_address, signed_message6[0], signed_message6[
-            1], order_id_6, assetID_6, collateralID_6, price6, stopPrice6, orderType6, position6, direction6, closeOrder6, leverage6, liquidatorAddress6, parentOrder6, 0,
+            1], order_id_6, assetID_6, collateralID_6, price6, stopPrice6, orderType6, position6, direction6, closeOrder6, leverage6, liquidatorAddress6, 0,
     ])
 
-    orderState4 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState4 = await alice.get_position_data(market_id_=marketID_2, direction_=direction1).call()
     res4 = list(orderState4.result.res)
     assert res4 == [
-        assetID_4,
-        collateralID_4,
-        price1,
         execution_price1,
         to64x61(1),
-        orderType1,
-        direction1,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage4
     ]
 
-    orderState5 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState5 = await bob.get_position_data(market_id_=marketID_2, direction_=direction2).call()
     res5 = list(orderState5.result.res)
     assert res5 == [
-        assetID_5,
-        collateralID_5,
-        price2,
         execution_price1,
         0,
-        orderType2,
-        direction2,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage5
     ]
 
-    orderState6 = await charlie.get_order_data(orderID_=order_id_3).call()
+    orderState6 = await charlie.get_position_data(market_id_=marketID_2, direction_=direction3).call()
     res6 = list(orderState6.result.res)
     assert res6 == [
-        assetID_6,
-        collateralID_6,
-        price3,
         execution_price1,
         0,
-        orderType3,
-        direction3,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage6
@@ -1537,42 +1474,28 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
         position1,
-        orderType1,
-        direction1,
-        to64x61(2),
-        2,
         to64x61(5000),
         to64x61(5000),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        to64x61(2),
-        2,
         to64x61(5000),
         to64x61(5000),
         leverage2
@@ -1684,42 +1607,28 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 1,
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 0,
     ])
 
-    orderState3 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState3 = await alice.get_position_data(market_id_=marketID_2, direction_=direction1).call()
     res3 = list(orderState3.result.res)
 
     assert res3 == [
-        assetID_3,
-        collateralID_3,
-        price1,
         execution_price1,
         0,
-        orderType1,
-        direction1,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage3
     ]
 
-    orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState4 = await bob.get_position_data(market_id_=marketID_2, direction_=direction1).call()
     res4 = list(orderState4.result.res)
 
     assert res4 == [
-        assetID_4,
-        collateralID_4,
-        price2,
         execution_price1,
         0,
-        orderType2,
-        direction2,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage4
@@ -1751,12 +1660,12 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     assert feeBalance_after.result.fee == feeBalance_curr.result.fee
 
 
-@pytest.mark.asyncio
-async def test_removing_closed_orders_from_position_array(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
+# @pytest.mark.asyncio
+# async def test_removing_closed_orders_from_position_array(adminAuth_factory):
+#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
 
-    alice_position_array = await alice.return_array_positions().call()
-    alice_parsed = list(alice_position_array.result.array_list)
+#     alice_position_array = await alice.return_array_positions().call()
+#     alice_parsed = list(alice_position_array.result.array_list)
 
 
 @pytest.mark.asyncio
@@ -1838,42 +1747,28 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
         position1,
-        orderType1,
-        direction1,
-        to64x61(5),
-        1,
         to64x61(2500),
         to64x61(22500),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        to64x61(5),
-        2,
         to64x61(25000),
         to64x61(0),
         leverage2
@@ -1992,42 +1887,28 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1, 
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 1, 
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 0,
     ])
 
-    orderState3 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState3 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res3 = list(orderState3.result.res)
 
     assert res3 == [
-        assetID_3,
-        collateralID_3,
-        price1,
         execution_price1,
         to64x61(7.5),
-        orderType1,
-        direction1,
-        to64x61(2.5),
-        3,
         to64x61(1250),
         to64x61(11250),
         leverage3
     ]
 
-    orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState4 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res4 = list(orderState4.result.res)
 
     assert res4 == [
-        assetID_4,
-        collateralID_4,
-        price2,
         execution_price1,
         to64x61(2.5),
-        orderType2,
-        direction2,
-        to64x61(2.5),
-        3,
         to64x61(12500),
         to64x61(0),
         leverage4
@@ -2128,42 +2009,28 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
         position1,
-        orderType1,
-        direction1,
-        to64x61(5),
-        1,
         to64x61(2500),
         to64x61(22500),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        to64x61(2.5),
-        2,
         to64x61(12500),
         to64x61(0),
         leverage2
@@ -2258,42 +2125,28 @@ async def test_opening_full_stop_orders(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
         position1,
-        orderType1,
-        direction1,
-        size,
-        2,
         to64x61(5000),
         to64x61(0),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        size,
-        2,
         to64x61(5000),
         to64x61(0),
         leverage2
@@ -2376,42 +2229,28 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
         position1,
-        orderType1,
-        direction1,
-        size,
-        2,
         to64x61(500),
         to64x61(4500),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        size,
-        2,
         to64x61(5000),
         to64x61(0),
         leverage2
@@ -2479,7 +2318,7 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 0,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 1,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
     ]))

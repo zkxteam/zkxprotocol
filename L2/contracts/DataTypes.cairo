@@ -95,7 +95,6 @@ struct MultipleOrder:
     member closeOrder : felt
     member leverage : felt
     member liquidatorAddress : felt
-    member parentPosition : felt
     member side : felt
 end
 
@@ -120,14 +119,12 @@ struct OrderRequest:
     member closeOrder : felt
     member leverage : felt
     member liquidatorAddress : felt
-    member parentPosition : felt
 end
 
 # @notice struct for storing the order data to Account Contract
 struct PositionDetails:
     member avgExecutionPrice : felt
     member positionSize : felt
-    member status : felt
     member marginAmount : felt
     member borrowedAmount : felt
     member leverage : felt

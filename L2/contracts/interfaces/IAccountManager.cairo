@@ -11,6 +11,7 @@ namespace IAccountManager:
         execution_price : felt,
         margin_amount : felt,
         borrowed_amount : felt,
+        market_id : felt
     ) -> (res : felt):
     end
 
@@ -22,7 +23,7 @@ namespace IAccountManager:
     func transfer_from(assetID_ : felt, amount : felt) -> ():
     end
 
-    func get_order_data(order_ID : felt) -> (res : PositionDetails):
+    func get_position_data(market_id_ : felt, direction_ : felt) -> (res : PositionDetails):
     end
 
     func transfer(assetID_ : felt, amount : felt) -> ():
