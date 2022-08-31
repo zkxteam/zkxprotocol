@@ -98,11 +98,11 @@ func update_collateral_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         verify_caller_authority(registry, version, ManageCollateralPrices_ACTION)
     end
 
-    with_attr error_message("price cannot be negative"):
+    with_attr error_message("Price cannot be negative"):
         assert_nn(price_)
     end
 
-    with_attr error_message("price should within 64x61 range"):
+    with_attr error_message("Price should within 64x61 range"):
         Math64x61_assert64x61(price_)
     end
 
@@ -116,7 +116,7 @@ func update_collateral_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         contract_address=asset_contract_address, id=collateral_id_
     )
 
-    with_attr error_message("Asset is not existing"):
+    with_attr error_message("Asset does not exist"):
         assert_not_zero(asset.ticker)
     end
 

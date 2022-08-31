@@ -141,15 +141,15 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
         contract_address=market_contract_address, id=market_id_
     )
 
-    with_attr error_message("price cannot be negative"):
+    with_attr error_message("Price cannot be negative"):
         assert_nn(price_)
     end
 
-    with_attr error_message("price should be within 64x61 range"):
+    with_attr error_message("Price should be within 64x61 range"):
         Math64x61_assert64x61(price_)
     end
 
-    with_attr error_message("Market is not existing"):
+    with_attr error_message("Market does not exist"):
         assert_not_zero(market.asset)
     end
 
