@@ -913,7 +913,7 @@ func update_withdrawal_history{
     local index_to_be_updated = index
     if index_to_be_updated != -1:
         let (history) = withdrawal_history_array.read(index=index_to_be_updated)
-       
+
         let updated_history = WithdrawalHistory(
             request_id=history.request_id,
             collateral_id=history.collateral_id,

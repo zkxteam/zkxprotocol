@@ -232,7 +232,6 @@ end
 
 # struct to store deposit payload information (for L1->L2 interaction) + other useful data
 struct DepositData:
-
     member user_L1_address: felt
     member user_L2_address: felt
     member ticker: felt
@@ -240,4 +239,10 @@ struct DepositData:
     member nonce: felt
     member message_hash: felt
     member timestamp: felt
+end
+
+# Struct to store Collateral price
+struct CollateralPrice:
+  member timestamp : felt
+  member price_in_usd : felt
 end
