@@ -27,6 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest tox cairo-lang
+          npm install -g ganache-cli@^6.12.2
 
       - name: Run tox
         # Run tox using the version of Python in `PATH`
