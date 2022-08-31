@@ -48,6 +48,8 @@ from contracts.Constants import (
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
     WithdrawalRequest_INDEX,
+    WITHDRAWAL_INITIATED,
+    WITHDRAWAL_SUCCEEDED,
 )
 from contracts.DataTypes import (
     Asset,
@@ -905,7 +907,7 @@ func update_withdrawal_history{
             timestamp=history.timestamp,
             node_operator_L2_address=history.node_operator_L2_address,
             fee=history.fee,
-            status=1,
+            status=WITHDRAWAL_SUCCEEDED,
         )
         withdrawal_history_array.write(index=index_to_be_updated, value=updated_history)
         return ()
@@ -1042,7 +1044,7 @@ func withdraw{
         timestamp=timestamp_,
         node_operator_L2_address=node_operator_L2_address_,
         fee=standard_fee,
-        status=0
+        status=WITHDRAWAL_INITIATED
         )
 
     # Update Withdrawal history
