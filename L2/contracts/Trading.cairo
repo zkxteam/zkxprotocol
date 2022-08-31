@@ -27,7 +27,15 @@ from contracts.Constants import (
     STOP_ORDER,
     TradingFees_INDEX,
 )
-from contracts.DataTypes import Asset, Market, MarketPrice, MultipleOrder, PositionDetails, OrderRequest, Signature
+from contracts.DataTypes import (
+    Asset,
+    Market,
+    MarketPrice,
+    MultipleOrder,
+    PositionDetails,
+    OrderRequest,
+    Signature,
+)
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
@@ -82,13 +90,12 @@ end
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
-):  
-
+):
     with_attr error_message("Registry address and version cannot be 0"):
         assert_not_zero(registry_address_)
         assert_not_zero(version_)
     end
-    
+
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
@@ -129,8 +136,7 @@ func execute_batch{
 
     # Get Market from the corresponding Id
     let (market : Market) = IMarkets.getMarket(
-        contract_address=market_contract_address,
-        id=marketID
+        contract_address=market_contract_address, id=marketID
     )
 
     tempvar ttl = market.ttl
@@ -142,8 +148,7 @@ func execute_batch{
 
     # Get Market price for the corresponding market Id
     let (market_prices : MarketPrice) = IMarketPrices.get_market_price(
-        contract_address=market_prices_contract_address,
-        id=marketID
+        contract_address=market_prices_contract_address, id=marketID
     )
 
     tempvar timestamp = market_prices.timestamp
@@ -153,9 +158,7 @@ func execute_batch{
     # update market price
     if status == FALSE:
         IMarketPrices.update_market_price(
-            contract_address=market_prices_contract_address,
-            id=marketID,
-            price=execution_price
+            contract_address=market_prices_contract_address, id=marketID, price=execution_price
         )
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -230,16 +233,18 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         leverage=[request_list].leverage,
         liquidatorAddress=[request_list].liquidatorAddress,
         side=[request_list].side
-    )
+        )
 
     # check that the user account is present in account registry (and thus that it was deployed by us)
 
     let (account_registry) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AccountRegistry_INDEX, version=version)
+        contract_address=registry, index=AccountRegistry_INDEX, version=version
+    )
 
     let (is_registered) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry, address_=temp_order.pub_key)
-    
+        contract_address=account_registry, address_=temp_order.pub_key
+    )
+
     with_attr error_message("User account not registered"):
         assert_not_zero(is_registered)
     end
@@ -296,24 +301,28 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         if temp_order.direction == LONG:
             # if long stop order
             # check that stop_price <= execution_price <= limit_price
-            with_attr error_message("Stop price should be less than or equal to the execution price for long orders"):
+            with_attr error_message(
+                    "Stop price should be less than or equal to the execution price for long orders"):
                 assert_le(temp_order.stopPrice, execution_price)
             end
             tempvar range_check_ptr = range_check_ptr
 
-            with_attr error_message("Execution price should be less than or equal to the order price for long orders"):
+            with_attr error_message(
+                    "Execution price should be less than or equal to the order price for long orders"):
                 assert_le(execution_price, temp_order.price)
             end
             tempvar range_check_ptr = range_check_ptr
         else:
             # if short stop order
             # check that limit_price <= execution_price <= stop_price
-            with_attr error_message("Order price should be less than or equal to the execution price for short orders"):
+            with_attr error_message(
+                    "Order price should be less than or equal to the execution price for short orders"):
                 assert_le(temp_order.price, execution_price)
             end
             tempvar range_check_ptr = range_check_ptr
 
-            with_attr error_message("Execution price should be less than or equal to the stop price for short orders"):
+            with_attr error_message(
+                    "Execution price should be less than or equal to the stop price for short orders"):
                 assert_le(execution_price, temp_order.stopPrice)
             end
             tempvar range_check_ptr = range_check_ptr
@@ -394,7 +403,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # If the order is to be opened
     if temp_order.closeOrder == FALSE:
-        
         # Get the fees from Trading Fee contract
         let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
             contract_address=registry, index=TradingFees_INDEX, version=version
@@ -408,7 +416,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         # Get order details
         let (position_details : PositionDetails) = IAccountManager.get_position_data(
-            contract_address=temp_order.pub_key, market_id_=marketID, direction_=temp_order.direction
+            contract_address=temp_order.pub_key,
+            market_id_=marketID,
+            direction_=temp_order.direction,
         )
         let margin_amount = position_details.marginAmount
         let borrowed_amount = position_details.borrowedAmount
@@ -460,9 +470,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             contract_address=liquidate_contract_address,
             order=temp_order,
             size=order_size,
-            execution_price=execution_price
+            execution_price=execution_price,
         )
-        
+
         # Deduct the amount from account contract
         IAccountManager.transfer_from(
             contract_address=temp_order.pub_key,
@@ -640,18 +650,18 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             #         contract_address=registry, index=InsuranceFund_INDEX, version=version
             #     )
 
-            #     # Withdraw the position from holding fund
+            # # Withdraw the position from holding fund
             #     IHolding.withdraw(
             #         contract_address=holding_address,
             #         asset_id_=temp_order.collateralID,
             #         amount=leveraged_amount_out,
             #     )
 
-            #     let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
+            # let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
             #         contract_address=registry, index=LiquidityFund_INDEX, version=version
             #     )
 
-            #     # Return the borrowed fund to the Liquidity fund
+            # # Return the borrowed fund to the Liquidity fund
             #     ILiquidityFund.deposit(
             #         contract_address=liquidity_fund_address,
             #         asset_id_=temp_order.collateralID,
@@ -659,22 +669,22 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             #         position_id_=temp_order.orderID,
             #     )
 
-            #     # Check if the account value for the position is negative
+            # # Check if the account value for the position is negative
             #     let (is_negative) = is_le(net_acc_value, 0)
 
-            #     if is_negative == TRUE:
+            # if is_negative == TRUE:
             #         # Absolute value of the acc value
             #         let (deficit) = abs_value(net_acc_value)
 
-            #         # Get the user balance
+            # # Get the user balance
             #         let (user_balance) = IAccountManager.get_balance(
             #             contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
             #         )
 
-            #         # Check if the user's balance can cover the deficit
+            # # Check if the user's balance can cover the deficit
             #         let (is_payable) = is_le(deficit, user_balance)
 
-            #         if is_payable == TRUE:
+            # if is_payable == TRUE:
             #             # Transfer the full amount from the user
             #             IAccountManager.transfer_from(
             #                 contract_address=temp_order.pub_key,
@@ -692,7 +702,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             #                 amount=user_balance,
             #             )
 
-            #             # Transfer the remaining amount from Insurance Fund
+            # # Transfer the remaining amount from Insurance Fund
             #             IInsuranceFund.withdraw(
             #                 contract_address=insurance_fund_address,
             #                 asset_id_=temp_order.collateralID,
@@ -700,7 +710,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             #                 position_id_=temp_order.orderID,
             #             )
 
-            #             tempvar syscall_ptr = syscall_ptr
+            # tempvar syscall_ptr = syscall_ptr
             #             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             #             tempvar range_check_ptr = range_check_ptr
             #         end
@@ -724,17 +734,17 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             #             contract_address=registry, index=Holding_INDEX, version=version
             #         )
 
-            #         IHolding.withdraw(
+            # IHolding.withdraw(
             #             contract_address=holding_address,
             #             asset_id_=temp_order.collateralID,
             #             amount=leveraged_amount_out,
             #         )
 
-            #         let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
+            # let (liquidity_fund_address) = IAuthorizedRegistry.get_contract_address(
             #             contract_address=registry, index=LiquidityFund_INDEX, version=version
             #         )
 
-            #         # Return the borrowed fund to the Liquidity fund
+            # # Return the borrowed fund to the Liquidity fund
             #         ILiquidityFund.deposit(
             #             contract_address=liquidity_fund_address,
             #             asset_id_=temp_order.collateralID,
@@ -742,7 +752,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             #             position_id_=temp_order.orderID,
             #         )
 
-            #         tempvar syscall_ptr = syscall_ptr
+            # tempvar syscall_ptr = syscall_ptr
             #         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             #         tempvar range_check_ptr = range_check_ptr
             #     else:
@@ -756,6 +766,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             #         tempvar range_check_ptr = range_check_ptr
             #     end
             # end
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
     end
 
@@ -765,21 +778,18 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assetID=temp_order.assetID,
         collateralID=temp_order.collateralID,
         price=temp_order.price,
-        stopPrice = temp_order.stopPrice,
+        stopPrice=temp_order.stopPrice,
         orderType=temp_order.orderType,
         positionSize=temp_order.positionSize,
         direction=temp_order.direction,
         closeOrder=temp_order.closeOrder,
         leverage=temp_order.leverage,
-        liquidatorAddress=temp_order.liquidatorAddress
+        liquidatorAddress=temp_order.liquidatorAddress,
     )
-
-    tempvar syscall_ptr = syscall_ptr
 
     # Create a temporary signature object
     let temp_signature : Signature = Signature(r_value=temp_order.sig_r, s_value=temp_order.sig_s)
 
-    tempvar syscall_ptr = syscall_ptr
     # Call the account contract to initialize the order
     IAccountManager.execute_order(
         contract_address=temp_order.pub_key,
@@ -789,10 +799,15 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         execution_price=average_execution_price,
         margin_amount=margin_amount_,
         borrowed_amount=borrowed_amount_,
-        market_id=marketID
+        market_id=marketID,
     )
 
-    trade_execution.emit(address=temp_order.pub_key, request=temp_order_request, market_id=marketID, execution_price=average_execution_price)
+    trade_execution.emit(
+        address=temp_order.pub_key,
+        request=temp_order_request,
+        market_id=marketID,
+        execution_price=average_execution_price,
+    )
 
     # If it's the first order in the array
     if assetID == 0:
@@ -831,4 +846,3 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         sum_temp,
     )
 end
-
