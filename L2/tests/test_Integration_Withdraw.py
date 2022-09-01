@@ -221,6 +221,13 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==3  # previous balance - withdraw amount - fee (1)
 
+    # should not be able to consume/withdraw message before it reaches L1
+    with eth_reverts("INVALID_MESSAGE_TO_CONSUME"):
+        l1_zkx_contract.withdraw.transact(eth_test_utils.accounts[0].address,
+                                      asset_ticker,
+                                      2*(10**18), # here amount is being given as uint256 not as 64x61 value
+                                      request_id)
+
     await postman.flush()
 
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
