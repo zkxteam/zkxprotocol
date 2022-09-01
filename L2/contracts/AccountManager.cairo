@@ -212,8 +212,11 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     public_key_ : felt, L1_address_ : felt, registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
+    with_attr error_message("Registry address, version, public key and L1 address cannot be 0"):
+        assert_not_zero(registry_address_)
         assert_not_zero(version_)
+        assert_not_zero(public_key_)
+        assert_not_zero(L1_address_)
     end
 
     public_key.write(public_key_)

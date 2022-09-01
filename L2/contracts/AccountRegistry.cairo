@@ -11,7 +11,6 @@ from contracts.Constants import (
     MasterAdmin_ACTION,
     Trading_INDEX,
 )
-
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
 
@@ -55,6 +54,11 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
+    with_attr error_message("Registry address and version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
+
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
@@ -94,19 +98,17 @@ func get_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
 ) -> (
     account_registry_len : felt, account_registry : felt*
 ):
-    alloc_locals
-
-    with_attr error_message("starting index cannot be negative"):
+    with_attr error_message("Starting index cannot be negative"):
         assert_nn(starting_index_)
     end
     
-    with_attr error_message("number of accounts cannot be negative or zero"):
+    with_attr error_message("Number of accounts cannot be negative or zero"):
         assert_lt(0, num_accounts_)
     end
 
     let ending_index = starting_index_ + num_accounts_
     let (reg_len) = account_registry_len.read()
-    with_attr error_message("cannot retrieve the specified num of accounts"):
+    with_attr error_message("Cannot retrieve the specified num of accounts"):
         assert_le(ending_index, reg_len)
     end
 
@@ -139,6 +141,10 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         assert caller = account_deployer_address
     end
 
+    with_attr error_message("Address cannot be zero"):
+        assert_not_zero(address_)
+    end
+
     let (is_present) = account_present.read(address=address_)
     if is_present == FALSE:
         let (reg_len) = account_registry_len.read()
@@ -162,8 +168,6 @@ end
 func remove_from_account_registry{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }(id_ : felt) -> ():
-    
-    alloc_locals
     with_attr error_message("Caller is not Master Admin"):
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
@@ -213,8 +217,6 @@ end
 func populate_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     iterator_, starting_index_ : felt, ending_index_ :felt, account_registry_list_ : felt*
 ) -> (account_registry_len : felt, account_registry : felt*):
-    alloc_locals
-
     if starting_index_ == ending_index_:
         return (iterator_, account_registry_list_)
     end
