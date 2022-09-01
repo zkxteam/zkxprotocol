@@ -728,7 +728,7 @@ func execute_order{
             # Return if the position size after the executing the current order is more than the order's positionSize
             let (size_by_leverage) = Math64x61_mul(size, request.leverage)
             with_attr error_message(
-                    "Paritally executed + remaining should be less than position in account contract."):
+                    "Paritally executed + remaining should be less than or equal to the position in account contract."):
                 assert_le(size + orderDetails.portionExecuted, request.positionSize)
             end
 
@@ -963,7 +963,9 @@ func withdraw{
     end
 
     # Make sure 'amount' is positive.
-    assert_nn(amount_)
+    with_attr error_message("Withdrawal amount requested cannot be negative"):
+        assert_nn(amount_)
+    end
 
     # get L2 Account contract address
     let (user_l2_address) = get_contract_address()
@@ -995,7 +997,7 @@ func withdraw{
 
     # Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_)
-    with_attr error_message("Withdrawal amount requested should be less than balance"):
+    with_attr error_message("Withdrawal amount requested should be less than or equal to the asset's balance"):
         assert_le(amount_, current_balance)
     end
     tempvar new_balance = current_balance - amount_
