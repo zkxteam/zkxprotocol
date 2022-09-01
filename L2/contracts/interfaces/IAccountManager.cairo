@@ -1,6 +1,12 @@
 %lang starknet
 
-from contracts.DataTypes import OrderRequest, OrderDetails, Signature, OrderDetailsWithIDs, CollateralBalance
+from contracts.DataTypes import (
+    OrderRequest,
+    OrderDetails,
+    Signature,
+    OrderDetailsWithIDs,
+    CollateralBalance,
+)
 
 @contract_interface
 namespace IAccountManager:
@@ -14,9 +20,7 @@ namespace IAccountManager:
     ) -> (res : felt):
     end
 
-    func update_withdrawal_history(
-        request_id_ : felt,
-    ):
+    func update_withdrawal_history(request_id_ : felt):
     end
 
     func transfer_from(assetID_ : felt, amount : felt) -> ():

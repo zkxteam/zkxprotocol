@@ -1,6 +1,6 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa 
+%builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
@@ -68,12 +68,7 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
-from contracts.Math_64x61 import (
-    Math64x61_div,
-    Math64x61_fromFelt,
-    Math64x61_mul,
-    Math64x61_toFelt,
-)
+from contracts.Math_64x61 import Math64x61_div, Math64x61_fromFelt, Math64x61_mul, Math64x61_toFelt
 
 ##########
 # Events #
@@ -81,16 +76,12 @@ from contracts.Math_64x61 import (
 
 # Event emitted whenever collateral is transferred from account by trading
 @event
-func transferred_from(
-    asset_id : felt, amount : felt
-):
+func transferred_from(asset_id : felt, amount : felt):
 end
 
 # Event emitted whenever collateral is transferred to account by trading
 @event
-func transferred(
-    asset_id : felt, amount : felt
-):
+func transferred(asset_id : felt, amount : felt):
 end
 
 # Event emitted whenever collateral is transferred to account by abr payment
@@ -109,9 +100,7 @@ end
 
 # Event emitted whenver a new withdrawal request is made
 @event
-func withdrawal_request(
-    collateral_id : felt, amount : felt, node_operator_l2 : felt
-):
+func withdrawal_request(collateral_id : felt, amount : felt, node_operator_l2 : felt):
 end
 
 # Event emitted whenever a position is marked to be liquidated/deleveraged
@@ -123,7 +112,6 @@ end
 @event
 func deposited(asset_id : felt, amount : felt):
 end
-
 
 ###########
 # Storage #
@@ -424,7 +412,7 @@ end
 @l1_handler
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt, user : felt, amount : felt, assetID_ : felt
-):  
+):
     alloc_locals
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -481,7 +469,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tempvar new_balance = balance_collateral + amount_in_decimal_representation
     balance.write(assetID=assetID_, value=new_balance)
 
-    deposited.emit(asset_id = assetID_, amount = amount_in_decimal_representation)
+    deposited.emit(asset_id=assetID_, amount=amount_in_decimal_representation)
     return ()
 end
 
@@ -512,7 +500,7 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 
     balance.write(assetID=assetID_, value=balance_ - amount)
 
-    transferred_from.emit(asset_id = assetID_, amount = amount)
+    transferred_from.emit(asset_id=assetID_, amount=amount)
     return ()
 end
 
@@ -544,9 +532,15 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(order_id = orderID_, value=block_timestamp)
+    last_updated.write(order_id=orderID_, value=block_timestamp)
 
-    transferred_from_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
+    transferred_from_abr.emit(
+        order_id=orderID_,
+        asset_id=assetID_,
+        market_id=marketID_,
+        amount=amount,
+        timestamp=block_timestamp,
+    )
     return ()
 end
 
@@ -577,9 +571,15 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(order_id = orderID_, value=block_timestamp)
+    last_updated.write(order_id=orderID_, value=block_timestamp)
 
-    transferred_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
+    transferred_abr.emit(
+        order_id=orderID_,
+        asset_id=assetID_,
+        market_id=marketID_,
+        amount=amount,
+        timestamp=block_timestamp,
+    )
     return ()
 end
 
@@ -609,10 +609,9 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (balance_) = balance.read(assetID=assetID_)
     balance.write(assetID=assetID_, value=balance_ + amount)
 
-    transferred.emit(asset_id = assetID_, amount = amount)
+    transferred.emit(asset_id=assetID_, amount=amount)
     return ()
 end
-
 
 # @notice External function called to remove a fully closed position
 # @param id_ - Index of the element in the array
@@ -902,7 +901,7 @@ func update_withdrawal_history{
     local index_to_be_updated = index
     if index_to_be_updated != -1:
         let (history) = withdrawal_history_array.read(index=index_to_be_updated)
-        
+
         let updated_history = WithdrawalHistory(
             request_id=history.request_id,
             collateral_id=history.collateral_id,
@@ -983,7 +982,8 @@ func withdraw{
 
     # Compute current balance
     let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id)
-    with_attr error_message("Fee amount should be less than or equal to the fee collateral balance"):
+    with_attr error_message(
+            "Fee amount should be less than or equal to the fee collateral balance"):
         assert_le(standard_fee, fee_collateral_balance)
     end
     tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee
@@ -1000,7 +1000,8 @@ func withdraw{
 
     # Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_)
-    with_attr error_message("Withdrawal amount requested should be less than or equal to the asset's balance"):
+    with_attr error_message(
+            "Withdrawal amount requested should be less than or equal to the asset's balance"):
         assert_le(amount_, current_balance)
     end
     tempvar new_balance = current_balance - amount_
@@ -1057,7 +1058,9 @@ func withdraw{
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_)
     withdrawal_history_array_len.write(array_len + 1)
 
-    withdrawal_request.emit(collateral_id = collateral_id_, amount = amount_, node_operator_l2 = node_operator_L2_address_)
+    withdrawal_request.emit(
+        collateral_id=collateral_id_, amount=amount_, node_operator_l2=node_operator_L2_address_
+    )
     return ()
 end
 
@@ -1075,7 +1078,8 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     with_attr error_message("Amount to be sold cannot be negative"):
         assert_nn(amount_to_be_sold_)
     end
-    with_attr error_message("Amount to be sold should be less than or equal to the portion executed"):
+    with_attr error_message(
+            "Amount to be sold should be less than or equal to the portion executed"):
         assert_le(amount_to_be_sold_, order_details.portionExecuted)
     end
 
@@ -1120,7 +1124,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     # Update amount_to_be_sold storage variable
     amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
 
-    liquidate_deleverage.emit(position_id = id_, amount = amount_to_be_sold_)
+    liquidate_deleverage.emit(position_id=id_, amount=amount_to_be_sold_)
     return ()
 end
 

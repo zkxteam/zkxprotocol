@@ -9,7 +9,12 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
-from contracts.Constants import Asset_INDEX, CollateralPrices_INDEX, Market_INDEX, MarketPrices_INDEX
+from contracts.Constants import (
+    Asset_INDEX,
+    CollateralPrices_INDEX,
+    Market_INDEX,
+    MarketPrices_INDEX,
+)
 from contracts.DataTypes import (
     CollateralBalance,
     CollateralPrice,
@@ -84,7 +89,6 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     return ()
 end
 
-
 ######################
 # External Functions #
 ######################
@@ -111,9 +115,9 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
-        contract_address=account_address
-    )
+    let (
+        positions_len : felt, positions : OrderDetailsWithIDs*
+    ) = IAccountManager.return_array_positions(contract_address=account_address)
 
     # Check if the list is empty
     with_attr error_message("Position array length is 0"):
@@ -512,9 +516,9 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (version) = contract_version.read()
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
-        contract_address=order.pub_key
-    )
+    let (
+        positions_len : felt, positions : OrderDetailsWithIDs*
+    ) = IAccountManager.return_array_positions(contract_address=order.pub_key)
 
     # Check if the list is empty
     if positions_len == 0:
@@ -539,7 +543,7 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
 
     let (leveraged_position_value) = Math64x61_mul(execution_price, size)
-    
+
     let (leveraged_position_value_collateral) = Math64x61_mul(
         leveraged_position_value, collateral_price.price_in_usd
     )
@@ -632,9 +636,7 @@ func populate_asset_prices_recurse{
     tempvar time_difference = current_timestamp - timestamp
     let (status) = is_le(time_difference, ttl)
     if status == TRUE:
-        let (asset_price_in_usd) = Math64x61_mul(
-            market_price.price, collateral_price.price_in_usd
-        )
+        let (asset_price_in_usd) = Math64x61_mul(market_price.price, collateral_price.price_in_usd)
         let price_data = PriceData(
             assetID=[positions].assetID,
             collateralID=[positions].collateralID,
@@ -731,9 +733,9 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     )
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
-        contract_address=account_address
-    )
+    let (
+        positions_len : felt, positions : OrderDetailsWithIDs*
+    ) = IAccountManager.return_array_positions(contract_address=account_address)
 
     if positions_len == 0:
         let (empty_positions_array : PriceData*) = alloc()

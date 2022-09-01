@@ -113,7 +113,7 @@ func modify_base_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     with_attr error_message("Caller does not have permission to update base abr value"):
         let (version) = contract_version.read()
         let (registry) = registry_address.read()
-        verify_caller_authority(registry, version, MasterAdmin_ACTION)    
+        verify_caller_authority(registry, version, MasterAdmin_ACTION)
     end
 
     base_abr.write(new_base_abr)
@@ -135,7 +135,6 @@ func modify_bollinger_width{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
 
     return ()
 end
-
 
 # @notice Function to calculate the ABR for the current period
 # @param perp_index_len - Size of the perp index prices array

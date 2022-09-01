@@ -18,7 +18,6 @@ from contracts.libraries.Utils import verify_caller_authority
 #############
 const MESSAGE_WITHDRAW = 3
 
-
 ##########
 # Events #
 ##########
@@ -26,7 +25,7 @@ const MESSAGE_WITHDRAW = 3
 # Event emitted whenever add_withdrawal_request() is called
 @event
 func add_withdrawal_request_called(
-    request_id : felt, user_l1_address : felt, ticker : felt, amount : felt, user_l2_address: felt
+    request_id : felt, user_l1_address : felt, ticker : felt, amount : felt, user_l2_address : felt
 ):
 end
 
@@ -117,7 +116,7 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     end
 
     # get current withdrawal request object according to request_id_
-    let current_request: WithdrawalRequest = withdrawal_request_mapping.read(request_id_)
+    let current_request : WithdrawalRequest = withdrawal_request_mapping.read(request_id_)
 
     # get user_l2_address to be used for updating withdrawal history in AccountManager
     let user_l2_address = current_request.user_l2_address
@@ -129,7 +128,9 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     withdrawal_request_mapping.write(request_id=request_id_, value=updated_request)
 
     # update withdrawal history status field to 1
-    IAccountManager.update_withdrawal_history(contract_address=user_l2_address, request_id_=request_id_)
+    IAccountManager.update_withdrawal_history(
+        contract_address=user_l2_address, request_id_=request_id_
+    )
 
     # update_withdrawal_request_called event is emitted
     update_withdrawal_request_called.emit(
@@ -180,7 +181,7 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
     )
-     # Send the withdrawal message.
+    # Send the withdrawal message.
     let (message_payload : felt*) = alloc()
     assert message_payload[0] = MESSAGE_WITHDRAW
     assert message_payload[1] = user_l1_address_
@@ -193,7 +194,11 @@ func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
 
     # add_withdrawal_request_called event is emitted
     add_withdrawal_request_called.emit(
-        request_id=request_id_, user_l1_address=user_l1_address_, ticker=ticker_, amount=amount_, user_l2_address=caller
+        request_id=request_id_,
+        user_l1_address=user_l1_address_,
+        ticker=ticker_,
+        amount=amount_,
+        user_l2_address=caller,
     )
 
     return ()

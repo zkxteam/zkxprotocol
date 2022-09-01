@@ -22,7 +22,7 @@ end
 
 # this event is emitted whenever the version for this contract is changed by the admin
 @event
-func contract_version_changed(new_version: felt):
+func contract_version_changed(new_version : felt):
 end
 
 ###########
@@ -127,7 +127,7 @@ func update_collateral_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     tempvar new_collateral_price : CollateralPrice = CollateralPrice(
         timestamp=timestamp_,
         price_in_usd=price_,
-    )
+        )
 
     collateral_prices.write(id=collateral_id_, value=new_collateral_price)
 
