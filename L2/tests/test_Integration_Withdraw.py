@@ -120,11 +120,14 @@ async def adminAuth_factory(starknet_service: StarknetService):
     token_contract_json = json.load(f)
 
     token_contract = eth_test_utils.accounts[0].deploy(token_contract_json)
+
+    #instantiate Postman instance - this connects the L1 and L2 layers
     postman = Postman(mock_starknet_messaging_contract,
                       starknet_service.starknet)
 
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
 
+    # add asset in setup since it will be used by all tests
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(
         asset_id, asset_ticker, asset_name)
@@ -179,6 +182,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
 
     
     token_contract.approve.transact(l1_zkx_contract.address, 6*(10**18))
+    # deposit tokens on L1 side
     l1_zkx_contract.depositToL1.transact(
         deployed_address, asset_ticker, 6*(10**18))
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
@@ -200,19 +204,21 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
             fromBlock=LATEST_BLOCK_ID
         )
-    nonce=0
-    for event in message_to_l2_filter.get_all_entries():
-        nonce=event.args["nonce"]
+
+    # send message to L2
     await postman.flush()
    
     
     # balance should be updated after message is sent to L2 and L1_handler is called
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==6
+
+    # create withdrawal message
     request_id=1
     collateral_id=asset_id
-    amount = to64x61(2) # here amount needs to be not just 64x61 but also without decimal part
+    amount = to64x61(2) # here amount needs to be not just in 64x61 format but also without decimal part
     withdrawal_request_msg_hash = compute_hash_on_elements([request_id, collateral_id, amount])
+    # sign withdrawal request message
     signature = signer3.sign(withdrawal_request_msg_hash)
 
     await signer1.send_transaction(admin1, deployed_address, 'withdraw', [
@@ -233,6 +239,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
     assert token_balance==94*(10**18)
 
+    # call withdraw message on L1_ZKX_contract and consume message from starknet core
     l1_zkx_contract.withdraw.transact(eth_test_utils.accounts[0].address,
                                       asset_ticker,
                                       2*(10**18), # here amount is being given as uint256 not as 64x61 value
@@ -249,11 +256,13 @@ async def test_withdraw_positive_flow(adminAuth_factory):
                                       2*(10**18), # here amount is being given as uint256 not as 64x61 value
                                       request_id)
    
+    # verify L1_ZKX balance
     token_balance=token_contract.balanceOf.call(l1_zkx_contract.address)
     assert token_balance==4*(10**18)
 
     result = await new_account_contract.get_withdrawal_history().call()
     
+    # verify withdrawal history (in AccountManager) and withdrawl request objects (in WithdrawalRequest)
     result=result.result.withdrawal_list[0]
     assert result.request_id == request_id
     assert result.collateral_id == asset_id
@@ -269,16 +278,17 @@ async def test_withdraw_positive_flow(adminAuth_factory):
 
     await postman.flush()
 
+    # after withdrawal update message is sent to L2 and L1_handler called, the object state should change
     result = await new_account_contract.get_withdrawal_history().call()
    
     result=result.result.withdrawal_list[0]
     assert result.request_id == request_id
     assert result.collateral_id == asset_id
-    assert result.status == 1
+    assert result.status == 1 # status should be updated
 
     result = await withdrawal_request.get_withdrawal_request_data(request_id).call()
     result=result.result.withdrawal_request
-
+    # withdrawal request object should be reset
     assert result.user_l2_address == 0
     assert result.ticker == 0
     assert result.amount == 0
@@ -332,6 +342,7 @@ async def test_withdraw_incorrect_payload(adminAuth_factory):
                                       3*(10**18), # incorrect amount
                                       request_id)
 
+    # the following call reverts inside L1_ZKX rather than starknet core
     with eth_reverts("Withdrawal failed: non-registered asset"):
         l1_zkx_contract.withdraw.transact(eth_test_utils.accounts[0].address,
                                       str_to_felt('incorrect ticker'), # incorrect ticker
@@ -402,6 +413,7 @@ async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
     with eth_reverts("INVALID_MESSAGE_TO_CONSUME"):
         # l1_zkx_address was not the intended recipient of this message since the L1_ZKX_address was changed on L2
         # prior to sending this message to L1
+        # hence the call will revert inside starknet core where msg hash will be incorrect
         l1_zkx_contract.withdraw.transact(eth_test_utils.accounts[0].address,
                                       asset_ticker,
                                       2*(10**18), # here amount is being given as uint256 not as 64x61 value

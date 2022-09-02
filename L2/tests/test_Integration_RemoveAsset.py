@@ -313,6 +313,8 @@ async def test_remove_asset_impersonator_ZKX_L1(adminAuth_factory):
 
     await postman.flush()
 
+    # this call will revert since the L!_ZKX contract has been removed as authorised from L2
+    # hence the message hash will not match in starknet core when trying to retrieve a message from L2 due to incorrect recipient
     with eth_reverts("INVALID_MESSAGE_TO_CONSUME"):
         l1_zkx_contract.removeAssetFromList.transact(asset_ticker, asset_id)
     

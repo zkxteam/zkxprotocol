@@ -127,6 +127,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
 
+    # adding asset in setup since it is required by all tests
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(
         asset_id, asset_ticker, asset_name)
@@ -171,6 +172,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     
     balance_zkx_before = l1_zkx_contract.balance
     
+    # deposit Eth
     l1_zkx_contract.depositEthToL1.transact(
         deployed_address, transact_args={"value":6*(10**18)})
 
@@ -200,10 +202,13 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     # balance should be updated after message is sent to L2 and L1_handler is called
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==6
+
     request_id=1
     collateral_id=asset_id
     amount = to64x61(2) # here amount needs to be not just 64x61 but also without decimal part
     withdrawal_request_msg_hash = compute_hash_on_elements([request_id, collateral_id, amount])
+
+    # sign withdrawal request
     signature = signer3.sign(withdrawal_request_msg_hash)
 
     await signer1.send_transaction(admin1, deployed_address, 'withdraw', [
@@ -231,7 +236,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
                                       2*(10**18), # here amount is being given as uint256 not as 64x61 value
                                       request_id)
    
-    
+    # verify L1_ZKX balance
     balance_zkx_after = l1_zkx_contract.balance
     assert balance_zkx_after == 4*(10**18)
 
@@ -470,6 +475,7 @@ async def test_withdraw_positive_flow_sponsored(adminAuth_factory):
     balance_user_after =eth_test_utils.accounts[0].balance
     assert balance_user_after == balance_user_before + 2*(10**18)
 
+    # verify L1_ZKX balance
     balance_zkx_after = l1_zkx_contract.balance
     assert balance_zkx_after == balance_zkx_before - 2*(10**18)
     
