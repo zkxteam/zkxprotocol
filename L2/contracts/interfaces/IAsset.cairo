@@ -4,11 +4,10 @@ from contracts.DataTypes import Asset, AssetWID
 
 @contract_interface
 namespace IAsset:
-
     ######################
     # External functions #
     ######################
-    
+
     func set_L1_zkx_address(l1_zkx_address : felt):
     end
 
@@ -24,7 +23,7 @@ namespace IAsset:
         tradable : felt,
         collateral : felt,
         token_decimal : felt,
-        metadata_id : felt
+        metadata_id : felt,
     ):
     end
 
@@ -41,7 +40,7 @@ namespace IAsset:
         incremental_initial_margin_fraction : felt,
         incremental_position_size : felt,
         baseline_position_size : felt,
-        maximum_position_size : felt
+        maximum_position_size : felt,
     ):
     end
 
@@ -64,5 +63,3 @@ namespace IAsset:
     func returnAllAssets() -> (array_list_len : felt, array_list : AssetWID*):
     end
 end
-
-    

@@ -5,7 +5,7 @@ from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
     initialize,
-    verify_caller_authority
+    verify_caller_authority,
 )
 from contracts.DataTypes import Asset, AssetWID
 from starkware.cairo.common.cairo_builtins import HashBuiltin
@@ -16,7 +16,7 @@ from contracts.Constants import ManageAssets_ACTION
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt, index_ : felt
 ):
-    initialize(registry_address_,version_,index_)
+    initialize(registry_address_, version_, index_)
     return ()
 end
 
@@ -32,19 +32,18 @@ func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
 ):
     verify_caller_authority(ManageAssets_ACTION)
     record_call_details('addAsset')
-    let (inner_address)=get_inner_contract()
+    let (inner_address) = get_inner_contract()
     IAsset.addAsset(inner_address, id, new_asset)
-    return()
+    return ()
 end
-
 
 @external
 func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt):
     verify_caller_authority(ManageAssets_ACTION)
     record_call_details('removeAsset')
-    let (inner_address)=get_inner_contract()
-    IAsset.removeAsset(inner_address,id)
-    return()
+    let (inner_address) = get_inner_contract()
+    IAsset.removeAsset(inner_address, id)
+    return ()
 end
 
 @external
@@ -58,17 +57,11 @@ func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
 ):
     verify_caller_authority(ManageAssets_ACTION)
     record_call_details('modify_core_settings')
-    let (inner_address)=get_inner_contract()
+    let (inner_address) = get_inner_contract()
     IAsset.modify_core_settings(
-        inner_address,
-        id,
-        short_name,
-        tradable,
-        collateral,
-        token_decimal,
-        metadata_id,
+        inner_address, id, short_name, tradable, collateral, token_decimal, metadata_id
     )
-    return()
+    return ()
 end
 
 @external
@@ -89,7 +82,7 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
 ):
     verify_caller_authority(ManageAssets_ACTION)
     record_call_details('modify_trade_settings')
-    let (inner_address)=get_inner_contract()
+    let (inner_address) = get_inner_contract()
     IAsset.modify_trade_settings(
         inner_address,
         id,
@@ -104,10 +97,9 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
         incremental_initial_margin_fraction,
         incremental_position_size,
         baseline_position_size,
-        maximum_position_size
+        maximum_position_size,
     )
-    return()
-
+    return ()
 end
 
 ##################
@@ -118,36 +110,34 @@ end
 func getAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt) -> (
     currAsset : Asset
 ):
-    let (inner_address)=get_inner_contract()
-    let (res)=IAsset.getAsset(inner_address,id)
-    return(res)
+    let (inner_address) = get_inner_contract()
+    let (res) = IAsset.getAsset(inner_address, id)
+    return (res)
 end
 
 @view
 func get_maintenance_margin{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt
 ) -> (maintenance_margin : felt):
-
-    let (inner_address)=get_inner_contract()
-    let (res)=IAsset.get_maintenance_margin(inner_address,id)
-    return(res)
+    let (inner_address) = get_inner_contract()
+    let (res) = IAsset.get_maintenance_margin(inner_address, id)
+    return (res)
 end
-
 
 @view
 func get_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     version : felt
 ):
-    let (inner_address)=get_inner_contract()
-    let (res)=IAsset.get_version(inner_address)
-    return(res)
+    let (inner_address) = get_inner_contract()
+    let (res) = IAsset.get_version(inner_address)
+    return (res)
 end
 
 @view
 func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     array_list_len : felt, array_list : AssetWID*
 ):
-    let (inner_address)=get_inner_contract()
+    let (inner_address) = get_inner_contract()
     let (array_list_len, array_list : AssetWID*) = IAsset.returnAllAssets(inner_address)
-    return(array_list_len,array_list)
+    return (array_list_len, array_list)
 end

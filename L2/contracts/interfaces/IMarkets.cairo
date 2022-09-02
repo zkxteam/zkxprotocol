@@ -31,6 +31,4 @@ namespace IMarkets:
 
     func returnAllMarkets() -> (array_list_len : felt, array_list : MarketWID*):
     end
-
-    
 end

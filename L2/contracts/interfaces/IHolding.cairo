@@ -2,7 +2,6 @@
 
 @contract_interface
 namespace IHolding:
-
     # external functions
     func fund(asset_id_ : felt, amount : felt):
     end

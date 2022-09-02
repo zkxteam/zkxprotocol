@@ -29,7 +29,15 @@ from contracts.Constants import (
     STOP_ORDER,
     TradingFees_INDEX,
 )
-from contracts.DataTypes import Asset, Market, MarketPrice, MultipleOrder, OrderDetails, OrderRequest, Signature
+from contracts.DataTypes import (
+    Asset,
+    Market,
+    MarketPrice,
+    MultipleOrder,
+    OrderDetails,
+    OrderRequest,
+    Signature,
+)
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
@@ -78,13 +86,12 @@ end
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
-):  
-
+):
     with_attr error_message("Registry address and version cannot be 0"):
         assert_not_zero(registry_address_)
         assert_not_zero(version_)
     end
-    
+
     registry_address.write(value=registry_address_)
     contract_version.write(value=version_)
     return ()
@@ -125,8 +132,7 @@ func execute_batch{
 
     # Get Market from the corresponding Id
     let (market : Market) = IMarkets.getMarket(
-        contract_address=market_contract_address,
-        id=marketID
+        contract_address=market_contract_address, id=marketID
     )
 
     tempvar ttl = market.ttl
@@ -138,8 +144,7 @@ func execute_batch{
 
     # Get Market price for the corresponding market Id
     let (market_prices : MarketPrice) = IMarketPrices.get_market_price(
-        contract_address=market_prices_contract_address,
-        id=marketID
+        contract_address=market_prices_contract_address, id=marketID
     )
 
     tempvar timestamp = market_prices.timestamp
@@ -149,9 +154,7 @@ func execute_batch{
     # update market price
     if status == FALSE:
         IMarketPrices.update_market_price(
-            contract_address=market_prices_contract_address,
-            id=marketID,
-            price=execution_price
+            contract_address=market_prices_contract_address, id=marketID, price=execution_price
         )
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -168,7 +171,7 @@ func execute_batch{
     )
 
     # Check if every order has a counter order
-    with_attr error_message("check and execute returned non zero integer."):
+    with_attr error_message("Check and execute returned non zero integer."):
         assert result = 0
     end
     return (1)
@@ -227,16 +230,18 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         liquidatorAddress=[request_list].liquidatorAddress,
         parentOrder=[request_list].parentOrder,
         side=[request_list].side
-    )
+        )
 
     # check that the user account is present in account registry (and thus that it was deployed by us)
 
     let (account_registry) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AccountRegistry_INDEX, version=version)
+        contract_address=registry, index=AccountRegistry_INDEX, version=version
+    )
 
     let (is_registered) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry, address_=temp_order.pub_key)
-    
+        contract_address=account_registry, address_=temp_order.pub_key
+    )
+
     with_attr error_message("User account not registered"):
         assert_not_zero(is_registered)
     end
@@ -258,20 +263,20 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
         let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
 
-        with_attr error_message("asset is non tradable in trading contract."):
+        with_attr error_message("Asset is non tradable in trading contract."):
             assert_not_zero(asset.tradable)
         end
 
-        with_attr error_message("asset is non collaterable in trading contract."):
+        with_attr error_message("Asset is non collaterable in trading contract."):
             assert_not_zero(collateral.collateral)
         end
 
-        with_attr error_message("market is non tradable in trading contract."):
+        with_attr error_message("Market is non tradable in trading contract."):
             assert_not_zero(market.tradable)
         end
 
         with_attr error_message(
-                "leverage is not less than currently allowed leverage of the asset"):
+                "Leverage is not less than currently allowed leverage of the asset"):
             assert_le(temp_order.leverage, asset.currently_allowed_leverage)
         end
 
@@ -290,51 +295,54 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     # Check if the execution_price is correct
     if temp_order.orderType == STOP_ORDER:
         # if stop order
-        
+
         if temp_order.direction == LONG:
             # if long stop order
             # check that stop_price <= execution_price <= limit_price
-            with_attr error_message("Stop price should be less than or equal to the execution price for long orders"):
+            with_attr error_message(
+                    "Stop price should be less than or equal to the execution price for long orders"):
                 assert_le(temp_order.stopPrice, execution_price)
             end
             tempvar range_check_ptr = range_check_ptr
 
-            with_attr error_message("Execution price should be less than or equal to the order price for long orders"):
+            with_attr error_message(
+                    "Execution price should be less than or equal to the order price for long orders"):
                 assert_le(execution_price, temp_order.price)
             end
             tempvar range_check_ptr = range_check_ptr
         else:
             # if short stop order
             # check that limit_price <= execution_price <= stop_price
-            with_attr error_message("Order price should be less than or equal to the execution price for short orders"):
+            with_attr error_message(
+                    "Order price should be less than or equal to the execution price for short orders"):
                 assert_le(temp_order.price, execution_price)
             end
             tempvar range_check_ptr = range_check_ptr
 
-            with_attr error_message("Execution price should be less than or equal to the stop price for short orders"):
+            with_attr error_message(
+                    "Execution price should be less than or equal to the stop price for short orders"):
                 assert_le(execution_price, temp_order.stopPrice)
             end
             tempvar range_check_ptr = range_check_ptr
         end
-
     else:
         tempvar range_check_ptr = range_check_ptr
     end
-    #tempvar range_check_ptr = range_check_ptr
+    # tempvar range_check_ptr = range_check_ptr
 
     if temp_order.orderType == LIMIT_ORDER:
         # if it's a limit order
         if temp_order.direction == LONG:
             # if it's a long order
             with_attr error_message(
-                    "limit-long order execution price should be less than limit price."):
+                    "Limit-long order execution price should be less than limit price."):
                 assert_le(execution_price, temp_order.price)
             end
             tempvar range_check_ptr = range_check_ptr
         else:
             # if it's a short order
             with_attr error_message(
-                    "limit-short order limit price should be less than execution price."):
+                    "Limit-short order limit price should be less than execution price."):
                 assert_le(temp_order.price, execution_price)
             end
             tempvar range_check_ptr = range_check_ptr
@@ -378,7 +386,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     )
     # If the order is to be opened
     if temp_order.closeOrder == FALSE:
-        
         # Get the fees from Trading Fee contract
         let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
             contract_address=registry, index=TradingFees_INDEX, version=version
@@ -444,9 +451,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             contract_address=liquidate_contract_address,
             order=temp_order,
             size=order_size,
-            execution_price=execution_price
+            execution_price=execution_price,
         )
-        
+
         # Deduct the amount from account contract
         IAccountManager.transfer_from(
             contract_address=temp_order.pub_key,
@@ -745,7 +752,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assetID=temp_order.assetID,
         collateralID=temp_order.collateralID,
         price=temp_order.price,
-        stopPrice = temp_order.stopPrice,
+        stopPrice=temp_order.stopPrice,
         orderType=temp_order.orderType,
         positionSize=temp_order.positionSize,
         direction=temp_order.direction,
@@ -773,7 +780,12 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         borrowed_amount=borrowed_amount_,
     )
 
-    trade_execution.emit(address=temp_order.pub_key, request=temp_order_request, market_id=marketID, execution_price=average_execution_price)
+    trade_execution.emit(
+        address=temp_order.pub_key,
+        request=temp_order_request,
+        market_id=marketID,
+        execution_price=average_execution_price,
+    )
 
     # If it's the first order in the array
     if assetID == 0:
@@ -812,4 +824,3 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         sum_temp,
     )
 end
-

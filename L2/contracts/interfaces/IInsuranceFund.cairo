@@ -2,7 +2,6 @@
 
 @contract_interface
 namespace IInsuranceFund:
-
     # external functions
     func fund(asset_id_ : felt, amount : felt):
     end
@@ -22,5 +21,4 @@ namespace IInsuranceFund:
 
     func liq_amount(asset_id_ : felt, position_id_ : felt) -> (amount : felt):
     end
-
 end
