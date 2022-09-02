@@ -367,7 +367,7 @@ end
 # @param window_size - Window size of the array
 # @param sum - Current sum of the stds
 # @returns sum - Final sum of the stds
-func find_std{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+func find_std_sum{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     array_len : felt, array : felt*, mean : felt, window_size : felt, sum : felt
 ) -> (sum : felt):
     # If reached the end of the array, return
@@ -382,7 +382,7 @@ func find_std{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (diff_sq) = Math64x61_mul(diff, diff)
 
     # Recursively call the next array element
-    return find_std(array_len, array + 1, mean, window_size - 1, sum + diff_sq)
+    return find_std_sum(array_len, array + 1, mean, window_size - 1, sum + diff_sq)
 end
 
 # @notice Function to calculate the moving average
@@ -502,7 +502,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     if is_boundary == 1:
         # Calculate the std deviation of the window
         let (curr_window_size) = Math64x61_fromFelt(iterator + 1)
-        let (std_deviation) = find_std(tail_window_len, tail_window, mean, iterator + 1, 0)
+        let (std_deviation) = find_std_sum(tail_window_len, tail_window, mean, iterator + 1, 0)
 
         local curr_window
         if iterator == 0:
@@ -539,7 +539,7 @@ func calc_bollinger{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     else:
         # Calculate the std deviation of the window
         let (curr_window_size) = Math64x61_fromFelt(window_size)
-        let (std_deviation) = find_std(tail_window_len, tail_window, mean, window_size, 0)
+        let (std_deviation) = find_std_sum(tail_window_len, tail_window, mean, window_size, 0)
 
         let (curr_size) = Math64x61_sub(curr_window_size, NUM_1)
 
