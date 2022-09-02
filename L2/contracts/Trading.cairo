@@ -171,7 +171,7 @@ func execute_batch{
     )
 
     # Check if every order has a counter order
-    with_attr error_message("check and execute returned non zero integer."):
+    with_attr error_message("Check and execute returned non zero integer."):
         assert result = 0
     end
     return (1)
@@ -263,20 +263,20 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
         let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
 
-        with_attr error_message("asset is non tradable in trading contract."):
+        with_attr error_message("Asset is non tradable in trading contract."):
             assert_not_zero(asset.tradable)
         end
 
-        with_attr error_message("asset is non collaterable in trading contract."):
+        with_attr error_message("Asset is non collaterable in trading contract."):
             assert_not_zero(collateral.collateral)
         end
 
-        with_attr error_message("market is non tradable in trading contract."):
+        with_attr error_message("Market is non tradable in trading contract."):
             assert_not_zero(market.tradable)
         end
 
         with_attr error_message(
-                "leverage is not less than currently allowed leverage of the asset"):
+                "Leverage is not less than currently allowed leverage of the asset"):
             assert_le(temp_order.leverage, asset.currently_allowed_leverage)
         end
 
@@ -335,14 +335,14 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         if temp_order.direction == LONG:
             # if it's a long order
             with_attr error_message(
-                    "limit-long order execution price should be less than limit price."):
+                    "Limit-long order execution price should be less than limit price."):
                 assert_le(execution_price, temp_order.price)
             end
             tempvar range_check_ptr = range_check_ptr
         else:
             # if it's a short order
             with_attr error_message(
-                    "limit-short order limit price should be less than execution price."):
+                    "Limit-short order limit price should be less than execution price."):
                 assert_le(temp_order.price, execution_price)
             end
             tempvar range_check_ptr = range_check_ptr

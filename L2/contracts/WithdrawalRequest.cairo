@@ -111,7 +111,7 @@ func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     )
 
     # Make sure the message was sent by the intended L1 contract.
-    with_attr error_message("from address is not matching"):
+    with_attr error_message("From address is not matching"):
         assert from_address = l1_zkx_address
     end
 

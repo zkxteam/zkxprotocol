@@ -426,7 +426,7 @@ end
 func _verify_market_pair_exists{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset : felt, assetCollateral : felt, should_exist : felt
 ):
-    with_attr error_message("market pair existence mismatch"):
+    with_attr error_message("Market pair existence mismatch"):
         let (pair_exists) = market_pair_exists.read(asset, assetCollateral)
         assert pair_exists = should_exist
     end
@@ -474,11 +474,11 @@ end
 func _verify_tradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tradable : felt
 ):
-    with_attr error_message("tradable cannot be less than zero"):
+    with_attr error_message("Tradable cannot be less than zero"):
         assert_le(0, tradable)
     end
 
-    with_attr error_message("tradable should be less than or equal to max trabele"):
+    with_attr error_message("Tradable should be less than or equal to max trabele"):
         assert_le(tradable, MAX_TRADABLE)
     end
 

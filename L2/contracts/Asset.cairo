@@ -528,7 +528,7 @@ end
 func _verify_ticker_exists{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ticker : felt, should_exist : felt
 ):
-    with_attr error_message("ticker existence mismatch"):
+    with_attr error_message("Ticker existence mismatch"):
         let (ticker_exists) = asset_ticker_exists.read(ticker)
         assert ticker_exists = should_exist
     end
