@@ -143,7 +143,7 @@ end
 # @returns array_list_len - Length of the array_list
 # @returns array_list - Fully populated list of MarketWID
 @view
-func returnAllMarkets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+func get_all_markets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     array_list_len : felt, array_list : MarketWID*
 ):
     alloc_locals
@@ -392,7 +392,7 @@ end
 # Internal Functions #
 ######################
 
-# @notice Internal Function called by returnAllMarkets to recursively add assets to the array and return it
+# @notice Internal Function called by get_all_markets to recursively add assets to the array and return it
 # @param iterator - Current index being populated
 # @param array_list_len - Stores the current length of the populated array
 # @param array_list - Array of MarketWID filled up to the index
