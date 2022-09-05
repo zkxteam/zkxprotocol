@@ -474,32 +474,26 @@ func populate_markets_by_state{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 
     let (market_details : Market) = market_by_id.read(market_id=market_id)
 
-    local count
-    tempvar first_check = 0
-    tempvar second_check = 0
     if market_details.tradable == tradable:
-        first_check = 1
+        if market_details.archived == archived:
+            let market_details_w_id = MarketWID(
+                id=market_id,
+                asset=market_details.asset,
+                assetCollateral=market_details.assetCollateral,
+                leverage=market_details.leverage,
+                tradable=market_details.tradable,
+                archived=market_details.archived,
+                ttl=market_details.ttl,
+            )
+            assert array_list[index] = market_details_w_id
+            return populate_markets_by_state(
+                iterator + 1, index + 1, tradable, archived, array_list_len, array_list
+            )
+        end
     end
-    if market_details.archived == archived:
-        second_check = 1
-    end
-    count =  first_check + second_check
-
-    if count == 2:
-        let market_details_w_id = MarketWID(
-            id=market_id,
-            asset=market_details.asset,
-            assetCollateral=market_details.assetCollateral,
-            leverage=market_details.leverage,
-            tradable=market_details.tradable,
-            archived=market_details.archived,
-            ttl=market_details.ttl,
-        )
-        assert array_list[index] = market_details_w_id
-        return populate_markets_by_state(iterator + 1, index + 1, tradable, archived, array_list_len, array_list)
-    else:
-        return populate_markets_by_state(iterator + 1, index, tradable, archived, array_list_len, array_list)
-    end
+    return populate_markets_by_state(
+        iterator + 1, index, tradable, archived, array_list_len, array_list
+    )
 end
 
 # @notice Internal function to check authorization

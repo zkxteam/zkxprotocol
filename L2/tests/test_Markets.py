@@ -313,6 +313,20 @@ async def test_retrieve_markets(adminAuth_factory):
 
     assert len(list(markets_new.result.array_list)) == len(list(markets.result.array_list)) + 1
 
+@pytest.mark.asyncio
+async def test_modify_archived_state(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'modify_archived_state', [str_to_felt("32f0406jz7qk5"), 1])
+
+    execution_info = await market.getMarket(str_to_felt("32f0406jz7qk5")).call()
+    fetched_market = execution_info.result.currMarket
+
+    assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj10")
+    assert fetched_market.leverage == to64x61(6)
+    assert fetched_market.tradable == 1
+    assert fetched_market.archived == 1
 
 @pytest.mark.asyncio
 async def test_get_all_archived_tradable_markets(adminAuth_factory):
@@ -331,4 +345,4 @@ async def test_get_all_archived_tradable_markets(adminAuth_factory):
     markets_new = await market.get_markets_by_state(1, 1).call()
     print("New Market list:", markets_new.result.array_list)
 
-    assert len(list(markets_new.result.array_list)) == len(list(markets.result.array_list)) - 7   
+    assert len(list(markets_new.result.array_list)) == len(list(markets.result.array_list)) - 6   
