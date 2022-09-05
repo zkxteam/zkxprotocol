@@ -993,7 +993,6 @@ func withdraw{
 
     IWithdrawalFeeBalance.update_withdrawal_fee_mapping(
         contract_address=withdrawal_fee_balance_address,
-        user_l2_address_=user_l2_address,
         collateral_id_=fee_collateral_id,
         fee_to_add_=standard_fee,
     )
