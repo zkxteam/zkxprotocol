@@ -30,7 +30,6 @@ class ContractType(Enum):
     ABRPayment = "contracts/ABRPayment.cairo"
     MarketPrices = "contracts/MarketPrices.cairo"
     Liquidate = "tests/testable/TestLiquidate.cairo"
-    CallFeeBalance = "contracts/CallFeeBalance.cairo"
     DepositDataManager = "contracts/DepositDataManager.cairo"
     WithdrawalFeeBalance = "contracts/WithdrawalFeeBalance.cairo"
     CollateralPrices = "contracts/CollateralPrices.cairo"
@@ -50,6 +49,7 @@ class ContractType(Enum):
     WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
     # Test-helping contracts
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
+    CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
 
 class OptimizedStarknetState(StarknetState):
 

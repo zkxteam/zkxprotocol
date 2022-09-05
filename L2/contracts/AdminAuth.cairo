@@ -56,7 +56,8 @@ end
 # @param address2 - Address for second initial admin
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        address1 : felt, address2 : felt):
+    address1 : felt, address2 : felt
+):
     # Action 0 is the admin role - the role which can add and remove admins
     admin_mapping.write(address=address1, action=MasterAdmin_ACTION, value=TRUE)
     admin_mapping.write(address=address2, action=MasterAdmin_ACTION, value=TRUE)
@@ -75,7 +76,8 @@ end
 # @return allowed - 0 if no access, 1 if access allowed
 @view
 func get_admin_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        address : felt, action : felt) -> (allowed : felt):
+    address : felt, action : felt
+) -> (allowed : felt):
     let (allowed) = admin_mapping.read(address=address, action=action)
     return (allowed=allowed)
 end
@@ -83,7 +85,8 @@ end
 # @notice - Returns minimum number of admins required in the system
 @view
 func get_min_num_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-        res : felt):
+    res : felt
+):
     let (res) = min_num_admins.read()
     return (res)
 end
@@ -91,7 +94,7 @@ end
 # @notice - Returns the total number of admins currently in the system
 @view
 func get_current_total_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        ) -> (res : felt):
+    ) -> (res : felt):
     let (res) = current_total_admins.read()
     return (res)
 end
@@ -106,11 +109,12 @@ end
 # @param value - 0 (FALSE) for revoking, 1 (TRUE) for granting
 @external
 func update_admin_mapping{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        address : felt, action : felt, value : felt):
+    address : felt, action : felt, value : felt
+):
     # Verify that caller has admin role
     let (caller) = get_caller_address()
     let (is_admin) = admin_mapping.read(address=caller, action=MasterAdmin_ACTION)
-    
+
     with_attr error_message("Unauthorized call - only admin can call this function"):
         assert is_admin = TRUE
     end
@@ -142,7 +146,8 @@ end
 # @param num - number of min admins to set (must be >= 2)
 @external
 func set_min_num_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        num : felt):
+    num : felt
+):
     # Verify that caller has admin role
     let (caller) = get_caller_address()
     let (is_admin) = admin_mapping.read(address=caller, action=MasterAdmin_ACTION)
@@ -155,7 +160,7 @@ func set_min_num_admins{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         assert_nn(num)
         assert_le(2, num)  # we enforce that there have to be atleast 2 admins in the system
     end
-    
+
     min_num_admins.write(num)
     return ()
 end
@@ -167,7 +172,8 @@ end
 # @notice - This function processes the update admin mapping call when action = MasterAdmin_ACTION
 # It checks that caller is not the same as previous approver/remover and updates the mapping accordingly
 func process_admin_action{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-        address : felt, value : felt, caller : felt):
+    address : felt, value : felt, caller : felt
+):
     if value == TRUE:
         # check that approver is not same as caller
         # if present approver is 0 then caller is first approver

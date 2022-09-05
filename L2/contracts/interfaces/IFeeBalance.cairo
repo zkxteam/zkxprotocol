@@ -2,7 +2,6 @@
 
 @contract_interface
 namespace IFeeBalance:
-    
     # external functions
     func update_fee_mapping(address : felt, assetID_ : felt, fee_to_add : felt):
     end
@@ -14,5 +13,4 @@ namespace IFeeBalance:
 
     func get_user_fee(address : felt, assetID_ : felt) -> (fee : felt):
     end
-
 end
