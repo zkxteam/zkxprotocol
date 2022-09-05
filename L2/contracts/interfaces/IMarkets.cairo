@@ -29,6 +29,6 @@ namespace IMarkets:
     func getMarket_from_assets(asset_id : felt, collateral_id : felt) -> (market_id : felt):
     end
 
-    func returnAllMarkets() -> (array_list_len : felt, array_list : MarketWID*):
+    func get_all_markets() -> (array_list_len : felt, array_list : MarketWID*):
     end
 end
