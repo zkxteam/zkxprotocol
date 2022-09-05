@@ -167,9 +167,14 @@ end
 func L1_address() -> (res : felt):
 end
 
-# Stores all positions held by the user
+# Stores all markets the user has position in
 @storage_var
-func position_array(index : felt) -> (position_id : felt):
+func index_to_market_array(index : felt) -> (market_id : felt):
+end
+
+# Stores the mapping from the market_id to index 
+@storage_var
+func market_to_index_mapping(market_id : felt) -> (market_id : felt):
 end
 
 # Stores all collaterals held by the user
@@ -177,9 +182,9 @@ end
 func collateral_array(index : felt) -> (collateral_id : felt):
 end
 
-# Stores length of the position array
+# Stores the length of the index_to_market_array 
 @storage_var
-func position_array_len() -> (len : felt):
+func index_to_market_array_len() -> (len : felt):
 end
 
 # Stores length of the collateral array
@@ -603,39 +608,6 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     return ()
 end
 
-
-# # @notice External function called to remove a fully closed position
-# # @param id_ - Index of the element in the array
-# # @return 1 - If successfully removed
-# @external
-# func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-#     id_ : felt
-# ) -> (res : felt):
-#     alloc_locals
-
-#     let (pos_id) = position_array.read(index=id_)
-#     if pos_id == 0:
-#         with_attr error_message("No order exists in that index"):
-#             assert 1 = 0
-#         end
-#     end
-
-#     let (posDetails : PositionDetails) = order_mapping.read(orderID=pos_id)
-
-#     with_attr error_message("The order is not fully closed yet."):
-#         assert posDetails.status = POSITION_CLOSED
-#     end
-
-#     let (arr_len) = position_array_len.read()
-#     let (last_id) = position_array.read(index=arr_len - 1)
-
-#     position_array.write(index=id_, value=last_id)
-#     position_array.write(index=arr_len - 1, value=0)
-
-#     position_array_len.write(arr_len - 1)
-#     return (1)
-# end
-
 # @notice Function called by Trading Contract
 # @param request - Details of the order to be executed
 # @param signature - Details of the signature
@@ -696,8 +668,23 @@ func execute_order{
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
+        if position_details.positionSize == 0:
+            add_to_market_array(market_id)
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        end
+
         # New position size
         let (new_positionSize) = Math64x61_add(position_details.positionSize, size)
+        
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
         
         # New leverage
         let total_value = margin_amount + borrowed_amount
@@ -783,6 +770,17 @@ func execute_order{
             borrowedAmount=borrowed_amount,
             leverage=new_leverage
         )
+
+        if new_positionSize == 0:
+            remove_from_market_array(market_id)
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        end
 
         # Write to the mapping
         position_mapping.write(marketID=market_id, direction=parent_direction, value=updated_position)
@@ -1132,15 +1130,38 @@ func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(
     end
 end
 
-# @notice Internal function to add a position to the array when it is opened
-# @param id_ - OrderRequest Id to be added
+# @notice Internal function to add a market to the array
+# @param market_id - Id of the market to tbe added
 # @return 1 - If successfully added
-func add_to_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id_ : felt
+func add_to_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt
 ) -> (res : felt):
-    let (arr_len) = position_array_len.read()
-    position_array.write(index=arr_len, value=id_)
-    position_array_len.write(arr_len + 1)
+    let (arr_len) = index_to_market_array_len.read()
+    index_to_market_array.write(index=arr_len, value=market_id)
+
+    market_to_index_mapping.write(market_id=market_id, value = arr_len)
+    index_to_market_array_len.write(value=arr_len + 1)
+    return (1)
+end
+
+# @notice Internal function called to remove a fully closed position
+# @param market_id - Id of the market
+# @return 1 - If successfully removed
+func remove_from_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt
+) -> (res : felt):
+    alloc_locals
+
+    let (index) = market_to_index_mapping.read(market_id=market_id)
+
+    let (arr_len) = index_to_market_array_len.read()
+    let (last_id) = index_to_market_array.read(index=arr_len - 1)
+
+    index_to_market_array.write(index=index, value=last_id)
+    index_to_market_array.write(index=arr_len - 1, value=0)
+
+    market_to_index_mapping.write(market_id=market_id, value = 0)
+    index_to_market_array_len.write(arr_len - 1)
     return (1)
 end
 

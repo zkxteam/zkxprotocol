@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import assert_in_range, assert_le, assert_not_zero
+from starkware.cairo.common.math import assert_in_range, assert_le, assert_lt, assert_not_zero
 from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
@@ -343,6 +343,11 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     with_attr error_message("User account not registered"):
         assert_not_zero(is_registered)
+    end
+
+    # check that position is not 0 or negative
+    with_attr error_message("Order request size cannot be negative or zero"):
+        assert_lt(0, temp_order.positionSize)
     end
 
     # Check if the execution_price is correct
