@@ -17,6 +17,7 @@ struct MarketWID:
     member assetCollateral : felt
     member leverage : felt
     member tradable : felt
+    member archived : felt
     member ttl : felt
 end
 

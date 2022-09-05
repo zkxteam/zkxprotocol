@@ -176,6 +176,28 @@ func getMarket_from_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
     return (currMarket)
 end
 
+# @notice View function to return markets by their state with ids in an array
+# @param tradable - tradable flag
+# @param archived - archived flag
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of MarketWID
+@view
+func get_markets_by_state{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    tradable : felt, archived : felt
+) -> (array_list_len : felt, array_list : MarketWID*):
+    alloc_locals
+
+    let (array_list : MarketWID*) = alloc()
+    let (array_list_len) = markets_array_len.read()
+    return populate_markets_by_state(
+        iterator=0,
+        tradable=tradable,
+        archived=archived,
+        array_list_len=array_list_len,
+        array_list=array_list,
+    )
+end
+
 ######################
 # External Functions #
 ######################
@@ -416,11 +438,64 @@ func populate_markets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
         assetCollateral=market_details.assetCollateral,
         leverage=market_details.leverage,
         tradable=market_details.tradable,
+        archived=market_details.archived,
         ttl=market_details.ttl,
     )
     assert array_list[iterator] = market_details_w_id
 
     return populate_markets(iterator + 1, array_list_len, array_list)
+end
+
+# @notice Internal Function called by get_all_markets to recursively add assets to the array and return it
+# @param iterator - Current index being populated
+# @param tradable - tradable flag
+# @param archived - archived flag
+# @param array_list_len - Stores the current length of the populated array
+# @param array_list - Array of MarketWID filled up to the index
+# @returns array_list_len - Length of the array_list
+# @returns array_list - Fully populated list of MarketWID
+func populate_markets_by_state{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    iterator : felt,
+    tradable : felt,
+    archived : felt,
+    array_list_len : felt,
+    array_list : MarketWID*,
+) -> (array_list_len : felt, array_list : MarketWID*):
+    alloc_locals
+
+    if iterator == array_list_len:
+        return (array_list_len, array_list)
+    end
+
+    let (market_id) = market_id_by_index.read(index=iterator)
+
+    let (market_details : Market) = market_by_id.read(market_id=market_id)
+
+    tempvar count
+    tempvar first_check
+    tempvar second_check
+    if market_details.tradable == tradable:
+        first_check = 1
+    end
+    if market_details.archived == archived:
+        second_check = 1
+    end
+    count =  first_check + second_check
+
+    if count == 2:
+        let market_details_w_id = MarketWID(
+            id=market_id,
+            asset=market_details.asset,
+            assetCollateral=market_details.assetCollateral,
+            leverage=market_details.leverage,
+            tradable=market_details.tradable,
+            archived=market_details.archived,
+            ttl=market_details.ttl,
+        )
+        assert array_list[iterator] = market_details_w_id
+    end
+    
+    return populate_markets_by_state(iterator + 1, tradable, archived, array_list_len, array_list)
 end
 
 # @notice Internal function to check authorization
