@@ -631,7 +631,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
             # If no leverage is used
             # to64x61(1) == 2305843009213693952
-            if temp_order.leverage == 2305843009213693952:
+            if temp_order.leverage == LEVERAGE_ONE:
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                 tempvar range_check_ptr = range_check_ptr
