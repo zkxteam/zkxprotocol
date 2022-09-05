@@ -428,7 +428,7 @@ async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
         [3],
         0,
         nonce
-    ), "from address is not matching")
+    ), "From address is not matching")
 
     # restoring L1_ZKX_address on L2
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
