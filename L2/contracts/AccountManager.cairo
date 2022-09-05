@@ -1153,12 +1153,15 @@ func remove_from_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     alloc_locals
 
     let (index) = market_to_index_mapping.read(market_id=market_id)
-
     let (arr_len) = index_to_market_array_len.read()
-    let (last_id) = index_to_market_array.read(index=arr_len - 1)
 
-    index_to_market_array.write(index=index, value=last_id)
-    index_to_market_array.write(index=arr_len - 1, value=0)
+    if arr_len == 1:
+        index_to_market_array.write(index=index, value=0)
+    else:
+        let (last_id) = index_to_market_array.read(index=arr_len - 1)
+        index_to_market_array.write(index=index, value=last_id)
+        index_to_market_array.write(index=arr_len - 1, value=0)
+    end
 
     market_to_index_mapping.write(market_id=market_id, value = 0)
     index_to_market_array_len.write(arr_len - 1)
