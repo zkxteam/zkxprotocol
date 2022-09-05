@@ -18,11 +18,11 @@ end
 @external
 func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt
-) -> (res : felt):
+):
     record_call_details('add_to_account_registry')
     let (inner_address) = get_inner_contract()
-    let (res) = IAccountRegistry.add_to_account_registry(inner_address, address_)
-    return (res)
+    IAccountRegistry.add_to_account_registry(inner_address, address_)
+    return ()
 end
 
 @external

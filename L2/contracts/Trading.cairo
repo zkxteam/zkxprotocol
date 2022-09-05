@@ -106,7 +106,6 @@ end
 # @param execution_price - Price at which the orders must be executed
 # @param request_list_len - No of orders in the batch
 # @param request_list - The batch of the orders
-# @returns res - 1 if executed correctly
 @external
 func execute_batch{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
@@ -116,7 +115,7 @@ func execute_batch{
     marketID : felt,
     request_list_len : felt,
     request_list : MultipleOrder*,
-) -> (res : felt):
+) -> ():
     alloc_locals
 
     let (registry) = registry_address.read()
@@ -174,7 +173,7 @@ func execute_batch{
     with_attr error_message("Check and execute returned non zero integer."):
         assert result = 0
     end
-    return (1)
+    return ()
 end
 
 ######################

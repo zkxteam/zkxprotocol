@@ -615,11 +615,10 @@ end
 
 # @notice External function called to remove a fully closed position
 # @param id_ - Index of the element in the array
-# @return 1 - If successfully removed
 @external
 func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id_ : felt
-) -> (res : felt):
+) -> ():
     alloc_locals
 
     let (pos_id) = position_array.read(index=id_)
@@ -642,7 +641,7 @@ func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     position_array.write(index=arr_len - 1, value=0)
 
     position_array_len.write(arr_len - 1)
-    return (1)
+    return ()
 end
 
 # @notice Function called by Trading Contract
@@ -651,7 +650,6 @@ end
 # @param size - Size of the Order to be executed
 # @param execution_price - Price at which the order should be executed
 # @param amount - TODO: Amount of funds that user must send/receive
-# @return 1, if executed correctly
 @external
 func execute_order{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
@@ -662,7 +660,7 @@ func execute_order{
     execution_price : felt,
     margin_amount : felt,
     borrowed_amount : felt,
-) -> (res : felt):
+) -> ():
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
 
@@ -873,7 +871,7 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr
         tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     end
-    return (1)
+    return ()
 end
 
 # @notice function to update l1 fee and node operators l1 wallet address
@@ -1247,14 +1245,13 @@ end
 
 # @notice Internal function to add a position to the array when it is opened
 # @param id_ - OrderRequest Id to be added
-# @return 1 - If successfully added
 func add_to_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id_ : felt
-) -> (res : felt):
+) -> ():
     let (arr_len) = position_array_len.read()
     position_array.write(index=arr_len, value=id_)
     position_array_len.write(arr_len + 1)
-    return (1)
+    return ()
 end
 
 # @notice Internal function to add collateral to the array
