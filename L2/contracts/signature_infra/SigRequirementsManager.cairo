@@ -64,7 +64,9 @@ func assert_func_handled{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
         core_function : CoreFunction):
     let (is_registered) = func_to_registration_mapping.read(core_function)
 
-    assert_not_zero(is_registered)
+    with_attr error_message("Function not registered for handling by signature infra"):
+        assert_not_zero(is_registered)
+    end
 
     return ()
 end
@@ -108,7 +110,7 @@ func set_sig_requirement{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
 
-    with_attr("Number of signatures required cannot be negative"):
+    with_attr error_message("Number of signatures required cannot be negative"):
         assert_nn(num_req)
     end
 
