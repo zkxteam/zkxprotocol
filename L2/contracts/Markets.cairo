@@ -296,6 +296,10 @@ func removeMarket{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     local last_market_index = curr_len - 1
     let (local last_market_id) = market_id_by_index.read(last_market_index)
 
+    with_attr error_message("Tradable market cannot be removed"):
+        assert_le(market_to_remove.tradable, 0)
+    end
+
     # Replace id_to_remove with last_market_id
     market_id_by_index.write(index_to_remove, last_market_id)
     market_index_by_id.write(last_market_id, index_to_remove)

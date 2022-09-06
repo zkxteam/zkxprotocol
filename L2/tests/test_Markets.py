@@ -257,11 +257,20 @@ async def test_remove_market_unauthorized_user(adminAuth_factory):
     await assert_revert(signer3.send_transaction(
         user1, market.contract_address, 'removeMarket', [str_to_felt("32f0406jz7qk1")]))
 
+@pytest.mark.asyncio
+async def test_remove_tradable_market(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'modifyTradable', [str_to_felt("32f0406jz7qk1"), 1])
+
+    await assert_revert(signer3.send_transaction(
+        admin1, market.contract_address, 'removeMarket', [str_to_felt("32f0406jz7qk1")]))
 
 @pytest.mark.asyncio
 async def test_remove_market(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
+    await signer1.send_transaction(admin1, market.contract_address, 'modifyTradable', [str_to_felt("32f0406jz7qk1"), 0])
     await signer1.send_transaction(admin1, market.contract_address, 'removeMarket', [str_to_felt("32f0406jz7qk1")])
 
     execution_info = await market.getMarket(str_to_felt("32f0406jz7qk1")).call()
