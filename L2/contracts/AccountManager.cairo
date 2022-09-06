@@ -229,6 +229,13 @@ end
 # View Functions #
 ##################
 
+### TODO : remove ###
+@view
+func get_market_len{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (res : felt):
+    let (res : felt) = index_to_market_array_len.read()
+    return (res = res)
+end
+
 # @notice view function to get public key
 # @return res - public key of an account
 @view
@@ -600,6 +607,19 @@ func get_net_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     )
 end
 
+@external
+func get_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    positions_array_len : felt, positions_array : PositionDetails*
+):
+    alloc_locals
+
+    let (positions_array : PositionDetails*) = alloc()
+    let (array_len : felt) = index_to_market_array_len.read()
+    return populate_positions(
+        positions_array_len=0, positions_array=positions_array, array_len=array_len - 1 
+    )
+end
+
 # @notice External function called by the Trading Contract to transfer funds from account contract
 # @param assetID_ - asset ID of the collateral that needs to be transferred
 # @param amount - Amount of funds to transfer to this contract
@@ -798,7 +818,16 @@ func execute_order{
         )
 
         if new_positionSize == 0:
-            remove_from_market_array(market_id)
+            if position_details.positionSize == 0:
+                remove_from_market_array(market_id)
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            end
             tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
@@ -1131,10 +1160,62 @@ func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*
     return populate_array_collaterals(array_list_len_ + 1, array_list_)
 end
 
+func populate_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    positions_array_len : felt, positions_array : PositionDetails*, array_len : felt
+) -> (positions_array_len : felt, positions_array : PositionDetails*):
+
+    alloc_locals
+    # If reached the end of the array, then return
+    if array_len == -1:
+        return (positions_array_len, positions_array)
+    end
+
+    # Get the market id at that position
+    let (curr_market_id : felt) = index_to_market_array.read(index=array_len)
+
+    # Get Long position
+    let (long_position : PositionDetails) = position_mapping.read(
+        marketID=curr_market_id, direction=LONG
+    )
+
+    # Get Short position
+    let (short_position : PositionDetails) = position_mapping.read(
+        marketID=curr_market_id, direction=SHORT
+    )
+
+    if long_position.positionSize == 0:
+    else:
+        # Store it in the array
+        assert positions_array[positions_array_len] = long_position
+        positions_array_len = positions_array_len + 1
+    end 
+
+    if short_position.positionSize == 0:
+    else:
+        # Store it in the array
+        assert positions_array[positions_array_len] = short_position
+        positions_array_len = positions_array_len + 1
+    end
+
+    %{
+        # Print the transaction values using a hint, for
+        # debugging purposes.
+        print(
+            f'Position array len: {ids.positions_array_len} '
+        )
+    %}
+
+    return populate_positions(
+        positions_array_len=positions_array_len,
+        positions_array=positions_array,
+        array_len=array_len - 1,
+    )
+end
+
+
 # @notice External function called by the ABR Contract to get the array of net positions of the user
 # @returns net_positions_array - Required array of net positions
 # @returns net_positions_array_len - Length of the array
-@external
 func populate_net_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     net_positions_array_len : felt, net_positions_array : NetPositions*, array_len : felt
 ) -> (net_positions_array_len : felt, net_positions_array : NetPositions*):
@@ -1171,7 +1252,7 @@ func populate_net_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     return populate_net_positions(
         net_positions_array_len=net_positions_array_len + 1,
         net_positions_array=net_positions_array,
-        array_len=net_positions_array_len,
+        array_len=array_len,
     )
 end
 
@@ -1211,6 +1292,12 @@ end
 func add_to_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt
 ) -> (res : felt):
+    let (is_exists) = market_to_index_mapping.read(market_id=market_id)
+
+    if is_exists == TRUE:
+        return (1)
+    end
+
     let (arr_len) = index_to_market_array_len.read()
     index_to_market_array.write(index=arr_len, value=market_id)
 
