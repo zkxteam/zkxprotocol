@@ -11,7 +11,7 @@ namespace IAsset:
     func set_L1_zkx_address(l1_zkx_address : felt):
     end
 
-    func addAsset(id : felt, new_asset : Asset):
+    func add_asset(id : felt, new_asset : Asset):
     end
 
     func removeAsset(id_to_remove : felt):

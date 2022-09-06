@@ -39,8 +39,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, collateral_prices.contract_address])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDT_ID, 0, str_to_felt("USDT"), str_to_felt("USDT"), 1, 0, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [USDT_ID, 0, str_to_felt("USDT"), str_to_felt("USDT"), 1, 0, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     return adminAuth, collateral_prices, admin1, admin2
 

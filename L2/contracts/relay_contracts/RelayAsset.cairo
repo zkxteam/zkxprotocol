@@ -27,13 +27,13 @@ end
 ######################
 
 @external
-func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+func add_asset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id : felt, new_asset : Asset
 ):
     verify_caller_authority(ManageAssets_ACTION)
-    record_call_details('addAsset')
+    record_call_details('add_asset')
     let (inner_address) = get_inner_contract()
-    IAsset.addAsset(inner_address, id, new_asset)
+    IAsset.add_asset(inner_address, id, new_asset)
     return ()
 end
 

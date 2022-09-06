@@ -131,11 +131,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(
         asset_id, asset_ticker, asset_name)
-    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
         add_asset_tx,
         from_address=asset.contract_address,
-        name="Asset_Added",
+        name="asset_added",
         data=[
             asset_id,
             asset_ticker,

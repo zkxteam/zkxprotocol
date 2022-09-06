@@ -54,13 +54,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_market.contract_address, 1, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_market.contract_address, 2, 1])
 
-    await signer1.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj8"), 0, str_to_felt("ETH"), str_to_felt("Ethereum"), 1, 0, 18, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj7"), 0, str_to_felt("USDC"), str_to_felt("USDCoin"), 0, 1, 6, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj6"), 0, str_to_felt("DOT"), str_to_felt("Polkadot"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj9"), 0, str_to_felt("TSLA"), str_to_felt("Tesla"), 0, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj10"), 0, str_to_felt("USDT"), str_to_felt("USDTether"), 0, 1, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj11"), 0, str_to_felt("LINK"), str_to_felt("Chainlink"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj12"), 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj8"), 0, str_to_felt("ETH"), str_to_felt("Ethereum"), 1, 0, 18, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj7"), 0, str_to_felt("USDC"), str_to_felt("USDCoin"), 0, 1, 6, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj6"), 0, str_to_felt("DOT"), str_to_felt("Polkadot"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj9"), 0, str_to_felt("TSLA"), str_to_felt("Tesla"), 0, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj10"), 0, str_to_felt("USDT"), str_to_felt("USDTether"), 0, 1, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj11"), 0, str_to_felt("LINK"), str_to_felt("Chainlink"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj12"), 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
 
     # Return relay versions of asset, market to test logic of underlying contracts
     return adminAuth, relay_asset, relay_market, admin1, admin2, user1
