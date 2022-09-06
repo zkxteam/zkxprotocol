@@ -2151,6 +2151,15 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     #assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
 
+@pytest.mark.asyncio
+async def test_retrieval_of_net_positions(adminAuth_factory):
+    starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
+
+    alice_positions = await alice.get_net_positions().call()
+    print(alice_positions)
+
+    bob_positions = await bob.get_net_positions().call()
+    print(bob_positions)
 
 @pytest.mark.asyncio
 async def test_for_risk_while_opening_order(adminAuth_factory):
