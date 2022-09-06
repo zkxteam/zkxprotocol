@@ -107,11 +107,11 @@ func getMarket_from_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
 end
 
 @view
-func returnAllMarkets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+func get_all_markets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     array_list_len : felt, array_list : MarketWID*
 ):
     let (inner_address) = get_inner_contract()
-    let (array_list_len, array_list : MarketWID*) = IMarkets.returnAllMarkets(
+    let (array_list_len, array_list : MarketWID*) = IMarkets.get_all_markets(
         contract_address=inner_address
     )
     return (array_list_len, array_list)
