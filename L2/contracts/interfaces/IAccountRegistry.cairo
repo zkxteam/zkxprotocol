@@ -3,7 +3,7 @@
 @contract_interface
 namespace IAccountRegistry:
     # external functions
-    func add_to_account_registry(address_ : felt) -> (res : felt):
+    func add_to_account_registry(address_ : felt) -> ():
     end
 
     func remove_from_account_registry(id_ : felt) -> ():

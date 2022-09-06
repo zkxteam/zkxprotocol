@@ -118,11 +118,10 @@ end
 
 # @notice add to account registry
 # @param address_ - L2 account contract address of the user
-# @return 1 - If successfully added
 @external
 func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address_ : felt
-) -> (res : felt):
+):
     # Check whether the call is from account deployer contract
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -152,7 +151,7 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
     end
-    return (1)
+    return ()
 end
 
 # @notice External function called to remove account address from registry
