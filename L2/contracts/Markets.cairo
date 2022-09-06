@@ -438,7 +438,8 @@ func populate_markets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 
     let (market_details : Market) = market_by_id.read(market_id=market_id)
 
-    if market_details.asset == 0:
+    let (id_exists) = market_id_exists.read(market_id)
+    if id_exists == FALSE:
         return populate_markets(iterator + 1, array_list_len, array_list)
     else:
         let market_details_w_id = MarketWID(
@@ -482,7 +483,8 @@ func populate_markets_by_state{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
 
     let (market_details : Market) = market_by_id.read(market_id=market_id)
 
-    if market_details.asset == 0:
+    let (id_exists) = market_id_exists.read(market_id)
+    if id_exists == FALSE:
         return populate_markets_by_state(
             iterator + 1, index, tradable, archived, array_list_len, array_list
         )
