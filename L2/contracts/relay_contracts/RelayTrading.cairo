@@ -25,7 +25,7 @@ func execute_batch{
     marketID : felt,
     request_list_len : felt,
     request_list : MultipleOrder*,
-) -> (res : felt):
+):
     alloc_locals
 
     local pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -34,8 +34,8 @@ func execute_batch{
 
     record_call_details('execute_batch')
     let (inner_address) = get_inner_contract()
-    let (res) = ITrading.execute_batch(
+    ITrading.execute_batch(
         inner_address, size, execution_price, marketID, request_list_len, request_list
     )
-    return (res)
+    return ()
 end

@@ -171,7 +171,7 @@ func deploy_account{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
 
     # getting a return value from the add_to_account_registry function means that it was successful
-    let (res) = IAccountRegistry.add_to_account_registry(account_registry, deployed_address)
+    IAccountRegistry.add_to_account_registry(account_registry, deployed_address)
 
     account_deployed.emit(
         pubkey=public_key, L1_address=L1_address, account_address=deployed_address
