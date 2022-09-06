@@ -335,7 +335,7 @@ func modifyTradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
-    let (asset1 : Asset) = IAsset.getAsset(contract_address=asset_address, id=_market.asset)
+    let (asset1 : Asset) = IAsset.get_asset(contract_address=asset_address, id=_market.asset)
 
     if _market.tradable == 2:
         market_by_id.write(
@@ -500,8 +500,8 @@ func _validate_market_properties{syscall_ptr : felt*, pedersen_ptr : HashBuiltin
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
-    let (asset1 : Asset) = IAsset.getAsset(contract_address=asset_address, id=market.asset)
-    let (asset2 : Asset) = IAsset.getAsset(
+    let (asset1 : Asset) = IAsset.get_asset(contract_address=asset_address, id=market.asset)
+    let (asset2 : Asset) = IAsset.get_asset(
         contract_address=asset_address, id=market.assetCollateral
     )
 

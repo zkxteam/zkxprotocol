@@ -168,7 +168,7 @@ async def test_remove_asset_positive_flow(adminAuth_factory):
 
     await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
 
-    await assert_revert(asset.getAsset(asset_id).call(), 'asset_id existence mismatch')
+    await assert_revert(asset.get_asset(asset_id).call(), 'asset_id existence mismatch')
     
 
     await postman.flush()
@@ -239,11 +239,11 @@ async def test_remove_asset_incorrect_payload(adminAuth_factory):
     assert len(asset_list)==1
     assert asset_list[0]==asset_ticker
 
-    asset_on_L2 = await asset.getAsset(asset_id).call()
+    asset_on_L2 = await asset.get_asset(asset_id).call()
 
     await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
 
-    await assert_revert(asset.getAsset(asset_id).call(), 'asset_id existence mismatch')
+    await assert_revert(asset.get_asset(asset_id).call(), 'asset_id existence mismatch')
 
     await postman.flush()
     asset_list = l1_zkx_contract.getAssetList.call()

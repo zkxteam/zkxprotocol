@@ -51,7 +51,7 @@ namespace IAsset:
     func get_L1_zkx_address() -> (res : felt):
     end
 
-    func getAsset(id : felt) -> (currAsset : Asset):
+    func get_asset(id : felt) -> (currAsset : Asset):
     end
 
     func get_maintenance_margin(id : felt) -> (maintenance_margin : felt):
@@ -60,6 +60,6 @@ namespace IAsset:
     func get_version() -> (version : felt):
     end
 
-    func returnAllAssets() -> (array_list_len : felt, array_list : AssetWID*):
+    func return_all_assets() -> (array_list_len : felt, array_list : AssetWID*):
     end
 end

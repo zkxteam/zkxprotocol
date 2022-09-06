@@ -107,11 +107,11 @@ end
 ##################
 
 @view
-func getAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt) -> (
+func get_asset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt) -> (
     currAsset : Asset
 ):
     let (inner_address) = get_inner_contract()
-    let (res) = IAsset.getAsset(inner_address, id)
+    let (res) = IAsset.get_asset(inner_address, id)
     return (res)
 end
 
@@ -134,10 +134,10 @@ func get_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 end
 
 @view
-func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+func return_all_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     array_list_len : felt, array_list : AssetWID*
 ):
     let (inner_address) = get_inner_contract()
-    let (array_list_len, array_list : AssetWID*) = IAsset.returnAllAssets(inner_address)
+    let (array_list_len, array_list : AssetWID*) = IAsset.return_all_assets(inner_address)
     return (array_list_len, array_list)
 end

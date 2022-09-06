@@ -439,7 +439,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         contract_address=registry, index=Asset_INDEX, version=version
     )
     # Reading token decimal field of an asset
-    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_)
+    let (asset : Asset) = IAsset.get_asset(contract_address=asset_address, id=assetID_)
     tempvar decimal = asset.token_decimal
 
     let (ten_power_decimal) = pow(10, decimal)
@@ -1016,7 +1016,7 @@ func withdraw{
         contract_address=registry, index=Asset_INDEX, version=version
     )
     # Reading token decimal field of an asset
-    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
+    let (asset : Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_)
     tempvar decimal = asset.token_decimal
     tempvar ticker = asset.ticker
 
