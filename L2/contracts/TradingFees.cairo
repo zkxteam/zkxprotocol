@@ -1,20 +1,16 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
 from contracts.Constants import (
-    AdminAuth_INDEX,
     FeeDiscount_INDEX,
     ManageFeeDetails_ACTION
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IFeeDiscount import IFeeDiscount
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_nn
-from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Math_64x61 import Math64x61_mul
+from contracts.libraries.Utils import verify_caller_authority
 
 # @notice Stores the contract version
 @storage_var
@@ -79,17 +75,12 @@ func update_base_fees{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     tier_ : felt, fee_details : BaseFee
 ):
     alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFeeDetails_ACTION
-    )
-    assert_not_zero(access)
+    # Auth check
+    with_attr error_message("Caller is not authorized to manage fee details"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
+    end
 
     # Update max base fee tier if new tier is the biggest
     let (current_max_base_fee_tier) = max_base_fee_tier.read()
@@ -118,17 +109,12 @@ func update_discount{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     tier_ : felt, discount_details : Discount
 ):
     alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFeeDetails_ACTION
-    )
-    assert_not_zero(access)
+    # Auth check
+    with_attr error_message("Caller is not authorized to manage fee details"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
+    end
 
     # Update max discount tier if new tier is the biggest
     let (current_max_discount_tier) = max_discount_tier.read()
@@ -155,18 +141,12 @@ end
 func update_max_base_fee_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tier_ : felt
 ):
-    alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFeeDetails_ACTION
-    )
-    assert_not_zero(access)
+    # Auth check
+    with_attr error_message("Caller is not authorized to manage fee details"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
+    end
 
     max_base_fee_tier.write(value=tier_)
     return ()
@@ -178,18 +158,12 @@ end
 func update_max_discount_tier{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tier_ : felt
 ):
-    alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    )
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageFeeDetails_ACTION
-    )
-    assert_not_zero(access)
+    # Auth check
+    with_attr error_message("Caller is not authorized to manage fee details"):
+        let (registry) = registry_address.read()
+        let (version) = contract_version.read()
+        verify_caller_authority(registry, version, ManageFeeDetails_ACTION)
+    end
 
     max_discount_tier.write(value=tier_)
     return ()

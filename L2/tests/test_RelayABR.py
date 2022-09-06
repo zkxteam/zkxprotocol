@@ -5,17 +5,13 @@ import time
 import calculate_abr
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, from64x61, to64x61, assert_revert
+from utils import Signer, from64x61, to64x61, assert_revert, convertTo64x61
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
 
-
-def convertTo64x61(nums):
-    for i in range(len(nums)):
-        nums[i] = to64x61(nums[i])
-
-    return nums
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
 
 
 @pytest.fixture(scope='module')
@@ -30,12 +26,12 @@ async def abr_factory():
 
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, 0, 1, 0]
+        constructor_calldata=[admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[admin2_signer.public_key, 0, 1, 0]
+        constructor_calldata=[admin2_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     adminAuth = await starknet.deploy(

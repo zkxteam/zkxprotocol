@@ -1,6 +1,5 @@
 %lang starknet
 
-
 from contracts.interfaces.IAsset import IAsset
 from contracts.libraries.RelayLibrary import (
     record_call_details,

@@ -4,7 +4,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, convertList
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
 
 alice_signer = Signer(123456789987654323)
 
@@ -17,6 +17,9 @@ ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
 TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
+
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
 
 
 @pytest.fixture(scope='module')
@@ -32,9 +35,10 @@ async def adminAuth_factory():
         "contracts/Account.cairo",
         constructor_calldata=[
             alice_signer.public_key,
+            L1_dummy_address,
             0,
             1,
-            0
+            L1_ZKX_dummy_address
         ]
     )
 

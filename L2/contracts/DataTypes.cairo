@@ -242,4 +242,15 @@ struct CoreFunction:
     member index: felt
     member version: felt
     member function_selector: felt
+
+# struct to store deposit payload information (for L1->L2 interaction) + other useful data
+struct DepositData:
+
+    member user_L1_address: felt
+    member user_L2_address: felt
+    member ticker: felt
+    member amount: felt
+    member nonce: felt
+    member message_hash: felt
+    member timestamp: felt
 end

@@ -14,23 +14,25 @@ signer3 = Signer(123456789987654323)
 def event_loop():
     return asyncio.new_event_loop()
 
+L1_dummy_address = 0x01234567899876543210
+L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory():
     starknet = await Starknet.empty()
     admin1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, 0, 1, 0]
+        constructor_calldata=[signer1.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     admin2 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, 0, 1, 0]
+        constructor_calldata=[signer2.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     user1 = await starknet.deploy(
         "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, 0, 1, 0]
+        constructor_calldata=[signer3.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
     )
 
     adminAuth = await starknet.deploy(

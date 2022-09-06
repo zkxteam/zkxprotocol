@@ -51,8 +51,8 @@ func update_contract_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     let (auth_addr) = contract_registry.read(index=AdminAuth_INDEX, version=version_)
     let (access) = IAdminAuth.get_admin_mapping(
         contract_address=auth_addr, address=caller, action=ManageAuthRegistry_ACTION
-    )
-    assert_not_zero(access)
+    )    
+
     with_attr error_message("Caller does not have permission to update contract registry"):
         assert_not_zero(access)
     end
