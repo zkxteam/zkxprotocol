@@ -38,11 +38,11 @@ func add_asset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 end
 
 @external
-func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt):
+func remove_asset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt):
     verify_caller_authority(ManageAssets_ACTION)
-    record_call_details('removeAsset')
+    record_call_details('remove_asset')
     let (inner_address) = get_inner_contract()
-    IAsset.removeAsset(inner_address, id)
+    IAsset.remove_asset(inner_address, id)
     return ()
 end
 

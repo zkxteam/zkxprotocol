@@ -307,7 +307,7 @@ async def test_removing_asset_by_admin(adminAuth_factory):
 
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [asset_id])
 
     await assert_revert(
         asset.get_asset(asset_id).call()
@@ -323,7 +323,7 @@ async def test_removing_asset_by_unauthorized_user(adminAuth_factory):
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
     assert_revert(lambda: 
-        signer3.send_transaction(user1, asset.contract_address, 'removeAsset', [asset_id])
+        signer3.send_transaction(user1, asset.contract_address, 'remove_asset', [asset_id])
     )
 
 
@@ -502,7 +502,7 @@ async def test_not_possible_to_remove_zero_asset_id(adminAuth_factory):
 
     # Should fail because zero asset_id can't be present
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [0])
+        signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [0])
     )
 
 @pytest.mark.asyncio
@@ -531,7 +531,7 @@ async def test_add_3_then_remove_FIRST_asset(fresh_asset_contract):
     assert len(assets_after_add) == 3
 
     # Remove asset
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [ID_TO_DELETE])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [ID_TO_DELETE])
 
     # Check removed asset is not present
     await assert_revert(
@@ -594,7 +594,7 @@ async def test_add_3_then_remove_SECOND_asset(fresh_asset_contract):
     assert len(assets_after_add) == 3
 
     # Remove asset
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [ID_TO_DELETE])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [ID_TO_DELETE])
 
     # Check removed asset is not present
     await assert_revert(
@@ -656,7 +656,7 @@ async def test_add_3_then_remove_THIRD_asset(fresh_asset_contract):
     assert len(assets_after_add) == 3
 
     # Remove asset
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [ID_TO_DELETE])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [ID_TO_DELETE])
 
     # Check removed asset is not present
     await assert_revert(

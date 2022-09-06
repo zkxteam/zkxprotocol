@@ -14,7 +14,7 @@ namespace IAsset:
     func add_asset(id : felt, new_asset : Asset):
     end
 
-    func removeAsset(id_to_remove : felt):
+    func remove_asset(id_to_remove : felt):
     end
 
     func modify_core_settings(
