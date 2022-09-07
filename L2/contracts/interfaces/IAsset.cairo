@@ -22,7 +22,6 @@ namespace IAsset:
         short_name : felt,
         tradable : felt,
         collateral : felt,
-        token_decimal : felt,
         metadata_id : felt,
     ):
     end
