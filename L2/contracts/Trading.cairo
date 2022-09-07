@@ -256,8 +256,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     # If it's the first order in the array
     if assetID == 0:
         # Check if the asset is tradable
-        let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=temp_order.assetID)
-        let (collateral : Asset) = IAsset.getAsset(
+        let (asset : Asset) = IAsset.get_asset(contract_address=asset_address, id=temp_order.assetID)
+        let (collateral : Asset) = IAsset.get_asset(
             contract_address=asset_address, id=temp_order.collateralID
         )
         let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)

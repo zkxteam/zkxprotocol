@@ -102,9 +102,9 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    execution_info = await asset.getAsset(asset_id).call()
+    execution_info = await asset.get_asset(asset_id).call()
     fetched_asset = execution_info.result.currAsset
 
     assert fetched_asset.ticker == asset_ticker
@@ -127,7 +127,7 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     assert fetched_asset.baseline_position_size == 1000
     assert fetched_asset.maximum_position_size == 10000
 
-    assets = await asset.returnAllAssets().call()
+    assets = await asset.return_all_assets().call()
     parsed_list = list(assets.result.array_list)[0]
 
     assert parsed_list.id == asset_id
@@ -159,7 +159,7 @@ async def test_adding_asset_by_unauthorized_user(adminAuth_factory):
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
     await assert_revert(
-        signer3.send_transaction(user1, asset.contract_address, 'addAsset', asset_properties)
+        signer3.send_transaction(user1, asset.contract_address, 'add_asset', asset_properties)
     )
 
 
@@ -169,7 +169,7 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
     new_asset_name = str_to_felt("NEW_NAME")
     new_tradable_status = 1
@@ -186,7 +186,7 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
         new_metadata_id
     ])
 
-    execution_info = await asset.getAsset(asset_id).call()
+    execution_info = await asset.get_asset(asset_id).call()
     fetched_asset = execution_info.result.currAsset
 
     assert fetched_asset.ticker == asset_ticker
@@ -204,7 +204,7 @@ async def test_modifying_asset_by_unauthorized_user(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
     assert_revert(lambda: 
         signer3.send_transaction(user1, asset.contract_address, 'modify_core_settings', [
@@ -225,7 +225,7 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
     new_tick_size = 2
     new_step_size = 2
@@ -256,7 +256,7 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
         new_maximum_position_size
     ])
 
-    execution_info = await asset.getAsset(asset_id).call()
+    execution_info = await asset.get_asset(asset_id).call()
     fetched_asset = execution_info.result.currAsset
 
     assert fetched_asset.ticker == asset_ticker
@@ -290,7 +290,7 @@ async def test_modifying_trade_settings_by_unauthorized_user(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
     assert_revert(lambda: 
         signer3.send_transaction(user1, asset.contract_address, 'modify_trade_settings', [
@@ -305,12 +305,12 @@ async def test_removing_asset_by_admin(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [asset_id])
 
     await assert_revert(
-        asset.getAsset(asset_id).call()
+        asset.get_asset(asset_id).call()
     )
 
 
@@ -320,10 +320,10 @@ async def test_removing_asset_by_unauthorized_user(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
     assert_revert(lambda: 
-        signer3.send_transaction(user1, asset.contract_address, 'removeAsset', [asset_id])
+        signer3.send_transaction(user1, asset.contract_address, 'remove_asset', [asset_id])
     )
 
 
@@ -333,7 +333,7 @@ async def test_modifying_trade_settings_by_admin_twice(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
     new_tick_size = 2
     new_step_size = 2
@@ -367,7 +367,7 @@ async def test_modifying_trade_settings_by_admin_twice(adminAuth_factory):
     await signer1.send_transaction(admin1, asset.contract_address, 'modify_trade_settings', modify_trade_settings_payload)
     await signer1.send_transaction(admin1, asset.contract_address, 'modify_trade_settings', modify_trade_settings_payload)
 
-    execution_info = await asset.getAsset(asset_id).call()
+    execution_info = await asset.get_asset(asset_id).call()
     fetched_asset = execution_info.result.currAsset
 
     assert fetched_asset.ticker == asset_ticker
@@ -400,12 +400,12 @@ async def test_retrieve_assets(adminAuth_factory):
     asset_id, asset_ticker, asset_name = generate_asset_info()
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
-    assets_before = await asset.returnAllAssets().call()
+    assets_before = await asset.return_all_assets().call()
     len_before = len(list(assets_before.result.array_list))
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    assets_after = await asset.returnAllAssets().call()
+    assets_after = await asset.return_all_assets().call()
     len_after = len(list(assets_after.result.array_list))
 
     assert len_after == len_before + 1
@@ -415,36 +415,36 @@ async def test_can_add_five_different_assets(adminAuth_factory):
     adminAuth, registry, asset, admin1, admin2, user1 = adminAuth_factory
 
     # Get number of assets before
-    assets_before = await asset.returnAllAssets().call()
+    assets_before = await asset.return_all_assets().call()
     len_before = len(list(assets_before.result.array_list))
 
     # Add 1st
     asset_id_1, asset_ticker_1, asset_name_1 = generate_asset_info()
     asset_properties_1 = build_default_asset_properties(asset_id_1, asset_ticker_1, asset_name_1)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_1)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
 
     # Add 2nd
     asset_id_2, asset_ticker_2, asset_name_2 = generate_asset_info()
     asset_properties_2 = build_default_asset_properties(asset_id_2, asset_ticker_2, asset_name_2)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_2)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
 
     # Add 3rd
     asset_id_3, asset_ticker_3, asset_name_3 = generate_asset_info()
     asset_properties_3 = build_default_asset_properties(asset_id_3, asset_ticker_3, asset_name_3)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_3)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_3)
 
     # Add 4th
     asset_id_4, asset_ticker_4, asset_name_4 = generate_asset_info()
     asset_properties_4 = build_default_asset_properties(asset_id_4, asset_ticker_4, asset_name_4)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_4)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_4)
 
     # Add 5th
     asset_id_5, asset_ticker_5, asset_name_5 = generate_asset_info()
     asset_properties_5 = build_default_asset_properties(asset_id_5, asset_ticker_5, asset_name_5)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_5)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_5)
 
     # Get number of assets after
-    assets_after = await asset.returnAllAssets().call()
+    assets_after = await asset.return_all_assets().call()
     len_after = len(list(assets_after.result.array_list))
 
     # Ensure 5 new assets were added
@@ -458,14 +458,14 @@ async def test_not_possible_to_add_same_id(adminAuth_factory):
     # Add 1st asset
     asset_id_1, asset_ticker_1, asset_name_1 = generate_asset_info()
     asset_properties_1 = build_default_asset_properties(asset_id_1, asset_ticker_1, asset_name_1)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_1)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
 
     # Second asset with SAME asset ID
     _, asset_ticker_2, asset_name_2 = generate_asset_info()
     asset_properties_2 = build_default_asset_properties(asset_id_1, asset_ticker_2, asset_name_2)
     # Should fail because asset ID is already present
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_2)
+        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
     )
 
 @pytest.mark.asyncio
@@ -475,14 +475,14 @@ async def test_not_possible_to_add_same_ticker(adminAuth_factory):
     # Add 1st asset
     asset_id_1, asset_ticker_1, asset_name_1 = generate_asset_info()
     asset_properties_1 = build_default_asset_properties(asset_id_1, asset_ticker_1, asset_name_1)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_1)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
 
     # Second asset with SAME asset ticker
     asset_id_2, _, asset_name_2 = generate_asset_info()
     asset_properties_2 = build_default_asset_properties(asset_id_2, asset_ticker_1, asset_name_2)
     # Should fail because asset ID is already present
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_2)
+        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
     )
 
 @pytest.mark.asyncio
@@ -493,7 +493,7 @@ async def test_not_possible_to_add_zero_asset_id(adminAuth_factory):
 
     # Should fail because asset_id is 0
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_1)
+        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
     )
 
 @pytest.mark.asyncio
@@ -502,7 +502,7 @@ async def test_not_possible_to_remove_zero_asset_id(adminAuth_factory):
 
     # Should fail because zero asset_id can't be present
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [0])
+        signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [0])
     )
 
 @pytest.mark.asyncio
@@ -512,34 +512,34 @@ async def test_add_3_then_remove_FIRST_asset(fresh_asset_contract):
     # Add 1st asset
     asset_id_1, asset_ticker_1, asset_name_1 = generate_asset_info()
     asset_properties_1 = build_default_asset_properties(asset_id_1, asset_ticker_1, asset_name_1)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_1)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
     
     # Add 2nd
     asset_id_2, asset_ticker_2, asset_name_2 = generate_asset_info()
     asset_properties_2 = build_default_asset_properties(asset_id_2, asset_ticker_2, asset_name_2)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_2)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
 
     # Add 3rd
     asset_id_3, asset_ticker_3, asset_name_3 = generate_asset_info()
     asset_properties_3 = build_default_asset_properties(asset_id_3, asset_ticker_3, asset_name_3)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_3)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_3)
 
     ID_TO_DELETE = asset_id_1
 
     # Check count is 3
-    assets_after_add = list((await asset.returnAllAssets().call()).result.array_list)
+    assets_after_add = list((await asset.return_all_assets().call()).result.array_list)
     assert len(assets_after_add) == 3
 
     # Remove asset
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [ID_TO_DELETE])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [ID_TO_DELETE])
 
     # Check removed asset is not present
     await assert_revert(
-        asset.getAsset(ID_TO_DELETE).call()
+        asset.get_asset(ID_TO_DELETE).call()
     )
 
     # Check count is 2
-    assets_after_remove = list((await asset.returnAllAssets().call()).result.array_list)
+    assets_after_remove = list((await asset.return_all_assets().call()).result.array_list)
     assert len(assets_after_remove) == 2
 
     # Check asset at 0 index, should be asset_3
@@ -553,17 +553,17 @@ async def test_add_3_then_remove_FIRST_asset(fresh_asset_contract):
     assert assets_after_remove[1].short_name == asset_name_2
 
     # Check deleted asset can be added again
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_1)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
 
     # Check re-added asset in assets list
-    final_assets = list((await asset.returnAllAssets().call()).result.array_list)
+    final_assets = list((await asset.return_all_assets().call()).result.array_list)
     assert len(final_assets) == 3
     assert final_assets[2].id == asset_id_1
     assert final_assets[2].ticker == asset_ticker_1
     assert final_assets[2].short_name == asset_name_1
 
     # Check re-added asset fetching by id
-    re_added_asset = (await asset.getAsset(ID_TO_DELETE).call()).result.currAsset
+    re_added_asset = (await asset.get_asset(ID_TO_DELETE).call()).result.currAsset
     assert re_added_asset.ticker == asset_ticker_1
     assert re_added_asset.short_name == asset_name_1
 
@@ -575,34 +575,34 @@ async def test_add_3_then_remove_SECOND_asset(fresh_asset_contract):
     # Add 1st asset
     asset_id_1, asset_ticker_1, asset_name_1 = generate_asset_info()
     asset_properties_1 = build_default_asset_properties(asset_id_1, asset_ticker_1, asset_name_1)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_1)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
     
     # Add 2nd
     asset_id_2, asset_ticker_2, asset_name_2 = generate_asset_info()
     asset_properties_2 = build_default_asset_properties(asset_id_2, asset_ticker_2, asset_name_2)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_2)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
 
     # Add 3rd
     asset_id_3, asset_ticker_3, asset_name_3 = generate_asset_info()
     asset_properties_3 = build_default_asset_properties(asset_id_3, asset_ticker_3, asset_name_3)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_3)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_3)
 
     ID_TO_DELETE = asset_id_2
 
     # Check count is 3
-    assets_after_add = list((await asset.returnAllAssets().call()).result.array_list)
+    assets_after_add = list((await asset.return_all_assets().call()).result.array_list)
     assert len(assets_after_add) == 3
 
     # Remove asset
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [ID_TO_DELETE])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [ID_TO_DELETE])
 
     # Check removed asset is not present
     await assert_revert(
-        asset.getAsset(ID_TO_DELETE).call()
+        asset.get_asset(ID_TO_DELETE).call()
     )
 
     # Check count is 2
-    assets_after_remove = list((await asset.returnAllAssets().call()).result.array_list)
+    assets_after_remove = list((await asset.return_all_assets().call()).result.array_list)
     assert len(assets_after_remove) == 2
 
     # Check asset at 0 index, should be asset_1
@@ -616,17 +616,17 @@ async def test_add_3_then_remove_SECOND_asset(fresh_asset_contract):
     assert assets_after_remove[1].short_name == asset_name_3
 
     # Check deleted asset can be added again
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_2)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
 
     # Check re-added asset in assets list
-    final_assets = list((await asset.returnAllAssets().call()).result.array_list)
+    final_assets = list((await asset.return_all_assets().call()).result.array_list)
     assert len(final_assets) == 3
     assert final_assets[2].id == asset_id_2
     assert final_assets[2].ticker == asset_ticker_2
     assert final_assets[2].short_name == asset_name_2
 
     # Check re-added asset fetching by id
-    re_added_asset = (await asset.getAsset(ID_TO_DELETE).call()).result.currAsset
+    re_added_asset = (await asset.get_asset(ID_TO_DELETE).call()).result.currAsset
     assert re_added_asset.ticker == asset_ticker_2
     assert re_added_asset.short_name == asset_name_2
 
@@ -637,34 +637,34 @@ async def test_add_3_then_remove_THIRD_asset(fresh_asset_contract):
     # Add 1st asset
     asset_id_1, asset_ticker_1, asset_name_1 = generate_asset_info()
     asset_properties_1 = build_default_asset_properties(asset_id_1, asset_ticker_1, asset_name_1)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_1)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
     
     # Add 2nd
     asset_id_2, asset_ticker_2, asset_name_2 = generate_asset_info()
     asset_properties_2 = build_default_asset_properties(asset_id_2, asset_ticker_2, asset_name_2)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_2)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
 
     # Add 3rd
     asset_id_3, asset_ticker_3, asset_name_3 = generate_asset_info()
     asset_properties_3 = build_default_asset_properties(asset_id_3, asset_ticker_3, asset_name_3)
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_3)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_3)
 
     ID_TO_DELETE = asset_id_3
 
     # Check count is 3
-    assets_after_add = list((await asset.returnAllAssets().call()).result.array_list)
+    assets_after_add = list((await asset.return_all_assets().call()).result.array_list)
     assert len(assets_after_add) == 3
 
     # Remove asset
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [ID_TO_DELETE])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [ID_TO_DELETE])
 
     # Check removed asset is not present
     await assert_revert(
-        asset.getAsset(ID_TO_DELETE).call()
+        asset.get_asset(ID_TO_DELETE).call()
     )
 
     # Check count is 2
-    assets_after_remove = list((await asset.returnAllAssets().call()).result.array_list)
+    assets_after_remove = list((await asset.return_all_assets().call()).result.array_list)
     assert len(assets_after_remove) == 2
 
     # Check asset at 0 index, should be asset_1
@@ -678,16 +678,16 @@ async def test_add_3_then_remove_THIRD_asset(fresh_asset_contract):
     assert assets_after_remove[1].short_name == asset_name_2
 
     # Check deleted asset can be added again
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties_3)
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_3)
 
     # Check re-added asset in assets list
-    final_assets = list((await asset.returnAllAssets().call()).result.array_list)
+    final_assets = list((await asset.return_all_assets().call()).result.array_list)
     assert len(final_assets) == 3
     assert final_assets[2].id == asset_id_3
     assert final_assets[2].ticker == asset_ticker_3
     assert final_assets[2].short_name == asset_name_3
 
     # Check re-added asset fetching by id
-    re_added_asset = (await asset.getAsset(ID_TO_DELETE).call()).result.currAsset
+    re_added_asset = (await asset.get_asset(ID_TO_DELETE).call()).result.currAsset
     assert re_added_asset.ticker == asset_ticker_3
     assert re_added_asset.short_name == asset_name_3

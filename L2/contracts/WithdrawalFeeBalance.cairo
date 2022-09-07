@@ -138,7 +138,7 @@ func set_standard_withdraw_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
-    let (asset : Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_)
+    let (asset : Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_)
     with_attr error_message("Standard fee should be a collateral in the system"):
         assert_not_zero(asset.collateral)
     end

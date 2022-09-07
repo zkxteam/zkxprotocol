@@ -219,25 +219,25 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [ETH_ID, 0, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [ETH_ID, 0, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
 
     call_counter = await relay_asset.get_call_counter(
-        admin1.contract_address,str_to_felt('addAsset')).call()
+        admin1.contract_address,str_to_felt('add_asset')).call()
     
     print(call_counter.result)
 
     assert call_counter.result.count == 2
 
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [UST_ID, 0, str_to_felt("UST"), str_to_felt("UST"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [UST_ID, 0, str_to_felt("UST"), str_to_felt("UST"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
 
     hash_list=await relay_asset.get_caller_hash_list(admin1.contract_address).call()
     print(hash_list.result)
     assert len(hash_list.result.hash_list) == 4
 
     call_counter = await relay_asset.get_call_counter(
-        admin1.contract_address,str_to_felt('addAsset')).call()
+        admin1.contract_address,str_to_felt('add_asset')).call()
     
     print(call_counter.result)
 

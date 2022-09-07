@@ -112,7 +112,7 @@ func update_collateral_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     )
 
     # Get Asset for the corresponding Id
-    let (asset : Asset) = IAsset.getAsset(
+    let (asset : Asset) = IAsset.get_asset(
         contract_address=asset_contract_address, id=collateral_id_
     )
 

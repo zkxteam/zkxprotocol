@@ -11,10 +11,10 @@ namespace IAsset:
     func set_L1_zkx_address(l1_zkx_address : felt):
     end
 
-    func addAsset(id : felt, new_asset : Asset):
+    func add_asset(id : felt, new_asset : Asset):
     end
 
-    func removeAsset(id_to_remove : felt):
+    func remove_asset(id_to_remove : felt):
     end
 
     func modify_core_settings(
@@ -51,7 +51,7 @@ namespace IAsset:
     func get_L1_zkx_address() -> (res : felt):
     end
 
-    func getAsset(id : felt) -> (currAsset : Asset):
+    func get_asset(id : felt) -> (currAsset : Asset):
     end
 
     func get_maintenance_margin(id : felt) -> (maintenance_margin : felt):
@@ -60,6 +60,6 @@ namespace IAsset:
     func get_version() -> (version : felt):
     end
 
-    func returnAllAssets() -> (array_list_len : felt, array_list : AssetWID*):
+    func return_all_assets() -> (array_list_len : felt, array_list : AssetWID*):
     end
 end

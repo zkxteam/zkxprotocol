@@ -124,11 +124,11 @@ async def test_remove_asset_positive_flow(adminAuth_factory):
     asset_properties = build_default_asset_properties(
         asset_id, asset_ticker, asset_name)
 
-    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
         add_asset_tx,
         from_address=asset.contract_address,
-        name="Asset_Added",
+        name="asset_added",
         data=[
             asset_id,
             asset_ticker,
@@ -164,11 +164,11 @@ async def test_remove_asset_positive_flow(adminAuth_factory):
     assert stored_asset_id==asset_id
 
 
-    asset_on_L2 = await asset.getAsset(asset_id).call()
+    asset_on_L2 = await asset.get_asset(asset_id).call()
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [asset_id])
 
-    await assert_revert(asset.getAsset(asset_id).call(), 'asset_id existence mismatch')
+    await assert_revert(asset.get_asset(asset_id).call(), 'asset_id existence mismatch')
     
 
     await postman.flush()
@@ -203,11 +203,11 @@ async def test_remove_asset_incorrect_payload(adminAuth_factory):
     asset_properties = build_default_asset_properties(
         asset_id, asset_ticker, asset_name)
 
-    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
         add_asset_tx,
         from_address=asset.contract_address,
-        name="Asset_Added",
+        name="asset_added",
         data=[
             asset_id,
             asset_ticker,
@@ -239,11 +239,11 @@ async def test_remove_asset_incorrect_payload(adminAuth_factory):
     assert len(asset_list)==1
     assert asset_list[0]==asset_ticker
 
-    asset_on_L2 = await asset.getAsset(asset_id).call()
+    asset_on_L2 = await asset.get_asset(asset_id).call()
 
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [asset_id])
 
-    await assert_revert(asset.getAsset(asset_id).call(), 'asset_id existence mismatch')
+    await assert_revert(asset.get_asset(asset_id).call(), 'asset_id existence mismatch')
 
     await postman.flush()
     asset_list = l1_zkx_contract.getAssetList.call()
@@ -285,11 +285,11 @@ async def test_remove_asset_impersonator_ZKX_L1(adminAuth_factory):
         asset_id, asset_ticker, asset_name)
 
     
-    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', asset_properties)
+    add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
         add_asset_tx,
         from_address=asset.contract_address,
-        name="Asset_Added",
+        name="asset_added",
         data=[
             asset_id,
             asset_ticker,
@@ -309,7 +309,7 @@ async def test_remove_asset_impersonator_ZKX_L1(adminAuth_factory):
     assert stored_asset_id==asset_id
 
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, 12345])
-    await signer1.send_transaction(admin1, asset.contract_address, 'removeAsset', [asset_id])
+    await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [asset_id])
 
     await postman.flush()
 
