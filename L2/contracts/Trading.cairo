@@ -290,7 +290,9 @@ func get_registry_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     )
 end
 
-
+# Internal Function to check if the price is fair for an order
+# @param order_ - Order to check
+# @param execution_price_ - Price at which the order got matched
 func check_order_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_ : MultipleOrder, execution_price_ : felt
 ):
