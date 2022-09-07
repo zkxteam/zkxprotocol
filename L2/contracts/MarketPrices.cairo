@@ -137,7 +137,7 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     )
 
     # Get Market from the corresponding Id
-    let (market : Market) = IMarkets.getMarket(
+    let (market : Market) = IMarkets.get_market(
         contract_address=market_contract_address, id=market_id_
     )
 

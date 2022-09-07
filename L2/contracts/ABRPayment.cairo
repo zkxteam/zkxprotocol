@@ -206,7 +206,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     end
 
     # Get the market id from market contract
-    let (market_id) = IMarkets.getMarket_from_assets(
+    let (market_id) = IMarkets.get_market_from_assets(
         contract_address=market_contract,
         asset_id=[positions].assetID,
         collateral_id=[positions].collateralID,
