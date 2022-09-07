@@ -173,7 +173,6 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
     new_asset_name = str_to_felt("NEW_NAME")
     new_tradable_status = 1
     new_collateral = 1
-    new_token_decimal = 10
     new_metadata_id = 1
 
     modify_tx = await signer1.send_transaction(admin1, asset.contract_address, 'modify_core_settings', [
@@ -181,7 +180,6 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
         new_asset_name,
         new_tradable_status,
         new_collateral,
-        new_token_decimal,
         new_metadata_id
     ])
     assert_event_emitted(
@@ -202,7 +200,6 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
     assert fetched_asset.short_name == new_asset_name
     assert fetched_asset.tradable == new_tradable_status
     assert fetched_asset.collateral == new_collateral
-    assert fetched_asset.token_decimal == new_token_decimal
     assert fetched_asset.metadata_id == new_metadata_id
     assert fetched_asset.asset_version == 0
 
@@ -222,7 +219,6 @@ async def test_modifying_asset_by_unauthorized_user(adminAuth_factory):
             asset_name, 
             0, 
             1, 
-            18, 
             1
         ])
     )

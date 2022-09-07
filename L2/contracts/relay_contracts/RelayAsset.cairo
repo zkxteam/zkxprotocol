@@ -48,19 +48,12 @@ end
 
 @external
 func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt,
-    short_name : felt,
-    tradable : felt,
-    collateral : felt,
-    token_decimal : felt,
-    metadata_id : felt,
+    id : felt, short_name : felt, tradable : felt, collateral : felt, metadata_id : felt
 ):
     verify_caller_authority(ManageAssets_ACTION)
     record_call_details('modify_core_settings')
     let (inner_address) = get_inner_contract()
-    IAsset.modify_core_settings(
-        inner_address, id, short_name, tradable, collateral, token_decimal, metadata_id
-    )
+    IAsset.modify_core_settings(inner_address, id, short_name, tradable, collateral, metadata_id)
     return ()
 end
 
