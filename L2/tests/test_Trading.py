@@ -979,6 +979,9 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
     res1 = list(orderState1.result.res)
 
+    print("execution price: ", from64x61(res1[3]))
+    print("margin :", from64x61(res1[9]))
+    print("borrowed :", from64x61(res1[10]))
     assert res1 == [
         assetID_1,
         collateralID_1,

@@ -20,9 +20,9 @@ end
 func execute_batch{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
 }(
-    size : felt,
-    execution_price : felt,
-    marketID : felt,
+    size_ : felt,
+    execution_price_ : felt,
+    marketID_ : felt,
     request_list_len : felt,
     request_list : MultipleOrder*,
 ):
@@ -35,7 +35,7 @@ func execute_batch{
     record_call_details('execute_batch')
     let (inner_address) = get_inner_contract()
     ITrading.execute_batch(
-        inner_address, size, execution_price, marketID, request_list_len, request_list
+        inner_address, size_, execution_price_, marketID_, request_list_len, request_list
     )
     return ()
 end
