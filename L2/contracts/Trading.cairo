@@ -137,7 +137,7 @@ func execute_batch{
     )
 
     # Get Market from the corresponding Id
-    let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID_)
+    let (market : Market) = IMarkets.get_market(contract_address=market_address, id=marketID_)
 
     tempvar ttl = market.ttl
 
@@ -380,7 +380,7 @@ func check_order_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     return ()
 end
 
-# @notice Intenal function that processes open orders 
+# @notice Intenal function that processes open orders
 # @param order_ - Order request
 # @param execution_price_ - The price at which it got matched
 # @param order_size_ - The size of the asset that got matched
@@ -393,7 +393,14 @@ end
 # @returns margin_amount_open - Margin amount for the order
 # @returns borrowed_amount_open - Borrowed amount for the order
 func process_open_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    order_ : MultipleOrder, execution_price_ : felt, order_size_ : felt, trading_fees_address_ : felt, liquidity_fund_address_ : felt, liquidate_address_ : felt, fees_balance_address_ : felt, holding_address_ : felt
+    order_ : MultipleOrder,
+    execution_price_ : felt,
+    order_size_ : felt,
+    trading_fees_address_ : felt,
+    liquidity_fund_address_ : felt,
+    liquidate_address_ : felt,
+    fees_balance_address_ : felt,
+    holding_address_ : felt,
 ) -> (average_execution_price_open : felt, margin_amount_open : felt, borrowed_amount_open : felt):
     alloc_locals
 
@@ -403,9 +410,7 @@ func process_open_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
 
     # Get the fees from Trading Fee contract
     let (fees_rate) = ITradingFees.get_user_fee_and_discount(
-        contract_address=trading_fees_address_,
-        address_=order_.pub_key,
-        side_=order_.side,
+        contract_address=trading_fees_address_, address_=order_.pub_key, side_=order_.side
     )
 
     # Get order details
@@ -450,8 +455,7 @@ func process_open_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     tempvar total_amount = total_position_value + fees
 
     # User must be able to pay the amount
-    with_attr error_message(
-            "User balance is less than value of the position in trading contract."):
+    with_attr error_message("User balance is less than value of the position in trading contract."):
         assert_le(total_amount, user_balance)
     end
 
@@ -464,9 +468,7 @@ func process_open_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
 
     # Deduct the amount from account contract
     IAccountManager.transfer_from(
-        contract_address=order_.pub_key,
-        assetID_=order_.collateralID,
-        amount=total_amount,
+        contract_address=order_.pub_key, assetID_=order_.collateralID, amount=total_amount
     )
 
     # Update the fees to be paid by user in fee balance contract
@@ -519,8 +521,15 @@ end
 # @returns margin_amount_open - Margin amount for the order
 # @returns borrowed_amount_open - Borrowed amount for the order
 func process_close_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    order_ : MultipleOrder, execution_price_ : felt, order_size_ : felt, liquidity_fund_address_ : felt, insurance_fund_address_ : felt, holding_address_ : felt
-)->(margin_amount_close : felt, borrowed_amount_close : felt, average_execution_price_close : felt):
+    order_ : MultipleOrder,
+    execution_price_ : felt,
+    order_size_ : felt,
+    liquidity_fund_address_ : felt,
+    insurance_fund_address_ : felt,
+    holding_address_ : felt,
+) -> (
+    margin_amount_close : felt, borrowed_amount_close : felt, average_execution_price_close : felt
+):
     alloc_locals
 
     local margin_amount_close
@@ -752,7 +761,7 @@ end
 
 # @notice Internal function called by execute_batch
 # @param size_ - Size of the order to be executed
-# @param assetID_ - Asset ID of the batch to be set by the first order 
+# @param assetID_ - Asset ID of the batch to be set by the first order
 # @param collateralID_ - Collateral ID of the batch to be set by the first order
 # @param marketID_ - Market ID of the batch to be set by the first order
 # @param ticker_ - The ticker of each order in the batch
@@ -828,7 +837,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     # Check if the price is fair
-    check_order_price(order_ = temp_order, execution_price_ = execution_price_)
+    check_order_price(order_=temp_order, execution_price_=execution_price_)
 
     # Check if size is less than or equal to postionSize
     let (cmp_res) = is_le(size_, temp_order.positionSize)
@@ -857,13 +866,37 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # If the order is to be opened
     if temp_order.closeOrder == FALSE:
-        let (average_execution_price_temp : felt, margin_amount_temp : felt, borrowed_amount_temp : felt) =  process_open_orders(order_ = temp_order, execution_price_ = execution_price_, order_size_ = order_size, trading_fees_address_ = trading_fees_address_, liquidity_fund_address_ = liquidity_fund_address_, liquidate_address_ = liquidate_address_, fees_balance_address_ = fees_balance_address_, holding_address_ = holding_address_)
+        let (
+            average_execution_price_temp : felt,
+            margin_amount_temp : felt,
+            borrowed_amount_temp : felt,
+        ) = process_open_orders(
+            order_=temp_order,
+            execution_price_=execution_price_,
+            order_size_=order_size,
+            trading_fees_address_=trading_fees_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            liquidate_address_=liquidate_address_,
+            fees_balance_address_=fees_balance_address_,
+            holding_address_=holding_address_,
+        )
 
-       assert margin_amount = margin_amount_temp
-       assert borrowed_amount = borrowed_amount_temp
-       assert average_execution_price = average_execution_price_temp
+        assert margin_amount = margin_amount_temp
+        assert borrowed_amount = borrowed_amount_temp
+        assert average_execution_price = average_execution_price_temp
     else:
-        let (average_execution_price_temp : felt, margin_amount_temp : felt, borrowed_amount_temp : felt) =  process_close_orders(order_ = temp_order, execution_price_ = execution_price_, order_size_ = order_size, liquidity_fund_address_ = liquidity_fund_address_, insurance_fund_address_ = insurance_fund_address_, holding_address_ = holding_address_) 
+        let (
+            average_execution_price_temp : felt,
+            margin_amount_temp : felt,
+            borrowed_amount_temp : felt,
+        ) = process_close_orders(
+            order_=temp_order,
+            execution_price_=execution_price_,
+            order_size_=order_size,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            holding_address_=holding_address_,
+        )
 
         assert margin_amount = margin_amount_temp
         assert borrowed_amount = borrowed_amount_temp
@@ -914,11 +947,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     # If it's the first order in the array
     if assetID_ == 0:
         # Check if the asset is tradable
-        let (asset : Asset) = IAsset.get_asset(contract_address=asset_address_, id=temp_order.assetID)
+        let (asset : Asset) = IAsset.get_asset(
+            contract_address=asset_address_, id=temp_order.assetID
+        )
         let (collateral : Asset) = IAsset.get_asset(
             contract_address=asset_address_, id=temp_order.collateralID
         )
-        let (market : Market) = IMarkets.getMarket(contract_address=market_address_, id=marketID_)
+        let (market : Market) = IMarkets.get_market(contract_address=market_address_, id=marketID_)
 
         with_attr error_message("asset is non tradable in trading contract."):
             assert_not_zero(asset.tradable)
