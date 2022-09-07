@@ -130,7 +130,7 @@ func execute_batch{
     )
 
     # Get Market from the corresponding Id
-    let (market : Market) = IMarkets.getMarket(
+    let (market : Market) = IMarkets.get_market(
         contract_address=market_contract_address, id=marketID
     )
 
@@ -256,11 +256,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     # If it's the first order in the array
     if assetID == 0:
         # Check if the asset is tradable
-        let (asset : Asset) = IAsset.get_asset(contract_address=asset_address, id=temp_order.assetID)
+        let (asset : Asset) = IAsset.get_asset(
+            contract_address=asset_address, id=temp_order.assetID
+        )
         let (collateral : Asset) = IAsset.get_asset(
             contract_address=asset_address, id=temp_order.collateralID
         )
-        let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
+        let (market : Market) = IMarkets.get_market(contract_address=market_address, id=marketID)
 
         with_attr error_message("Asset is non tradable in trading contract."):
             assert_not_zero(asset.tradable)

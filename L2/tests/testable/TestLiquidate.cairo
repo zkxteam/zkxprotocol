@@ -9,7 +9,12 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
-from contracts.Constants import Asset_INDEX, CollateralPrices_INDEX, Market_INDEX, MarketPrices_INDEX
+from contracts.Constants import (
+    Asset_INDEX,
+    CollateralPrices_INDEX,
+    Market_INDEX,
+    MarketPrices_INDEX,
+)
 from contracts.DataTypes import (
     CollateralBalance,
     CollateralPrice,
@@ -418,9 +423,9 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
-        contract_address=account_address
-    )
+    let (
+        positions_len : felt, positions : OrderDetailsWithIDs*
+    ) = IAccountManager.return_array_positions(contract_address=account_address)
 
     # Check if the list is empty
     with_attr error_message("Position array length is 0"):
@@ -471,7 +476,6 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     return (liq_result, least_collateral_ratio_position)
 end
 
-
 # @notice Internal function to check if position can be opened
 # @param order - MultipleOrder structure
 # @param size - matched order size of current order
@@ -491,9 +495,9 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (version) = contract_version.read()
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
-        contract_address=order.pub_key
-    )
+    let (
+        positions_len : felt, positions : OrderDetailsWithIDs*
+    ) = IAccountManager.return_array_positions(contract_address=order.pub_key)
 
     # Check if the list is empty
     if positions_len == 0:
@@ -518,7 +522,7 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     )
 
     let (leveraged_position_value) = Math64x61_mul(execution_price, size)
-    
+
     let (leveraged_position_value_collateral) = Math64x61_mul(
         leveraged_position_value, collateral_price.price_in_usd
     )
@@ -588,7 +592,7 @@ func populate_asset_prices_recurse{
     end
 
     # Get the market id from market contract
-    let (market_id) = IMarkets.getMarket_from_assets(
+    let (market_id) = IMarkets.get_market_from_assets(
         contract_address=market_contract_address,
         asset_id=[positions].assetID,
         collateral_id=[positions].collateralID,
@@ -600,7 +604,7 @@ func populate_asset_prices_recurse{
         contract_address=collateral_price_address, id=[positions].collateralID
     )
     # Get Market from the corresponding Id
-    let (market : Market) = IMarkets.getMarket(
+    let (market : Market) = IMarkets.get_market(
         contract_address=market_contract_address, id=market_id
     )
     # Calculate the timestamp
@@ -611,9 +615,7 @@ func populate_asset_prices_recurse{
     tempvar time_difference = current_timestamp - timestamp
     let (status) = is_le(time_difference, ttl)
     if status == TRUE:
-        let (asset_price_in_usd) = Math64x61_mul(
-            market_price.price, collateral_price.price_in_usd
-        )
+        let (asset_price_in_usd) = Math64x61_mul(market_price.price, collateral_price.price_in_usd)
         let price_data = PriceData(
             assetID=[positions].assetID,
             collateralID=[positions].collateralID,
@@ -710,9 +712,9 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     )
 
     # Fetch all the positions from the Account contract
-    let (positions_len : felt, positions : OrderDetailsWithIDs*) = IAccountManager.return_array_positions(
-        contract_address=account_address
-    )
+    let (
+        positions_len : felt, positions : OrderDetailsWithIDs*
+    ) = IAccountManager.return_array_positions(contract_address=account_address)
 
     if positions_len == 0:
         let (empty_positions_array : PriceData*) = alloc()
