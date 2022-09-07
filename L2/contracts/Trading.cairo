@@ -109,17 +109,17 @@ end
 ######################
 
 # @notice Function to execute multiple orders in a batch
-# @param size - Size of the order to be executed
-# @param execution_price - Price at which the orders must be executed
+# @param size_ - Size of the order to be executed
+# @param execution_price_ - Price at which the orders must be executed
 # @param request_list_len - No of orders in the batch
 # @param request_list - The batch of the orders
 @external
 func execute_batch{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
 }(
-    size : felt,
-    execution_price : felt,
-    marketID : felt,
+    size_ : felt,
+    execution_price_ : felt,
+    marketID_ : felt,
     request_list_len : felt,
     request_list : MultipleOrder*,
 ) -> ():
@@ -137,7 +137,7 @@ func execute_batch{
     )
 
     # Get Market from the corresponding Id
-    let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
+    let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID_)
 
     tempvar ttl = market.ttl
 
@@ -148,7 +148,7 @@ func execute_batch{
 
     # Get Market price for the corresponding market Id
     let (market_prices : MarketPrice) = IMarketPrices.get_market_price(
-        contract_address=market_prices_contract_address, id=marketID
+        contract_address=market_prices_contract_address, id=marketID_
     )
 
     tempvar timestamp = market_prices.timestamp
@@ -158,7 +158,7 @@ func execute_batch{
     # update market price
     if status == FALSE:
         IMarketPrices.update_market_price(
-            contract_address=market_prices_contract_address, id=marketID, price=execution_price
+            contract_address=market_prices_contract_address, id=marketID_, price=execution_price_
         )
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -183,11 +183,11 @@ func execute_batch{
 
     # Recursively loop through the orders in the batch
     let (result) = check_and_execute(
-        size,
+        size_,
         0,
         0,
-        marketID,
-        execution_price,
+        marketID_,
+        execution_price_,
         request_list_len,
         request_list,
         0,
@@ -214,6 +214,15 @@ end
 # Internal Functions #
 ######################
 
+# @notice Internal function to retrieve contract addresses from the Auth Registry
+# @returns account_registry_address - Address of the Account Registry contract
+# @returns asset_address - Address of the Asset contract
+# @returns holding_address - Address of the Holding contract
+# @returns trading_fees_address - Address of the Trading contract
+# @returns fees_balance_address - Address of the Fee Balance contract
+# @returns liquidate_address - Address of the Liquidate contract
+# @returns liquidity_fund_address - Address of the Liquidity Fund contract
+# @returns insurance_fund_address - Address of the Insurance Fund contract
 func get_registry_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ) -> (
     account_registry_address : felt,
@@ -280,6 +289,7 @@ func get_registry_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
         insurance_fund_address,
     )
 end
+
 
 func check_order_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_ : MultipleOrder, execution_price_ : felt
@@ -368,9 +378,21 @@ func check_order_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     return ()
 end
 
+# @notice Intenal function that processes open orders 
+# @param order_ - Order request
+# @param execution_price_ - The price at which it got matched
+# @param order_size_ - The size of the asset that got matched
+# @param trading_fees_address_ - Address of the Trading Fees contract
+# @param liquidity_fund_address_ - Address of the Liquidity contract
+# @param liquidate_address_ - Address of the Liquidate contract
+# @param fees_balance_address_ - Address of the Fee Balance contract
+# @param holding_address_ - Address of the Holding contract
+# @returns average_execution_price_open - Average Execution Price for the order
+# @returns margin_amount_open - Margin amount for the order
+# @returns borrowed_amount_open - Borrowed amount for the order
 func process_open_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_ : MultipleOrder, execution_price_ : felt, order_size_ : felt, trading_fees_address_ : felt, liquidity_fund_address_ : felt, liquidate_address_ : felt, fees_balance_address_ : felt, holding_address_ : felt
-) -> ( margin_amount_open : felt, borrowed_amount_open : felt, average_execution_price_open : felt):
+) -> (average_execution_price_open : felt, margin_amount_open : felt, borrowed_amount_open : felt):
     alloc_locals
 
     local margin_amount_open
@@ -483,6 +505,17 @@ func process_open_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     return (average_execution_price_open, margin_amount_open, borrowed_amount_open)
 end
 
+# @notice Intenal function that processes close orders including Liquidation & Deleveraging
+# @param order_ - Order request
+# @param execution_price_ - The price at which it got matched
+# @param order_size_ - The size of the asset that got matched
+# @param liquidity_fund_address_ - Address of the Liquidity contract
+# @param liquidate_address_ - Address of the Liquidate contract
+# @param insurance_fund_address - Address of the Insurance Fund contract
+# @param holding_address_ - Address of the Holding contract
+# @returns average_execution_price_open - Average Execution Price for the order
+# @returns margin_amount_open - Margin amount for the order
+# @returns borrowed_amount_open - Borrowed amount for the order
 func process_close_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     order_ : MultipleOrder, execution_price_ : felt, order_size_ : felt, liquidity_fund_address_ : felt, insurance_fund_address_ : felt, holding_address_ : felt
 )->(margin_amount_close : felt, borrowed_amount_close : felt, average_execution_price_close : felt):
@@ -716,62 +749,76 @@ func process_close_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
 end
 
 # @notice Internal function called by execute_batch
-# @param size - Size of the order to be executed
-# @param ticker - The ticker of each order in the batch
-# @param execution_price - Price at which the orders must be executed
-# @param request_list_len - No of orders in the batch
-# @param request_list - The batch of the orders
+# @param size_ - Size of the order to be executed
+# @param assetID_ - Asset ID of the batch to be set by the first order 
+# @param collateralID_ - Collateral ID of the batch to be set by the first order
+# @param marketID_ - Market ID of the batch to be set by the first order
+# @param ticker_ - The ticker of each order in the batch
+# @param execution_price_ - Price at which the orders must be executed
+# @param request_list_len_ - No of orders in the batch
+# @param request_list_ - The batch of the orders
+# @param sum_ - Net sum of all the orders in the batch
+# @param account_registry_address_ - Address of the Account Registry contract
+# @param asset_address_ - Address of the Asset contract
+# @param market_address_ - Address of the Market contract
+# @param holding_address_ - Address of the Holding contract
+# @param trading_fees_address_ - Address of the Trading contract
+# @param fees_balance_address_ - Address of the Fee Balance contract
+# @param liquidate_address_ - Address of the Liquidate contract
+# @param liquidity_fund_address_ - Address of the Liquidity Fund contract
+# @param insurance_fund_address_ - Address of the Insurance Fund contract
+# @param max_leverage_ - Maximum Leverage for the market set by the first order
 # @returns 1, if executed correctly
 func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    size : felt,
-    assetID : felt,
-    collateralID : felt,
-    marketID : felt,
-    execution_price : felt,
-    request_list_len : felt,
-    request_list : MultipleOrder*,
-    sum : felt,
-    account_registry_address : felt,
-    asset_address : felt,
-    market_address : felt,
-    holding_address : felt,
-    trading_fees_address : felt,
-    fees_balance_address : felt,
-    liquidate_address : felt,
-    liquidity_fund_address : felt,
-    insurance_fund_address : felt,
-    max_leverage : felt,
+    size_ : felt,
+    assetID_ : felt,
+    collateralID_ : felt,
+    marketID_ : felt,
+    execution_price_ : felt,
+    request_list_len_ : felt,
+    request_list_ : MultipleOrder*,
+    sum_ : felt,
+    account_registry_address_ : felt,
+    asset_address_ : felt,
+    market_address_ : felt,
+    holding_address_ : felt,
+    trading_fees_address_ : felt,
+    fees_balance_address_ : felt,
+    liquidate_address_ : felt,
+    liquidity_fund_address_ : felt,
+    insurance_fund_address_ : felt,
+    max_leverage_ : felt,
 ) -> (res : felt):
     alloc_locals
 
     # Check if the list is empty, if yes return 1
-    if request_list_len == 0:
-        return (sum)
+    if request_list_len_ == 0:
+        return (sum_)
     end
 
     # Create a struct object for the order
     tempvar temp_order : MultipleOrder = MultipleOrder(
-        pub_key=[request_list].pub_key,
-        sig_r=[request_list].sig_r,
-        sig_s=[request_list].sig_s,
-        orderID=[request_list].orderID,
-        assetID=[request_list].assetID,
-        collateralID=[request_list].collateralID,
-        price=[request_list].price,
-        stopPrice=[request_list].stopPrice,
-        orderType=[request_list].orderType,
-        positionSize=[request_list].positionSize,
-        direction=[request_list].direction,
-        closeOrder=[request_list].closeOrder,
-        leverage=[request_list].leverage,
-        liquidatorAddress=[request_list].liquidatorAddress,
-        parentOrder=[request_list].parentOrder,
-        side=[request_list].side
+        pub_key=[request_list_].pub_key,
+        sig_r=[request_list_].sig_r,
+        sig_s=[request_list_].sig_s,
+        orderID=[request_list_].orderID,
+        assetID=[request_list_].assetID,
+        collateralID=[request_list_].collateralID,
+        price=[request_list_].price,
+        stopPrice=[request_list_].stopPrice,
+        orderType=[request_list_].orderType,
+        positionSize=[request_list_].positionSize,
+        direction=[request_list_].direction,
+        closeOrder=[request_list_].closeOrder,
+        leverage=[request_list_].leverage,
+        liquidatorAddress=[request_list_].liquidatorAddress,
+        parentOrder=[request_list_].parentOrder,
+        side=[request_list_].side
         )
 
     # check that the user account is present in account registry (and thus that it was deployed by us)
     let (is_registered) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry_address, address_=temp_order.pub_key
+        contract_address=account_registry_address_, address_=temp_order.pub_key
     )
 
     with_attr error_message("User account not registered"):
@@ -779,16 +826,16 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     # Check if the price is fair
-    check_order_price(order_ = temp_order, execution_price_ = execution_price)
+    check_order_price(order_ = temp_order, execution_price_ = execution_price_)
 
     # Check if size is less than or equal to postionSize
-    let (cmp_res) = is_le(size, temp_order.positionSize)
+    let (cmp_res) = is_le(size_, temp_order.positionSize)
 
     local order_size
 
     if cmp_res == 1:
         # If yes, make the order_size to be size
-        assert order_size = size
+        assert order_size = size_
     else:
         # If no, make order_size to be the positionSize̦
         assert order_size = temp_order.positionSize
@@ -797,9 +844,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     local sum_temp
 
     if temp_order.direction == LONG:
-        assert sum_temp = sum + order_size
+        assert sum_temp = sum_ + order_size
     else:
-        assert sum_temp = sum - order_size
+        assert sum_temp = sum_ - order_size
     end
 
     local margin_amount
@@ -808,13 +855,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # If the order is to be opened
     if temp_order.closeOrder == FALSE:
-       let (margin_amount_temp : felt, borrowed_amount_temp : felt, average_execution_price_temp : felt) =  process_open_orders(order_ = temp_order, execution_price_ = execution_price, order_size_ = order_size, trading_fees_address_ = trading_fees_address, liquidity_fund_address_ = liquidity_fund_address, liquidate_address_ = liquidate_address, fees_balance_address_ = fees_balance_address, holding_address_ = holding_address)
+        let (average_execution_price_temp : felt, margin_amount_temp : felt, borrowed_amount_temp : felt) =  process_open_orders(order_ = temp_order, execution_price_ = execution_price_, order_size_ = order_size, trading_fees_address_ = trading_fees_address_, liquidity_fund_address_ = liquidity_fund_address_, liquidate_address_ = liquidate_address_, fees_balance_address_ = fees_balance_address_, holding_address_ = holding_address_)
 
        assert margin_amount = margin_amount_temp
        assert borrowed_amount = borrowed_amount_temp
        assert average_execution_price = average_execution_price_temp
     else:
-        let (margin_amount_temp : felt, borrowed_amount_temp : felt, average_execution_price_temp : felt) =  process_close_orders(order_ = temp_order, execution_price_ = execution_price, order_size_ = order_size, liquidity_fund_address_ = liquidity_fund_address, insurance_fund_address_ = insurance_fund_address, holding_address_ = holding_address) 
+        let (average_execution_price_temp : felt, margin_amount_temp : felt, borrowed_amount_temp : felt) =  process_close_orders(order_ = temp_order, execution_price_ = execution_price_, order_size_ = order_size, liquidity_fund_address_ = liquidity_fund_address_, insurance_fund_address_ = insurance_fund_address_, holding_address_ = holding_address_) 
 
         assert margin_amount = margin_amount_temp
         assert borrowed_amount = borrowed_amount_temp
@@ -858,18 +905,18 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     trade_execution.emit(
         address=temp_order.pub_key,
         request=temp_order_request,
-        market_id=marketID,
+        market_id=marketID_,
         execution_price=average_execution_price,
     )
 
-        # If it's the first order in the array
-    if assetID == 0:
+    # If it's the first order in the array
+    if assetID_ == 0:
         # Check if the asset is tradable
-        let (asset : Asset) = IAsset.get_asset(contract_address=asset_address, id=temp_order.assetID)
+        let (asset : Asset) = IAsset.get_asset(contract_address=asset_address_, id=temp_order.assetID)
         let (collateral : Asset) = IAsset.get_asset(
-            contract_address=asset_address, id=temp_order.collateralID
+            contract_address=asset_address_, id=temp_order.collateralID
         )
-        let (market : Market) = IMarkets.getMarket(contract_address=market_address, id=marketID)
+        let (market : Market) = IMarkets.getMarket(contract_address=market_address_, id=marketID_)
 
         with_attr error_message("asset is non tradable in trading contract."):
             assert_not_zero(asset.tradable)
@@ -890,60 +937,60 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         # Recursive call with the ticker and price to compare against
         return check_and_execute(
-            size,
+            size_,
             temp_order.assetID,
             temp_order.collateralID,
-            marketID,
-            execution_price,
-            request_list_len - 1,
-            request_list + MultipleOrder.SIZE,
+            marketID_,
+            execution_price_,
+            request_list_len_ - 1,
+            request_list_ + MultipleOrder.SIZE,
             sum_temp,
-            account_registry_address,
-            asset_address,
-            market_address,
-            holding_address,
-            trading_fees_address,
-            fees_balance_address,
-            liquidate_address,
-            liquidity_fund_address,
-            insurance_fund_address,
+            account_registry_address_,
+            asset_address_,
+            market_address_,
+            holding_address_,
+            trading_fees_address_,
+            fees_balance_address_,
+            liquidate_address_,
+            liquidity_fund_address_,
+            insurance_fund_address_,
             asset.currently_allowed_leverage,
         )
     end
 
     # Assert that the order has the same ticker and price as the first order
     with_attr error_message("assetID is not same as opposite order's assetID in trading contract."):
-        assert assetID = temp_order.assetID
+        assert assetID_ = temp_order.assetID
     end
 
     with_attr error_message(
             "collateralID is not same as opposite order's collateralID in trading contract."):
-        assert collateralID = temp_order.collateralID
+        assert collateralID_ = temp_order.collateralID
     end
 
     with_attr error_message("leverage is not less than currently allowed leverage of the asset"):
-        assert_le(temp_order.leverage, max_leverage)
+        assert_le(temp_order.leverage, max_leverage_)
     end
 
     # Recursive Call
     return check_and_execute(
-        size,
-        assetID,
-        collateralID,
-        marketID,
-        execution_price,
-        request_list_len - 1,
-        request_list + MultipleOrder.SIZE,
+        size_,
+        assetID_,
+        collateralID_,
+        marketID_,
+        execution_price_,
+        request_list_len_ - 1,
+        request_list_ + MultipleOrder.SIZE,
         sum_temp,
-        account_registry_address,
-        asset_address,
-        market_address,
-        holding_address,
-        trading_fees_address,
-        fees_balance_address,
-        liquidate_address,
-        liquidity_fund_address,
-        insurance_fund_address,
-        max_leverage,
+        account_registry_address_,
+        asset_address_,
+        market_address_,
+        holding_address_,
+        trading_fees_address_,
+        fees_balance_address_,
+        liquidate_address_,
+        liquidity_fund_address_,
+        insurance_fund_address_,
+        max_leverage_,
     )
 end
