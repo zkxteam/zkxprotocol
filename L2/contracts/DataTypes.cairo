@@ -229,6 +229,20 @@ struct QuoteL1Message:
     member L1_fee_ticker : felt
 end
 
+struct CoreFunctionCall:
+    member index: felt
+    member version: felt
+    member nonce: felt
+    member function_selector: felt
+    member calldata_len: felt
+    member calldata: felt*
+end
+
+struct CoreFunction:
+    member index: felt
+    member version: felt
+    member function_selector: felt
+end
 # struct to store deposit payload information (for L1->L2 interaction) + other useful data
 struct DepositData:
 
