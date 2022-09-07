@@ -53,12 +53,47 @@ contract MultisigAdmin is IMultisig {
         return txCallsById[id];
     }
 
-    function isTxApproved(uint256 id, address user)
+    function isTxApproved(uint256 id, address admin)
         external
         view
         returns (bool)
     {
-        return isApproved[id][user];
+        return isApproved[id][admin];
+    }
+
+    function canBeExecuted(uint256 id, uint256 value)
+        external
+        view
+        returns (bool)
+    {
+        // 1. Check status and quorum
+        Transaction storage _tx = txById[id];
+        bool isTxPending = _tx.status == Status.Pending;
+        bool isQuorumReached = _tx.approvals >= quorum;
+
+        // 2. Check execution date
+        uint128 _now = uint128(block.timestamp);
+        bool isQuorumDateSet = _tx.quorumTime != 0;
+        uint128 earliestExecuteDate = _tx.quorumTime + _tx.delay;
+        bool isDelayPassed = _now > earliestExecuteDate;
+        bool isNotExpired = _now < earliestExecuteDate + EXECUTION_PERIOD;
+
+        // 3. Check ETH value to be spent
+        uint256 valueToBeSpent = 0;
+		Call[] memory calls = txCallsById[id];
+        for (uint256 i = 0; i < calls.length; i++) {
+            valueToBeSpent += calls[i].value;
+        }
+        bool isEnoughValue = value >= valueToBeSpent;
+
+        // 4. Result
+        return
+            isTxPending &&
+            isQuorumReached &&
+            isQuorumDateSet &&
+            isDelayPassed &&
+            isNotExpired &&
+            isEnoughValue;
     }
 
     ///////////
