@@ -1035,6 +1035,12 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
 
+    # Cannot remove an open order from the array`
+    await assert_revert(
+        admin1_signer.send_transaction(admin1, alice.contract_address, 'remove_from_array', [0]),
+        "The order is not fully closed yet"
+    )
+   
     #### Closing Of Orders ########
     size2 = to64x61(1)
     marketID_2 = BTC_USD_ID
@@ -1144,6 +1150,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     assert bob_total_fees_after.result.fee == bob_total_fees.result.fee
     assert feeBalance_after.result.fee == feeBalance_curr.result.fee
 
+    # Should be able to remove a closed order
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'remove_from_array', [0])
 
 @pytest.mark.asyncio
 async def test_three_orders_in_a_batch(adminAuth_factory):
@@ -1321,6 +1329,12 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     #assert from64x61(charlie_total_fees.result.fee) == from64x61(charlie_total_fees_before.result.fee + fees3.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res + fees3.result.res)
 
+    # Cannot remove an open order from the array`
+    await assert_revert(
+        admin1_signer.send_transaction(admin1, alice.contract_address, 'remove_from_array', [0]),
+        "The order is not fully closed yet"
+    )
+
     ##### Closing Of Orders ########
     size2 = to64x61(4)
     marketID_2 = BTC_USD_ID
@@ -1470,6 +1484,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     assert charlie_total_fees_after.result.fee == charlie_total_fees.result.fee
     assert feeBalance_after.result.fee == feeBalance_curr.result.fee
 
+    # Should be able to remove a close order from the array
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'remove_from_array', [0])
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
@@ -1759,14 +1775,6 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     assert alice_total_fees_after.result.fee == alice_total_fees.result.fee
     assert bob_total_fees_after.result.fee == bob_total_fees.result.fee
     assert feeBalance_after.result.fee == feeBalance_curr.result.fee
-
-
-@pytest.mark.asyncio
-async def test_removing_closed_orders_from_position_array(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_position_array = await alice.return_array_positions().call()
-    alice_parsed = list(alice_position_array.result.array_list)
 
 
 @pytest.mark.asyncio
