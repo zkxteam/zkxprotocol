@@ -9,10 +9,12 @@ from contracts.libraries.Utils import verify_caller_authority
 # Events  #
 ###########
 
+# event emitted whenever a public key is whitelisted
 @event
 func pubkey_added_to_whitelist(pubkey : felt):
 end
 
+# event emitted whenever a public key is removed from whitelist
 @event
 func pubkey_removed_from_whitelist(pubkey : felt):
 end
@@ -21,14 +23,17 @@ end
 # Storage #
 ###########
 
+# this stores a mapping from pubkey to whether it is whitelisted
 @storage_var
 func pubkey_to_whitelist(pubkey : felt) -> (res : felt):
 end
 
+# this var stores the registry address
 @storage_var
 func registry_address() -> (address : felt):
 end
 
+# stores contract version
 @storage_var
 func version() -> (res : felt):
 end
@@ -40,8 +45,11 @@ end
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         registry_address_ : felt, version_ : felt):
-    assert_not_zero(registry_address_)
-    assert_not_zero(version_)
+
+    with_attr error_message("Registry Address or Version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
 
     registry_address.write(registry_address_)
     version.write(version_)
@@ -53,7 +61,7 @@ end
 # View Functions #
 ##################
 
-
+# @notice - returns whether a public key is whitelisted or not
 @view
 func is_whitelisted{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         pubkey : felt) -> (res : felt):

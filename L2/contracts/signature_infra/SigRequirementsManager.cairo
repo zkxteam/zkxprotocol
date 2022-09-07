@@ -10,10 +10,12 @@ from contracts.libraries.Utils import verify_caller_authority
 # Events  #
 ###########
 
+# this event is emitted whenever a signature requirement is set for any function
 @event
 func signature_requirement_set(index: felt, version: felt, function_selector:felt, num_sig_req: felt):
 end
 
+# this event is emitted whenever a function is deregistered from the system
 @event
 func function_deregistered(index: felt, version: felt, function_selector:felt):
 end
@@ -22,18 +24,22 @@ end
 # Storage #
 ###########
 
+# this var stores the registry address
 @storage_var
 func registry_address() -> (address : felt):
 end
 
+# stores contract version
 @storage_var
 func version() -> (res : felt):
 end
 
+# stores mapping from function -> whether it is registered
 @storage_var
 func func_to_registration_mapping(core_function : CoreFunction) -> (res : felt):
 end
 
+# stores number of signatures required for a function
 @storage_var
 func func_to_num_sig_mapping(core_function : CoreFunction) -> (num : felt):
 end
@@ -45,8 +51,11 @@ end
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         registry_address_ : felt, version_ : felt):
-    assert_not_zero(registry_address_)
-    assert_not_zero(version_)
+    
+    with_attr error_message("Registry Address or Version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
 
     registry_address.write(registry_address_)
     version.write(version_)
@@ -71,6 +80,7 @@ func assert_func_handled{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     return ()
 end
 
+# @notice - this function returns number of signatures required for a function
 @view
 func get_sig_requirement{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         core_function : CoreFunction) -> (num_req : felt):

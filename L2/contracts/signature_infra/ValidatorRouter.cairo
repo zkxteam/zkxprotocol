@@ -15,10 +15,12 @@ from contracts.libraries.Utils import SignatureVerification, verify_caller_autho
 # Events  #
 ###########
 
+# event emitted whenever a function is called through the signature handling infrastructure
 @event
 func core_function_called(index: felt, version: felt, function_selector:felt):
 end
 
+# event emitted whenever signature checking mechanism is toggled
 @event 
 func signature_check_toggled(prev_value: felt, new_value: felt):
 end
@@ -27,15 +29,17 @@ end
 # Storage #
 ###########
 
+# this var stores the registry address
 @storage_var
 func registry_address() -> (address : felt):
 end
 
+# stores contract version
 @storage_var
 func version() -> (res : felt):
 end
 
-# nonce helps keep track of unique transactions
+# nonce helps keep track of unique transactions to avoid replay attacks on the system
 @storage_var
 func nonce() -> (res : felt):
 end
@@ -54,8 +58,11 @@ end
 @constructor
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         registry_address_ : felt, version_ : felt):
-    assert_not_zero(registry_address_)
-    assert_not_zero(version_)
+
+    with_attr error_message("Registry Address or Version cannot be 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
+    end
 
     registry_address.write(registry_address_)
     version.write(version_)
@@ -88,6 +95,7 @@ func get_current_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     return (current_version)
 end
 
+# @notice - returns current valid nonce
 @view
 func get_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
         current_nonce : felt):
