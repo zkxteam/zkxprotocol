@@ -364,7 +364,7 @@ func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
     let (array_list : OrderDetailsWithIDs*) = alloc()
     let (array_list_len : felt) = position_array_len.read()
-    return populate_array_positions(iterator_=0, array_list_len_=0, array_list_=array_list, len_=array_list_len)
+    return populate_array_positions(iterator_=0, array_list_len_=0, array_list_=array_list, final_len_=array_list_len)
 end
 
 # @notice view function to get all use collaterals
@@ -375,7 +375,7 @@ func return_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     ) -> (array_list_len : felt, array_list : CollateralBalance*):
     let (array_list : CollateralBalance*) = alloc()
     let (array_len) = collateral_array_len.read()
-    return populate_array_collaterals(iterator_=0, array_list_=array_list, len_=array_len)
+    return populate_array_collaterals(iterator_=0, array_list_=array_list, final_len_=array_len)
 end
 
 # @notice view function to get withdrawal history
@@ -386,7 +386,7 @@ func get_withdrawal_history{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     ) -> (withdrawal_list_len : felt, withdrawal_list : WithdrawalHistory*):
     let (array_list : WithdrawalHistory*) = alloc()
     let (array_len : felt) = withdrawal_history_array_len.read()
-    return populate_withdrawals_array(iterator_=0, withdrawal_list_=array_list, len_=array_len)
+    return populate_withdrawals_array(iterator_=0, withdrawal_list_=array_list, final_len_=array_len)
 end
 
 # @notice view function to check if eight hours is complete or not
@@ -1145,35 +1145,35 @@ end
 # @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
 # @param iterator_ - Stores the current length of the populated withdrawals array
 # @param withdrawal_list_ - Array of WithdrawalRequest filled up to the index
-# @param len_ - Length of the withdrwal array
+# @param final_len_ - Length of the withdrwal array
 # @return withdrawal_list_len - Length of the withdrawal_list
 # @return withdrawal_list - Fully populated list of Withdrawals
 func populate_withdrawals_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    iterator_ : felt, withdrawal_list_ : WithdrawalHistory*, len_ : felt
+    iterator_ : felt, withdrawal_list_ : WithdrawalHistory*, final_len_ : felt
 ) -> (withdrawal_list_len : felt, withdrawal_list : WithdrawalHistory*):
     let (withdrawal_history) = withdrawal_history_array.read(index=iterator_)
 
-    if iterator_== len_:
-        return (len_, withdrawal_list_)
+    if iterator_== final_len_:
+        return (final_len_, withdrawal_list_)
     end
 
     assert withdrawal_list_[iterator_] = withdrawal_history
-    return populate_withdrawals_array(iterator_ + 1, withdrawal_list_, len_)
+    return populate_withdrawals_array(iterator_ + 1, withdrawal_list_, final_len_)
 end
 
 # @notice Internal Function called by return_array_collaterals to recursively add collateralBalance to the array and return it
 # @param iterator - Stores the current length of the populated array
 # @param array_list_ - Array of CollateralBalance filled up to the index
-# @param len_ - Length of the array collaterals
+# @param final_len_ - Length of the array collaterals
 # @return array_list_len - Length of the array_list
 # @return array_list - Fully populated list of CollateralBalance
 func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    iterator_ : felt, array_list_ : CollateralBalance*, len_ : felt
+    iterator_ : felt, array_list_ : CollateralBalance*, final_len_ : felt
 ) -> (array_list_len : felt, array_list : CollateralBalance*):
     let (collateral_id) = collateral_array.read(index=iterator_)
 
-    if iterator_ == len_:
-        return (len_, array_list_)
+    if iterator_ == final_len_:
+        return (final_len_, array_list_)
     end
 
     let (collateral_balance : felt) = balance.read(assetID=collateral_id)
@@ -1182,22 +1182,22 @@ func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*
     )
 
     assert array_list_[iterator_] = collateral_balance_struct
-    return populate_array_collaterals(iterator_ + 1, array_list_, len_)
+    return populate_array_collaterals(iterator_ + 1, array_list_, final_len_)
 end
 
 # @notice Internal Function called by return array to recursively add positions to the array and return it
 # @param iterator_ - Index of the position_array currently pointing to
 # @param array_list_len_ - Current length of the array_list_ array
 # @param array_list_ - Array of OrderRequests filled up to the index
-# @param len_ - Stores the length of the positions array
+# @param final_len_ - Stores the length of the positions array
 # @return array_list_len - Length of the array_list
 # @return array_list - Fully populated list of OrderDetails
 func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    iterator_ : felt, array_list_len_ : felt, array_list_ : OrderDetailsWithIDs*, len_ : felt, 
+    iterator_ : felt, array_list_len_ : felt, array_list_ : OrderDetailsWithIDs*, final_len_ : felt, 
 ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
     let (pos) = position_array.read(index=iterator_)
 
-    if iterator_ == len_:
+    if iterator_ == final_len_:
         return (array_list_len_, array_list_)
     end
 
@@ -1218,13 +1218,13 @@ func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     )
 
     if pos_details.status == ORDER_CLOSED:
-        return populate_array_positions(iterator_ + 1, array_list_len_, array_list_, len_)
+        return populate_array_positions(iterator_ + 1, array_list_len_, array_list_, final_len_)
     else:
         if pos_details.status == ORDER_LIQUIDATED:
-            return populate_array_positions(iterator_ + 1, array_list_len_, array_list_, len_)
+            return populate_array_positions(iterator_ + 1, array_list_len_, array_list_, final_len_)
         else:
             assert array_list_[array_list_len_] = order_details_w_id
-            return populate_array_positions(iterator_ + 1, array_list_len_ + 1, array_list_, len_)
+            return populate_array_positions(iterator_ + 1, array_list_len_ + 1, array_list_, final_len_)
         end
     end
 end
