@@ -362,9 +362,14 @@ end
 @view
 func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+    alloc_locals
+
     let (array_list : OrderDetailsWithIDs*) = alloc()
-    let (array_list_len : felt) = position_array_len.read()
-    return populate_array_positions(iterator_=0, array_list_len_=0, array_list_=array_list, final_len_=array_list_len)
+    let (array_len : felt) = position_array_len.read()
+    
+    let (new_array_len) = populate_array_positions(iterator_=0, array_list_len_=0, array_list_=array_list, final_len_=array_len)
+
+    return (new_array_len, array_list)
 end
 
 # @notice view function to get all use collaterals
@@ -373,9 +378,13 @@ end
 @view
 func return_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ) -> (array_list_len : felt, array_list : CollateralBalance*):
+    alloc_locals
+
     let (array_list : CollateralBalance*) = alloc()
     let (array_len) = collateral_array_len.read()
-    return populate_array_collaterals(iterator_=0, array_list_=array_list, final_len_=array_len)
+    populate_array_collaterals(iterator_=0, array_list_=array_list, final_len_=array_len)
+
+    return(array_len, array_list)
 end
 
 # @notice view function to get withdrawal history
@@ -384,9 +393,13 @@ end
 @view
 func get_withdrawal_history{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ) -> (withdrawal_list_len : felt, withdrawal_list : WithdrawalHistory*):
+    alloc_locals
+
     let (array_list : WithdrawalHistory*) = alloc()
     let (array_len : felt) = withdrawal_history_array_len.read()
-    return populate_withdrawals_array(iterator_=0, withdrawal_list_=array_list, final_len_=array_len)
+    populate_withdrawals_array(iterator_=0, withdrawal_list_=array_list, final_len_=array_len)
+
+    return(array_len, array_list)
 end
 
 # @notice view function to check if eight hours is complete or not
@@ -1133,11 +1146,11 @@ end
 # @return withdrawal_list - Fully populated list of Withdrawals
 func populate_withdrawals_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     iterator_ : felt, withdrawal_list_ : WithdrawalHistory*, final_len_ : felt
-) -> (withdrawal_list_len : felt, withdrawal_list : WithdrawalHistory*):
+) -> ():
     let (withdrawal_history) = withdrawal_history_array.read(index=iterator_)
 
     if iterator_== final_len_:
-        return (final_len_, withdrawal_list_)
+        return()
     end
 
     assert withdrawal_list_[iterator_] = withdrawal_history
@@ -1152,11 +1165,11 @@ end
 # @return array_list - Fully populated list of CollateralBalance
 func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     iterator_ : felt, array_list_ : CollateralBalance*, final_len_ : felt
-) -> (array_list_len : felt, array_list : CollateralBalance*):
+) -> ():
     let (collateral_id) = collateral_array.read(index=iterator_)
 
     if iterator_ == final_len_:
-        return (final_len_, array_list_)
+        return()
     end
 
     let (collateral_balance : felt) = balance.read(assetID=collateral_id)
@@ -1173,15 +1186,14 @@ end
 # @param array_list_len_ - Current length of the array_list_ array
 # @param array_list_ - Array of OrderRequests filled up to the index
 # @param final_len_ - Stores the length of the positions array
-# @return array_list_len - Length of the array_list
-# @return array_list - Fully populated list of OrderDetails
+# @return array_list_len - Length of the new array_list
 func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     iterator_ : felt, array_list_len_ : felt, array_list_ : OrderDetailsWithIDs*, final_len_ : felt, 
-) -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
+) -> (array_list_len : felt):
     let (pos) = position_array.read(index=iterator_)
 
     if iterator_ == final_len_:
-        return (array_list_len_, array_list_)
+        return (array_list_len_)
     end
 
     let (pos_details : OrderDetails) = order_mapping.read(orderID=pos)
