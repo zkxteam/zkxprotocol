@@ -1158,8 +1158,6 @@ end
 # @param iterator_ - Stores the current length of the populated withdrawals array
 # @param withdrawal_list_ - Array of WithdrawalRequest filled up to the index
 # @param final_len_ - Length of the withdrwal array
-# @return withdrawal_list_len - Length of the withdrawal_list
-# @return withdrawal_list - Fully populated list of Withdrawals
 func populate_withdrawals_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     iterator_ : felt, withdrawal_list_ : WithdrawalHistory*, final_len_ : felt
 ) -> ():
@@ -1177,8 +1175,6 @@ end
 # @param iterator - Stores the current length of the populated array
 # @param array_list_ - Array of CollateralBalance filled up to the index
 # @param final_len_ - Length of the array collaterals
-# @return array_list_len - Length of the array_list
-# @return array_list - Fully populated list of CollateralBalance
 func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     iterator_ : felt, array_list_ : CollateralBalance*, final_len_ : felt
 ) -> ():
