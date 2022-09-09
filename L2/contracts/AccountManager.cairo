@@ -1,6 +1,6 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa 
+%builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
@@ -68,12 +68,7 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
-from contracts.Math_64x61 import (
-    Math64x61_div,
-    Math64x61_fromFelt,
-    Math64x61_mul,
-    Math64x61_toFelt,
-)
+from contracts.Math_64x61 import Math64x61_div, Math64x61_fromFelt, Math64x61_mul, Math64x61_toFelt
 
 ##########
 # Events #
@@ -81,16 +76,12 @@ from contracts.Math_64x61 import (
 
 # Event emitted whenever collateral is transferred from account by trading
 @event
-func transferred_from(
-    asset_id : felt, amount : felt
-):
+func transferred_from(asset_id : felt, amount : felt):
 end
 
 # Event emitted whenever collateral is transferred to account by trading
 @event
-func transferred(
-    asset_id : felt, amount : felt
-):
+func transferred(asset_id : felt, amount : felt):
 end
 
 # Event emitted whenever collateral is transferred to account by abr payment
@@ -109,9 +100,7 @@ end
 
 # Event emitted whenver a new withdrawal request is made
 @event
-func withdrawal_request(
-    collateral_id : felt, amount : felt, node_operator_l2 : felt
-):
+func withdrawal_request(collateral_id : felt, amount : felt, node_operator_l2 : felt):
 end
 
 # Event emitted whenever a position is marked to be liquidated/deleveraged
@@ -123,7 +112,6 @@ end
 @event
 func deposited(asset_id : felt, amount : felt):
 end
-
 
 ###########
 # Storage #
@@ -371,8 +359,10 @@ func return_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
 
     let (array_list : OrderDetailsWithIDs*) = alloc()
     let (array_len : felt) = position_array_len.read()
-    
-    let (new_array_len) = populate_array_positions(iterator_=0, array_list_len_=0, array_list_=array_list, final_len_=array_len)
+
+    let (new_array_len) = populate_array_positions(
+        iterator_=0, array_list_len_=0, array_list_=array_list, final_len_=array_len
+    )
 
     return (new_array_len, array_list)
 end
@@ -389,7 +379,7 @@ func return_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     let (array_len) = collateral_array_len.read()
     populate_array_collaterals(iterator_=0, array_list_=array_list, final_len_=array_len)
 
-    return(array_len, array_list)
+    return (array_len, array_list)
 end
 
 # @notice view function to get withdrawal history
@@ -404,7 +394,7 @@ func get_withdrawal_history{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     let (array_len : felt) = withdrawal_history_array_len.read()
     populate_withdrawals_array(iterator_=0, withdrawal_list_=array_list, final_len_=array_len)
 
-    return(array_len, array_list)
+    return (array_len, array_list)
 end
 
 # @notice view function to check if eight hours is complete or not
@@ -440,7 +430,7 @@ end
 @l1_handler
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt, user : felt, amount : felt, assetID_ : felt
-):  
+):
     alloc_locals
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -497,7 +487,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tempvar new_balance = balance_collateral + amount_in_decimal_representation
     balance.write(assetID=assetID_, value=new_balance)
 
-    deposited.emit(asset_id = assetID_, amount = amount_in_decimal_representation)
+    deposited.emit(asset_id=assetID_, amount=amount_in_decimal_representation)
     return ()
 end
 
@@ -528,7 +518,7 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 
     balance.write(assetID=assetID_, value=balance_ - amount)
 
-    transferred_from.emit(asset_id = assetID_, amount = amount)
+    transferred_from.emit(asset_id=assetID_, amount=amount)
     return ()
 end
 
@@ -560,9 +550,15 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(order_id = orderID_, value=block_timestamp)
+    last_updated.write(order_id=orderID_, value=block_timestamp)
 
-    transferred_from_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
+    transferred_from_abr.emit(
+        order_id=orderID_,
+        asset_id=assetID_,
+        market_id=marketID_,
+        amount=amount,
+        timestamp=block_timestamp,
+    )
     return ()
 end
 
@@ -593,9 +589,15 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(order_id = orderID_, value=block_timestamp)
+    last_updated.write(order_id=orderID_, value=block_timestamp)
 
-    transferred_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
+    transferred_abr.emit(
+        order_id=orderID_,
+        asset_id=assetID_,
+        market_id=marketID_,
+        amount=amount,
+        timestamp=block_timestamp,
+    )
     return ()
 end
 
@@ -659,7 +661,7 @@ func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         position_array.write(index=id_, value=last_id)
         position_array.write(index=arr_len - 1, value=0)
     end
-    
+
     position_array_len.write(arr_len - 1)
     return ()
 end
@@ -757,7 +759,8 @@ func execute_order{
             if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
                 tempvar range_check_ptr = range_check_ptr
             else:
-                with_attr error_message("Order status should be less than or equal to the ORDER_CLOSED_PARTIALLY status"):
+                with_attr error_message(
+                        "Order status should be less than or equal to the ORDER_CLOSED_PARTIALLY status"):
                     assert_le(orderDetails.status, ORDER_CLOSED_PARTIALLY)
                 end
                 tempvar range_check_ptr = range_check_ptr
@@ -1003,7 +1006,8 @@ func withdraw{
 
     # Compute current balance
     let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id)
-    with_attr error_message("Fee amount should be less than or equal to the fee collateral balance"):
+    with_attr error_message(
+            "Fee amount should be less than or equal to the fee collateral balance"):
         assert_le(standard_fee, fee_collateral_balance)
     end
     tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee
@@ -1019,7 +1023,8 @@ func withdraw{
 
     # Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_)
-    with_attr error_message("Withdrawal amount requested should be less than or equal to the current balance"):
+    with_attr error_message(
+            "Withdrawal amount requested should be less than or equal to the current balance"):
         assert_le(amount_, current_balance)
     end
     tempvar new_balance = current_balance - amount_
@@ -1076,7 +1081,9 @@ func withdraw{
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_)
     withdrawal_history_array_len.write(array_len + 1)
 
-    withdrawal_request.emit(collateral_id = collateral_id_, amount = amount_, node_operator_l2 = node_operator_L2_address_)
+    withdrawal_request.emit(
+        collateral_id=collateral_id_, amount=amount_, node_operator_l2=node_operator_L2_address_
+    )
     return ()
 end
 
@@ -1094,7 +1101,8 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     with_attr error_message("Amount to be sold cannot be negative"):
         assert_nn(amount_to_be_sold_)
     end
-    with_attr error_message("Amount to be sold should be less than or equal to the portion executed"):
+    with_attr error_message(
+            "Amount to be sold should be less than or equal to the portion executed"):
         assert_le(amount_to_be_sold_, order_details.portionExecuted)
     end
 
@@ -1139,7 +1147,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     # Update amount_to_be_sold storage variable
     amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
 
-    liquidate_deleverage.emit(position_id = id_, amount = amount_to_be_sold_)
+    liquidate_deleverage.emit(position_id=id_, amount=amount_to_be_sold_)
     return ()
 end
 
@@ -1158,8 +1166,8 @@ func populate_withdrawals_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*
 ) -> ():
     let (withdrawal_history) = withdrawal_history_array.read(index=iterator_)
 
-    if iterator_== final_len_:
-        return()
+    if iterator_ == final_len_:
+        return ()
     end
 
     assert withdrawal_list_[iterator_] = withdrawal_history
@@ -1178,7 +1186,7 @@ func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*
     let (collateral_id) = collateral_array.read(index=iterator_)
 
     if iterator_ == final_len_:
-        return()
+        return ()
     end
 
     let (collateral_balance : felt) = balance.read(assetID=collateral_id)
@@ -1197,7 +1205,7 @@ end
 # @param final_len_ - Stores the length of the positions array
 # @return array_list_len - Length of the new array_list
 func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    iterator_ : felt, array_list_len_ : felt, array_list_ : OrderDetailsWithIDs*, final_len_ : felt, 
+    iterator_ : felt, array_list_len_ : felt, array_list_ : OrderDetailsWithIDs*, final_len_ : felt
 ) -> (array_list_len : felt):
     let (pos) = position_array.read(index=iterator_)
 
@@ -1228,7 +1236,9 @@ func populate_array_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
             return populate_array_positions(iterator_ + 1, array_list_len_, array_list_, final_len_)
         else:
             assert array_list_[array_list_len_] = order_details_w_id
-            return populate_array_positions(iterator_ + 1, array_list_len_ + 1, array_list_, final_len_)
+            return populate_array_positions(
+                iterator_ + 1, array_list_len_ + 1, array_list_, final_len_
+            )
         end
     end
 end
