@@ -672,7 +672,6 @@ end
 # @param size - Size of the Order to be executed
 # @param execution_price - Price at which the order should be executed
 # @param amount - TODO: Amount of funds that user must send/receive
-# @return 1, if executed correctly
 @external
 func execute_order{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
@@ -1275,7 +1274,6 @@ end
 
 # @notice Internal function to add a position to the array when it is opened
 # @param id_ - OrderRequest Id to be added
-# @return 1 - If successfully added
 func add_to_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id_ : felt
 ) -> ():
