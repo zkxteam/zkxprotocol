@@ -48,6 +48,8 @@ from contracts.Constants import (
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
     WithdrawalRequest_INDEX,
+    WITHDRAWAL_INITIATED,
+    WITHDRAWAL_SUCCEEDED,
 )
 from contracts.DataTypes import (
     Asset,
@@ -210,8 +212,11 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     public_key_ : felt, L1_address_ : felt, registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
+    with_attr error_message("Registry address, version, public key and L1 address cannot be 0"):
+        assert_not_zero(registry_address_)
         assert_not_zero(version_)
+        assert_not_zero(public_key_)
+        assert_not_zero(L1_address_)
     end
 
     public_key.write(public_key_)
@@ -620,7 +625,7 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (balance_) = balance.read(assetID=assetID_)
     balance.write(assetID=assetID_, value=balance_ + amount)
 
-    transferred.emit(asset_id = assetID_, amount = amount)
+    transferred.emit(asset_id=assetID_, amount=amount)
     return ()
 end
 
@@ -676,7 +681,7 @@ func execute_order{
     execution_price : felt,
     margin_amount : felt,
     borrowed_amount : felt,
-) -> (res : felt):
+) -> ():
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
 
@@ -744,7 +749,7 @@ func execute_order{
             # Return if the position size after the executing the current order is more than the order's positionSize
             let (size_by_leverage) = Math64x61_mul(size, request.leverage)
             with_attr error_message(
-                    "Paritally executed + remaining should be less than position in account contract."):
+                    "Paritally executed + remaining should be less than or equal to the position in account contract."):
                 assert_le(size + orderDetails.portionExecuted, request.positionSize)
             end
 
@@ -752,7 +757,9 @@ func execute_order{
             if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
                 tempvar range_check_ptr = range_check_ptr
             else:
-                assert_le(orderDetails.status, ORDER_CLOSED_PARTIALLY)
+                with_attr error_message("Order status should be less than or equal to the ORDER_CLOSED_PARTIALLY status"):
+                    assert_le(orderDetails.status, ORDER_CLOSED_PARTIALLY)
+                end
                 tempvar range_check_ptr = range_check_ptr
             end
 
@@ -887,7 +894,7 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr
         tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     end
-    return (1)
+    return ()
 end
 
 # @notice function to update l1 fee and node operators l1 wallet address
@@ -923,7 +930,7 @@ func update_withdrawal_history{
             timestamp=history.timestamp,
             node_operator_L2_address=history.node_operator_L2_address,
             fee=history.fee,
-            status=1,
+            status=WITHDRAWAL_SUCCEEDED,
         )
         withdrawal_history_array.write(index=index_to_be_updated, value=updated_history)
         return ()
@@ -979,7 +986,9 @@ func withdraw{
     end
 
     # Make sure 'amount' is positive.
-    assert_nn(amount_)
+    with_attr error_message("Withdrawal amount requested cannot be negative"):
+        assert_nn(amount_)
+    end
 
     # get L2 Account contract address
     let (user_l2_address) = get_contract_address()
@@ -1010,7 +1019,7 @@ func withdraw{
 
     # Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_)
-    with_attr error_message("Withdrawal amount requested should be less than balance"):
+    with_attr error_message("Withdrawal amount requested should be less than or equal to the current balance"):
         assert_le(amount_, current_balance)
     end
     tempvar new_balance = current_balance - amount_
@@ -1059,7 +1068,7 @@ func withdraw{
         timestamp=timestamp_,
         node_operator_L2_address=node_operator_L2_address_,
         fee=standard_fee,
-        status=0
+        status=WITHDRAWAL_INITIATED
         )
 
     # Update Withdrawal history
@@ -1259,11 +1268,11 @@ end
 # @return 1 - If successfully added
 func add_to_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     id_ : felt
-) -> (res : felt):
+) -> ():
     let (arr_len) = position_array_len.read()
     position_array.write(index=arr_len, value=id_)
     position_array_len.write(arr_len + 1)
-    return (1)
+    return ()
 end
 
 # @notice Internal function to add collateral to the array
