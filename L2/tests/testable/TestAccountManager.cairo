@@ -682,7 +682,7 @@ func execute_order{
     execution_price : felt,
     margin_amount : felt,
     borrowed_amount : felt,
-) -> ():
+) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
 
@@ -896,7 +896,7 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr
         tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     end
-    return ()
+    return (1)
 end
 
 # @notice function to update l1 fee and node operators l1 wallet address
@@ -1351,8 +1351,8 @@ func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
 
     if curr_balance == 0:
         add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
-        return()
+        return ()
     else:
-        return()
+        return ()
     end
 end

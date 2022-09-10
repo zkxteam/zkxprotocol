@@ -682,7 +682,7 @@ func execute_order{
     execution_price : felt,
     margin_amount : felt,
     borrowed_amount : felt,
-) -> ():
+) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
 
@@ -896,7 +896,7 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr
         tempvar ecdsa_ptr : SignatureBuiltin* = ecdsa_ptr
     end
-    return ()
+    return (1)
 end
 
 # @notice function to update l1 fee and node operators l1 wallet address

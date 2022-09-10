@@ -23,16 +23,20 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def abr_factory(starknet_service: StarknetService):
-
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
-    admin1 = await account_factory.deploy_account(admin1_signer.public_key)
-    admin2 = await account_factory.deploy_account(admin2_signer.public_key)
-    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        admin1_signer.public_key
+    ])
+    admin2 = await starknet_service.deploy(ContractType.Account, [
+        admin2_signer.public_key
+    ])
 
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, 0x0])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     abr = await starknet_service.deploy(ContractType.ABR, [registry.contract_address, 1])
-
+    
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+  
     timestamp = int(time.time())
 
     starknet_service.starknet.state.state.block_info = BlockInfo(

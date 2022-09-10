@@ -422,7 +422,7 @@ func process_open_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
 
     # calculate avg execution price
     if order_details.executionPrice == 0:
-        assert average_execution_price_open = execution_price_
+        average_execution_price_open = execution_price_
         tempvar range_check_ptr = range_check_ptr
     else:
         let (portion_executed_value) = Math64x61_mul(
@@ -432,7 +432,7 @@ func process_open_orders{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
         let cumulative_order_value = portion_executed_value + current_order_value
         let cumulative_order_size = order_details.portionExecuted + order_size_
         let (price) = Math64x61_div(cumulative_order_value, cumulative_order_size)
-        assert average_execution_price_open = price
+        average_execution_price_open = price
         tempvar range_check_ptr = range_check_ptr
     end
 
@@ -880,10 +880,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             fees_balance_address_=fees_balance_address_,
             holding_address_=holding_address_,
         )
-
         assert margin_amount = margin_amount_temp
         assert borrowed_amount = borrowed_amount_temp
         assert average_execution_price = average_execution_price_temp
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
     else:
         let (
             average_execution_price_temp : felt,
@@ -897,10 +900,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             insurance_fund_address_=insurance_fund_address_,
             holding_address_=holding_address_,
         )
-
         assert margin_amount = margin_amount_temp
         assert borrowed_amount = borrowed_amount_temp
         assert average_execution_price = average_execution_price_temp
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
     end
 
     # Create a temporary order object
