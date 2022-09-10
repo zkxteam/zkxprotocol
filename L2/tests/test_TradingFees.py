@@ -18,10 +18,12 @@ def event_loop():
 async def adminAuth_factory(starknet_service: StarknetService):
 
     # Deploy accounts
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
-    admin1 = await account_factory.deploy_account(signer1.public_key)
-    admin2 = await account_factory.deploy_account(signer2.public_key)
-    user1 = await account_factory.deploy_ZKX_account(signer3.public_key)
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        signer1.public_key
+    ])
+    admin2 = await starknet_service.deploy(ContractType.Account, [
+        signer2.public_key
+    ])
     
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
@@ -29,6 +31,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
+    user1 = await account_factory.deploy_ZKX_account(signer3.public_key)
 
     non_discount = 2305843009213693952 - to64x61(0.03)
     fee = to64x61(0.0002)

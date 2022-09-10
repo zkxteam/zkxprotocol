@@ -22,13 +22,9 @@ async def contract_factory(starknet_service: StarknetService):
         signer1.public_key,
     ])
 
-    admin2 = await starknet_service.deploy(ContractType.AccountManager, [
+    admin2 = await starknet_service.deploy(ContractType.Account, [
         signer2.public_key,
-        L1_dummy_address,
-        0,
-        1
     ])
-
 
     arrayTesting = await starknet_service.deploy(ContractType.ArrayTesting, [])
 
