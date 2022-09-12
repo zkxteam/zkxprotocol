@@ -126,10 +126,10 @@ async def abr_factory(starknet_service: StarknetService):
         ContractType.MarketPrices, 
         [registry.contract_address, 1]
     )
-    liquidate = await starknet_service.deploy(
-        ContractType.Liquidate, 
-        [registry.contract_address, 1]
-    )
+    # liquidate = await starknet_service.deploy(
+    #     ContractType.Liquidate, 
+    #     [registry.contract_address, 1]
+    # )
 
     timestamp = int(time.time())
 
@@ -168,7 +168,7 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [18, 1, abr_fund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [19, 1, abr_payment.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    # await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
 
     # Add base fee and discount in Trading Fee contract
@@ -338,9 +338,9 @@ async def test_abr_payments(abr_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ])
 
     alice_balance = await alice.get_balance(USDC_ID).call()
@@ -362,7 +362,7 @@ async def test_abr_payments(abr_factory):
         from_address=abr_payment.contract_address,
         name="abr_payment_called_user_position",
         data=[
-            order_id_1,
+            marketID_1,
             alice.contract_address,
             initial_timestamp
         ]
@@ -373,7 +373,7 @@ async def test_abr_payments(abr_factory):
         from_address=abr_payment.contract_address,
         name="abr_payment_called_user_position",
         data=[
-            order_id_2,
+            marketID_1,
             bob.contract_address,
             initial_timestamp
         ]
@@ -384,7 +384,6 @@ async def test_abr_payments(abr_factory):
         from_address=abr_fund.contract_address,
         name="withdraw_ABR_called",
         data=[
-            order_id_1,
             alice.contract_address,
             marketID_1,
             abr_to_pay.result.res,
@@ -397,7 +396,6 @@ async def test_abr_payments(abr_factory):
         from_address=abr_fund.contract_address,
         name="deposit_ABR_called",
         data=[
-            order_id_2,
             bob.contract_address,
             marketID_1,
             abr_to_pay.result.res,
@@ -410,8 +408,6 @@ async def test_abr_payments(abr_factory):
         from_address=alice.contract_address,
         name="transferred_abr",
         data=[
-            order_id_1,
-            USDC_ID,
             marketID_1,
             abr_to_pay.result.res,
             initial_timestamp
@@ -423,8 +419,6 @@ async def test_abr_payments(abr_factory):
         from_address=bob.contract_address,
         name="transferred_from_abr",
         data=[
-            order_id_2,
-            USDC_ID,
             marketID_1,
             abr_to_pay.result.res,
             initial_timestamp
@@ -485,7 +479,7 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
         from_address=abr_payment.contract_address,
         name="abr_payment_called_user_position",
         data=[
-            str_to_felt("343uofdsjnv"),
+            BTC_USD_ID,
             alice.contract_address,
             timestamp
         ]
@@ -496,7 +490,7 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
         from_address=abr_payment.contract_address,
         name="abr_payment_called_user_position",
         data=[
-            str_to_felt("wer4iljerw"),
+            BTC_USD_ID,
             bob.contract_address,
             timestamp
         ]
@@ -507,7 +501,6 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
         from_address=abr_fund.contract_address,
         name="withdraw_ABR_called",
         data=[
-            str_to_felt("343uofdsjnv"),
             alice.contract_address,
             BTC_USD_ID,
             abr_to_pay.result.res,
@@ -520,7 +513,6 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
         from_address=abr_fund.contract_address,
         name="deposit_ABR_called",
         data=[
-            str_to_felt("wer4iljerw"),
             bob.contract_address,
             BTC_USD_ID,
             abr_to_pay.result.res,
@@ -533,8 +525,6 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
         from_address=alice.contract_address,
         name="transferred_abr",
         data=[
-            str_to_felt("343uofdsjnv"),
-            USDC_ID,
             BTC_USD_ID,
             abr_to_pay.result.res,
             timestamp
@@ -546,8 +536,6 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
         from_address=bob.contract_address,
         name="transferred_from_abr",
         data=[
-            str_to_felt("wer4iljerw"),
-            USDC_ID,
             BTC_USD_ID,
             abr_to_pay.result.res,
             timestamp

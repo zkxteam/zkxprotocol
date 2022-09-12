@@ -32,5 +32,6 @@ namespace IMarkets:
     func returnAllMarkets() -> (array_list_len : felt, array_list : MarketWID*):
     end
 
-    
+    func getCollateral_from_market(market_id : felt) -> (collateral_id : felt):
+    end
 end

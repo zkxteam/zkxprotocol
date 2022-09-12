@@ -77,7 +77,7 @@ func modify_base_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     with_attr error_message("Caller does not have permission to update base abr value"):
         let (version) = contract_version.read()
         let (registry) = registry_address.read()
-        verify_caller_authority(registry, version, MasterAdmin_ACTION)    
+        verify_caller_authority(registry, version, MasterAdmin_ACTION)
     end
 
     base_abr.write(new_base_abr)
@@ -671,7 +671,7 @@ func calculate_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (last_call) = last_updated.read(market_id=market_id)
 
     # Minimum time before the second call
-    let min_time = last_call + 28000
+    let min_time = last_call + 28800
     let (is_eight_hours) = is_le(block_timestamp, min_time)
 
     # If 8 hours have not passed yet
