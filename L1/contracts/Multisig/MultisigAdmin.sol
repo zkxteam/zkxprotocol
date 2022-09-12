@@ -9,15 +9,15 @@ contract MultisigAdmin is IMultisig {
     //////////////
 
     uint32 public immutable quorum;
-    uint128 public constant MIN_DELAY = 10 minutes;
-    uint128 public constant MAX_DELAY = 30 days;
-    uint128 public constant EXECUTION_PERIOD = 7 days;
+    uint256 public constant MIN_DELAY = 10 minutes;
+    uint256 public constant MAX_DELAY = 30 days;
+    uint256 public constant EXECUTION_PERIOD = 7 days;
 
     /////////////
     // Storage //
     /////////////
 
-    uint256 public totalTransactions;
+	uint256[] private allTransactions;
     mapping(uint256 => Transaction) private txById;
     mapping(uint256 => Call[]) private txCallsById;
     mapping(uint256 => mapping(address => bool)) isApproved;
@@ -29,7 +29,7 @@ contract MultisigAdmin is IMultisig {
 
     constructor(uint32 _quorum, address[] memory _admins) {
         require(
-            _quorum > 1 && uint256(_quorum) < _admins.length - 1,
+            _quorum > 1 && uint256(_quorum) < _admins.length,
             "Invalid _quorum value"
         );
         quorum = _quorum;
@@ -44,6 +44,10 @@ contract MultisigAdmin is IMultisig {
     //////////
     // View //
     //////////
+
+	function getAllTxIds() external view returns (uint256[] memory) {
+		return allTransactions;
+	}
 
     function getTxInfo(uint256 id) external view returns (Transaction memory) {
         return txById[id];
@@ -72,11 +76,10 @@ contract MultisigAdmin is IMultisig {
         bool isQuorumReached = _tx.approvals >= quorum;
 
         // 2. Check execution date
-        uint128 _now = uint128(block.timestamp);
         bool isQuorumDateSet = _tx.quorumTime != 0;
-        uint128 earliestExecuteDate = _tx.quorumTime + _tx.delay;
-        bool isDelayPassed = _now > earliestExecuteDate;
-        bool isNotExpired = _now < earliestExecuteDate + EXECUTION_PERIOD;
+        uint256 earliestExecuteDate = uint256(_tx.quorumTime + _tx.delay);
+        bool isDelayPassed = block.timestamp >= earliestExecuteDate;
+        bool isNotExpired = block.timestamp <= earliestExecuteDate + EXECUTION_PERIOD;
 
         // 3. Check ETH value to be spent
         uint256 valueToBeSpent = 0;
@@ -100,22 +103,26 @@ contract MultisigAdmin is IMultisig {
     // Write //
     ///////////
 
-    function proposeTx(Call[] calldata calls, uint128 delay)
+	function fund() external payable {
+		/* Does nothing, just receives ether */
+	}
+
+    function proposeTx(uint256 id, Call[] calldata calls, uint256 delay)
         external
         onlyAdmins
     {
         // 1. Validate tx
-        uint256 id = totalTransactions++;
-        require(txById[id].status == Status.Absent, "Tx already present");
+		require(txById[id].status == Status.Absent, "Tx already exists");
         require(calls.length > 0, "No calls provided");
         require(delay >= MIN_DELAY && delay <= MAX_DELAY, "Invalid delay");
 
         // 2. Store tx
+		allTransactions.push(id);
         txById[id] = Transaction({
             initiator: msg.sender,
             status: Status.Pending,
             approvals: 0,
-            delay: delay,
+            delay: uint128(delay),
             quorumTime: 0
         });
 
@@ -172,11 +179,10 @@ contract MultisigAdmin is IMultisig {
         Transaction storage _tx = txById[id];
         require(_tx.status == Status.Pending, "Tx not in Pending status");
         require(_tx.approvals >= quorum, "Quorum not reached");
-        uint128 _now = uint128(block.timestamp);
         require(_tx.quorumTime != 0, "Unknown when quorum was reached");
-        uint128 earliestExecuteDate = _tx.quorumTime + _tx.delay;
-        require(_now > earliestExecuteDate, "Too early");
-        require(_now < earliestExecuteDate + EXECUTION_PERIOD, "Tx expired");
+        uint256 earliestExecuteDate = uint256(_tx.quorumTime + _tx.delay);
+        require(block.timestamp >= earliestExecuteDate, "Too early");
+        require(block.timestamp <= earliestExecuteDate + EXECUTION_PERIOD, "Tx expired");
 
         // 2. Execute tx
         _tx.status = Status.Executed;
@@ -213,7 +219,7 @@ contract MultisigAdmin is IMultisig {
     /////////////
 
     function prepareCalldata(Call memory call)
-        private
+        public
         pure
         returns (bytes memory)
     {

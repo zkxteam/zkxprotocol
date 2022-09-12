@@ -32,8 +32,8 @@ interface IMultisig {
     // Read //
     //////////
 
-	/// @notice Total number of transactions
-    function totalTransactions() external view returns (uint256);
+	/// @notice Array with all tx ids in a proposed order, starting with latest ones
+    function getAllTxIds() external view returns (uint256[] memory);
 
 	/// @notice Information about tx initiator, status, approval count, delay and quorum time
 	/// @param id - id of tx
@@ -66,12 +66,16 @@ interface IMultisig {
 
     ///////////
     // Write //
-    ///////////
+    ///////////s
+
+	/// @notice Funds contract with ether
+	function fund() external payable;
 
 	/// @notice Propose tx for confirmation and execution
+	/// @param id - id of proposed tx, must be unique
 	/// @param calls - array of calls to be executed during tx execution
 	/// @param delay — delay in seconds between tx confirmation and execution
-    function proposeTx(Call[] calldata calls, uint128 delay) external;
+    function proposeTx(uint256 id, Call[] calldata calls, uint256 delay) external;
 
 	/// @notice Execute already confirmed tx
 	/// @param id — id of tx to be executed
@@ -94,7 +98,7 @@ interface IMultisig {
     ////////////
 
 	/// @notice Triggered when new tx was proposed
-    event TxProposed(uint256 indexed id, uint128 delay);
+    event TxProposed(uint256 indexed id, uint256 delay);
 
 	/// @notice Triggered when tx was executed
     event TxExecuted(uint256 indexed id);
