@@ -210,7 +210,7 @@ async def abr_factory(starknet_service: StarknetService):
         baseline_position_size = to64x61(1000),
         maximum_position_size = to64x61(10000)
     )
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', BTC_settings)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_settings)
 
     # Add USDC asset
     USDC_settings = build_asset_properties(
@@ -235,7 +235,7 @@ async def abr_factory(starknet_service: StarknetService):
         baseline_position_size = to64x61(1000),
         maximum_position_size = to64x61(10000)
     )
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', USDC_settings)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_settings)
 
     # Add markets
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1, 0, 10])
