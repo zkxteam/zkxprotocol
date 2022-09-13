@@ -1282,11 +1282,11 @@ end
 # @return 1 - If successfully added
 func add_to_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt
-) -> (res : felt):
+):
     let (is_exists) = market_is_exist.read(market_id=market_id)
 
     if is_exists == TRUE:
-        return (1)
+        return ()
     end
 
     let (arr_len) = index_to_market_array_len.read()
@@ -1295,7 +1295,7 @@ func add_to_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     market_to_index_mapping.write(market_id=market_id, value=arr_len)
     index_to_market_array_len.write(value=arr_len + 1)
     market_is_exist.write(market_id=market_id, value=TRUE)
-    return (1)
+    return ()
 end
 
 # @notice Internal function called to remove a market_id when both positions are fully closed
@@ -1303,7 +1303,7 @@ end
 # @return 1 - If successfully removed
 func remove_from_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt
-) -> (res : felt):
+):
     alloc_locals
 
     let (index) = market_to_index_mapping.read(market_id=market_id)
@@ -1320,7 +1320,7 @@ func remove_from_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
     market_to_index_mapping.write(market_id=market_id, value=0)
     market_is_exist.write(market_id=market_id, value=FALSE)
     index_to_market_array_len.write(arr_len - 1)
-    return (1)
+    return ()
 end
 
 # @notice Internal function to add collateral to the array
