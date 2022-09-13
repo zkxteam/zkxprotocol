@@ -34,9 +34,6 @@ const Math64x61_ONE = 1 * Math64x61_FRACT_PART
 # E (~2.7182) * ONE (2305843009213693952)
 const Math64x61_E = 6267931151224907085
 
-# 0.000'000'000'000'000'001 or from_decimal_felt(1, 18)
-const Math64x61_MIN_FRACTION = 2
-
 ##############
 # Assertions #
 ##############
@@ -49,7 +46,7 @@ end
 
 # Validates that X is a positive Math64x61 value. X must be >= 0.000'000'000'000'000'001
 func Math64x61_assertPositive64x61{range_check_ptr}(x : felt):
-    assert_in_range(x, Math64x61_MIN_FRACTION, Math64x61_BOUND)
+    assert_in_range(x, 1, Math64x61_BOUND)
     return ()
 end
 

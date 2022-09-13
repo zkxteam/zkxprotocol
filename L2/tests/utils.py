@@ -213,6 +213,7 @@ def get_transaction_hash(account, call_array, calldata, nonce, max_fee):
         StarknetChainId.TESTNET.value,
         [],
     )
+    
 
 def build_default_asset_properties(
     id,
