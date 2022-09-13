@@ -130,12 +130,6 @@ struct PositionDetails:
     member leverage : felt
 end
 
-# @notice struct for sending the array of positions for ABR calculations
-struct NetPositions:
-    member marketID : felt
-    member positionSize : felt
-end
-
 # Struct for passing signature to Account Contract
 struct Signature:
     member r_value : felt
