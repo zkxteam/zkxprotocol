@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted
+from utils import str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted, to64x61
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -22,25 +22,25 @@ def generate_asset_info():
 def build_default_asset_properties(id, ticker, name):
     return [
         id, # id
-        0, # asset_version
+        1, # asset_version
         ticker, # ticker
         name, # short_name
         0, # tradable
         0, # collateral
         18, # token_decimal
         0, # metadata_id
-        1, # tick_size
-        1, # step_size
-        10, # minimum_order_size
-        1, # minimum_leverage
-        5, # maximum_leverage
-        3, # currently_allowed_leverage
-        1, # maintenance_margin_fraction
-        1, # initial_margin_fraction
-        1, # incremental_initial_margin_fraction
-        100, # incremental_position_size
-        1000, # baseline_position_size
-        10000 # maximum_position_size
+        to64x61(0.001), # tick_size
+        to64x61(0.01), # step_size
+        to64x61(0.1), # minimum_order_size
+        to64x61(1), # minimum_leverage
+        to64x61(10), # maximum_leverage
+        to64x61(3), # currently_allowed_leverage
+        to64x61(1), # maintenance_margin_fraction
+        to64x61(1), # initial_margin_fraction
+        to64x61(1), # incremental_initial_margin_fraction
+        to64x61(100), # incremental_position_size
+        to64x61(1000), # baseline_position_size
+        to64x61(10000) # maximum_position_size
     ]
 
 
@@ -112,43 +112,44 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     assert fetched_asset.collateral == 0
     assert fetched_asset.token_decimal == 18
     assert fetched_asset.metadata_id == 0
-    assert fetched_asset.asset_version == 0
-    assert fetched_asset.tick_size == 1
-    assert fetched_asset.step_size == 1
-    assert fetched_asset.minimum_order_size == 10
-    assert fetched_asset.minimum_leverage == 1
-    assert fetched_asset.maximum_leverage == 5
-    assert fetched_asset.currently_allowed_leverage == 3
-    assert fetched_asset.maintenance_margin_fraction == 1
-    assert fetched_asset.initial_margin_fraction == 1
-    assert fetched_asset.incremental_initial_margin_fraction == 1
-    assert fetched_asset.incremental_position_size == 100
-    assert fetched_asset.baseline_position_size == 1000
-    assert fetched_asset.maximum_position_size == 10000
+    assert fetched_asset.asset_version == 1
+    assert fetched_asset.tick_size == to64x61(0.001)
+    assert fetched_asset.step_size == to64x61(0.01)
+    assert fetched_asset.minimum_order_size == to64x61(0.1)
+    assert fetched_asset.minimum_leverage == to64x61(1)
+    assert fetched_asset.maximum_leverage == to64x61(10)
+    assert fetched_asset.currently_allowed_leverage == to64x61(3)
+    assert fetched_asset.maintenance_margin_fraction == to64x61(1)
+    assert fetched_asset.initial_margin_fraction == to64x61(1)
+    assert fetched_asset.incremental_initial_margin_fraction == to64x61(1)
+    assert fetched_asset.incremental_position_size == to64x61(100)
+    assert fetched_asset.baseline_position_size == to64x61(1000)
+    assert fetched_asset.maximum_position_size == to64x61(10000)
+
 
     assets = await asset.return_all_assets().call()
     parsed_list = list(assets.result.array_list)[0]
 
     assert parsed_list.id == asset_id
-    assert parsed_list.asset_version == 0
+    assert parsed_list.asset_version == 1
     assert parsed_list.ticker == asset_ticker
     assert parsed_list.short_name == asset_name
     assert parsed_list.tradable == 0
     assert parsed_list.collateral == 0
     assert parsed_list.token_decimal == 18
     assert parsed_list.metadata_id == 0
-    assert parsed_list.tick_size == 1
-    assert parsed_list.step_size == 1
-    assert parsed_list.minimum_order_size == 10
-    assert parsed_list.minimum_leverage == 1
-    assert parsed_list.maximum_leverage == 5
-    assert parsed_list.currently_allowed_leverage == 3
-    assert parsed_list.maintenance_margin_fraction == 1
-    assert parsed_list.initial_margin_fraction == 1
-    assert parsed_list.incremental_initial_margin_fraction == 1
-    assert parsed_list.incremental_position_size == 100
-    assert parsed_list.baseline_position_size == 1000
-    assert parsed_list.maximum_position_size == 10000
+    assert parsed_list.tick_size == to64x61(0.001)
+    assert parsed_list.step_size == to64x61(0.01)
+    assert parsed_list.minimum_order_size == to64x61(0.1)
+    assert parsed_list.minimum_leverage == to64x61(1)
+    assert parsed_list.maximum_leverage == to64x61(10)
+    assert parsed_list.currently_allowed_leverage == to64x61(3)
+    assert parsed_list.maintenance_margin_fraction == to64x61(1)
+    assert parsed_list.initial_margin_fraction == to64x61(1)
+    assert parsed_list.incremental_initial_margin_fraction == to64x61(1)
+    assert parsed_list.incremental_position_size == to64x61(100)
+    assert parsed_list.baseline_position_size == to64x61(1000)
+    assert parsed_list.maximum_position_size == to64x61(10000)
 
 
 @pytest.mark.asyncio
@@ -201,7 +202,7 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
     assert fetched_asset.tradable == new_tradable_status
     assert fetched_asset.collateral == new_collateral
     assert fetched_asset.metadata_id == new_metadata_id
-    assert fetched_asset.asset_version == 0
+    assert fetched_asset.asset_version == 1
 
 
 @pytest.mark.asyncio
@@ -232,18 +233,18 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
 
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    new_tick_size = 2
-    new_step_size = 2
-    new_minimum_order_size = 11
-    new_minimum_leverage = 2
-    new_maximum_leverage = 6
-    new_currently_allowed_leverage = 4
-    new_maintenance_margin_fraction = 2
-    new_initial_margin_fraction = 2
-    new_incremental_initial_margin_fraction = 2
-    new_incremental_position_size = 200
-    new_baseline_position_size = 2000
-    new_maximum_position_size = 20000
+    new_tick_size = to64x61(2)
+    new_step_size = to64x61(2)
+    new_minimum_order_size = to64x61(0.25)
+    new_minimum_leverage = to64x61(2)
+    new_maximum_leverage = to64x61(100)
+    new_currently_allowed_leverage = to64x61(100)
+    new_maintenance_margin_fraction = to64x61(2)
+    new_initial_margin_fraction = to64x61(2)
+    new_incremental_initial_margin_fraction = to64x61(2)
+    new_incremental_position_size = to64x61(200)
+    new_baseline_position_size = to64x61(2000)
+    new_maximum_position_size = to64x61(20000)
 
     version_before = (await asset.get_version().call()).result.version
     modify_tx = await signer1.send_transaction(admin1, asset.contract_address, 'modify_trade_settings', [
@@ -269,7 +270,7 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
             asset_id,
             asset_ticker,
             version_before + 1, # new_contract_version
-            1, # new_asset_version
+            2, # new_asset_version
             admin1.contract_address
         ]
     )
@@ -295,7 +296,7 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
     assert fetched_asset.incremental_position_size == new_incremental_position_size
     assert fetched_asset.baseline_position_size == new_baseline_position_size
     assert fetched_asset.maximum_position_size == new_maximum_position_size
-    assert fetched_asset.asset_version == 1
+    assert fetched_asset.asset_version == 2
 
     execution_info1 = await asset.get_version().call()
     version = execution_info1.result.version
@@ -312,7 +313,19 @@ async def test_modifying_trade_settings_by_unauthorized_user(adminAuth_factory):
 
     assert_revert(lambda: 
         signer3.send_transaction(user1, asset.contract_address, 'modify_trade_settings', [
-            asset_id, 2, 2, 11, 2, 6, 4, 2, 2, 2, 200, 2000, 20000
+            asset_id, 
+            to64x61(2), # tick_size 
+            to64x61(2), # step_size
+            to64x61(0.25), # minimum_order_size
+            to64x61(2), # minimum_leverage
+            to64x61(100), # maximum_leverage
+            to64x61(100), # currently_allowed_leverage
+            to64x61(2), # maintenance_margin_fraction
+            to64x61(2), # initial_margin_fraction
+            to64x61(2), # incremental_initial_margin_fraction
+            to64x61(200), # incremental_position_size
+            to64x61(2000), # baseline_position_size
+            to64x61(20000) # maximum_position_size
         ])
     )
 
@@ -363,18 +376,18 @@ async def test_modifying_trade_settings_by_admin_twice(adminAuth_factory):
 
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    new_tick_size = 2
-    new_step_size = 2
-    new_minimum_order_size = 11
-    new_minimum_leverage = 2
-    new_maximum_leverage = 6
-    new_currently_allowed_leverage = 4
-    new_maintenance_margin_fraction = 2
-    new_initial_margin_fraction = 2
-    new_incremental_initial_margin_fraction = 2
-    new_incremental_position_size = 200
-    new_baseline_position_size = 2000
-    new_maximum_position_size = 20000
+    new_tick_size = to64x61(2)
+    new_step_size = to64x61(2)
+    new_minimum_order_size = to64x61(0.25)
+    new_minimum_leverage = to64x61(2)
+    new_maximum_leverage = to64x61(100)
+    new_currently_allowed_leverage = to64x61(100)
+    new_maintenance_margin_fraction = to64x61(2)
+    new_initial_margin_fraction = to64x61(2)
+    new_incremental_initial_margin_fraction = to64x61(2)
+    new_incremental_position_size = to64x61(200)
+    new_baseline_position_size = to64x61(2000)
+    new_maximum_position_size = to64x61(20000)
 
     modify_trade_settings_payload = [
         asset_id,
@@ -415,7 +428,7 @@ async def test_modifying_trade_settings_by_admin_twice(adminAuth_factory):
     assert fetched_asset.incremental_position_size == new_incremental_position_size
     assert fetched_asset.baseline_position_size == new_baseline_position_size
     assert fetched_asset.maximum_position_size == new_maximum_position_size
-    assert fetched_asset.asset_version == 2
+    assert fetched_asset.asset_version == 3
 
     execution_info1 = await asset.get_version().call()
     version = execution_info1.result.version

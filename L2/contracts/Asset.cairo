@@ -3,14 +3,16 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_in_range, assert_le, assert_not_zero
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.starknet.common.syscalls import get_caller_address, get_contract_address
 
 from contracts.Constants import AdminAuth_INDEX, L1_ZKX_Address_INDEX, ManageAssets_ACTION
 from contracts.DataTypes import Asset, AssetWID
+from contracts.Math_64x61 import Math64x61_assertPositive64x61
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.Validation import assert_bool
 from contracts.libraries.Utils import verify_caller_authority
 
 #############
@@ -534,6 +536,36 @@ end
 func validate_asset_properties{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     asset_ : Asset
 ):
-    # TODO: add asset properties validation https://thalidao.atlassian.net/browse/ZKX-623
+    with_attr error_message("Asset: Invalid core settings"):
+        assert_bool(asset_.collateral)
+        assert_bool(asset_.tradable)
+        assert_in_range(asset_.token_decimal, 1, 19)
+    end
+    with_attr error_message("Asset: Invalid trade settings"):
+        Math64x61_assertPositive64x61(asset_.tick_size)
+        Math64x61_assertPositive64x61(asset_.step_size)
+        Math64x61_assertPositive64x61(asset_.minimum_order_size)
+        Math64x61_assertPositive64x61(asset_.maintenance_margin_fraction)
+        Math64x61_assertPositive64x61(asset_.initial_margin_fraction)
+        Math64x61_assertPositive64x61(asset_.incremental_initial_margin_fraction)
+    end
+    with_attr error_message("Asset: Invalid min leverage"):
+        Math64x61_assertPositive64x61(asset_.minimum_leverage)
+    end
+    with_attr error_message("Asset: Invalid max leverage"):
+        Math64x61_assertPositive64x61(asset_.maximum_leverage)
+        assert_le(asset_.minimum_leverage, asset_.maximum_leverage)
+    end
+    with_attr error_message("Asset: Invalid currently allowed leverage"):
+        Math64x61_assertPositive64x61(asset_.currently_allowed_leverage)
+        assert_le(asset_.minimum_leverage, asset_.currently_allowed_leverage)
+        assert_le(asset_.currently_allowed_leverage, asset_.maximum_leverage)
+    end
+    with_attr error_message("Asset: Invalid position size settings"):
+        Math64x61_assertPositive64x61(asset_.incremental_position_size)
+        Math64x61_assertPositive64x61(asset_.baseline_position_size)
+        Math64x61_assertPositive64x61(asset_.maximum_position_size)
+        assert_le(asset_.baseline_position_size, asset_.maximum_position_size)
+    end
     return ()
 end
