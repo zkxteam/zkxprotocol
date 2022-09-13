@@ -238,7 +238,15 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_settings)
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1, 0, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [
+        BTC_USD_ID, # market id
+        BTC_ID, # asset id
+        USDC_ID, # collateral id
+        to64x61(10), # leverage
+        1, # tradable
+        0, # archived
+        10 # ttl
+    ])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
