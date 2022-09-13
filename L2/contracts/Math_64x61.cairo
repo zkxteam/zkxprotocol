@@ -4,6 +4,7 @@ from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.math_cmp import is_le, is_not_zero
 from starkware.cairo.common.pow import pow
 from starkware.cairo.common.math import (
+    assert_in_range,
     assert_le,
     assert_lt,
     sqrt,
@@ -14,43 +15,70 @@ from starkware.cairo.common.math import (
     assert_not_zero,
 )
 
+#############
+# Constants #
+#############
+
+# 0x010000000000000000 or 18446744073709551616
 const Math64x61_INT_PART = 2 ** 64
+
+# 0x002000000000000000 or 2305843009213693952
 const Math64x61_FRACT_PART = 2 ** 61
+
+# 0x20000000000000000000000000000000 or 42535295865117307932921825928971026432
 const Math64x61_BOUND = 2 ** 125
+
+# 0x002000000000000000 or 2305843009213693952
 const Math64x61_ONE = 1 * Math64x61_FRACT_PART
+
+# E (~2.7182) * ONE (2305843009213693952)
 const Math64x61_E = 6267931151224907085
 
+##############
+# Assertions #
+##############
+
+# Validates that X is a valid Math64x61 value
 func Math64x61_assert64x61{range_check_ptr}(x : felt):
-    assert_lt(x, Math64x61_BOUND)
-    assert_le(-Math64x61_BOUND, x)
+    assert_in_range(x, -Math64x61_BOUND, Math64x61_BOUND)
     return ()
 end
 
-# Converts a fixed point value to a felt, truncating the fractional component
-func Math64x61_toFelt{range_check_ptr}(x : felt) -> (res : felt):
-    let (res, _) = signed_div_rem(x, Math64x61_FRACT_PART, Math64x61_BOUND)
+# Validates that X is a positive Math64x61 value. X must be >= 0.000'000'000'000'000'001
+func Math64x61_assertPositive64x61{range_check_ptr}(x : felt):
+    assert_in_range(x, 1, Math64x61_BOUND)
+    return ()
+end
+
+##############
+# Conversion #
+##############
+
+# Converts a felt with decimals to a fixed point value ensuring no overflow occurs
+func Math64x61_fromDecimalFelt{range_check_ptr}(x : felt, decimals : felt) -> (res : felt):
+    assert_in_range(decimals, 1, 19)
+    let (ten_power_decimals) = pow(10, decimals)
+    let (res) = Math64x61_div(x, ten_power_decimals)
     return (res)
 end
 
-# Converts a felt to a fixed point value ensuring it will not overflow
-func Math64x61_fromFelt{range_check_ptr}(x : felt) -> (res : felt):
-    assert_lt(x, Math64x61_INT_PART)
-    assert_le(-Math64x61_INT_PART, x)
-    return (x * Math64x61_FRACT_PART)
-end
-
-# Converts a fixed point 64.61 value to a uint256 value
-func Math64x61_toUint256(x : felt) -> (res : Uint256):
-    let res = Uint256(low=x, high=0)
+# Converts an integer felt value that has no decimals to a fixed point value (window_size, iterator etc.)
+func Math64x61_fromIntFelt{range_check_ptr}(x : felt) -> (res : felt):
+    assert_in_range(x, -Math64x61_INT_PART, Math64x61_INT_PART)
+    let res = x * Math64x61_FRACT_PART
     return (res)
 end
 
-# Converts a uint256 value into a fixed point 64.61 value ensuring it will not overflow
-func Math64x61_fromUint256{range_check_ptr}(x : Uint256) -> (res : felt):
-    assert x.high = 0
-    let (res) = Math64x61_fromFelt(x.low)
+# Converts a fixed point value to a felt with decimals, truncating the fractional component
+func Math64x61_toDecimalFelt{range_check_ptr}(x : felt, decimals : felt) -> (res : felt):
+    let (ten_power_decimals) = pow(10, decimals)
+    let (res) = Math64x61_mul(x, ten_power_decimals)
     return (res)
 end
+
+###################
+# Math operations #
+###################
 
 # Calculates the floor of a 64.61 value
 func Math64x61_floor{range_check_ptr}(x : felt) -> (res : felt):
@@ -333,7 +361,7 @@ func Math64x61_log2{range_check_ptr}(x : felt) -> (res : felt):
     let (r2) = Math64x61_mul(r3 + a2, norm)
     local norm_res = r2 + a1
 
-    let (int_part) = Math64x61_fromFelt(b)
+    let (int_part) = Math64x61_fromIntFelt(b)
     local res = int_part + norm_res
     Math64x61_assert64x61(res)
     return (res)

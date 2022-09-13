@@ -3,10 +3,9 @@ import pytest
 import ABR_data
 import time
 import asyncio
-from starkware.starknet.testing.starknet import Starknet
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, hash_order, assert_event_emitted, to64x61, convertTo64x61, assert_revert
+from utils import Signer, build_asset_properties, str_to_felt, hash_order, assert_event_emitted, to64x61, convertTo64x61, assert_revert
 from helpers import StarknetService, ContractType, AccountFactory
 
 admin1_signer = Signer(123456789987654321)
@@ -188,12 +187,66 @@ async def abr_factory(starknet_service: StarknetService):
     discount3 = to64x61(0.1)
     await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
-    # Add assets
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    # Add BTC asset
+    BTC_settings = build_asset_properties(
+        id = BTC_ID,
+        asset_version = 0,
+        ticker = str_to_felt("BTC"),
+        short_name = str_to_felt("Bitcoin"),
+        tradable = 1,
+        collateral = 0,
+        token_decimal = 8,
+        metadata_id = 0,
+        tick_size = to64x61(0.000000001),
+        step_size = to64x61(0.000001),
+        minimum_order_size = to64x61(0.001),
+        minimum_leverage = to64x61(1),
+        maximum_leverage = to64x61(10),
+        currently_allowed_leverage = to64x61(10),
+        maintenance_margin_fraction = to64x61(1),
+        initial_margin_fraction = to64x61(1),
+        incremental_initial_margin_fraction = to64x61(1),
+        incremental_position_size = to64x61(100),
+        baseline_position_size = to64x61(1000),
+        maximum_position_size = to64x61(10000)
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_settings)
+
+    # Add USDC asset
+    USDC_settings = build_asset_properties(
+        id = USDC_ID,
+        asset_version = 0,
+        ticker = str_to_felt("USDC"),
+        short_name = str_to_felt("USDC"),
+        tradable = 0,
+        collateral = 1,
+        token_decimal = 6,
+        metadata_id = 0,
+        tick_size = to64x61(0.01),
+        step_size = to64x61(0.1),
+        minimum_order_size = to64x61(1),
+        minimum_leverage = to64x61(1),
+        maximum_leverage = to64x61(5),
+        currently_allowed_leverage = to64x61(3),
+        maintenance_margin_fraction = to64x61(1),
+        initial_margin_fraction = to64x61(1),
+        incremental_initial_margin_fraction = to64x61(1),
+        incremental_position_size = to64x61(100),
+        baseline_position_size = to64x61(1000),
+        maximum_position_size = to64x61(10000)
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_settings)
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [
+        BTC_USD_ID, # market id
+        BTC_ID, # asset id
+        USDC_ID, # collateral id
+        to64x61(10), # leverage
+        1, # tradable
+        0, # archived
+        10 # ttl
+    ])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
