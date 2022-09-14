@@ -1,6 +1,6 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa 
+%builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
@@ -53,6 +53,7 @@ from contracts.DataTypes import (
     Message,
     PositionDetails,
     PositionDetailsWithIDs,
+    NetPositions,
     OrderRequest,
     Signature,
     WithdrawalHistory,
@@ -79,16 +80,12 @@ from contracts.Math_64x61 import (
 
 # Event emitted whenever collateral is transferred from account by trading
 @event
-func transferred_from(
-    asset_id : felt, amount : felt
-):
+func transferred_from(asset_id : felt, amount : felt):
 end
 
 # Event emitted whenever collateral is transferred to account by trading
 @event
-func transferred(
-    asset_id : felt, amount : felt
-):
+func transferred(asset_id : felt, amount : felt):
 end
 
 # Event emitted whenever collateral is transferred to account by abr payment
@@ -107,9 +104,7 @@ end
 
 # Event emitted whenver a new withdrawal request is made
 @event
-func withdrawal_request(
-    collateral_id : felt, amount : felt, node_operator_l2 : felt
-):
+func withdrawal_request(collateral_id : felt, amount : felt, node_operator_l2 : felt):
 end
 
 # Event emitted whenever a position is marked to be liquidated/deleveraged
@@ -121,7 +116,6 @@ end
 @event
 func deposited(asset_id : felt, amount : felt):
 end
-
 
 ###########
 # Storage #
@@ -167,9 +161,19 @@ end
 func L1_address() -> (res : felt):
 end
 
-# Stores all positions held by the user
+# Stores all markets the user has position in
 @storage_var
-func position_array(index : felt) -> (position_id : felt):
+func index_to_market_array(index : felt) -> (market_id : felt):
+end
+
+# Stores the mapping from the market_id to index
+@storage_var
+func market_to_index_mapping(market_id : felt) -> (market_id : felt):
+end
+
+# Stores if a market exists
+@storage_var
+func market_is_exist(market_id) -> (res : felt):
 end
 
 # Stores all collaterals held by the user
@@ -177,9 +181,9 @@ end
 func collateral_array(index : felt) -> (collateral_id : felt):
 end
 
-# Stores length of the position array
+# Stores the length of the index_to_market_array
 @storage_var
-func position_array_len() -> (len : felt):
+func index_to_market_array_len() -> (len : felt):
 end
 
 # Stores length of the collateral array
@@ -320,7 +324,7 @@ end
 func get_position_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id_ : felt, direction_ : felt
 ) -> (res : PositionDetails):
-    let (res) = position_mapping.read(marketID = market_id_, direction = direction_)
+    let (res) = position_mapping.read(marketID=market_id_, direction=direction_)
     return (res=res)
 end
 
@@ -414,7 +418,7 @@ end
 @l1_handler
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt, user : felt, amount : felt, assetID_ : felt
-):  
+):
     alloc_locals
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
@@ -471,7 +475,7 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     tempvar new_balance = balance_collateral + amount_in_decimal_representation
     balance.write(assetID=assetID_, value=new_balance)
 
-    deposited.emit(asset_id = assetID_, amount = amount_in_decimal_representation)
+    deposited.emit(asset_id=assetID_, amount=amount_in_decimal_representation)
     return ()
 end
 
@@ -502,7 +506,7 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 
     balance.write(assetID=assetID_, value=balance_ - amount)
 
-    transferred_from.emit(asset_id = assetID_, amount = amount)
+    transferred_from.emit(asset_id=assetID_, amount=amount)
     return ()
 end
 
@@ -534,9 +538,15 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(order_id = orderID_, value=block_timestamp)
+    last_updated.write(order_id=orderID_, value=block_timestamp)
 
-    transferred_from_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
+    transferred_from_abr.emit(
+        order_id=orderID_,
+        asset_id=assetID_,
+        market_id=marketID_,
+        amount=amount,
+        timestamp=block_timestamp,
+    )
     return ()
 end
 
@@ -567,10 +577,48 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(order_id = orderID_, value=block_timestamp)
+    last_updated.write(order_id=orderID_, value=block_timestamp)
 
-    transferred_abr.emit(order_id = orderID_, asset_id = assetID_, market_id = marketID_, amount = amount, timestamp = block_timestamp)
+    transferred_abr.emit(
+        order_id=orderID_,
+        asset_id=assetID_,
+        market_id=marketID_,
+        amount=amount,
+        timestamp=block_timestamp,
+    )
     return ()
+end
+
+# @notice External function called by the ABR Contract to get the array of net positions of the user
+# @returns net_positions_array_len - Length of the array
+# @returns net_positions_array - Required array of net positions
+@external
+func get_net_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    net_positions_array_len : felt, net_positions_array : NetPositions*
+):
+    alloc_locals
+
+    let (net_positions_array : NetPositions*) = alloc()
+    let (array_len : felt) = index_to_market_array_len.read()
+    return populate_net_positions(
+        net_positions_array_len_=0, net_positions_array_=net_positions_array, final_len_=array_len
+    )
+end
+
+# @notice External function called by the Liquidate Contract to get the array of net positions of the user
+# @returns positions_array_len - Length of the array
+# @returns positions_array - Required array of positions
+@external
+func get_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    positions_array_len : felt, positions_array : PositionDetails*
+):
+    alloc_locals
+
+    let (positions_array : PositionDetails*) = alloc()
+    let (array_len : felt) = index_to_market_array_len.read()
+    return populate_positions(
+        positions_array_len_=0, positions_array_=positions_array, final_len_=array_len - 1
+    )
 end
 
 # @notice External function called by the Trading Contract to transfer funds from account contract
@@ -599,42 +647,9 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     let (balance_) = balance.read(assetID=assetID_)
     balance.write(assetID=assetID_, value=balance_ + amount)
 
-    transferred.emit(asset_id = assetID_, amount = amount)
+    transferred.emit(asset_id=assetID_, amount=amount)
     return ()
 end
-
-
-# # @notice External function called to remove a fully closed position
-# # @param id_ - Index of the element in the array
-# # @return 1 - If successfully removed
-# @external
-# func remove_from_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-#     id_ : felt
-# ) -> (res : felt):
-#     alloc_locals
-
-#     let (pos_id) = position_array.read(index=id_)
-#     if pos_id == 0:
-#         with_attr error_message("No order exists in that index"):
-#             assert 1 = 0
-#         end
-#     end
-
-#     let (posDetails : PositionDetails) = order_mapping.read(orderID=pos_id)
-
-#     with_attr error_message("The order is not fully closed yet."):
-#         assert posDetails.status = POSITION_CLOSED
-#     end
-
-#     let (arr_len) = position_array_len.read()
-#     let (last_id) = position_array.read(index=arr_len - 1)
-
-#     position_array.write(index=id_, value=last_id)
-#     position_array.write(index=arr_len - 1, value=0)
-
-#     position_array_len.write(arr_len - 1)
-#     return (1)
-# end
 
 # @notice Function called by Trading Contract
 # @param request - Details of the order to be executed
@@ -653,7 +668,7 @@ func execute_order{
     execution_price : felt,
     margin_amount : felt,
     borrowed_amount : felt,
-    market_id : felt
+    market_id : felt,
 ) -> (res : felt):
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
@@ -678,7 +693,9 @@ func execute_order{
     is_valid_signature_order(hash, signature, request.liquidatorAddress)
 
     # Get the details of the position
-    let (position_details) = position_mapping.read(marketID = market_id, direction = request.direction)
+    let (position_details : PositionDetails) = position_mapping.read(
+        marketID=market_id, direction=request.direction
+    )
 
     # Get the portion executed details if already exists
     let (order_portion_executed) = portion_executed.read(orderID=request.orderID)
@@ -686,34 +703,51 @@ func execute_order{
 
     # Return if the position size after the executing the current order is more than the order's positionSize
     with_attr error_message(
-         "portion executed + size should be less than position in account contract."):
-            assert_le(new_position_executed, request.positionSize)
+            "portion executed + size should be less than position in account contract."):
+        assert_le(new_position_executed, request.positionSize)
     end
-    
+
     # Update the portion executed
     portion_executed.write(orderID=request.orderID, value=new_position_executed)
 
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
+        if position_details.position_size == 0:
+            add_to_market_array(market_id)
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        end
+
         # New position size
-        let (new_positionSize) = Math64x61_add(position_details.positionSize, size)
-        
+        let (new_position_size) = Math64x61_add(position_details.position_size, size)
+
+        tempvar syscall_ptr = syscall_ptr
+        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+        tempvar range_check_ptr = range_check_ptr
+
         # New leverage
         let total_value = margin_amount + borrowed_amount
         let (new_leverage) = Math64x61_div(total_value, margin_amount)
- 
+
         # Create a new struct with the updated details
         let updated_position = PositionDetails(
-            avgExecutionPrice=execution_price,
-            positionSize=new_positionSize,
-            marginAmount=margin_amount,
-            borrowedAmount=borrowed_amount,
-            leverage=new_leverage
+            avg_execution_price=execution_price,
+            position_size=new_position_size,
+            margin_amount=margin_amount,
+            borrowed_amount=borrowed_amount,
+            leverage=new_leverage,
         )
 
         # Write to the mapping
-        position_mapping.write(marketID=market_id, direction=request.direction, value=updated_position)
+        position_mapping.write(
+            marketID=market_id, direction=request.direction, value=updated_position
+        )
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
@@ -726,19 +760,21 @@ func execute_order{
         else:
             assert parent_direction = LONG
         end
-        
+
         # Get the parent position details
-        let (parent_position_details) = position_mapping.read(marketID = market_id, direction = parent_direction)
-        let (new_positionSize) = Math64x61_sub(parent_position_details.positionSize, size)
+        let (parent_position_details) = position_mapping.read(
+            marketID=market_id, direction=parent_direction
+        )
+        let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size)
 
         # Assert that the parent position is open
         with_attr error_message("The parent position size is 0"):
-            assert_not_zero(parent_position_details.positionSize)
+            assert_not_zero(parent_position_details.position_size)
         end
 
         # Assert that the size amount can be closed from the parent position
         with_attr error_message("The size of close order is more than the portionExecuted"):
-            assert_nn(new_positionSize)
+            assert_nn(new_position_size)
         end
 
         # Calculate the new leverage if it's a deleveraging order
@@ -777,15 +813,37 @@ func execute_order{
 
         # Create a new struct with the updated details
         let updated_position = PositionDetails(
-            avgExecutionPrice=execution_price,
-            positionSize=new_positionSize,
-            marginAmount=margin_amount,
-            borrowedAmount=borrowed_amount,
-            leverage=new_leverage
+            avg_execution_price=execution_price,
+            position_size=new_position_size,
+            margin_amount=margin_amount,
+            borrowed_amount=borrowed_amount,
+            leverage=new_leverage,
         )
 
+        if new_position_size == 0:
+            if position_details.position_size == 0:
+                remove_from_market_array(market_id)
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            end
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        else:
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
+        end
+
         # Write to the mapping
-        position_mapping.write(marketID=market_id, direction=parent_direction, value=updated_position)
+        position_mapping.write(
+            marketID=market_id, direction=parent_direction, value=updated_position
+        )
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
@@ -916,7 +974,8 @@ func withdraw{
 
     # Compute current balance
     let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id)
-    with_attr error_message("Fee amount should be less than or equal to the fee collateral balance"):
+    with_attr error_message(
+            "Fee amount should be less than or equal to the fee collateral balance"):
         assert_le(standard_fee, fee_collateral_balance)
     end
     tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee
@@ -983,14 +1042,16 @@ func withdraw{
         node_operator_L2_address=node_operator_L2_address_,
         fee=standard_fee,
         status=0
-    )
+        )
 
     # Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read()
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_)
     withdrawal_history_array_len.write(array_len + 1)
 
-    withdrawal_request.emit(collateral_id = collateral_id_, amount = amount_, node_operator_l2 = node_operator_L2_address_)
+    withdrawal_request.emit(
+        collateral_id=collateral_id_, amount=amount_, node_operator_l2=node_operator_L2_address_
+    )
     return ()
 end
 
@@ -1003,16 +1064,16 @@ end
 # ):
 #     alloc_locals
 
-#     let (order_details : OrderDetails) = order_mapping.read(orderID=id_)
+# let (order_details : OrderDetails) = order_mapping.read(orderID=id_)
 
-#     with_attr error_message("Amount to be sold cannot be negative"):
+# with_attr error_message("Amount to be sold cannot be negative"):
 #         assert_nn(amount_to_be_sold_)
 #     end
 #     with_attr error_message("Amount to be sold should be less than or equal to the portion executed"):
 #         assert_le(amount_to_be_sold_, order_details.portionExecuted)
 #     end
 
-#     # Check if the caller is the liquidator contract
+# # Check if the caller is the liquidator contract
 #     let (caller) = get_caller_address()
 #     let (registry) = registry_address.read()
 #     let (version) = contract_version.read()
@@ -1020,18 +1081,18 @@ end
 #         contract_address=registry, index=Liquidate_INDEX, version=version
 #     )
 
-#     with_attr error_message("Only liquidate contract is allowed to call for liquidation"):
+# with_attr error_message("Only liquidate contract is allowed to call for liquidation"):
 #         assert caller = liquidate_address
 #     end
 
-#     local status_
+# local status_
 #     if amount_to_be_sold_ == 0:
 #         status_ = ORDER_TO_BE_LIQUIDATED
 #     else:
 #         status_ = ORDER_TO_BE_DELEVERAGED
 #     end
 
-#     # Create a new struct with the updated details by setting toBeLiquidated flag to true
+# # Create a new struct with the updated details by setting toBeLiquidated flag to true
 #     let updated_order = OrderDetails(
 #         assetID=order_details.assetID,
 #         collateralID=order_details.collateralID,
@@ -1053,7 +1114,7 @@ end
 #     # Update amount_to_be_sold storage variable
 #     amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
 
-#     liquidate_deleverage.emit(position_id = id_, amount = amount_to_be_sold_)
+# liquidate_deleverage.emit(position_id = id_, amount = amount_to_be_sold_)
 #     return ()
 # end
 
@@ -1102,6 +1163,101 @@ func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*
     return populate_array_collaterals(array_list_len_ + 1, array_list_)
 end
 
+# @notice Internal Function called by get_positions to recursively add active positions to the array and return it
+# @param positions_array_len_ - Length of the array
+# @param positions_array_ - Required array of positions
+# @param final_len_ - Length of the final array
+# @returns positions_array_len - Length of the positions array
+# @returns positions_array - Array with the positions
+func populate_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    positions_array_len_ : felt, positions_array_ : PositionDetails*, final_len_ : felt
+) -> (positions_array_len : felt, positions_array : PositionDetails*):
+    alloc_locals
+    # If reached the end of the array, then return
+    if final_len_ == -1:
+        return (positions_array_len_, positions_array_)
+    end
+
+    # Get the market id at that position
+    let (curr_market_id : felt) = index_to_market_array.read(index=final_len_)
+
+    # Get Long position
+    let (long_position : PositionDetails) = position_mapping.read(
+        marketID=curr_market_id, direction=LONG
+    )
+
+    # Get Short position
+    let (short_position : PositionDetails) = position_mapping.read(
+        marketID=curr_market_id, direction=SHORT
+    )
+
+    tempvar counter = positions_array_len_
+
+    if long_position.position_size == 0:
+    else:
+        # Store it in the array
+        assert positions_array_[counter] = long_position
+        counter = counter + 1
+    end
+
+    if short_position.position_size == 0:
+    else:
+        # Store it in the array
+        assert positions_array_[counter] = short_position
+        counter = counter + 1
+    end
+
+    return populate_positions(
+        positions_array_len_=counter, positions_array_=positions_array_, final_len_=final_len_ - 1
+    )
+end
+
+# @notice External function called by the ABR Contract to get the array of net positions of the user
+# @param net_positions_array_len_ - Length of the array
+# @param net_positions_array_ - Required array of net positions
+# @param final_len_ - Length of the final array
+# @returns net_positions_array_len - Length of the net positions array
+# @returns net_positions_array - Array with the net positions
+func populate_net_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    net_positions_array_len_ : felt, net_positions_array_ : NetPositions*, final_len_ : felt
+) -> (net_positions_array_len : felt, net_positions_array : NetPositions*):
+    # If reached the end of the array, then return
+    if net_positions_array_len_ == final_len_:
+        return (net_positions_array_len_, net_positions_array_)
+    end
+
+    # Get the market id at that position
+    let (curr_market_id : felt) = index_to_market_array.read(index=net_positions_array_len_)
+
+    # Get Long position
+    let (long_position : PositionDetails) = position_mapping.read(
+        marketID=curr_market_id, direction=LONG
+    )
+
+    # Get Short position
+    let (short_position : PositionDetails) = position_mapping.read(
+        marketID=curr_market_id, direction=SHORT
+    )
+
+    # Calculate the net position
+    let (net_size : felt) = Math64x61_sub(long_position.position_size, short_position.position_size)
+
+    # Create the struct with the details
+    let net_position_struct : NetPositions = NetPositions(
+        market_id=curr_market_id, position_size=net_size
+    )
+
+    # Store it in the array
+    assert net_positions_array_[net_positions_array_len_] = net_position_struct
+
+    # Recursively call the next market_id
+    return populate_net_positions(
+        net_positions_array_len_=net_positions_array_len_ + 1,
+        net_positions_array_=net_positions_array_,
+        final_len_=final_len_,
+    )
+end
+
 # @notice Internal function to hash the order parameters
 # @param orderRequest - Struct of order request to hash
 # @param res - Hash of the details
@@ -1132,16 +1288,51 @@ func hash_withdrawal_request{pedersen_ptr : HashBuiltin*}(
     end
 end
 
-# @notice Internal function to add a position to the array when it is opened
-# @param id_ - OrderRequest Id to be added
+# @notice Internal function to add a market to the array
+# @param market_id - Id of the market to tbe added
 # @return 1 - If successfully added
-func add_to_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id_ : felt
-) -> (res : felt):
-    let (arr_len) = position_array_len.read()
-    position_array.write(index=arr_len, value=id_)
-    position_array_len.write(arr_len + 1)
-    return (1)
+func add_to_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt
+):
+    let (is_exists) = market_is_exist.read(market_id=market_id)
+
+    if is_exists == TRUE:
+        return ()
+    end
+
+    let (arr_len) = index_to_market_array_len.read()
+    index_to_market_array.write(index=arr_len, value=market_id)
+
+    market_to_index_mapping.write(market_id=market_id, value=arr_len)
+    index_to_market_array_len.write(value=arr_len + 1)
+    market_is_exist.write(market_id=market_id, value=TRUE)
+    return ()
+end
+
+# @notice Internal function called to remove a market_id when both positions are fully closed
+# @param market_id - Id of the market
+# @return 1 - If successfully removed
+func remove_from_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    market_id : felt
+):
+    alloc_locals
+
+    let (index) = market_to_index_mapping.read(market_id=market_id)
+    let (arr_len) = index_to_market_array_len.read()
+
+    if arr_len == 1:
+        index_to_market_array.write(index=index, value=0)
+    else:
+        let (last_id) = index_to_market_array.read(index=arr_len - 1)
+        index_to_market_array.write(index=index, value=last_id)
+        index_to_market_array.write(index=arr_len - 1, value=0)
+        market_to_index_mapping.write(market_id=last_id, value=index)
+    end
+
+    market_to_index_mapping.write(market_id=market_id, value=0)
+    market_is_exist.write(market_id=market_id, value=FALSE)
+    index_to_market_array_len.write(arr_len - 1)
+    return ()
 end
 
 # @notice Internal function to add collateral to the array

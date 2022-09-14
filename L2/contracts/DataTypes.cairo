@@ -88,7 +88,7 @@ struct MultipleOrder:
     member assetID : felt
     member collateralID : felt
     member price : felt
-    member stopPrice: felt
+    member stopPrice : felt
     member orderType : felt
     member positionSize : felt
     member direction : felt
@@ -112,7 +112,7 @@ struct OrderRequest:
     member assetID : felt
     member collateralID : felt
     member price : felt
-    member stopPrice: felt
+    member stopPrice : felt
     member orderType : felt
     member positionSize : felt
     member direction : felt
@@ -123,11 +123,17 @@ end
 
 # @notice struct for storing the order data to Account Contract
 struct PositionDetails:
-    member avgExecutionPrice : felt
-    member positionSize : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
+    member avg_execution_price : felt
+    member position_size : felt
+    member margin_amount : felt
+    member borrowed_amount : felt
     member leverage : felt
+end
+
+# @notice struct for sending the array of positions for ABR calculations
+struct NetPositions:
+    member market_id : felt
+    member position_size : felt
 end
 
 # Struct for passing signature to Account Contract
@@ -200,10 +206,10 @@ end
 
 # Struct to store Market price
 struct MarketPrice:
-  member asset_id : felt
-  member collateral_id : felt
-  member timestamp : felt
-  member price : felt
+    member asset_id : felt
+    member collateral_id : felt
+    member timestamp : felt
+    member price : felt
 end
 
 # Struct for message to consume for quoting fee in L1
@@ -218,12 +224,11 @@ end
 
 # struct to store deposit payload information (for L1->L2 interaction) + other useful data
 struct DepositData:
-
-    member user_L1_address: felt
-    member user_L2_address: felt
-    member ticker: felt
-    member amount: felt
-    member nonce: felt
-    member message_hash: felt
-    member timestamp: felt
+    member user_L1_address : felt
+    member user_L2_address : felt
+    member ticker : felt
+    member amount : felt
+    member nonce : felt
+    member message_hash : felt
+    member timestamp : felt
 end
