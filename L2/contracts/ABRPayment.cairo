@@ -121,8 +121,8 @@ func user_pays{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 ):
     IAccountManager.transfer_from_abr(
         contract_address=account_address_,
-        collateralID_=collateral_id_,
-        marketID_=market_id_,
+        collateral_id_=collateral_id_,
+        market_id_=market_id_,
         amount_=abs_payment_amount_,
     )
     IABRFund.deposit(
@@ -155,8 +155,8 @@ func user_receives{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     )
     IAccountManager.transfer_abr(
         contract_address=account_address_,
-        collateralID_=collateral_id_,
-        marketID_=market_id_,
+        collateral_id_=collateral_id_,
+        market_id_=market_id_,
         amount_=abs_payment_amount_,
     )
     return ()
@@ -185,12 +185,12 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
 
     # Check if abr already collected
     let (is_called) = IAccountManager.timestamp_check(
-        contract_address=account_address_, market_id_=[net_positions_].marketID
+        contract_address=account_address_, market_id_=[net_positions_].market_id
     )
 
     # Get the collateral ID of the market
-    let (collateral_id) = IMarkets.getCollateral_from_market(
-        contract_address=market_contract_, market_id=[net_positions_].marketID
+    let (collateral_id) = IMarkets.get_collateral_from_market(
+        contract_address=market_contract_, market_id=[net_positions_].market_id
     )
 
     if is_called == 1:
@@ -206,15 +206,15 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
 
     # Get the abr value
     let (abr : felt, price : felt, timestamp : felt) = IABR.get_abr_value(
-        contract_address=abr_contract_, market_id=[net_positions_].marketID
+        contract_address=abr_contract_, market_id=[net_positions_].market_id
     )
 
     # Find if the abr_rate is +ve or -ve
-    let (position_value) = Math64x61_mul(price, [net_positions_].positionSize)
+    let (position_value) = Math64x61_mul(price, [net_positions_].position_size)
     let (payment_amount) = Math64x61_mul(abr, position_value)
     let (abs_payment_amount) = abs_value(payment_amount)
     let (is_negative) = is_le(abr, 0)
-    let (is_negative_net_size) = is_le([net_positions_].positionSize, 0)
+    let (is_negative_net_size) = is_le([net_positions_].position_size, 0)
 
     # If the abr is negative
     if is_negative == TRUE:
@@ -224,7 +224,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
                 account_address_,
                 abr_funding_,
                 collateral_id,
-                [net_positions_].marketID,
+                [net_positions_].market_id,
                 abs_payment_amount,
             )
         else:
@@ -233,7 +233,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
                 account_address_,
                 abr_funding_,
                 collateral_id,
-                [net_positions_].marketID,
+                [net_positions_].market_id,
                 abs_payment_amount,
             )
         end
@@ -245,7 +245,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
                 account_address_,
                 abr_funding_,
                 collateral_id,
-                [net_positions_].marketID,
+                [net_positions_].market_id,
                 abs_payment_amount,
             )
         else:
@@ -254,7 +254,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
                 account_address_,
                 abr_funding_,
                 collateral_id,
-                [net_positions_].marketID,
+                [net_positions_].market_id,
                 abs_payment_amount,
             )
         end
@@ -264,7 +264,7 @@ func pay_abr_users_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     let (block_timestamp) = get_block_timestamp()
 
     abr_payment_called_user_position.emit(
-        market_id=[net_positions_].marketID,
+        market_id=[net_positions_].market_id,
         account_address=account_address_,
         timestamp=block_timestamp,
     )

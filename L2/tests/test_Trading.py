@@ -1010,13 +1010,10 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
 
-    alice_net_positions = await alice.get_net_positions().call()
-    print(list(alice_net_positions.result.net_positions_array))
     # alice_positions = await alice.get_positions().call()
     # print(list(alice_positions.result.positions_array))
-    
-    alice_len = await alice.get_market_len().call()
-    print("list size is : ", alice_len.result.res)
+
+    # print("list size is : ", alice_len.result.res)
 
     #### Closing Of Orders ########
     size2 = to64x61(1)
@@ -2292,17 +2289,17 @@ async def test_retrieval_of_net_positions_2(adminAuth_factory):
     bob_net_positions = await bob.get_net_positions().call()
     bob_net_positions_parsed = list(bob_net_positions.result.net_positions_array)
 
-    print(from64x61(alice_net_positions_parsed[0].positionSize))
-    print(from64x61(bob_net_positions_parsed[0].positionSize))
+    print(from64x61(alice_net_positions_parsed[0].position_size))
+    print(from64x61(bob_net_positions_parsed[0].position_size))
 
     assert len(alice_net_positions_parsed) == 2
     assert len(bob_net_positions_parsed) == 2
 
-    assert from64x61(alice_net_positions_parsed[0].positionSize) == 4.0
-    assert from64x61(bob_net_positions_parsed[0].positionSize) == -4.0
+    assert from64x61(alice_net_positions_parsed[0].position_size) == 4.0
+    assert from64x61(bob_net_positions_parsed[0].position_size) == -4.0
 
-    assert from64x61(alice_net_positions_parsed[1].positionSize) == -2.0
-    assert from64x61(bob_net_positions_parsed[1].positionSize) == 2.0
+    assert from64x61(alice_net_positions_parsed[1].position_size) == -2.0
+    assert from64x61(bob_net_positions_parsed[1].position_size) == 2.0
 
 # @pytest.mark.asyncio
 # async def test_for_risk_while_opening_order(adminAuth_factory):

@@ -175,7 +175,7 @@ end
 # @param market_id - Market Id
 # @returns collateral_id - Collateral Id of the market
 @view
-func getCollateral_from_market{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+func get_collateral_from_market{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt
 ) -> (collateral_id : felt):
     let (currMarket) = market_by_id.read(market_id=market_id)

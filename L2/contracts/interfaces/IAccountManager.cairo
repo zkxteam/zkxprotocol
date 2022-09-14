@@ -45,10 +45,10 @@ namespace IAccountManager:
     ):
     end
 
-    func transfer_from_abr(collateralID_ : felt, marketID_ : felt, amount_ : felt):
+    func transfer_from_abr(collateral_id_ : felt, market_id_ : felt, amount_ : felt):
     end
 
-    func transfer_abr(collateralID_ : felt, marketID_ : felt, amount_ : felt):
+    func transfer_abr(collateral_id_ : felt, market_id_ : felt, amount_ : felt):
     end
 
     func timestamp_check(market_id_ : felt) -> (is_eight_hours : felt):

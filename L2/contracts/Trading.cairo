@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import assert_in_range, assert_le, assert_lt, assert_not_zero
+from starkware.cairo.common.math import assert_in_range, assert_le, assert_not_zero
 from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
@@ -345,11 +345,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         assert_not_zero(is_registered)
     end
 
-    # check that position is not 0 or negative
-    with_attr error_message("Order request size cannot be negative or zero"):
-        assert_lt(0, temp_order.positionSize)
-    end
-
     # Check if the execution_price is correct
     if temp_order.orderType == STOP_ORDER:
         # if stop order
@@ -467,20 +462,20 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             market_id_=marketID,
             direction_=temp_order.direction,
         )
-        let margin_amount = position_details.marginAmount
-        let borrowed_amount = position_details.borrowedAmount
+        let margin_amount = position_details.margin_amount
+        let borrowed_amount = position_details.borrowed_amount
 
         # calculate avg execution price
-        if position_details.positionSize == 0:
+        if position_details.position_size == 0:
             assert average_execution_price = execution_price
             tempvar range_check_ptr = range_check_ptr
         else:
             let (portion_executed_value) = Math64x61_mul(
-                position_details.positionSize, position_details.avgExecutionPrice
+                position_details.position_size, position_details.avg_execution_price
             )
             let (current_order_value) = Math64x61_mul(order_size, execution_price)
             let cumulative_order_value = portion_executed_value + current_order_value
-            let cumulative_order_size = position_details.positionSize + order_size
+            let cumulative_order_size = position_details.position_size + order_size
             let (price) = Math64x61_div(cumulative_order_value, cumulative_order_size)
             assert average_execution_price = price
             tempvar range_check_ptr = range_check_ptr
@@ -579,12 +574,12 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
 
         with_attr error_message("The parentPosition size cannot be 0"):
-            assert_not_zero(parent_position.positionSize)
+            assert_not_zero(parent_position.position_size)
         end
 
-        let margin_amount = parent_position.marginAmount
-        let borrowed_amount = parent_position.borrowedAmount
-        average_execution_price = parent_position.avgExecutionPrice
+        let margin_amount = parent_position.margin_amount
+        let borrowed_amount = parent_position.borrowed_amount
+        average_execution_price = parent_position.avg_execution_price
 
         local diff
         local actual_execution_price
@@ -593,22 +588,22 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         if temp_order.direction == SHORT:
             # Open order was a long order
             actual_execution_price = execution_price
-            diff = execution_price - parent_position.avgExecutionPrice
+            diff = execution_price - parent_position.avg_execution_price
         else:
             # Open order was a short order
-            diff = parent_position.avgExecutionPrice - execution_price
-            actual_execution_price = parent_position.avgExecutionPrice + diff
+            diff = parent_position.avg_execution_price - execution_price
+            actual_execution_price = parent_position.avg_execution_price + diff
         end
 
         # Calculate pnl and net account value
-        let (pnl) = Math64x61_mul(parent_position.positionSize, diff)
+        let (pnl) = Math64x61_mul(parent_position.position_size, diff)
         tempvar net_acc_value = margin_amount + pnl
 
         # Total value of the asset at current price
         let (leveraged_amount_out) = Math64x61_mul(order_size, actual_execution_price)
 
         # Calculate the amount that needs to be returned to liquidity fund
-        let (percent_of_order) = Math64x61_div(order_size, parent_position.positionSize)
+        let (percent_of_order) = Math64x61_div(order_size, parent_position.position_size)
         let (value_to_be_returned) = Math64x61_mul(borrowed_amount, percent_of_order)
         let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order)
 

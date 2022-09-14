@@ -230,15 +230,6 @@ end
 # View Functions #
 ##################
 
-# ## TODO : remove ###
-@view
-func get_market_len{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
-):
-    let (res : felt) = index_to_market_array_len.read()
-    return (res=res)
-end
-
 # @notice view function to get public key
 # @return res - public key of an account
 @view
@@ -516,12 +507,12 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 end
 
 # @notice External function called by the ABR Payment contract
-# @param collateralID_ - Collateral ID of the position
-# @param marketID_ - Market ID of the position
+# @param collateral_id_ - Collateral ID of the position
+# @param market_id_ - Market ID of the position
 # @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    collateralID_ : felt, marketID_ : felt, amount_ : felt
+    collateral_id_ : felt, market_id_ : felt, amount_ : felt
 ):
     # Check if the caller is ABR Payment
     let (caller) = get_caller_address()
@@ -537,24 +528,24 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     end
 
     # Reduce the amount from balance
-    let (balance_) = balance.read(assetID=collateralID_)
-    balance.write(assetID=collateralID_, value=balance_ - amount_)
+    let (balance_) = balance.read(assetID=collateral_id_)
+    balance.write(assetID=collateral_id_, value=balance_ - amount_)
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(market_id=marketID_, value=block_timestamp)
+    last_updated.write(market_id=market_id_, value=block_timestamp)
 
-    transferred_from_abr.emit(market_id=marketID_, amount=amount_, timestamp=block_timestamp)
+    transferred_from_abr.emit(market_id=market_id_, amount=amount_, timestamp=block_timestamp)
     return ()
 end
 
 # @notice External function called by the ABR Payment contract
-# @param collateralID_ - Collateral ID of the position
-# @param marketID_ - Market ID of the position
+# @param collateral_id_ - Collateral ID of the position
+# @param market_id_ - Market ID of the position
 # @param amount_ - Amount of funds to transfer from this contract
 @external
 func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    collateralID_ : felt, marketID_ : felt, amount_ : felt
+    collateral_id_ : felt, market_id_ : felt, amount_ : felt
 ):
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
@@ -569,14 +560,14 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
     end
 
     # Add amount to balance
-    let (balance_) = balance.read(assetID=collateralID_)
-    balance.write(assetID=collateralID_, value=balance_ + amount_)
+    let (balance_) = balance.read(assetID=collateral_id_)
+    balance.write(assetID=collateral_id_, value=balance_ + amount_)
 
     # Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp()
-    last_updated.write(market_id=marketID_, value=block_timestamp)
+    last_updated.write(market_id=market_id_, value=block_timestamp)
 
-    transferred_abr.emit(market_id=marketID_, amount=amount_, timestamp=block_timestamp)
+    transferred_abr.emit(market_id=market_id_, amount=amount_, timestamp=block_timestamp)
     return ()
 end
 
@@ -684,7 +675,9 @@ func execute_order{
     is_valid_signature_order(hash, signature, request.liquidatorAddress)
 
     # Get the details of the position
-    let (position_details) = position_mapping.read(marketID=market_id, direction=request.direction)
+    let (position_details : PositionDetails) = position_mapping.read(
+        marketID=market_id, direction=request.direction
+    )
 
     # Get the portion executed details if already exists
     let (order_portion_executed) = portion_executed.read(orderID=request.orderID)
@@ -702,7 +695,7 @@ func execute_order{
     # closeOrder == 0 -> Open a new position
     # closeOrder == 1 -> Close a position
     if request.closeOrder == 0:
-        if position_details.positionSize == 0:
+        if position_details.position_size == 0:
             add_to_market_array(market_id)
             tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -714,7 +707,7 @@ func execute_order{
         end
 
         # New position size
-        let (new_positionSize) = Math64x61_add(position_details.positionSize, size)
+        let (new_position_size) = Math64x61_add(position_details.position_size, size)
 
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -726,10 +719,10 @@ func execute_order{
 
         # Create a new struct with the updated details
         let updated_position = PositionDetails(
-            avgExecutionPrice=execution_price,
-            positionSize=new_positionSize,
-            marginAmount=margin_amount,
-            borrowedAmount=borrowed_amount,
+            avg_execution_price=execution_price,
+            position_size=new_position_size,
+            margin_amount=margin_amount,
+            borrowed_amount=borrowed_amount,
             leverage=new_leverage,
         )
 
@@ -754,16 +747,16 @@ func execute_order{
         let (parent_position_details) = position_mapping.read(
             marketID=market_id, direction=parent_direction
         )
-        let (new_positionSize) = Math64x61_sub(parent_position_details.positionSize, size)
+        let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size)
 
         # Assert that the parent position is open
         with_attr error_message("The parent position size is 0"):
-            assert_not_zero(parent_position_details.positionSize)
+            assert_not_zero(parent_position_details.position_size)
         end
 
         # Assert that the size amount can be closed from the parent position
         with_attr error_message("The size of close order is more than the portionExecuted"):
-            assert_nn(new_positionSize)
+            assert_nn(new_position_size)
         end
 
         # Calculate the new leverage if it's a deleveraging order
@@ -802,15 +795,15 @@ func execute_order{
 
         # Create a new struct with the updated details
         let updated_position = PositionDetails(
-            avgExecutionPrice=execution_price,
-            positionSize=new_positionSize,
-            marginAmount=margin_amount,
-            borrowedAmount=borrowed_amount,
+            avg_execution_price=execution_price,
+            position_size=new_position_size,
+            margin_amount=margin_amount,
+            borrowed_amount=borrowed_amount,
             leverage=new_leverage,
         )
 
-        if new_positionSize == 0:
-            if position_details.positionSize == 0:
+        if new_position_size == 0:
+            if position_details.position_size == 0:
                 remove_from_market_array(market_id)
                 tempvar syscall_ptr = syscall_ptr
                 tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
@@ -1182,14 +1175,14 @@ func populate_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
 
     tempvar counter = positions_array_len_
 
-    if long_position.positionSize == 0:
+    if long_position.position_size == 0:
     else:
         # Store it in the array
         assert positions_array_[counter] = long_position
         counter = counter + 1
     end
 
-    if short_position.positionSize == 0:
+    if short_position.position_size == 0:
     else:
         # Store it in the array
         assert positions_array_[counter] = short_position
@@ -1229,11 +1222,11 @@ func populate_net_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     )
 
     # Calculate the net position
-    let (net_size : felt) = Math64x61_sub(long_position.positionSize, short_position.positionSize)
+    let (net_size : felt) = Math64x61_sub(long_position.position_size, short_position.position_size)
 
     # Create the struct with the details
     let net_position_struct : NetPositions = NetPositions(
-        marketID=curr_market_id, positionSize=net_size
+        market_id=curr_market_id, position_size=net_size
     )
 
     # Store it in the array
@@ -1282,11 +1275,11 @@ end
 # @return 1 - If successfully added
 func add_to_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt
-) -> (res : felt):
+):
     let (is_exists) = market_is_exist.read(market_id=market_id)
 
     if is_exists == TRUE:
-        return (1)
+        return ()
     end
 
     let (arr_len) = index_to_market_array_len.read()
@@ -1295,7 +1288,7 @@ func add_to_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     market_to_index_mapping.write(market_id=market_id, value=arr_len)
     index_to_market_array_len.write(value=arr_len + 1)
     market_is_exist.write(market_id=market_id, value=TRUE)
-    return (1)
+    return ()
 end
 
 # @notice Internal function called to remove a market_id when both positions are fully closed
@@ -1303,7 +1296,7 @@ end
 # @return 1 - If successfully removed
 func remove_from_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     market_id : felt
-) -> (res : felt):
+):
     alloc_locals
 
     let (index) = market_to_index_mapping.read(market_id=market_id)
@@ -1315,12 +1308,13 @@ func remove_from_market_array{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, 
         let (last_id) = index_to_market_array.read(index=arr_len - 1)
         index_to_market_array.write(index=index, value=last_id)
         index_to_market_array.write(index=arr_len - 1, value=0)
+        market_to_index_mapping.write(market_id=last_id, value=index)
     end
 
     market_to_index_mapping.write(market_id=market_id, value=0)
     market_is_exist.write(market_id=market_id, value=FALSE)
     index_to_market_array_len.write(arr_len - 1)
-    return (1)
+    return ()
 end
 
 # @notice Internal function to add collateral to the array
