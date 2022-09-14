@@ -214,13 +214,6 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [alice.contract_address])
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [bob.contract_address])
 
-    print("Contracts:")
-    print("alice: ", hex(alice.contract_address))
-    print("bob:", hex(bob.contract_address))
-    print("abr_fund:", hex(abr_fund.contract_address))
-    print("abr_payment:", hex(abr_payment.contract_address))
-    print("abr:", hex(abr.contract_address))
-
     return (starknet_service.starknet, admin1, trading, fixed_math, alice, 
         bob, abr, abr_fund, abr_payment, btc_perp_spot_64x61, btc_perp_64x61, timestamp, admin2)
 
