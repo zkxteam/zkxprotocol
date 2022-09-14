@@ -11,6 +11,9 @@ from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
 from starkware.starknet.services.api.contract_class import ContractClass
 from starkware.starknet.testing.contract import StarknetContract
 from starkware.cairo.common.hash_state import compute_hash_on_elements
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address
+
 
 signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
@@ -24,53 +27,43 @@ def event_loop():
 
 
 @pytest.fixture(scope="module")
-async def adminAuth_factory():
-    starknet = await Starknet.empty()
+async def adminAuth_factory(starknet_service: StarknetService):
 
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo", constructor_calldata=[signer1.public_key, 0, 1, 0]
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        signer1.public_key
+    ])
+    admin2 = await starknet_service.deploy(ContractType.Account, [
+        signer2.public_key
+    ])
+
+    user3 = await starknet_service.deploy(ContractType.Account, [
+        signer3.public_key
+    ])
+
+    user4 = await starknet_service.deploy(ContractType.Account, [
+        signer4.public_key
+    ])
+
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+
+    test_asset = await starknet_service.deploy(
+        ContractType.TestAsset, []
     )
 
-    admin2 = await starknet.deploy(
-        "contracts/Account.cairo", constructor_calldata=[signer2.public_key, 0, 1, 0]
+    validator_router = await starknet_service.deploy(
+        ContractType.ValidatorRouter,
+        [registry.contract_address, 1],
     )
 
-    user3 = await starknet.deploy(
-        "contracts/Account.cairo", constructor_calldata=[signer3.public_key, 0, 1, 0]
+    sig_req_manager = await starknet_service.deploy(
+        ContractType.SigRequirementsManager,
+        [registry.contract_address, 1],
     )
 
-    user4 = await starknet.deploy(
-        "contracts/Account.cairo", constructor_calldata=[signer4.public_key, 0, 1, 0]
-    )
-
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address, admin2.contract_address],
-    )
-
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[adminAuth.contract_address],
-    )
-
-    test_asset = await starknet.deploy(
-        "tests/contracts/Asset.cairo", constructor_calldata=[]
-    )
-
-    validator_router = await starknet.deploy(
-        "contracts/signature_infra/ValidatorRouter.cairo",
-        constructor_calldata=[registry.contract_address, 1],
-    )
-
-    sig_req_manager = await starknet.deploy(
-        "contracts/signature_infra/SigRequirementsManager.cairo",
-        constructor_calldata=[registry.contract_address, 1],
-    )
-
-    pubkey_whitelister = await starknet.deploy(
-        "contracts/signature_infra/PubkeyWhitelister.cairo",
-        constructor_calldata=[registry.contract_address, 1],
+    pubkey_whitelister = await starknet_service.deploy(
+        ContractType.PubkeyWhitelister,
+        [registry.contract_address, 1],
     )
 
     await signer1.send_transaction(

@@ -33,6 +33,10 @@ class ContractType(Enum):
     DepositDataManager = "contracts/DepositDataManager.cairo"
     WithdrawalFeeBalance = "contracts/WithdrawalFeeBalance.cairo"
     CollateralPrices = "contracts/CollateralPrices.cairo"
+    ValidatorRouter = "contracts/signature_infra/ValidatorRouter.cairo"
+    SigRequirementsManager = "contracts/signature_infra/SigRequirementsManager.cairo"
+    PubkeyWhitelister = "contracts/signature_infra/PubkeyWhitelister.cairo"
+
     # Relay contracts
     RelayABR = "contracts/relay_contracts/RelayABR.cairo"
     RelayABRPayment = "contracts/relay_contracts/RelayABRPayment.cairo"
@@ -50,6 +54,7 @@ class ContractType(Enum):
     # Test-helping contracts
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
+    TestAsset = "tests/contracts/Asset.cairo"
 
 class OptimizedStarknetState(StarknetState):
 
