@@ -22,16 +22,12 @@ end
 
 # Event emitted whenever deposit() is called
 @event
-func deposit_ABR_called(
-    order_id : felt, account_address : felt, market_id : felt, amount : felt, timestamp : felt
-):
+func deposit_ABR_called(account_address : felt, market_id : felt, amount : felt, timestamp : felt):
 end
 
 # Event emitted whenever withdraw() is called
 @event
-func withdraw_ABR_called(
-    order_id : felt, account_address : felt, market_id : felt, amount : felt, timestamp : felt
-):
+func withdraw_ABR_called(account_address : felt, market_id : felt, amount : felt, timestamp : felt):
 end
 
 ###############
@@ -85,14 +81,13 @@ end
 # @param amount_ - value to deduct from market_id's balance
 @external
 func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    order_id_ : felt, account_address_ : felt, market_id_ : felt, amount_ : felt
+    account_address_ : felt, market_id_ : felt, amount_ : felt
 ):
     FundLib.deposit_to_contract(market_id_, amount_, ABR_PAYMENT_INDEX)
 
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
     deposit_ABR_called.emit(
-        order_id=order_id_,
         account_address=account_address_,
         market_id=market_id_,
         amount=amount_,
@@ -108,14 +103,13 @@ end
 # @param amount_ - value to deduct from market_id's balance
 @external
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    order_id_ : felt, account_address_ : felt, market_id_ : felt, amount_ : felt
+    account_address_ : felt, market_id_ : felt, amount_ : felt
 ):
     FundLib.withdraw_from_contract(market_id_, amount_, ABR_PAYMENT_INDEX)
 
     # Get the latest block
     let (block_timestamp) = get_block_timestamp()
     withdraw_ABR_called.emit(
-        order_id=order_id_,
         account_address=account_address_,
         market_id=market_id_,
         amount=amount_,
