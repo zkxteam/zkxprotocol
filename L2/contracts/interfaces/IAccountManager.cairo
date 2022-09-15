@@ -5,7 +5,7 @@ from contracts.DataTypes import (
     NetPositions,
     OrderRequest,
     PositionDetails,
-    PositionDetailsWithIDs,
+    PositionDetailsWithMarket,
     Signature,
 )
 
@@ -37,7 +37,7 @@ namespace IAccountManager:
     func get_balance(assetID_ : felt) -> (res : felt):
     end
 
-    func get_positions() -> (array_list_len : felt, array_list : PositionDetailsWithIDs*):
+    func get_positions() -> (array_list_len : felt, array_list : PositionDetailsWithMarket*):
     end
 
     func get_net_positions() -> (

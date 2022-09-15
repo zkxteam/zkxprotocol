@@ -130,6 +130,17 @@ struct PositionDetails:
     member leverage : felt
 end
 
+# Struct to be used for liquidation calls
+struct PositionDetailsWithMarket:
+    member market_id : felt
+    member direction : felt
+    member avg_execution_price : felt
+    member position_size : felt
+    member margin_amount : felt
+    member borrowed_amount : felt
+    member leverage : felt
+end
+
 # @notice struct for sending the array of positions for ABR calculations
 struct NetPositions:
     member market_id : felt
@@ -158,24 +169,6 @@ struct Message:
     member calldata : felt*
     member calldata_size : felt
     member nonce : felt
-end
-
-# status 0: initiated
-# status 1: partial
-# status 2: executed
-# status 3: close partial
-# status 4: close
-# status 5: toBeDeleveraged
-# status 6: toBeLiquidated
-# status 7: fullyLiquidated
-struct PositionDetailsWithIDs:
-    member orderID : felt
-    member avgExecutionPrice : felt
-    member positionSize : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
-    member leverage : felt
 end
 
 # Struct to store collateral balances

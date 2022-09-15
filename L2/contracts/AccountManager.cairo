@@ -52,7 +52,7 @@ from contracts.DataTypes import (
     CollateralBalance,
     Message,
     PositionDetails,
-    PositionDetailsWithIDs,
+    PositionDetailsWithMarket,
     NetPositions,
     OrderRequest,
     Signature,
@@ -592,14 +592,14 @@ end
 # @returns positions_array - Required array of positions
 @external
 func get_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    positions_array_len : felt, positions_array : PositionDetails*
+    positions_array_len : felt, positions_array : PositionDetailsWithMarket*
 ):
     alloc_locals
 
-    let (positions_array : PositionDetails*) = alloc()
+    let (positions_array : PositionDetailsWithMarket*) = alloc()
     let (array_len : felt) = index_to_market_array_len.read()
     return populate_positions(
-        positions_array_len_=0, positions_array_=positions_array, final_len_=array_len - 1
+        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     )
 end
 
@@ -1148,20 +1148,25 @@ end
 # @notice Internal Function called by get_positions to recursively add active positions to the array and return it
 # @param positions_array_len_ - Length of the array
 # @param positions_array_ - Required array of positions
+# @param iterator_ - Current length of traversed array
 # @param final_len_ - Length of the final array
 # @returns positions_array_len - Length of the positions array
 # @returns positions_array - Array with the positions
 func populate_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    positions_array_len_ : felt, positions_array_ : PositionDetails*, final_len_ : felt
-) -> (positions_array_len : felt, positions_array : PositionDetails*):
+    positions_array_len_ : felt,
+    positions_array_ : PositionDetailsWithMarket*,
+    iterator_ : felt,
+    final_len_ : felt,
+) -> (positions_array_len : felt, positions_array : PositionDetailsWithMarket*):
     alloc_locals
-    # If reached the end of the array, then return
-    if final_len_ == -1:
+
+    # If we reached the end of the array, then return
+    if final_len_ == iterator_:
         return (positions_array_len_, positions_array_)
     end
 
     # Get the market id at that position
-    let (curr_market_id : felt) = index_to_market_array.read(index=final_len_)
+    let (curr_market_id : felt) = index_to_market_array.read(index=iterator_)
 
     # Get Long position
     let (long_position : PositionDetails) = position_mapping.read(
@@ -1173,24 +1178,48 @@ func populate_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         marketID=curr_market_id, direction=SHORT
     )
 
-    tempvar counter = positions_array_len_
+    local is_long
+    local is_short
 
     if long_position.position_size == 0:
+        assert is_long = 0
     else:
         # Store it in the array
-        assert positions_array_[counter] = long_position
-        counter = counter + 1
+        let curr_position = PositionDetailsWithMarket(
+            market_id=curr_market_id,
+            direction=LONG,
+            avg_execution_price=long_position.avg_execution_price,
+            position_size=long_position.position_size,
+            margin_amount=long_position.margin_amount,
+            borrowed_amount=long_position.borrowed_amount,
+            leverage=long_position.leverage,
+        )
+        assert positions_array_[positions_array_len_] = curr_position
+        assert is_long = 1
     end
 
     if short_position.position_size == 0:
+        assert is_short = 0
     else:
         # Store it in the array
-        assert positions_array_[counter] = short_position
-        counter = counter + 1
+        let curr_position = PositionDetailsWithMarket(
+            market_id=curr_market_id,
+            direction=SHORT,
+            avg_execution_price=short_position.avg_execution_price,
+            position_size=short_position.position_size,
+            margin_amount=short_position.margin_amount,
+            borrowed_amount=short_position.borrowed_amount,
+            leverage=short_position.leverage,
+        )
+        assert positions_array_[positions_array_len_ + is_long] = curr_position
+        assert is_short = 1
     end
 
     return populate_positions(
-        positions_array_len_=counter, positions_array_=positions_array_, final_len_=final_len_ - 1
+        positions_array_len_=positions_array_len_ + is_long + is_short,
+        positions_array_=positions_array_,
+        iterator_=iterator_ + 1,
+        final_len_=final_len_,
     )
 end
 

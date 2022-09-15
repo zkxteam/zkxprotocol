@@ -34,4 +34,12 @@ namespace IMarkets:
 
     func get_collateral_from_market(market_id : felt) -> (collateral_id : felt):
     end
+
+    func get_asset_collateral_from_market(market_id : felt) -> (
+        asset_id : felt, collateral_id : felt
+    ):
+    end
+
+    func get_ttl_from_market(market_id : felt) -> (ttl : felt):
+    end
 end
