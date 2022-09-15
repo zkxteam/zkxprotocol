@@ -6,6 +6,7 @@ struct Market:
     member assetCollateral : felt
     member leverage : felt
     member tradable : felt
+    member archived : felt
     member ttl : felt
 end
 
@@ -16,6 +17,7 @@ struct MarketWID:
     member assetCollateral : felt
     member leverage : felt
     member tradable : felt
+    member archived : felt
     member ttl : felt
 end
 
@@ -88,7 +90,7 @@ struct MultipleOrder:
     member assetID : felt
     member collateralID : felt
     member price : felt
-    member stopPrice: felt
+    member stopPrice : felt
     member orderType : felt
     member positionSize : felt
     member direction : felt
@@ -113,7 +115,7 @@ struct OrderRequest:
     member assetID : felt
     member collateralID : felt
     member price : felt
-    member stopPrice: felt
+    member stopPrice : felt
     member orderType : felt
     member positionSize : felt
     member direction : felt
@@ -201,6 +203,7 @@ struct WithdrawalHistory:
     member amount : felt
     member timestamp : felt
     member node_operator_L2_address : felt
+    member fee : felt
     member status : felt
 end
 
@@ -213,10 +216,10 @@ end
 
 # Struct to store Market price
 struct MarketPrice:
-  member asset_id : felt
-  member collateral_id : felt
-  member timestamp : felt
-  member price : felt
+    member asset_id : felt
+    member collateral_id : felt
+    member timestamp : felt
+    member price : felt
 end
 
 # Struct for message to consume for quoting fee in L1
@@ -245,12 +248,17 @@ struct CoreFunction:
 end
 # struct to store deposit payload information (for L1->L2 interaction) + other useful data
 struct DepositData:
+    member user_L1_address : felt
+    member user_L2_address : felt
+    member ticker : felt
+    member amount : felt
+    member nonce : felt
+    member message_hash : felt
+    member timestamp : felt
+end
 
-    member user_L1_address: felt
-    member user_L2_address: felt
-    member ticker: felt
-    member amount: felt
-    member nonce: felt
-    member message_hash: felt
-    member timestamp: felt
+# Struct to store Collateral price
+struct CollateralPrice:
+    member timestamp : felt
+    member price_in_usd : felt
 end

@@ -4,7 +4,6 @@ from contracts.DataTypes import BaseFee, Discount
 
 @contract_interface
 namespace ITradingFees:
-
     # external functions
 
     func update_base_fees(tier_ : felt, fee_details : BaseFee):
@@ -19,7 +18,7 @@ namespace ITradingFees:
     func update_max_discount_tier(tier_ : felt):
     end
 
-    #view functions
+    # view functions
 
     func get_base_fees(tier_ : felt) -> (base_fee : BaseFee):
     end
@@ -35,5 +34,4 @@ namespace ITradingFees:
 
     func get_user_fee_and_discount(address_ : felt, side_ : felt) -> (fee : felt):
     end
-
 end

@@ -12,6 +12,7 @@ from starkware.starknet.core.os.transaction_hash.transaction_hash import (
     TransactionHashPrefix,
     calculate_transaction_hash_common,
 )
+from starkware.starknet.business_logic.execution.objects import Event
 
 MAX_UINT256 = (2**128 - 1, 2**128 - 1)
 
@@ -19,7 +20,7 @@ SCALE = 2**61
 PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481
 PRIME_HALF = PRIME/2
 PI = 7244019458077122842
-
+TRANSACTION_VERSION=0
 
 def from64x61(num):
     res = num
@@ -91,30 +92,45 @@ class Signer():
     def sign(self, message_hash):
         return sign(msg_hash=message_hash, priv_key=self.private_key)
 
-    async def send_transaction(self, account, to, selector_name, calldata, nonce=None):
+
+    async def send_transactions(self, account, calls, nonce=None, max_fee=0):
         if nonce is None:
             execution_info = await account.get_nonce().call()
             nonce, = execution_info.result
 
-        selector = get_selector_from_name(selector_name)
-        message_hash = hash_message(
-            account.contract_address, to, selector, calldata, nonce)
-        sig_r, sig_s = self.sign(message_hash)
+        build_calls = []
+        for call in calls:
+            build_call = list(call)
+            build_call[0] = hex(build_call[0])
+            build_calls.append(build_call)
 
-        temp = account.execute(to, selector, calldata, nonce)
-        # storing hash of current transaction in current_hash which will be accessible through signer object
+        (call_array, calldata, sig_r, sig_s) = self.sign_transaction(
+            hex(account.contract_address), build_calls, nonce, max_fee)
+
+        temp = account.__execute__(call_array, calldata, nonce)
         self.current_hash = calculate_transaction_hash_common(
             TransactionHashPrefix.INVOKE,
             0,  # version
             account.contract_address,  # to
-            get_selector_from_name('execute'),  # entry_point
+            get_selector_from_name('__execute__'),  # entry_point
             temp.calldata,  # calldata
             0,  # maxfee
             1536727068981429685321,  # chainid
             [],
         )
-        return await account.execute(to, selector, calldata, nonce).invoke(signature=[sig_r, sig_s])
+        return await account.__execute__(call_array, calldata, nonce).invoke(signature=[sig_r, sig_s])
 
+    async def send_transaction(self, account, to, selector_name, calldata, nonce=None, max_fee=0):
+        return await self.send_transactions(account, [(to, selector_name, calldata)], nonce, max_fee)
+        
+    def sign_transaction(self, sender, calls, nonce, max_fee):
+        """Sign a transaction for an Account."""
+        (call_array, calldata) = from_call_to_call_array(calls)
+        message_hash = get_transaction_hash(
+            int(sender, 16), call_array, calldata, nonce, int(max_fee)
+        )
+        sig_r, sig_s = self.sign(message_hash)
+        return (call_array, calldata, sig_r, sig_s)
 
 def hash_message(sender, to, selector, calldata, nonce):
     message = [
@@ -151,3 +167,141 @@ async def assert_revert(fun, reverted_with=None):
         _, error = err.args
         if reverted_with is not None:
             assert reverted_with in error['message']
+
+def assert_event_emitted(tx_exec_info, from_address, name, data):
+    assert Event(
+        from_address=from_address,
+        keys=[get_selector_from_name(name)],
+        data=data,
+    ) in tx_exec_info.raw_events
+
+
+def from_call_to_call_array(calls):
+    """Transform from Call to CallArray."""
+    call_array = []
+    calldata = []
+    for _, call in enumerate(calls):
+        assert len(call) == 3, "Invalid call parameters"
+        entry = (
+            int(call[0], 16),
+            get_selector_from_name(call[1]),
+            len(calldata),
+            len(call[2]),
+        )
+        call_array.append(entry)
+        calldata.extend(call[2])
+    return (call_array, calldata)
+
+
+def get_transaction_hash(account, call_array, calldata, nonce, max_fee):
+    """Calculate the transaction hash."""
+    execute_calldata = [
+        len(call_array),
+        *[x for t in call_array for x in t],
+        len(calldata),
+        *calldata,
+        nonce,
+    ]
+
+    return calculate_transaction_hash_common(
+        TransactionHashPrefix.INVOKE,
+        TRANSACTION_VERSION,
+        account,
+        get_selector_from_name("__execute__"),
+        execute_calldata,
+        max_fee,
+        StarknetChainId.TESTNET.value,
+        [],
+    )
+    
+
+def build_default_asset_properties(
+    id,
+    ticker,
+    short_name,
+    asset_version = 1,
+    tradable = 0,
+    collateral = 0,
+    token_decimal = 18,
+    metadata_id = 0,
+    tick_size = to64x61(0.01),
+    step_size = to64x61(0.1),
+    minimum_order_size = to64x61(1),
+    minimum_leverage = to64x61(1),
+    maximum_leverage = to64x61(10),
+    currently_allowed_leverage = to64x61(3),
+    maintenance_margin_fraction = to64x61(1),
+    initial_margin_fraction = to64x61(1),
+    incremental_initial_margin_fraction = to64x61(1),
+    incremental_position_size = to64x61(100),
+    baseline_position_size = to64x61(1000),
+    maximum_position_size = to64x61(10000)
+):
+    return [
+        id, 
+        asset_version, 
+        ticker, 
+        short_name, 
+        tradable, 
+        collateral, 
+        token_decimal, 
+        metadata_id, 
+        tick_size, 
+        step_size, 
+        minimum_order_size,
+        minimum_leverage,
+        maximum_leverage,
+        currently_allowed_leverage,
+        maintenance_margin_fraction,
+        initial_margin_fraction,
+        incremental_initial_margin_fraction,
+        incremental_position_size,
+        baseline_position_size,
+        maximum_position_size
+    ]
+
+
+def build_asset_properties(
+    id,
+    asset_version,
+    ticker,
+    short_name,
+    tradable,
+    collateral,
+    token_decimal,
+    metadata_id,
+    tick_size,
+    step_size,
+    minimum_order_size,
+    minimum_leverage,
+    maximum_leverage,
+    currently_allowed_leverage,
+    maintenance_margin_fraction,
+    initial_margin_fraction,
+    incremental_initial_margin_fraction,
+    incremental_position_size,
+    baseline_position_size,
+    maximum_position_size
+):
+    return [
+        id, 
+        asset_version, 
+        ticker, 
+        short_name, 
+        tradable, 
+        collateral, 
+        token_decimal, 
+        metadata_id, 
+        tick_size, 
+        step_size, 
+        minimum_order_size,
+        minimum_leverage,
+        maximum_leverage,
+        currently_allowed_leverage,
+        maintenance_margin_fraction,
+        initial_margin_fraction,
+        incremental_initial_margin_fraction,
+        incremental_position_size,
+        baseline_position_size,
+        maximum_position_size
+    ]

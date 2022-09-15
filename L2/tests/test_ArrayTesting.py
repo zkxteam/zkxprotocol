@@ -3,13 +3,12 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
+from helpers import StarknetService, ContractType
 
 signer1 = Signer(123456789987654321)
-
+signer2= Signer(12345)
 L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -17,19 +16,19 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def contract_factory():
-    starknet = await Starknet.empty()
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
+async def contract_factory(starknet_service: StarknetService):
+    
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        signer1.public_key,
+    ])
 
-    arrayTesting = await starknet.deploy(
-        "contracts/ArrayTesting.cairo",
-        constructor_calldata=[]
-    )
+    admin2 = await starknet_service.deploy(ContractType.Account, [
+        signer2.public_key,
+    ])
 
-    return arrayTesting, admin1
+    arrayTesting = await starknet_service.deploy(ContractType.ArrayTesting, [])
+
+    return arrayTesting, admin1, admin2
 
 
 @pytest.mark.asyncio
@@ -40,7 +39,7 @@ async def create_positions(contract, account):
 
 @pytest.mark.asyncio
 async def test_get_admin_mapping(contract_factory):
-    arrayTesting, admin1 = contract_factory
+    arrayTesting, admin1, admin2 = contract_factory
 
     await create_positions(arrayTesting, admin1)
 

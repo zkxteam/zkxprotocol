@@ -1,9 +1,15 @@
 %lang starknet
 
-from contracts.DataTypes import OrderRequest, OrderDetails, Signature, OrderDetailsWithIDs, CollateralBalance
+from contracts.DataTypes import (
+    OrderRequest,
+    OrderDetails,
+    Signature,
+    OrderDetailsWithIDs,
+    CollateralBalance,
+)
 
 @contract_interface
-namespace IAccount:
+namespace IAccountManager:
     func execute_order(
         request : OrderRequest,
         signature : Signature,
@@ -14,9 +20,7 @@ namespace IAccount:
     ) -> (res : felt):
     end
 
-    func update_withdrawal_history(
-        request_id_ : felt,
-    ):
+    func update_withdrawal_history(request_id_ : felt):
     end
 
     func transfer_from(assetID_ : felt, amount : felt) -> ():
@@ -34,13 +38,13 @@ namespace IAccount:
     func return_array_positions() -> (array_list_len : felt, array_list : OrderDetailsWithIDs*):
     end
 
-    func transfer_from_abr(assetID_ : felt, marketID_ : felt, amount : felt):
+    func transfer_from_abr(orderID_ : felt, assetID_ : felt, marketID_ : felt, amount : felt):
     end
 
-    func transfer_abr(assetID_ : felt, marketID_ : felt, amount : felt):
+    func transfer_abr(orderID_ : felt, assetID_ : felt, marketID_ : felt, amount : felt):
     end
 
-    func timestamp_check(market_id : felt) -> (is_eight_hours : felt):
+    func timestamp_check(orderID_ : felt) -> (is_eight_hours : felt):
     end
 
     func get_public_key() -> (res : felt):

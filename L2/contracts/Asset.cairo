@@ -1,65 +1,116 @@
 %lang starknet
 
-from contracts.DataTypes import Asset, AssetWID
-from contracts.Constants import (
-    AdminAuth_INDEX,
-    RiskManagement_INDEX,
-    ManageAssets_ACTION,
-)
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IAdminAuth import IAdminAuth
-from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.alloc import alloc
-from starkware.starknet.common.messages import send_message_to_l1
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
-from starkware.starknet.common.syscalls import get_caller_address
+from starkware.cairo.common.math import assert_in_range, assert_le, assert_not_zero
+from starkware.starknet.common.messages import send_message_to_l1
+from starkware.starknet.common.syscalls import get_caller_address, get_contract_address
+
+from contracts.Constants import AdminAuth_INDEX, L1_ZKX_Address_INDEX, ManageAssets_ACTION
+from contracts.DataTypes import Asset, AssetWID
+from contracts.Math_64x61 import Math64x61_assertPositive64x61
+from contracts.interfaces.IAdminAuth import IAdminAuth
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.Validation import assert_bool
+from contracts.libraries.Utils import verify_caller_authority
+
+#############
+# Constants #
+#############
 
 const ADD_ASSET = 1
 const REMOVE_ASSET = 2
 
-#
-# Storage
-#
+##########
+# Events #
+##########
 
-# @notice Stores the contract version
+# Event emitted on Asset contract deployment
+@event
+func asset_contract_created(
+    contract_address : felt, registry_address : felt, version : felt, caller_address : felt
+):
+end
+
+# Event emitted whenever new asset is added
+@event
+func asset_added(asset_id : felt, ticker : felt, caller_address : felt):
+end
+
+# Event emitted whenever asset is removed
+@event
+func asset_removed(asset_id : felt, ticker : felt, caller_address : felt):
+end
+
+# Event emitted whenever asset core settings are updated
+@event
+func asset_core_settings_update(asset_id : felt, ticker : felt, caller_address : felt):
+end
+
+# Event emitted whenever asset trade settings are updated
+@event
+func asset_trade_settings_update(
+    asset_id : felt,
+    ticker : felt,
+    new_contract_version : felt,
+    new_asset_version : felt,
+    caller_address : felt,
+):
+end
+
+###########
+# Storage #
+###########
+
+# Contract version
 @storage_var
 func contract_version() -> (version : felt):
 end
 
-# @notice Stores the address of Authorized Registry contract
+# Address of AuthorizedRegistry contract
 @storage_var
 func registry_address() -> (contract_address : felt):
 end
 
-# @notice stores the address of L1 zkx contract
-@storage_var
-func L1_zkx_address() -> (res : felt):
-end
-
-# @notice stores the version of the asset contract to refresh in node
+# Version of Asset contract to refresh in node
 @storage_var
 func version() -> (res : felt):
 end
 
-# @notice Mapping between asset ID and Asset data
-@storage_var
-func asset(id : felt) -> (res : Asset):
-end
-
-# Store assets in an array to enable retrieval from node
-@storage_var
-func assets_array(index : felt) -> (asset_id : felt):
-end
-
-# Length of the assets array
+# Length of assets array
 @storage_var
 func assets_array_len() -> (len : felt):
 end
 
-#
-# Constructor
-#
+# Array of asset IDs
+@storage_var
+func asset_id_by_index(index : felt) -> (asset_id : felt):
+end
+
+# Mapping between asset ID and asset's index
+@storage_var
+func asset_index_by_id(asset_id : felt) -> (index : felt):
+end
+
+# Mapping between asset ID and asset's data
+@storage_var
+func asset_by_id(asset_id : felt) -> (res : Asset):
+end
+
+# Bool indicating if ID already exists
+@storage_var
+func asset_id_exists(asset_id : felt) -> (res : felt):
+end
+
+# Bool indicating if ticker already exists
+@storage_var
+func asset_ticker_exists(ticker : felt) -> (res : felt):
+end
+
+###############
+# Constructor #
+###############
 
 # @notice Constructor of the smart-contract
 # @param registry_address_ Address of the AuthorizedRegistry contract
@@ -68,306 +119,453 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
-    return ()
-end
-
-#
-# Setters
-#
-
-# @notice set L1 zkx contract address function
-# @param address - L1 zkx contract address as an argument
-@external
-func set_L1_zkx_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    l1_zkx_address : felt
-):
-    with_attr error_message("Caller is not authorized to manage assets"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageAssets_ACTION)
+    # Validate arguments
+    with_attr error_message("Registry address or version used for Asset deployment is 0"):
+        assert_not_zero(registry_address_)
+        assert_not_zero(version_)
     end
-    L1_zkx_address.write(value=l1_zkx_address)
+
+    # Initialize storage
+    registry_address.write(registry_address_)
+    contract_version.write(version_)
+
+    # Emit event
+    let (contract_address) = get_contract_address()
+    let (caller_address) = get_caller_address()
+    asset_contract_created.emit(contract_address, registry_address_, version_, caller_address)
+
     return ()
 end
 
-#
-# Getters
-#
+##################
+# View functions #
+##################
 
-# @notice get L1 zkx contract address function
-@view
-func get_L1_zkx_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    res : felt
-):
-    let (res) = L1_zkx_address.read()
-    return (res=res)
-end
-
-# @notice Getter function for Assets
-# @param id - random string generated by zkxnode's mongodb
+# @notice View function for Assets
+# @param id_ - random string generated by zkxnode's mongodb
 # @return currAsset - Returns the requested asset
 @view
-func getAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt) -> (
+func get_asset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id_ : felt) -> (
     currAsset : Asset
 ):
-    let (currAsset) = asset.read(id=id)
-    return (currAsset)
+    verify_asset_id_exists(id_, should_exist_=TRUE)
+    let (asset : Asset) = asset_by_id.read(id_)
+    return (asset)
 end
 
-# @notice Return the maintenance margin for the asset
-# @param id - Id of the asset
+# @notice View function to get the maintenance margin for the asset
+# @param id_ - Id of the asset
 # @return maintenance_margin - Returns the maintenance margin of the asset
 @view
 func get_maintenance_margin{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt
+    id_ : felt
 ) -> (maintenance_margin : felt):
-    let (curr_asset) = asset.read(id=id)
-    return (curr_asset.maintenance_margin_fraction)
+    verify_asset_id_exists(id_, should_exist_=TRUE)
+    let (asset : Asset) = asset_by_id.read(id_)
+    return (asset.maintenance_margin_fraction)
 end
 
-# @notice Getter function for getting version
-# @return  - Returns the version
+# @notice View function for getting version
+# @return - Returns the version
 @view
 func get_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
     version : felt
 ):
     let (res) = version.read()
-    return (version=res)
+    return (res)
 end
 
-#
-# Business logic
-#
+# @notice View function to return all the assets with ids in an array
+# @return array_list_len - Number of assets
+# @return array_list - Fully populated list of assets
+@view
+func return_all_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    array_list_len : felt, array_list : AssetWID*
+):
+    let (final_len) = assets_array_len.read()
+    let (asset_list : AssetWID*) = alloc()
+    return populate_asset_list(0, final_len, asset_list)
+end
+
+######################
+# External functions #
+######################
 
 # @notice Add asset function
-# @param id - random string generated by zkxnode's mongodb
-# @param Asset - Asset struct variable with the required details
+# @param id_ - random string generated by zkxnode's mongodb
+# @param new_asset_ - Asset struct variable with the required details
 @external
-func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt, newAsset : Asset
+func add_asset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    id_ : felt, new_asset_ : Asset
 ):
-    with_attr error_message("Caller is not authorized to manage assets"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageAssets_ACTION)
-    end
+    alloc_locals
 
-    asset.write(id=id, value=newAsset)
-    updateAssetListInL1(assetId=id, ticker=newAsset.ticker, action=ADD_ASSET)
+    # Verify authority, state and input
+    assert_not_zero(id_)
+    verify_caller_authority_asset()
+    verify_asset_id_exists(id_, should_exist_=FALSE)
+    verify_ticker_exists(new_asset_.ticker, should_exist_=FALSE)
+    validate_asset_properties(new_asset_)
 
+    # Save asset_id
     let (curr_len) = assets_array_len.read()
-    assets_array.write(index=curr_len, value=id)
-    assets_array_len.write(value=curr_len + 1)
+    asset_id_by_index.write(curr_len, id_)
+    asset_index_by_id.write(id_, curr_len)
+    assets_array_len.write(curr_len + 1)
+
+    # Update id & ticker existence
+    asset_id_exists.write(id_, TRUE)
+    asset_ticker_exists.write(new_asset_.ticker, TRUE)
+
+    # Save new_asset struct
+    asset_by_id.write(id_, new_asset_)
+
+    # Trigger asset update on L1
+    update_asset_on_L1(asset_id_=id_, ticker_=new_asset_.ticker, action_=ADD_ASSET)
+
+    # Emit event
+    let (caller_address) = get_caller_address()
+    asset_added.emit(asset_id=id_, ticker=new_asset_.ticker, caller_address=caller_address)
+
     return ()
 end
 
 # @notice Remove asset function
-# @param id - random string generated by zkxnode's mongodb
+# @param id_to_remove_ - random string generated by zkxnode's mongodb
 @external
-func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(id : felt):
-    with_attr error_message("Caller is not authorized to manage assets"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageAssets_ACTION)
-    end
+func remove_asset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    id_to_remove_ : felt
+):
+    alloc_locals
 
-    let (_asset : Asset) = asset.read(id=id)
+    # Verify authority and state
+    verify_caller_authority_asset()
+    verify_asset_id_exists(id_to_remove_, should_exist_=TRUE)
 
-    asset.write(
-        id=id,
-        value=Asset(asset_version=0, ticker=0, short_name=0, tradable=0, collateral=0, token_decimal=0,
-        metadata_id=0, tick_size=0, step_size=0, minimum_order_size=0, minimum_leverage=0, maximum_leverage=0,
-        currently_allowed_leverage=0, maintenance_margin_fraction=0, initial_margin_fraction=0, incremental_initial_margin_fraction=0,
-        incremental_position_size=0, baseline_position_size=0, maximum_position_size=0),
+    # Prepare necessary data
+    let (asset_to_remove : Asset) = asset_by_id.read(id_to_remove_)
+    local ticker_to_remove = asset_to_remove.ticker
+    let (local index_to_remove) = asset_index_by_id.read(id_to_remove_)
+    let (local curr_len) = assets_array_len.read()
+    local last_asset_index = curr_len - 1
+    let (local last_asset_id) = asset_id_by_index.read(last_asset_index)
+
+    # Replace id_to_remove with last_asset_id
+    asset_id_by_index.write(index_to_remove, last_asset_id)
+    asset_index_by_id.write(last_asset_id, index_to_remove)
+
+    # Delete id_to_remove
+    asset_id_by_index.write(last_asset_index, 0)
+    assets_array_len.write(curr_len - 1)
+
+    # Mark id & ticker as non-existing
+    asset_id_exists.write(id_to_remove_, FALSE)
+    asset_ticker_exists.write(ticker_to_remove, FALSE)
+
+    # Delete asset struct
+    asset_by_id.write(
+        id_to_remove_,
+        Asset(
+        asset_version=0,
+        ticker=0,
+        short_name=0,
+        tradable=0,
+        collateral=0,
+        token_decimal=0,
+        metadata_id=0,
+        tick_size=0,
+        step_size=0,
+        minimum_order_size=0,
+        minimum_leverage=0,
+        maximum_leverage=0,
+        currently_allowed_leverage=0,
+        maintenance_margin_fraction=0,
+        initial_margin_fraction=0,
+        incremental_initial_margin_fraction=0,
+        incremental_position_size=0,
+        baseline_position_size=0,
+        maximum_position_size=0
+        ),
     )
 
-    updateAssetListInL1(assetId=id, ticker=_asset.ticker, action=REMOVE_ASSET)
+    # Trigger asset update on L1
+    update_asset_on_L1(asset_id_=id_to_remove_, ticker_=ticker_to_remove, action_=REMOVE_ASSET)
+
+    # Emit event
+    let (caller_address) = get_caller_address()
+    asset_removed.emit(
+        asset_id=id_to_remove_, ticker=ticker_to_remove, caller_address=caller_address
+    )
 
     return ()
 end
 
 # @notice Modify core settings of asset function
-# @param id - random string generated by zkxnode's mongodb
-# @param short_name - new short_name for the asset
-# @param tradable - new tradable flag value for the asset
-# @param collateral - new collateral falg value for the asset
-# @param token_decimal - It represents decimal point value of the token
-# @param metadata_id -ID generated by asset metadata collection in zkx node
+# @param id_ - random string generated by zkxnode's mongodb
+# @param short_name_ - new short_name for the asset
+# @param tradable_ - new tradable flag value for the asset
+# @param collateral_ - new collateral falg value for the asset
+# @param metadata_id_ - ID generated by asset metadata collection in zkx node
 @external
 func modify_core_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt,
-    short_name : felt,
-    tradable : felt,
-    collateral : felt,
-    token_decimal : felt,
-    metadata_id : felt,
+    id_ : felt, short_name_ : felt, tradable_ : felt, collateral_ : felt, metadata_id_ : felt
 ):
-    with_attr error_message("Caller is not authorized to manage assets"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageAssets_ACTION)
-    end
+    alloc_locals
 
-    let (_asset : Asset) = asset.read(id=id)
+    # Verify authority and state
+    verify_caller_authority_asset()
+    verify_asset_id_exists(id_, should_exist_=TRUE)
 
-    asset.write(
-        id=id,
-        value=Asset(asset_version=_asset.asset_version, ticker=_asset.ticker, short_name=short_name, tradable=tradable,
-        collateral=collateral, token_decimal=token_decimal, metadata_id=metadata_id, tick_size=_asset.tick_size, step_size=_asset.step_size,
-        minimum_order_size=_asset.minimum_order_size, minimum_leverage=_asset.minimum_leverage, maximum_leverage=_asset.maximum_leverage,
-        currently_allowed_leverage=_asset.currently_allowed_leverage, maintenance_margin_fraction=_asset.maintenance_margin_fraction,
-        initial_margin_fraction=_asset.initial_margin_fraction, incremental_initial_margin_fraction=_asset.incremental_initial_margin_fraction,
-        incremental_position_size=_asset.incremental_position_size, baseline_position_size=_asset.baseline_position_size,
-        maximum_position_size=_asset.maximum_position_size),
+    # Create updated_asset
+    let (asset : Asset) = asset_by_id.read(id_)
+    local updated_asset : Asset = Asset(
+        asset_version=asset.asset_version,
+        ticker=asset.ticker,
+        short_name=short_name_,
+        tradable=tradable_,
+        collateral=collateral_,
+        token_decimal=asset.token_decimal,
+        metadata_id=metadata_id_,
+        tick_size=asset.tick_size,
+        step_size=asset.step_size,
+        minimum_order_size=asset.minimum_order_size,
+        minimum_leverage=asset.minimum_leverage,
+        maximum_leverage=asset.maximum_leverage,
+        currently_allowed_leverage=asset.currently_allowed_leverage,
+        maintenance_margin_fraction=asset.maintenance_margin_fraction,
+        initial_margin_fraction=asset.initial_margin_fraction,
+        incremental_initial_margin_fraction=asset.incremental_initial_margin_fraction,
+        incremental_position_size=asset.incremental_position_size,
+        baseline_position_size=asset.baseline_position_size,
+        maximum_position_size=asset.maximum_position_size
+        )
+
+    # Validate and save updated asset
+    validate_asset_properties(updated_asset)
+    asset_by_id.write(id_, updated_asset)
+
+    # Emit event
+    let (caller_address) = get_caller_address()
+    asset_core_settings_update.emit(
+        asset_id=id_, ticker=updated_asset.ticker, caller_address=caller_address
     )
+
     return ()
 end
 
 # @notice Modify core settings of asset function
-# @param id - random string generated by zkxnode's mongodb
-# @param tick_size - new tradable flag value for the asset
-# @param step_size - new collateral flag value for the asset
-# @param minimum_order_size - new minimum_order_size value for the asset
-# @param minimum_leverage - new minimum_leverage value for the asset
-# @param maximum_leverage - new maximum_leverage value for the asset
-# @param currently_allowed_leverage - new currently_allowed_leverage value for the asset
-# @param maintenance_margin_fraction - new maintenance_margin_fraction value for the asset
-# @param initial_margin_fraction - new initial_margin_fraction value for the asset
-# @param incremental_initial_margin_fraction - new incremental_initial_margin_fraction value for the asset
-# @param incremental_position_size - new incremental_position_size value for the asset
-# @param baseline_position_size - new baseline_position_size value for the asset
-# @param maximum_position_size - new maximum_position_size value for the asset
+# @param id_ - random string generated by zkxnode's mongodb
+# @param tick_size_ - new tradable flag value for the asset
+# @param step_size_ - new collateral flag value for the asset
+# @param minimum_order_size_ - new minimum_order_size value for the asset
+# @param minimum_leverage_ - new minimum_leverage value for the asset
+# @param maximum_leverage_ - new maximum_leverage value for the asset
+# @param currently_allowed_leverage_ - new currently_allowed_leverage value for the asset
+# @param maintenance_margin_fraction_ - new maintenance_margin_fraction value for the asset
+# @param initial_margin_fraction_ - new initial_margin_fraction value for the asset
+# @param incremental_initial_margin_fraction_ - new incremental_initial_margin_fraction value for the asset
+# @param incremental_position_size_ - new incremental_position_size value for the asset
+# @param baseline_position_size_ - new baseline_position_size value for the asset
+# @param maximum_position_size_ - new maximum_position_size value for the asset
 @external
 func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt,
-    tick_size : felt,
-    step_size : felt,
-    minimum_order_size : felt,
-    minimum_leverage : felt,
-    maximum_leverage : felt,
-    currently_allowed_leverage : felt,
-    maintenance_margin_fraction : felt,
-    initial_margin_fraction : felt,
-    incremental_initial_margin_fraction : felt,
-    incremental_position_size : felt,
-    baseline_position_size : felt,
-    maximum_position_size : felt,
+    id_ : felt,
+    tick_size_ : felt,
+    step_size_ : felt,
+    minimum_order_size_ : felt,
+    minimum_leverage_ : felt,
+    maximum_leverage_ : felt,
+    currently_allowed_leverage_ : felt,
+    maintenance_margin_fraction_ : felt,
+    initial_margin_fraction_ : felt,
+    incremental_initial_margin_fraction_ : felt,
+    incremental_position_size_ : felt,
+    baseline_position_size_ : felt,
+    maximum_position_size_ : felt,
 ):
     alloc_locals
-    # Auth Check
-    let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (ver) = contract_version.read()
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=ver
-    )
-    let (risk_management_addr) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=RiskManagement_INDEX, version=ver
+
+    # Verify authority and state
+    verify_caller_authority_asset()
+    verify_asset_id_exists(id_, should_exist_=TRUE)
+
+    # Create updated_asset
+    let (asset : Asset) = asset_by_id.read(id_)
+    local updated_asset : Asset = Asset(
+        asset_version=asset.asset_version + 1,
+        ticker=asset.ticker,
+        short_name=asset.short_name,
+        tradable=asset.tradable,
+        collateral=asset.collateral,
+        token_decimal=asset.token_decimal,
+        metadata_id=asset.metadata_id,
+        tick_size=tick_size_,
+        step_size=step_size_,
+        minimum_order_size=minimum_order_size_,
+        minimum_leverage=minimum_leverage_,
+        maximum_leverage=maximum_leverage_,
+        currently_allowed_leverage=currently_allowed_leverage_,
+        maintenance_margin_fraction=maintenance_margin_fraction_,
+        initial_margin_fraction=initial_margin_fraction_,
+        incremental_initial_margin_fraction=incremental_initial_margin_fraction_,
+        incremental_position_size=incremental_position_size_,
+        baseline_position_size=baseline_position_size_,
+        maximum_position_size=maximum_position_size_
+        )
+
+    # Validate and save updated asset
+    validate_asset_properties(updated_asset)
+    asset_by_id.write(id_, updated_asset)
+
+    # Bump version
+    let (local curr_ver) = version.read()
+    version.write(curr_ver + 1)
+
+    # Emit event
+    let (caller_address) = get_caller_address()
+    asset_trade_settings_update.emit(
+        asset_id=id_,
+        ticker=updated_asset.ticker,
+        new_contract_version=curr_ver + 1,
+        new_asset_version=updated_asset.asset_version,
+        caller_address=caller_address,
     )
 
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageAssets_ACTION
-    )
-    if access == 0:
-        assert caller = risk_management_addr
-    end
-
-    let (ver) = version.read()
-    version.write(value=ver + 1)
-
-    let (_asset : Asset) = asset.read(id=id)
-
-    asset.write(
-        id=id,
-        value=Asset(asset_version=_asset.asset_version + 1, ticker=_asset.ticker, short_name=_asset.short_name, tradable=_asset.tradable,
-        collateral=_asset.collateral, token_decimal=_asset.token_decimal, metadata_id=_asset.metadata_id, tick_size=tick_size, step_size=step_size,
-        minimum_order_size=minimum_order_size, minimum_leverage=minimum_leverage, maximum_leverage=maximum_leverage,
-        currently_allowed_leverage=currently_allowed_leverage, maintenance_margin_fraction=maintenance_margin_fraction,
-        initial_margin_fraction=initial_margin_fraction, incremental_initial_margin_fraction=incremental_initial_margin_fraction,
-        incremental_position_size=incremental_position_size, baseline_position_size=baseline_position_size, maximum_position_size=maximum_position_size),
-    )
     return ()
 end
 
-# @notice Function to update asset list in L1
-# @param assetId - random string generated by zkxnode's mongodb
-# @param ticker - Name of the asset
-func updateAssetListInL1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    assetId : felt, ticker : felt, action : felt
+######################
+# Internal functions #
+######################
+
+# @notice Internal function to update asset list in L1
+# @param asset_id_ - random string generated by zkxnode's mongodb
+# @param ticker_ - Ticker of the asset
+# @param action_ - It could be ADD_ASSET or REMOVE_ASSET action
+func update_asset_on_L1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    asset_id_ : felt, ticker_ : felt, action_ : felt
 ):
-    with_attr error_message("Caller is not authorized to manage assets"):
+    # Build message payload
+    let (message_payload : felt*) = alloc()
+    assert message_payload[0] = action_
+    assert message_payload[1] = ticker_
+    assert message_payload[2] = asset_id_
+
+    # Send asset update message to L1
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (L1_ZKX_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
+    )
+    send_message_to_l1(to_address=L1_ZKX_address, payload_size=3, payload=message_payload)
+
+    return ()
+end
+
+# @notice Internal Function called by return_all_assets to recursively add assets to the array and return it
+# @param current_len_ - current length of array being populated
+# @param final_len_ - final length of array being populated
+# @param asset_array_ - array being populated with assets
+# @return array_list_len - Iterator used to populate array
+# @return array_list - Fully populated array of AssetWID
+func populate_asset_list{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    current_len_ : felt, final_len_ : felt, asset_array_ : AssetWID*
+) -> (array_list_len : felt, array_list : AssetWID*):
+    alloc_locals
+    if current_len_ == final_len_:
+        return (final_len_, asset_array_)
+    end
+    let (id) = asset_id_by_index.read(current_len_)
+    let (asset : Asset) = asset_by_id.read(id)
+    assert asset_array_[current_len_] = AssetWID(
+        id=id,
+        asset_version=asset.asset_version,
+        ticker=asset.ticker,
+        short_name=asset.short_name,
+        tradable=asset.tradable,
+        collateral=asset.collateral,
+        token_decimal=asset.token_decimal,
+        metadata_id=asset.metadata_id,
+        tick_size=asset.tick_size,
+        step_size=asset.step_size,
+        minimum_order_size=asset.minimum_order_size,
+        minimum_leverage=asset.minimum_leverage,
+        maximum_leverage=asset.maximum_leverage,
+        currently_allowed_leverage=asset.currently_allowed_leverage,
+        maintenance_margin_fraction=asset.maintenance_margin_fraction,
+        initial_margin_fraction=asset.initial_margin_fraction,
+        incremental_initial_margin_fraction=asset.incremental_initial_margin_fraction,
+        incremental_position_size=asset.incremental_position_size,
+        baseline_position_size=asset.baseline_position_size,
+        maximum_position_size=asset.maximum_position_size,
+        )
+    return populate_asset_list(current_len_ + 1, final_len_, asset_array_)
+end
+
+func verify_caller_authority_asset{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}():
+    with_attr error_message("Caller not authorized to manage assets"):
         let (registry) = registry_address.read()
         let (version) = contract_version.read()
         verify_caller_authority(registry, version, ManageAssets_ACTION)
     end
-
-    # Send the add asset message.
-    let (message_payload : felt*) = alloc()
-    assert message_payload[0] = action
-    assert message_payload[1] = ticker
-    assert message_payload[2] = assetId
-
-    let (L1_CONTRACT_ADDRESS) = get_L1_zkx_address()
-
-    send_message_to_l1(to_address=L1_CONTRACT_ADDRESS, payload_size=3, payload=message_payload)
-
     return ()
 end
 
-# @notice Internal Function called by returnAllAssets to recursively add assets to the array and return it
-# @param array_list_len - Stores the current length of the populated array
-# @param array_list - Array of AssetWID filled up to the index
-# @returns array_list_len - Length of the array_list
-# @returns array_list - Fully populated list of AssetWID
-func populate_assets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    array_list_len : felt, array_list : AssetWID*
-) -> (array_list_len : felt, array_list : AssetWID*):
-    alloc_locals
-    let (asset_id) = assets_array.read(index=array_list_len)
-
-    if asset_id == 0:
-        return (array_list_len, array_list)
+func verify_asset_id_exists{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    asset_id_ : felt, should_exist_ : felt
+):
+    with_attr error_message("asset_id existence mismatch"):
+        let (id_exists) = asset_id_exists.read(asset_id_)
+        assert id_exists = should_exist_
     end
-
-    let (asset_details : Asset) = asset.read(id=asset_id)
-    let assets_details_w_id = AssetWID(
-        id=asset_id,
-        asset_version=asset_details.asset_version,
-        ticker=asset_details.ticker,
-        short_name=asset_details.short_name,
-        tradable=asset_details.tradable,
-        collateral=asset_details.collateral,
-        token_decimal=asset_details.token_decimal,
-        metadata_id=asset_details.metadata_id,
-        tick_size=asset_details.tick_size,
-        step_size=asset_details.step_size,
-        minimum_order_size=asset_details.minimum_order_size,
-        minimum_leverage=asset_details.minimum_leverage,
-        maximum_leverage=asset_details.maximum_leverage,
-        currently_allowed_leverage=asset_details.currently_allowed_leverage,
-        maintenance_margin_fraction=asset_details.maintenance_margin_fraction,
-        initial_margin_fraction=asset_details.initial_margin_fraction,
-        incremental_initial_margin_fraction=asset_details.incremental_initial_margin_fraction,
-        incremental_position_size=asset_details.incremental_position_size,
-        baseline_position_size=asset_details.baseline_position_size,
-        maximum_position_size=asset_details.maximum_position_size,
-    )
-    assert array_list[array_list_len] = assets_details_w_id
-
-    return populate_assets(array_list_len + 1, array_list)
+    return ()
 end
 
-# @notice View function to return all the assets with ids in an array
-# @returns array_list_len - Length of the array_list
-# @returns array_list - Fully populated list of AssetWID
-@view
-func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    array_list_len : felt, array_list : AssetWID*
+func verify_ticker_exists{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ticker_ : felt, should_exist_ : felt
 ):
-    alloc_locals
+    with_attr error_message("Ticker existence mismatch"):
+        let (ticker_exists) = asset_ticker_exists.read(ticker_)
+        assert ticker_exists = should_exist_
+    end
+    return ()
+end
 
-    let (array_list : AssetWID*) = alloc()
-    return populate_assets(array_list_len=0, array_list=array_list)
+func validate_asset_properties{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    asset_ : Asset
+):
+    with_attr error_message("Asset: Invalid core settings"):
+        assert_bool(asset_.collateral)
+        assert_bool(asset_.tradable)
+        assert_in_range(asset_.token_decimal, 1, 19)
+    end
+    with_attr error_message("Asset: Invalid trade settings"):
+        Math64x61_assertPositive64x61(asset_.tick_size)
+        Math64x61_assertPositive64x61(asset_.step_size)
+        Math64x61_assertPositive64x61(asset_.minimum_order_size)
+        Math64x61_assertPositive64x61(asset_.maintenance_margin_fraction)
+        Math64x61_assertPositive64x61(asset_.initial_margin_fraction)
+        Math64x61_assertPositive64x61(asset_.incremental_initial_margin_fraction)
+    end
+    with_attr error_message("Asset: Invalid min leverage"):
+        Math64x61_assertPositive64x61(asset_.minimum_leverage)
+    end
+    with_attr error_message("Asset: Invalid max leverage"):
+        Math64x61_assertPositive64x61(asset_.maximum_leverage)
+        assert_le(asset_.minimum_leverage, asset_.maximum_leverage)
+    end
+    with_attr error_message("Asset: Invalid currently allowed leverage"):
+        Math64x61_assertPositive64x61(asset_.currently_allowed_leverage)
+        assert_le(asset_.minimum_leverage, asset_.currently_allowed_leverage)
+        assert_le(asset_.currently_allowed_leverage, asset_.maximum_leverage)
+    end
+    with_attr error_message("Asset: Invalid position size settings"):
+        Math64x61_assertPositive64x61(asset_.incremental_position_size)
+        Math64x61_assertPositive64x61(asset_.baseline_position_size)
+        Math64x61_assertPositive64x61(asset_.maximum_position_size)
+        assert_le(asset_.baseline_position_size, asset_.maximum_position_size)
+    end
+    return ()
 end

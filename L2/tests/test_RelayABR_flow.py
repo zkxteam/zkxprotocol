@@ -4,8 +4,11 @@ import ABR_data
 import time
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
+from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, assert_revert, convertTo64x61
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
@@ -20,9 +23,6 @@ BTC_ID = str_to_felt("32f0406jz7qj8")
 USDC_ID = str_to_felt("fghj3am52qpzsib")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
-
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -30,188 +30,65 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def abr_factory():
-    starknet = await Starknet.empty()
+async def abr_factory(starknet_service: StarknetService):
 
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[admin1_signer.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
+    # Deploy infrastructure (Part 1)
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        admin1_signer.public_key
+       
+    ])
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, 0x0])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
+    asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
 
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            0x0
-        ]
-    )
+    # Deploy accounts
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
+    alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
 
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
+    # Deploy infrastructure (Part 2)
+    fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
+    holding = await starknet_service.deploy(ContractType.Holding, [registry.contract_address, 1])
+    feeBalance = await starknet_service.deploy(ContractType.FeeBalance, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
+    liquidity = await starknet_service.deploy(ContractType.LiquidityFund, [registry.contract_address, 1])
+    insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
+    emergency = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
+    trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
+    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
+    accountRegistry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
+    abr = await starknet_service.deploy(ContractType.ABR, [registry.contract_address, 1])
+    abr_fund = await starknet_service.deploy(ContractType.ABRFund, [registry.contract_address, 1])
+    abr_payment = await starknet_service.deploy(ContractType.ABRPayment, [registry.contract_address, 1])
+    relay_abr = await starknet_service.deploy(ContractType.RelayABR, [
+        registry.contract_address, 
+        1, 
+        17 # abr index
+    ])
+    relay_abr_payment = await starknet_service.deploy(ContractType.RelayABRPayment, [
+        registry.contract_address, 
+        1, 
+        19 # abr_payment index
+    ])
+    marketPrices = await starknet_service.deploy(
+        ContractType.MarketPrices, 
+        [registry.contract_address, 1]
     )
-
-    fees = await starknet.deploy(
-        "contracts/TradingFees.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    asset = await starknet.deploy(
-        "contracts/Asset.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    alice = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            alice_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    bob = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            bob_signer.public_key,
-            L1_dummy_address,
-            registry.contract_address,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-    fixed_math = await starknet.deploy(
-        "contracts/Math_64x61.cairo",
-        constructor_calldata=[
-        ]
-    )
-
-    holding = await starknet.deploy(
-        "contracts/Holding.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    feeBalance = await starknet.deploy(
-        "contracts/FeeBalance.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    market = await starknet.deploy(
-        "contracts/Markets.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    liquidity = await starknet.deploy(
-        "contracts/LiquidityFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    insurance = await starknet.deploy(
-        "contracts/InsuranceFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    emergency = await starknet.deploy(
-        "contracts/EmergencyFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    trading = await starknet.deploy(
-        "contracts/Trading.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    feeDiscount = await starknet.deploy(
-        "contracts/FeeDiscount.cairo",
-        constructor_calldata=[]
-    )
-
-    accountRegistry = await starknet.deploy(
-        "contracts/AccountRegistry.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    abr = await starknet.deploy(
-        "contracts/ABR.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    abr_fund = await starknet.deploy(
-        "contracts/ABRFund.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    abr_payment = await starknet.deploy(
-        "contracts/ABRPayment.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    relay_abr = await starknet.deploy(
-        "contracts/relay_contracts/RelayABR.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            17  # abr index
-        ]
-    )
-
-    relay_abr_payment = await starknet.deploy(
-        "contracts/relay_contracts/RelayABRPayment.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            19  # abr_payment index
-        ]
+    liquidate = await starknet_service.deploy(
+        ContractType.Liquidate, 
+        [registry.contract_address, 1]
     )
 
     timestamp = int(time.time())
 
-    starknet.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp, gas_price=starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet.state.state.block_info.sequencer_address
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
     )
 
     # Access 1 allows adding and removing assets from the system
@@ -241,6 +118,8 @@ async def abr_factory():
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [18, 1, abr_fund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [19, 1, abr_payment.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -260,11 +139,11 @@ async def abr_factory():
     await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, 0, 1, 10])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 10])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
@@ -276,7 +155,7 @@ async def abr_factory():
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_USD_ID, to64x61(1000000)])
 
     # Set the balance of admin1 and admin2
-    await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
+    # await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
 
     btc_perp_spot_64x61 = convertTo64x61(ABR_data.btc_perp_spot)
     btc_perp_64x61 = convertTo64x61(ABR_data.btc_perp)

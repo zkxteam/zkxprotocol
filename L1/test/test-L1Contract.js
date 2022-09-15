@@ -103,7 +103,7 @@ async function deployZKXToken(deployer) {
   return token;
 }
 
-async function preapreToAdd(
+async function prepareStarknetToAdd(
   asset,
   zkxContract = L1ZKXContract,
   starknetMock = starknetCoreMock,
@@ -123,11 +123,11 @@ async function addAsset(
   starknetMock = starknetCoreMock,
   assetAddress = L2_ASSET_ADDRESS
 ) {
-  await preapreToAdd(asset, zkxContract, starknetMock, assetAddress);
+  await prepareStarknetToAdd(asset, zkxContract, starknetMock, assetAddress);
   await zkxContract.updateAssetListInL1(asset.ticker, asset.collateralID);
 }
 
-async function prepareToRemove(
+async function prepareStarknetToRemove(
   asset,
   zkxContract = L1ZKXContract,
   starknetMock = starknetCoreMock,
@@ -141,13 +141,7 @@ async function prepareToRemove(
   );
 }
 
-async function prepareToWithdraw(
-  asset,
-  recipient,
-  L2Address,
-  amount,
-  requestID
-) {
+async function prepareStarknetToWithdraw(asset, recipient, amount, requestID) {
   const payload = [
     INDEX.WITHDRAWAL,
     recipient.address,
@@ -156,7 +150,7 @@ async function prepareToWithdraw(
     requestID,
   ];
   await starknetCoreMock.addL2ToL1Message(
-    L2Address,
+    L2_WITHDRAWAL_ADDRESS,
     L1ZKXContract.address,
     payload
   );
@@ -176,7 +170,7 @@ describe("Asset management", function () {
 
   it("Add ETH", async function () {
     // Given
-    await preapreToAdd(ETH_ASSET);
+    await prepareStarknetToAdd(ETH_ASSET);
 
     // When
     await L1ZKXContract.updateAssetListInL1(
@@ -195,7 +189,7 @@ describe("Asset management", function () {
 
   it("Add ZKXToken", async function () {
     // Given
-    await preapreToAdd(ZKX_ASSET);
+    await prepareStarknetToAdd(ZKX_ASSET);
 
     // When
     await L1ZKXContract.updateAssetListInL1(
@@ -221,8 +215,8 @@ describe("Asset management", function () {
 
   it("Add both ETH & ZKXToken", async function () {
     // Given
-    await preapreToAdd(ETH_ASSET);
-    await preapreToAdd(ZKX_ASSET);
+    await prepareStarknetToAdd(ETH_ASSET);
+    await prepareStarknetToAdd(ZKX_ASSET);
 
     // When
     await L1ZKXContract.updateAssetListInL1(
@@ -262,7 +256,7 @@ describe("Asset management", function () {
       ZKX_ASSET.ticker,
       ZKXToken.address
     );
-    await prepareToRemove(ETH_ASSET);
+    await prepareStarknetToRemove(ETH_ASSET);
 
     // When
     await L1ZKXContract.removeAssetFromList(
@@ -291,7 +285,7 @@ describe("Asset management", function () {
       ZKX_ASSET.ticker,
       ZKXToken.address
     );
-    await prepareToRemove(ZKX_ASSET);
+    await prepareStarknetToRemove(ZKX_ASSET);
 
     // When
     await L1ZKXContract.removeAssetFromList(
@@ -320,7 +314,7 @@ describe("Asset management", function () {
       ZKX_ASSET.ticker,
       ZKXToken.address
     );
-    await preapreToAdd(ETH_ASSET);
+    await prepareStarknetToAdd(ETH_ASSET);
 
     // When
     await expect(
@@ -343,7 +337,7 @@ describe("Asset management", function () {
       ZKX_ASSET.ticker,
       ZKXToken.address
     );
-    await preapreToAdd(ZKX_ASSET);
+    await prepareStarknetToAdd(ZKX_ASSET);
 
     // When
     await expect(
@@ -406,9 +400,9 @@ describe("Asset management", function () {
 
   it("Add 3 assets, then remove first", async function () {
     // Prepare
-    await preapreToAdd(ASSET_1);
-    await preapreToAdd(ASSET_2);
-    await preapreToAdd(ASSET_3);
+    await prepareStarknetToAdd(ASSET_1);
+    await prepareStarknetToAdd(ASSET_2);
+    await prepareStarknetToAdd(ASSET_3);
 
     // Add 5 assets
     await L1ZKXContract.updateAssetListInL1(
@@ -438,7 +432,7 @@ describe("Asset management", function () {
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
-    await prepareToRemove(ASSET_1);
+    await prepareStarknetToRemove(ASSET_1);
     await L1ZKXContract.removeAssetFromList(
       ASSET_1.ticker,
       ASSET_1.collateralID
@@ -473,9 +467,9 @@ describe("Asset management", function () {
 
   it("Add 3 assets, then remove middle", async function () {
     // Prepare
-    await preapreToAdd(ASSET_1);
-    await preapreToAdd(ASSET_2);
-    await preapreToAdd(ASSET_3);
+    await prepareStarknetToAdd(ASSET_1);
+    await prepareStarknetToAdd(ASSET_2);
+    await prepareStarknetToAdd(ASSET_3);
 
     // Add 5 assets
     await L1ZKXContract.updateAssetListInL1(
@@ -505,7 +499,7 @@ describe("Asset management", function () {
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
-    await prepareToRemove(ASSET_2);
+    await prepareStarknetToRemove(ASSET_2);
     await L1ZKXContract.removeAssetFromList(
       ASSET_2.ticker,
       ASSET_2.collateralID
@@ -540,9 +534,9 @@ describe("Asset management", function () {
 
   it("Add 3 assets, then remove last", async function () {
     // Prepare
-    await preapreToAdd(ASSET_1);
-    await preapreToAdd(ASSET_2);
-    await preapreToAdd(ASSET_3);
+    await prepareStarknetToAdd(ASSET_1);
+    await prepareStarknetToAdd(ASSET_2);
+    await prepareStarknetToAdd(ASSET_3);
 
     // Add 5 assets
     await L1ZKXContract.updateAssetListInL1(
@@ -572,7 +566,7 @@ describe("Asset management", function () {
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
-    await prepareToRemove(ASSET_3);
+    await prepareStarknetToRemove(ASSET_3);
     await L1ZKXContract.removeAssetFromList(
       ASSET_3.ticker,
       ASSET_3.collateralID
@@ -819,41 +813,20 @@ describe("Deposits", function () {
 
     // Prepare mock for withdrawal
     const requestID = 42;
-    await prepareToWithdraw(
-      ETH_ASSET,
-      alice,
-      ALICE_L2_ADDRESS,
-      amount,
-      requestID
-    );
+    await prepareStarknetToWithdraw(ETH_ASSET, alice, amount, requestID);
     await starknetCoreMock.resetCounters();
 
     // Rogue can't withdraw Alice's funds
     const rogueContract = L1ZKXContract.connect(rogue);
     await expect(
-      rogueContract.withdrawEth(
-        rogue.address,
-        ROGUE_L2_ADDRESS,
-        amount,
-        requestID
-      )
+      rogueContract.withdrawEth(rogue.address, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
     await expect(
-      rogueContract.withdrawEth(
-        rogue.address,
-        ALICE_L2_ADDRESS,
-        amount,
-        requestID
-      )
+      rogueContract.withdrawEth(rogue.address, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
 
     // Alice successfully withdraws funds
-    await aliceContract.withdrawEth(
-      alice.address,
-      ALICE_L2_ADDRESS,
-      amount,
-      requestID
-    );
+    await aliceContract.withdrawEth(alice.address, amount, requestID);
     // Withdrawal should consume 1 message from L2
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(
       1
@@ -952,40 +925,21 @@ describe("Deposits", function () {
 
     // Prepare withdrawal details
     const requestID = 42;
-    await prepareToWithdraw(
-      ZKX_ASSET,
-      alice,
-      ALICE_L2_ADDRESS,
-      amount,
-      requestID
-    );
+    await prepareStarknetToWithdraw(ZKX_ASSET, alice, amount, requestID);
     await starknetCoreMock.resetCounters();
 
     // Rogue can't withdraw Alice's funds
     await expect(
-      rogueContract.withdraw(
-        rogue.address,
-        ROGUE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
-        amount,
-        requestID
-      )
+      rogueContract.withdraw(rogue.address, ZKX_ASSET.ticker, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
 
     await expect(
-      rogueContract.withdraw(
-        rogue.address,
-        ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
-        amount,
-        requestID
-      )
+      rogueContract.withdraw(rogue.address, ZKX_ASSET.ticker, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
 
     // Alice successfully withdraws funds
     await aliceContract.withdraw(
       alice.address,
-      ALICE_L2_ADDRESS,
       ZKX_ASSET.ticker,
       amount,
       requestID
