@@ -1,6 +1,6 @@
 require("@nomiclabs/hardhat-waffle");
 require("dotenv").config({ path: "./.env" });
-require("hardhat-gas-reporter");
+// require("hardhat-gas-reporter");
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -32,9 +32,9 @@ module.exports = {
     myNetwork: {
       url: "http://localhost:5000",
     },
-    goerli: {
-      url: process.env.ALCHEMY_URL,
-      accounts: [`0x${process.env.PRIVATE_KEY}`],
-    },
+    // goerli: {
+    //   url: process.env.ALCHEMY_URL,
+    //   accounts: [`0x${process.env.PRIVATE_KEY}`],
+    // },
   },
 };

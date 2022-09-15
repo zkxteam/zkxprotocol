@@ -4,13 +4,9 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
-
-signer1 = Signer(123456789987654321)
-signer2 = Signer(123456789987654322)
-signer3 = Signer(12345)
-
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address
+from dummy_signers import signer1, signer2, signer3
 
 
 @pytest.fixture(scope='module')
@@ -24,77 +20,38 @@ def event_loop():
 AccountRegistry_INDEX=14
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory():
-    starknet = await Starknet.empty()
+async def adminAuth_factory(starknet_service: StarknetService):
+
+    # Deploy admins
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
+    admin1 = await account_factory.deploy_account(signer1.public_key)
+    admin2 = await account_factory.deploy_account(signer2.public_key)
+    admin3 = await account_factory.deploy_account(signer3.public_key)
     
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
+    # Deploy infrastructure
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
 
-    admin2 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    admin3 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            admin2.contract_address
-        ]
-    )
-
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
-    )
-
-    account_registry = await starknet.deploy(
-        "contracts/AccountRegistry.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-
-
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address,3,1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address,2,1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address,3,1])
 
     # account registry contract has to be in index to be acceible by relay
-    await signer1.send_transaction(admin1, 
-                                registry.contract_address,
-                                 'update_contract_registry', [AccountRegistry_INDEX,1, account_registry.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [AccountRegistry_INDEX,1, account_registry.contract_address])
     
-
-    relay_account_registry = await starknet.deploy(
-        "contracts/relay_contracts/RelayAccountRegistry.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1,
-            AccountRegistry_INDEX
-        ]
-    )
+    relay_account_registry = await starknet_service.deploy(ContractType.RelayAccountRegistry, [
+        registry.contract_address,
+        1,
+        AccountRegistry_INDEX
+    ])
 
     # spoof account deployer contract since add_to_account_registry only accepts calls from account deployer contract
 
-    await signer1.send_transaction(admin1, 
-                                registry.contract_address,
-                                 'update_contract_registry', [20,1, relay_account_registry.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20,1, relay_account_registry.contract_address])
 
     # give relay master admin access for priviledged access
-    await signer1.send_transaction(admin1, 
-    adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address,0,1])
-
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address, 0, 1])
+    await signer2.send_transaction(admin2, adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address, 0, 1])
 
     return adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry
 
@@ -118,8 +75,9 @@ async def test_add_address_to_account_registry(adminAuth_factory):
     hash_transaction_2=signer1.current_hash # hash of 2nd transaction
     print(hash_transaction_2)
 
-    fetched_account_registry = await account_registry.get_account_registry().call()
-    fetched_account_registry1 = await relay_account_registry.get_account_registry().call()
+    array_length = await account_registry.get_registry_len().call()
+    fetched_account_registry = await account_registry.get_account_registry(0, array_length.result.len).call()
+    fetched_account_registry1 = await relay_account_registry.get_account_registry(0, array_length.result.len).call()
     call_counter = await relay_account_registry.get_call_counter(
         admin1.contract_address,str_to_felt('add_to_account_registry')).call()
     
@@ -158,7 +116,8 @@ async def test_add_address_to_account_registry(adminAuth_factory):
 async def test_remove_address_from_account_registry(adminAuth_factory):
     adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry = adminAuth_factory
 
-    fetched_account_registry1 = await relay_account_registry.get_account_registry().call()
+    array_length_before = await account_registry.get_registry_len().call()
+    fetched_account_registry1 = await relay_account_registry.get_account_registry(0, array_length_before.result.len).call()
     call_counter = await relay_account_registry.get_call_counter(
         admin1.contract_address,str_to_felt('add_to_account_registry')).call()
     
@@ -173,8 +132,9 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
     print(hash_list.result)
     assert len(hash_list.result.hash_list) == 3 # total transactions = 2 add + 1 remove = 3
 
-    fetched_account_registry = await account_registry.get_account_registry().call()
-    relay_fetched_account_registry = await relay_account_registry.get_account_registry().call()
+    array_length_after = await account_registry.get_registry_len().call()
+    fetched_account_registry = await account_registry.get_account_registry(0, array_length_after.result.len).call()
+    relay_fetched_account_registry = await relay_account_registry.get_account_registry(0, array_length_after.result.len).call()
     print(fetched_account_registry.result.account_registry)
 
     # verify through relay and direct to underlying contract

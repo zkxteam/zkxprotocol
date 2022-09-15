@@ -3,14 +3,10 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
-
-signer1 = Signer(123456789987654321)
-signer2 = Signer(123456789987654322)
-signer3 = Signer(123456789987654323)
-
-L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_addresses import L1_dummy_address
+from dummy_signers import signer1, signer2, signer3
 
 
 @pytest.fixture(scope='module')
@@ -19,227 +15,239 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory():
-    starknet = await Starknet.empty()
-    admin1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer1.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    admin2 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer2.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    user1 = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[signer3.public_key, L1_dummy_address, 0, 1, L1_ZKX_dummy_address]
-    )
-
-    adminAuth = await starknet.deploy(
-        "contracts/AdminAuth.cairo",
-        constructor_calldata=[
-            admin1.contract_address,
-            admin2.contract_address
-        ]
-    )
-
-    registry = await starknet.deploy(
-        "contracts/AuthorizedRegistry.cairo",
-        constructor_calldata=[
-            adminAuth.contract_address
-        ]
-    )
-
-    asset = await starknet.deploy(
-        "contracts/Asset.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
-
-    market = await starknet.deploy(
-        "contracts/Markets.cairo",
-        constructor_calldata=[
-            registry.contract_address,
-            1
-        ]
-    )
+async def adminAuth_factory(starknet_service: StarknetService):
+    # Deploy accounts
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
+    admin1 = await account_factory.deploy_account(signer1.public_key)
+    admin2 = await account_factory.deploy_account(signer2.public_key)
+    user1 = await account_factory.deploy_account(signer3.public_key)
+    
+    # Deploy infrastructure
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj8"), 0, str_to_felt("ETH"), str_to_felt("Ethereum"), 1, 0, 18, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj7"), 0, str_to_felt("USDC"), str_to_felt("USDCoin"), 0, 1, 6, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj6"), 0, str_to_felt("DOT"), str_to_felt("Polkadot"), 0, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj9"), 0, str_to_felt("TSLA"), str_to_felt("Tesla"), 0, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, asset.contract_address, 'addAsset', [str_to_felt("32f0406jz7qj10"), 0, str_to_felt("USDT"), str_to_felt("USDTether"), 0, 1, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj8"), 0, str_to_felt("ETH"), str_to_felt("Ethereum"), 1, 0, 18, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj7"), 0, str_to_felt("USDC"), str_to_felt("USDCoin"), 0, 1, 6, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj6"), 0, str_to_felt("DOT"), str_to_felt("Polkadot"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj9"), 0, str_to_felt("TSLA"), str_to_felt("Tesla"), 0, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj10"), 0, str_to_felt("USDT"), str_to_felt("USDTether"), 0, 1, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj11"), 0, str_to_felt("LINK"), str_to_felt("Chainlink"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj12"), 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj20"), 0, str_to_felt("SUPER"), str_to_felt("Super"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj21"), 0, str_to_felt("DOGE"), str_to_felt("Doge"), 1, 1, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj22"), 0, str_to_felt("ADA"), str_to_felt("Cardano"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [str_to_felt("32f0406jz7qj23"), 0, str_to_felt("LUNA"), str_to_felt("Luna"), 1, 0, 10, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
 
     return adminAuth, asset, market, admin1, admin2, user1
 
 
 @pytest.mark.asyncio
-async def test_get_admin_mapping(adminAuth_factory):
+async def test_add_new_market_not_admin(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    execution_info = await adminAuth.get_admin_mapping(admin1.contract_address, 1).call()
-    assert execution_info.result.allowed == 1
-
-    execution_info1 = await adminAuth.get_admin_mapping(admin2.contract_address, 1).call()
-    assert execution_info1.result.allowed == 0
+    await assert_revert( signer3.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60])
+    )
 
 
 @pytest.mark.asyncio
-async def test_add_new_market_no_collateral(adminAuth_factory):
+async def test_add_new_market_invalid_leverage(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    assert_revert(lambda: signer3.send_transaction(user1, market.contract_address, 'addMarket', [
-                  str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj6"), 1, 0, 10]))
-
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(11), 1, 0, 60]))
+    
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(0), 1, 0, 60]))
+    
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(-43), 1, 0, 60]))
 
 @pytest.mark.asyncio
-async def test_add_new_market_invalid_asset(adminAuth_factory):
+async def test_add_new_market_invalid_ttl(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    assert_revert(lambda: signer1.send_transaction(admin1, market.contract_address, 'addMarket', [
-                  str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7ql8"), str_to_felt("32f0406jz7qj7"), 1, 0, 10]))
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 0]))
+    
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 36001]))
+    
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, -60]))
 
+@pytest.mark.asyncio
+async def test_add_new_market_invalid_tradable(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 0, 0, 60]))
+
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 3, 0, 60]))
+    
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), -1, 0, 60]))
+
+@pytest.mark.asyncio
+async def test_add_new_market_non_existent_asset(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7q348"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60]))
+
+@pytest.mark.asyncio
+async def test_add_new_market_non_existent_collateral(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7q316"), to64x61(8), 1, 0, 60]))
+
+@pytest.mark.asyncio
+async def test_add_new_market_not_collateral(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj9"), to64x61(8), 1, 0, 60]))
 
 @pytest.mark.asyncio
 async def test_add_new_tradable_market_non_tradable_asset(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    assert_revert(lambda: signer3.send_transaction(user1, market.contract_address, 'addMarket', [
-                  str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj6"), str_to_felt("32f0406jz7qj7"), 1, 1, 10]))
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj6"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60]))
 
 
 @pytest.mark.asyncio
 async def test_add_new_market(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, market.contract_address, 'addMarket', [str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), 1, 1, 10])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(10), 1, 0, 60])
 
-    execution_info = await market.getMarket(str_to_felt("32f0406jz7qk1")).call()
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk1")).call()
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
     assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
-    assert fetched_market.leverage == 1
+    assert fetched_market.leverage == to64x61(10)
 
-    markets = await market.returnAllMarkets().call()
+    markets = await market.get_all_markets().call()
     parsed_list = list(markets.result.array_list)[0]
 
     assert parsed_list.id == str_to_felt("32f0406jz7qk1")
     assert parsed_list.asset == str_to_felt("32f0406jz7qj8")
     assert parsed_list.assetCollateral == str_to_felt("32f0406jz7qj7")
-    assert parsed_list.leverage == 1
+    assert parsed_list.leverage == to64x61(10)
+
+@pytest.mark.asyncio
+async def test_override_existing_market(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert(
+        signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj11"), str_to_felt("32f0406jz7qj7=10"), to64x61(10), 1, 0, 60]))
+
+
+@pytest.mark.asyncio
+async def test_add_new_market_with_existing_market_pair(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert(
+        signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("32f0406jz7qk9"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(10), 1, 0, 60]))
 
 
 @pytest.mark.asyncio
 async def test_add_new_market_non_tradable(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, market.contract_address, 'addMarket', [str_to_felt("32f0406jz7qk3"), str_to_felt("32f0406jz7qj6"), str_to_felt("32f0406jz7qj7"), 1, 0, 10])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("32f0406jz7qk3"), str_to_felt("32f0406jz7qj6"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60])
 
-    execution_info = await market.getMarket(str_to_felt("32f0406jz7qk3")).call()
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk3")).call()
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
     assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
-    assert fetched_market.leverage == 1
-    assert fetched_market.tradable == 0
+    assert fetched_market.leverage == to64x61(8)
+    assert fetched_market.tradable == 1
 
 
 @pytest.mark.asyncio
 async def test_add_new_market_default_tradable(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, market.contract_address, 'addMarket', [str_to_felt("32f0406jz7qk4"), str_to_felt("32f0406jz7qj6"), str_to_felt("32f0406jz7qj7"), 1, 2, 10])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("32f0406jz7qk4"), str_to_felt("32f0406jz7qj11"), str_to_felt("32f0406jz7qj7"), to64x61(1), 2, 0, 10])
 
-    execution_info = await market.getMarket(str_to_felt("32f0406jz7qk4")).call()
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk4")).call()
     fetched_market = execution_info.result.currMarket
 
-    assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
+    assert fetched_market.asset == str_to_felt("32f0406jz7qj11")
     assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
-    assert fetched_market.leverage == 1
-    assert fetched_market.tradable == 0
-
-
-@pytest.mark.asyncio
-async def test_add_new_market_unauthorized_user(adminAuth_factory):
-    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
-
-    assert_revert(lambda: signer3.send_transaction(user1, market.contract_address, 'addMarket', [
-                  str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), 1, 1, 10]))
-
-
-@pytest.mark.asyncio
-async def test_add_new_market_non_tradable_asset(adminAuth_factory):
-    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
-
-    await signer1.send_transaction(admin1, market.contract_address, 'addMarket', [str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj6"), str_to_felt("32f0406jz7qj7"), 1, 0, 10])
-
-
-@pytest.mark.asyncio
-async def test_modify_leverage_unauthorized_user(adminAuth_factory):
-    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
-
-    assert_revert(lambda: signer1.send_transaction(
-        admin1, market.contract_address, 'modifyLeverage', [str_to_felt("32f0406jz7qk1"), 2]))
+    assert fetched_market.leverage == to64x61(1)
+    assert fetched_market.tradable == 2
 
 
 @pytest.mark.asyncio
 async def test_modify_leverage(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, market.contract_address, 'modifyLeverage', [str_to_felt("32f0406jz7qk1"), 2])
+    await signer1.send_transaction(admin1, market.contract_address, 'modify_leverage', [str_to_felt("32f0406jz7qk1"), to64x61(5)])
 
-    execution_info = await market.getMarket(str_to_felt("32f0406jz7qk1")).call()
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk1")).call()
     fetched_market = execution_info.result.currMarket
 
-    assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
+    assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
     assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
-    assert fetched_market.leverage == 2
+    assert fetched_market.leverage == to64x61(5)
 
 
 @pytest.mark.asyncio
 async def test_modify_tradable_unauthorized_user(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    assert_revert(lambda: signer1.send_transaction(
-        admin1, market.contract_address, 'modifyLeverage', [str_to_felt("32f0406jz7qk1"), 0]))
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'modify_tradable', [str_to_felt("32f0406jz7qk1"), 0]))
 
 
 @pytest.mark.asyncio
 async def test_modify_tradable(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, market.contract_address, 'modifyTradable', [str_to_felt("32f0406jz7qk1"), 0])
+    await signer1.send_transaction(admin1, market.contract_address, 'modify_tradable', [str_to_felt("32f0406jz7qk1"), 0])
 
-    execution_info = await market.getMarket(str_to_felt("32f0406jz7qk1")).call()
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk1")).call()
     fetched_market = execution_info.result.currMarket
 
-    assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
+    assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
     assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
-    assert fetched_market.leverage == 2
+    assert fetched_market.leverage == to64x61(5)
     assert fetched_market.tradable == 0
+
+@pytest.mark.asyncio
+async def test_modify_non_admin_tradable(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert(
+        signer3.send_transaction(user1, market.contract_address, 'modify_tradable', [str_to_felt("32f0406jz7qk1"), 1]))
 
 
 @pytest.mark.asyncio
 async def test_modify_tradable_0_to_1(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, market.contract_address, 'addMarket', [str_to_felt("32f0406jz7qk5"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), 1, 0, 10])
-    await signer1.send_transaction(admin1, market.contract_address, 'modifyTradable', [str_to_felt("32f0406jz7qk5"), 1])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("32f0406jz7qk5"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj10"), to64x61(6), 1, 0, 10])
+    await signer1.send_transaction(admin1, market.contract_address, 'modify_tradable', [str_to_felt("32f0406jz7qk5"), 1])
 
-    execution_info = await market.getMarket(str_to_felt("32f0406jz7qk5")).call()
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk5")).call()
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
-    assert fetched_market.leverage == 1
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj10")
+    assert fetched_market.leverage == to64x61(6)
     assert fetched_market.tradable == 1
 
 
@@ -247,33 +255,104 @@ async def test_modify_tradable_0_to_1(adminAuth_factory):
 async def test_remove_market_unauthorized_user(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    assert_revert(lambda: signer1.send_transaction(
-        admin1, market.contract_address, 'removeMarket', [str_to_felt("32f0406jz7qk1")]))
+    await assert_revert(signer3.send_transaction(
+        user1, market.contract_address, 'remove_market', [str_to_felt("32f0406jz7qk1")]))
 
+@pytest.mark.asyncio
+async def test_remove_tradable_market(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'modify_tradable', [str_to_felt("32f0406jz7qk1"), 1])
+
+    await assert_revert(signer3.send_transaction(
+        admin1, market.contract_address, 'remove_market', [str_to_felt("32f0406jz7qk1")]))
 
 @pytest.mark.asyncio
 async def test_remove_market(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await signer1.send_transaction(admin1, market.contract_address, 'removeMarket', [str_to_felt("32f0406jz7qk1")])
+    await signer1.send_transaction(admin1, market.contract_address, 'modify_tradable', [str_to_felt("32f0406jz7qk1"), 0])
+    await signer1.send_transaction(admin1, market.contract_address, 'remove_market', [str_to_felt("32f0406jz7qk1")])
 
-    execution_info = await market.getMarket(str_to_felt("32f0406jz7qk1")).call()
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk1")).call()
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == 0
     assert fetched_market.assetCollateral == 0
     assert fetched_market.leverage == 0
 
+@pytest.mark.asyncio
+async def test_change_leverage_unauthorized(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_leverage', [to64x61(100)]))
+
+@pytest.mark.asyncio
+async def test_change_ttl_unauthorized(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_ttl_leverage', [to64x61(7200)]))
+
+
+@pytest.mark.asyncio
+async def test_change_leverage_authorized(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'change_max_leverage', [to64x61(100)])
+
+@pytest.mark.asyncio
+async def test_change_ttl_authorized(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'change_max_ttl', [7200])
 
 @pytest.mark.asyncio
 async def test_retrieve_markets(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    markets = await market.returnAllMarkets().call()
+    markets = await market.get_all_markets().call()
 
-    await signer1.send_transaction(admin1, market.contract_address, 'addMarket', [str_to_felt("2dsyfdj289fdj"), str_to_felt("32f0406jz7qj9"), str_to_felt("32f0406jz7qj10"), 1, 0, 10])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("2dsyfdj289fdj"), str_to_felt("32f0406jz7qj12"), str_to_felt("32f0406jz7qj10"), to64x61(50), 1, 0, 3610])
 
-    markets_new = await market.returnAllMarkets().call()
 
-    assert len(list(markets_new.result.array_list)) == len(
-        list(markets.result.array_list)) + 1
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk5")).call()
+    fetched_market = execution_info.result.currMarket
+
+    print(fetched_market)
+    markets_new = await market.get_all_markets().call()
+
+    assert len(list(markets_new.result.array_list)) == len(list(markets.result.array_list)) + 1
+
+@pytest.mark.asyncio
+async def test_modify_archived_state(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'modify_archived_state', [str_to_felt("32f0406jz7qk5"), 1])
+
+    execution_info = await market.get_market(str_to_felt("32f0406jz7qk5")).call()
+    fetched_market = execution_info.result.currMarket
+
+    assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
+    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj10")
+    assert fetched_market.leverage == to64x61(6)
+    assert fetched_market.tradable == 1
+    assert fetched_market.archived == 1
+
+@pytest.mark.asyncio
+async def test_get_all_archived_tradable_markets(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("2dsyfdj289fdw"), str_to_felt("32f0406jz7qj20"), str_to_felt("32f0406jz7qj7"), to64x61(50), 1, 0, 3610])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("2dsyfdj289fdh"), str_to_felt("32f0406jz7qj21"), str_to_felt("32f0406jz7qj7"), to64x61(50), 1, 1, 3610])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("2dsyfdj289fdi"), str_to_felt("32f0406jz7qj22"), str_to_felt("32f0406jz7qj7"), to64x61(50), 0, 1, 3610])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [str_to_felt("2dsyfdj289fdk"), str_to_felt("32f0406jz7qj23"), str_to_felt("32f0406jz7qj7"), to64x61(50), 0, 0, 3610])
+    
+
+    markets = await market.get_all_markets().call()
+    print("Market list:", markets.result.array_list)
+    print("Market list length:", len(list(markets.result.array_list)))
+
+    markets_new = await market.get_markets_by_state(1, 1).call()
+    print("New Market list:", markets_new.result.array_list)
+
+    assert len(list(markets_new.result.array_list)) == len(list(markets.result.array_list)) - 6   

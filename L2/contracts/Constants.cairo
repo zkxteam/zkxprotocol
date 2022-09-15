@@ -12,8 +12,8 @@ const EmergencyFund_INDEX = 8
 const LiquidityFund_INDEX = 9
 const InsuranceFund_INDEX = 10
 const Liquidate_INDEX = 11
-const RiskManagement_INDEX = 12
-const LiquidatorAddress_INDEX = 13
+const L1_ZKX_Address_INDEX = 12
+const CollateralPrices_INDEX = 13
 const AccountRegistry_INDEX = 14
 const WithdrawalFeeBalance_INDEX = 15
 const WithdrawalRequest_INDEX = 16
@@ -48,3 +48,26 @@ const ManageMarkets_ACTION = 2
 const ManageAuthRegistry_ACTION = 3
 const ManageFeeDetails_ACTION = 4
 const ManageFunds_ACTION = 5
+const ManageGovernanceToken_ACTION = 6
+const ManageCollateralPrices_ACTION = 7
+
+const ORDER_INITIATED = 0
+const ORDER_OPENED_PARTIALLY = 1
+const ORDER_OPENED = 2
+const ORDER_CLOSED_PARTIALLY = 3
+const ORDER_CLOSED = 4
+const ORDER_TO_BE_DELEVERAGED = 5
+const ORDER_TO_BE_LIQUIDATED = 6
+const ORDER_LIQUIDATED = 7
+
+const MARKET_ORDER = 0
+const LIMIT_ORDER = 1
+const STOP_ORDER = 2
+const LIQUIDATION_ORDER = 3
+const DELEVERAGING_ORDER = 4
+
+const LONG = 1
+const SHORT = 0
+
+const WITHDRAWAL_INITIATED = 0
+const WITHDRAWAL_SUCCEEDED = 1

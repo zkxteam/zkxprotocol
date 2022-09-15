@@ -4,9 +4,9 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
-
-alice_signer = Signer(123456789987654323)
+from utils import Signer, str_to_felt, MAX_UINT256, from64x61, to64x61
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_signers import signer1, signer2
 
 BTC_ID = str_to_felt("32f0406jz7qj8")
 ETH_ID = str_to_felt("65ksgn23nv")
@@ -19,7 +19,6 @@ DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
 L1_dummy_address = 0x01234567899876543210
-L1_ZKX_dummy_address = 0x98765432100123456789
 
 
 @pytest.fixture(scope='module')
@@ -28,32 +27,26 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory():
-    starknet = await Starknet.empty()
+async def adminAuth_factory(starknet_service: StarknetService):
+    
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 1, 1)
+    admin1 = await starknet_service.deploy(ContractType.Account, [
+        signer1.public_key
+    ])
+    alice = await account_factory.deploy_ZKX_account(signer2.public_key)
 
-    alice = await starknet.deploy(
-        "contracts/Account.cairo",
-        constructor_calldata=[
-            alice_signer.public_key,
-            L1_dummy_address,
-            0,
-            1,
-            L1_ZKX_dummy_address
-        ]
-    )
-
-    return alice
+    return alice, admin1
 
 
 @pytest.mark.asyncio
 async def test_should_set_collaterals(adminAuth_factory):
-    alice = adminAuth_factory
+    alice, admin1 = adminAuth_factory
 
     alice_balance_usdc = to64x61(5500)
     alice_balance_ust = to64x61(100)
 
-    await alice_signer.send_transaction(alice, alice.contract_address, 'set_balance', [USDC_ID, alice_balance_usdc])
-    await alice_signer.send_transaction(alice, alice.contract_address, 'set_balance', [UST_ID, alice_balance_ust])
+    await signer1.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance_usdc])
+    await signer1.send_transaction(admin1, alice.contract_address, 'set_balance', [UST_ID, alice_balance_ust])
 
     alice_curr_balance_usdc_before = await alice.get_balance(USDC_ID).call()
     alice_curr_balance_ust_before = await alice.get_balance(UST_ID).call()
