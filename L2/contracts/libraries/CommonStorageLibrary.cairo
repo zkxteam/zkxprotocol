@@ -2,6 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
+from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import MasterAdmin_ACTION
 from contracts.libraries.Utils import verify_caller_authority
@@ -12,12 +13,12 @@ from contracts.libraries.Utils import verify_caller_authority
 
 # this event is emitted whenever contract version is changed by the admin
 @event
-func contract_version_changed(new_version : felt):
+func contract_version_changed(caller : felt, old_version : felt, new_version : felt):
 end
 
 # this event is emitted whenever authorized registry contract address is changed by the admin
 @event
-func registry_address_changed(new_address : felt):
+func registry_address_changed(caller : felt, old_address : felt, new_address : felt):
 end
 
 ###########
@@ -88,6 +89,7 @@ namespace CommonLib:
     ):
         let (current_registry_address) = CommonLib_registry_address.read()
         let (current_contract_version) = CommonLib_contract_version.read()
+        let (caller) = get_caller_address()
 
         verify_caller_authority(current_registry_address, current_contract_version, MasterAdmin_ACTION)
 
@@ -96,7 +98,7 @@ namespace CommonLib:
         end
 
         CommonLib_contract_version.write(value=new_version_)
-        contract_version_changed.emit(new_version=new_version_)
+        contract_version_changed.emit(caller=caller, old_version=current_contract_version, new_version=new_version_)
         return ()
     end
 
@@ -108,6 +110,7 @@ namespace CommonLib:
     ):
         let (current_registry_address) = CommonLib_registry_address.read()
         let (current_contract_version) = CommonLib_contract_version.read()
+        let (caller) = get_caller_address()
 
         verify_caller_authority(current_registry_address, current_contract_version, MasterAdmin_ACTION)
 
@@ -116,7 +119,7 @@ namespace CommonLib:
         end
 
         CommonLib_registry_address.write(value=registry_address_)
-        registry_address_changed.emit(new_address=registry_address_)
+        registry_address_changed.emit(caller=caller, old_address=current_registry_address, new_address=registry_address_)
         return ()
     end
 end
