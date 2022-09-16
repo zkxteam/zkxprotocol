@@ -42,11 +42,13 @@ namespace CommonLib:
     func initialize{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
         registry_address_ : felt, contract_version_ : felt
     ):
+        # Validate arguments
         with_attr error_message("Registry address and version cannot be 0"):
             assert_not_zero(registry_address_)
             assert_not_zero(contract_version_)
         end
 
+        # Initialize storage
         CommonLib_registry_address.write(value=registry_address_)
         CommonLib_contract_version.write(value=contract_version_)
         return ()
