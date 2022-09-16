@@ -9,6 +9,7 @@ from contracts.DataTypes import Asset
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonStorageLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
@@ -34,16 +35,6 @@ end
 ###########
 # Storage #
 ###########
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
 
 # Stores the standard withdraw fee
 @storage_var
@@ -71,13 +62,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -117,8 +102,8 @@ end
 func set_standard_withdraw_fee{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     fee_ : felt, collateral_id_ : felt
 ):
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Auth check
     with_attr error_message("Caller is not Master Admin"):
@@ -158,8 +143,8 @@ func update_withdrawal_fee_mapping{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }(collateral_id_ : felt, fee_to_add_ : felt):
     # Auth check
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (caller) = get_caller_address()
 
     # fetch account registry contract address
@@ -210,8 +195,8 @@ end
 func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     collateral_id_ : felt, amount_to_withdraw_ : felt
 ):
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Auth check
     with_attr error_message("Caller is not Master Admin"):
