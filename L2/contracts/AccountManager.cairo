@@ -1,7 +1,5 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
@@ -68,6 +66,7 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
+from contracts.libraries.CommonStorageLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_div, Math64x61_fromDecimalFelt, Math64x61_mul, Math64x61_toDecimalFelt
 
 ##########
@@ -116,16 +115,6 @@ end
 ###########
 # Storage #
 ###########
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
 
 # Stores public key associated with an account
 @storage_var
@@ -200,17 +189,15 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     public_key_ : felt, L1_address_ : felt, registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address, version, public key and L1 address cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
+    with_attr error_message("Public key and L1 address cannot be 0"):
         assert_not_zero(public_key_)
         assert_not_zero(L1_address_)
     end
 
     public_key.write(public_key_)
     L1_address.write(L1_address_)
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -433,8 +420,8 @@ func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
 ):
     alloc_locals
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Get L1 ZKX contract address
     let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
@@ -496,8 +483,8 @@ func transfer_from{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 ) -> ():
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (balance_) = balance.read(assetID=assetID_)
 
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
@@ -525,8 +512,8 @@ func transfer_from_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 ):
     # Check if the caller is ABR Payment
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
@@ -565,8 +552,8 @@ func transfer_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_
 ):
     # Check if the caller is trading contract
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
@@ -601,8 +588,8 @@ func transfer{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}
     assetID_ : felt, amount : felt
 ) -> ():
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
@@ -680,8 +667,8 @@ func execute_order{
 
     # Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
@@ -899,8 +886,8 @@ func update_withdrawal_history{
 }(request_id_ : felt):
     alloc_locals
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Get asset contract address
     let (withdrawal_request_address) = IAuthorizedRegistry.get_contract_address(
@@ -953,8 +940,8 @@ func withdraw{
     alloc_locals
     let (__fp__, _) = get_fp_and_pc()
 
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     let (signature_ : felt*) = alloc()
     assert signature_[0] = sig_r_
@@ -1094,8 +1081,8 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
 
     # Check if the caller is the liquidator contract
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Liquidate_INDEX, version=version
     )
