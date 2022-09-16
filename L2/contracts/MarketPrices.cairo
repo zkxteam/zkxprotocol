@@ -16,6 +16,7 @@ from contracts.DataTypes import Market, MarketPrice
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.libraries.CommonStorageLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
@@ -31,16 +32,6 @@ end
 ###########
 # Storage #
 ###########
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of AuthorizedRegistry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
 
 # Mapping between market ID and Market Prices
 @storage_var
@@ -58,13 +49,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -94,8 +79,8 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
     market_id_ : felt, price_ : felt
 ):
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AdminAuth_INDEX, version=version
@@ -125,8 +110,8 @@ func update_market_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range
         tempvar range_check_ptr = range_check_ptr
     end
 
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Calculate the timestamp
     let (timestamp_) = get_block_timestamp()
