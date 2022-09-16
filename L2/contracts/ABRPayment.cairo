@@ -1,7 +1,5 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
@@ -23,6 +21,7 @@ from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.libraries.CommonStorageLibrary import CommonLib
 
 ##########
 # Events #
@@ -31,20 +30,6 @@ from contracts.interfaces.IMarkets import IMarkets
 # Event emitted when abr payment called for a position
 @event
 func abr_payment_called_user_position(position_id : felt, account_address : felt, timestamp : felt):
-end
-
-###########
-# Storage #
-###########
-
-# Stores the authregistry address
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
-# Stores tbe contract version
-@storage_var
-func contract_version() -> (version : felt):
 end
 
 ###############
@@ -57,14 +42,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, contract_version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(contract_version_)
-        assert_not_zero(registry_address_)
-    end
-
-    registry_address.write(registry_address_)
-    contract_version.write(contract_version_)
-
+    CommonLib.initialize(registry_address_, contract_version_)
     return ()
 end
 
@@ -82,8 +60,8 @@ func pay_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     # ## Signature checks go here ####
 
     # Get the account registry smart-contract
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (account_registry) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AccountRegistry_INDEX, version=version
     )
