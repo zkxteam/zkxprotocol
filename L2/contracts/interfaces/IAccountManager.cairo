@@ -60,6 +60,11 @@ namespace IAccountManager:
     func return_array_collaterals() -> (array_list_len : felt, array_list : CollateralBalance*):
     end
 
-    func liquidate_position(id : felt, amount : felt) -> ():
+    func liquidate_position(position_ : PositionDetailsWithMarket, amount_to_be_sold_ : felt) -> ():
+    end
+
+    func get_deleveragable_or_liquidatable_position() -> (
+        market_id : felt, direction : felt, amount_to_be_sold : felt
+    ):
     end
 end

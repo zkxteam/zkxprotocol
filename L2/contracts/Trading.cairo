@@ -505,13 +505,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             assert_le(total_amount, user_balance)
         end
 
-        # TODO : Modify Liquidate contract and uncomment this check
-        # ILiquidate.check_order_can_be_opened(
-        #     contract_address=liquidate_address,
-        #     order=temp_order,
-        #     size=order_size,
-        #     execution_price=execution_price,
-        # )
+        ## Check if the position can be opened
+        #ILiquidate.check_order_can_be_opened(
+        #    contract_address=liquidate_address,
+        #    order=temp_order,
+        #    size=order_size,
+        #    execution_price=execution_price,
+        #)
 
         # Deduct the amount from account contract
         IAccountManager.transfer_from(
@@ -617,6 +617,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         end
 
         # Check if the position is to be liquidated
+        let (not_liquidation) = is_le(temp_order.orderType, 2)
+
         # TODO : Add liquidation checks
         local not_liquidation = TRUE
 
@@ -675,110 +677,118 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar range_check_ptr = range_check_ptr
             end
         else:
-            # # Liquidation order
-            # if parent_position.status == ORDER_TO_BE_LIQUIDATED:
-            # # Withdraw the position from holding fund
-            #     IHolding.withdraw(
-            #         contract_address=holding_address,
-            #         asset_id_=temp_order.collateralID,
-            #         amount=leveraged_amount_out,
-            #     )
-            # # Return the borrowed fund to the Liquidity fund
-            #     ILiquidityFund.deposit(
-            #         contract_address=liquidity_fund_address,
-            #         asset_id_=temp_order.collateralID,
-            #         amount=value_to_be_returned,
-            #         position_id_=temp_order.orderID,
-            #     )
+            let (
+                liquidatable_market_id : felt, liquidatable_direction : felt, amount_to_be_sold
+            ) = IAccountManager.get_deleveragable_or_liquidatable_position(
+                contract_address=temp_order.pub_key
+            )
 
-            # # Check if the account value for the position is negative
-            #     let (is_negative) = is_le(net_acc_value, 0)
+            with_attr error_message("Parent position not marked as liquidatable/deleveragable"):
+                assert liquidatable_market_id = marketID
+                assert liquidatable_direction = parent_direction
+            end
 
-            # if is_negative == TRUE:
-            #         # Absolute value of the acc value
-            #         let (deficit) = abs_value(net_acc_value)
+            # Liquidation order
+            if amount_to_be_sold == 0:
+                with_attr error_message("Wrong order type passed"):
+                    assert temp_order.orderType = 3
+                end
+                # Withdraw the position from holding fund
+                IHolding.withdraw(
+                    contract_address=holding_address,
+                    asset_id_=temp_order.collateralID,
+                    amount=leveraged_amount_out,
+                )
 
-            # # Get the user balance
-            #         let (user_balance) = IAccountManager.get_balance(
-            #             contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
-            #         )
+                # Return the borrowed fund to the Liquidity fund
+                ILiquidityFund.deposit(
+                    contract_address=liquidity_fund_address,
+                    asset_id_=temp_order.collateralID,
+                    amount=value_to_be_returned,
+                    position_id_=temp_order.orderID,
+                )
 
-            # # Check if the user's balance can cover the deficit
-            #         let (is_payable) = is_le(deficit, user_balance)
+                # Check if the account value for the position is negative
+                let (is_negative) = is_le(net_acc_value, 0)
 
-            # if is_payable == TRUE:
-            #             # Transfer the full amount from the user
-            #             IAccountManager.transfer_from(
-            #                 contract_address=temp_order.pub_key,
-            #                 assetID_=temp_order.collateralID,
-            #                 amount=deficit,
-            #             )
-            #             tempvar syscall_ptr = syscall_ptr
-            #             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            #             tempvar range_check_ptr = range_check_ptr
-            #         else:
-            #             # Transfer the partial amount from the user
-            #             IAccountManager.transfer_from(
-            #                 contract_address=temp_order.pub_key,
-            #                 assetID_=temp_order.collateralID,
-            #                 amount=user_balance,
-            #             )
+                if is_negative == TRUE:
+                    # Absolute value of the acc value
+                    let (deficit) = abs_value(net_acc_value)
 
-            # # Transfer the remaining amount from Insurance Fund
-            #             IInsuranceFund.withdraw(
-            #                 contract_address=insurance_fund_address,
-            #                 asset_id_=temp_order.collateralID,
-            #                 amount=deficit - user_balance,
-            #                 position_id_=temp_order.orderID,
-            #             )
+                    # Get the user balance
+                    let (user_balance) = IAccountManager.get_balance(
+                        contract_address=temp_order.pub_key, assetID_=temp_order.collateralID
+                    )
 
-            # tempvar syscall_ptr = syscall_ptr
-            #             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            #             tempvar range_check_ptr = range_check_ptr
-            #         end
-            #     else:
-            #         # Deposit the user's remaining margin in Insurance Fund
-            #         IInsuranceFund.deposit(
-            #             contract_address=insurance_fund_address,
-            #             asset_id_=temp_order.collateralID,
-            #             amount=net_acc_value,
-            #             position_id_=temp_order.orderID,
-            #         )
-            #         tempvar syscall_ptr = syscall_ptr
-            #         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            #         tempvar range_check_ptr = range_check_ptr
-            #     end
-            # else:
-            #     # Deleveraging order
-            #     if parent_position.status == ORDER_TO_BE_DELEVERAGED:
-            #         # Withdraw the position from holding fund
-            # IHolding.withdraw(
-            #             contract_address=holding_address,
-            #             asset_id_=temp_order.collateralID,
-            #             amount=leveraged_amount_out,
-            #         )
-            # # Return the borrowed fund to the Liquidity fund
-            #         ILiquidityFund.deposit(
-            #             contract_address=liquidity_fund_address,
-            #             asset_id_=temp_order.collateralID,
-            #             amount=leveraged_amount_out,
-            #             position_id_=temp_order.orderID,
-            #         )
+                    # Check if the user's balance can cover the deficit
+                    let (is_payable) = is_le(deficit, user_balance)
 
-            # tempvar syscall_ptr = syscall_ptr
-            #         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            #         tempvar range_check_ptr = range_check_ptr
-            #     else:
-            #         # The position is not marked as "to be deleveraged" aka status 5 and "to be liquidated" aka status 6
-            #         with_attr error_message(
-            #                 "The position cannot be deleveraged or liqudiated w/o status 5 or 6"):
-            #             assert 1 = 0
-            #         end
-            #         tempvar syscall_ptr = syscall_ptr
-            #         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            #         tempvar range_check_ptr = range_check_ptr
-            #     end
-            # end
+                    if is_payable == TRUE:
+                        # Transfer the full amount from the user
+                        IAccountManager.transfer_from(
+                            contract_address=temp_order.pub_key,
+                            assetID_=temp_order.collateralID,
+                            amount=deficit,
+                        )
+                        tempvar syscall_ptr = syscall_ptr
+                        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                        tempvar range_check_ptr = range_check_ptr
+                    else:
+                        # Transfer the partial amount from the user
+                        IAccountManager.transfer_from(
+                            contract_address=temp_order.pub_key,
+                            assetID_=temp_order.collateralID,
+                            amount=user_balance,
+                        )
+
+                        # Transfer the remaining amount from Insurance Fund
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address,
+                            asset_id_=temp_order.collateralID,
+                            amount=deficit - user_balance,
+                            position_id_=temp_order.orderID,
+                        )
+
+                        tempvar syscall_ptr = syscall_ptr
+                        tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                        tempvar range_check_ptr = range_check_ptr
+                    end
+                else:
+                    # Deposit the user's remaining margin in Insurance Fund
+                    IInsuranceFund.deposit(
+                        contract_address=insurance_fund_address,
+                        asset_id_=temp_order.collateralID,
+                        amount=net_acc_value,
+                        position_id_=temp_order.orderID,
+                    )
+                    tempvar syscall_ptr = syscall_ptr
+                    tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                    tempvar range_check_ptr = range_check_ptr
+                end
+            else:
+                # Deleveraging order
+                with_attr error_message("Wrong order type passed"):
+                    assert temp_order.orderType = 4
+                end
+
+                # Withdraw the position from holding fund
+                IHolding.withdraw(
+                    contract_address=holding_address,
+                    asset_id_=temp_order.collateralID,
+                    amount=leveraged_amount_out,
+                )
+                # Return the borrowed fund to the Liquidity fund
+                ILiquidityFund.deposit(
+                    contract_address=liquidity_fund_address,
+                    asset_id_=temp_order.collateralID,
+                    amount=leveraged_amount_out,
+                    position_id_=temp_order.orderID,
+                )
+
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            end
             tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr

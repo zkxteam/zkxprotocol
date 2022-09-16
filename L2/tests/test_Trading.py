@@ -78,7 +78,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
     feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     marketPrices = await starknet_service.deploy(ContractType.MarketPrices, [registry.contract_address, 1])
-    # liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
+    liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
 
     timestamp = int(time.time())
 
@@ -123,7 +123,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [8, 1, emergency.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidity.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insurance.contract_address])
-    # await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
 
@@ -2306,6 +2306,7 @@ async def test_retrieval_of_net_positions_2(adminAuth_factory):
 
     bob_positions = await bob.get_positions().call()
     print(list(bob_positions.result.positions_array))
+
 # @pytest.mark.asyncio
 # async def test_for_risk_while_opening_order(adminAuth_factory):
 #     starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory

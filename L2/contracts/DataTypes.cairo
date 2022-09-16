@@ -141,6 +141,13 @@ struct PositionDetailsWithMarket:
     member leverage : felt
 end
 
+# Struct to store the position that is to be Liquidated/Deleveraged
+struct LiquidatablePosition:
+    member market_id : felt
+    member direction : felt
+    member amount_to_be_sold : felt
+end
+
 # @notice struct for sending the array of positions for ABR calculations
 struct NetPositions:
     member market_id : felt

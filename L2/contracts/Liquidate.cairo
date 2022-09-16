@@ -159,8 +159,8 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         )
         IAccountManager.liquidate_position(
             contract_address=account_address,
-            id=least_collateral_ratio_position.market_id,
-            amount=amount_to_be_sold,
+            position_=least_collateral_ratio_position,
+            amount_to_be_sold_=amount_to_be_sold,
         )
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
