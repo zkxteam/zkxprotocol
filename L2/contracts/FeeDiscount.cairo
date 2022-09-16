@@ -4,6 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_lt, assert_nn, assert_not_zero
 
 from contracts.Constants import ManageGovernanceToken_ACTION
+from contracts.libraries.CommonStorageLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
@@ -25,16 +26,6 @@ end
 # Storage #
 ###########
 
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
 # Stores number of tokens each user holds
 @storage_var
 func user_tokens(address : felt) -> (number_of_tokens : felt):
@@ -51,13 +42,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -87,8 +72,8 @@ end
 func increment_governance_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address : felt, value : felt
 ):
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     # Auth check
     with_attr error_message("Caller is not authorized to manage governance tokens"):
         verify_caller_authority(registry, version, ManageGovernanceToken_ACTION)
@@ -113,8 +98,8 @@ end
 func decrement_governance_tokens{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     address : felt, value : felt
 ):
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     # Auth check
     with_attr error_message("Caller is not authorized to manage fee details"):
         verify_caller_authority(registry, version, ManageGovernanceToken_ACTION)
