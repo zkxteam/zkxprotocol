@@ -6,6 +6,7 @@ from starkware.cairo.common.math import assert_not_zero
 
 from contracts.Constants import MasterAdmin_ACTION
 from contracts.DataTypes import DepositData
+from contracts.libraries.CommonStorageLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
 ###########
@@ -21,14 +22,6 @@ end
 func num_deposits(address : felt) -> (res : felt):
 end
 
-@storage_var
-func registry_address() -> (address : felt):
-end
-
-@storage_var
-func version() -> (res : felt):
-end
-
 ###############
 # Constructor #
 ###############
@@ -37,13 +30,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(registry_address_)
-    version.write(version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -65,22 +52,6 @@ func get_deposit_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     return (total_deposits, ret_data)
 end
 
-@view
-func get_registry_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    address : felt
-):
-    let (current_registry_address) = registry_address.read()
-    return (current_registry_address)
-end
-
-@view
-func get_current_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    current_version : felt
-):
-    let (current_version) = version.read()
-    return (current_version)
-end
-
 ######################
 # External Functions #
 ######################
@@ -98,18 +69,6 @@ func store_deposit_data{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
 
     L2_address_to_DepositData.write(data.user_L2_address, current_num_deposits, data)
     num_deposits.write(data.user_L2_address, current_num_deposits + 1)
-    return ()
-end
-
-@external
-func set_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    new_version : felt
-):
-    let (current_registry_address) = registry_address.read()
-    let (current_version) = version.read()
-
-    verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
-    version.write(new_version)
     return ()
 end
 
