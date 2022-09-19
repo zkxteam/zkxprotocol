@@ -21,7 +21,7 @@ from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
-from contracts.libraries.CommonStorageLibrary import CommonLib
+from contracts.libraries.CommonLibrary import CommonLib
 
 ##########
 # Events #

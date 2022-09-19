@@ -51,7 +51,7 @@ from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingFees import ITradingFees
-from contracts.libraries.CommonStorageLibrary import CommonLib
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
 #############

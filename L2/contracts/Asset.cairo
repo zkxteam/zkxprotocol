@@ -12,7 +12,7 @@ from contracts.DataTypes import Asset, AssetWID
 from contracts.Math_64x61 import Math64x61_assertPositive64x61
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.libraries.CommonStorageLibrary import CommonLib
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Validation import assert_bool
 from contracts.libraries.Utils import verify_caller_authority
 

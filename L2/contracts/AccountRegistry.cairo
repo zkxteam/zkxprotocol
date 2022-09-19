@@ -8,7 +8,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountDeployer_INDEX, MasterAdmin_ACTION, Trading_INDEX
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.libraries.CommonStorageLibrary import CommonLib
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
 ###########

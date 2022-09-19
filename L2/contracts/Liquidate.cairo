@@ -31,7 +31,7 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.ICollateralPrices import ICollateralPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IMarketPrices import IMarketPrices
-from contracts.libraries.CommonStorageLibrary import CommonLib
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_div, Math64x61_mul
 
 ##########

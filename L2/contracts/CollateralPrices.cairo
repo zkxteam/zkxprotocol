@@ -8,7 +8,7 @@ from contracts.Constants import Asset_INDEX, MasterAdmin_ACTION, ManageCollatera
 from contracts.DataTypes import Asset, CollateralPrice
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.libraries.CommonStorageLibrary import CommonLib
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 

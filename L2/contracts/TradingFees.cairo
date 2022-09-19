@@ -7,7 +7,7 @@ from starkware.cairo.common.math_cmp import is_le, is_nn
 from contracts.Constants import FeeDiscount_INDEX, ManageFeeDetails_ACTION
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IFeeDiscount import IFeeDiscount
-from contracts.libraries.CommonStorageLibrary import CommonLib
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_mul
 
