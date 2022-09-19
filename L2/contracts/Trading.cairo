@@ -70,6 +70,19 @@ end
 # Storage #
 ###########
 
+# ## Remove ###
+@storage_var
+func liquidation_called() -> (res : felt):
+end
+
+@view
+func return_liquidation_called{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
+}() -> (res : felt):
+    let (res) = liquidation_called.read()
+    return (res)
+end
+
 # Stores the contract version
 @storage_var
 func contract_version() -> (version : felt):
@@ -505,13 +518,13 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             assert_le(total_amount, user_balance)
         end
 
-        ## Check if the position can be opened
-        #ILiquidate.check_order_can_be_opened(
-        #    contract_address=liquidate_address,
-        #    order=temp_order,
-        #    size=order_size,
-        #    execution_price=execution_price,
-        #)
+        # Check if the position can be opened
+        ILiquidate.check_order_can_be_opened(
+            contract_address=liquidate_address,
+            order=temp_order,
+            size=order_size,
+            execution_price=execution_price,
+        )
 
         # Deduct the amount from account contract
         IAccountManager.transfer_from(
@@ -619,11 +632,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         # Check if the position is to be liquidated
         let (not_liquidation) = is_le(temp_order.orderType, 2)
 
-        # TODO : Add liquidation checks
-        local not_liquidation = TRUE
-
         # If it's just a close order
         if not_liquidation == TRUE:
+            liquidation_called.write(5)
             # Deduct funds from holding contract
             IHolding.withdraw(
                 contract_address=holding_address,
@@ -677,13 +688,14 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar range_check_ptr = range_check_ptr
             end
         else:
+            liquidation_called.write(4)
             let (
                 liquidatable_market_id : felt, liquidatable_direction : felt, amount_to_be_sold
             ) = IAccountManager.get_deleveragable_or_liquidatable_position(
                 contract_address=temp_order.pub_key
             )
 
-            with_attr error_message("Parent position not marked as liquidatable/deleveragable"):
+            with_attr error_message("position not marked as liquidatable/deleveragable"):
                 assert liquidatable_market_id = marketID
                 assert liquidatable_direction = parent_direction
             end
@@ -730,6 +742,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                             assetID_=temp_order.collateralID,
                             amount=deficit,
                         )
+
+                        liquidation_called.write(1)
                         tempvar syscall_ptr = syscall_ptr
                         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                         tempvar range_check_ptr = range_check_ptr
@@ -749,6 +763,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                             position_id_=temp_order.orderID,
                         )
 
+                        liquidation_called.write(2)
                         tempvar syscall_ptr = syscall_ptr
                         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                         tempvar range_check_ptr = range_check_ptr
@@ -761,6 +776,8 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                         amount=net_acc_value,
                         position_id_=temp_order.orderID,
                     )
+
+                    liquidation_called.write(3)
                     tempvar syscall_ptr = syscall_ptr
                     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                     tempvar range_check_ptr = range_check_ptr

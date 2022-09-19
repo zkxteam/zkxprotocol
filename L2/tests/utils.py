@@ -213,3 +213,21 @@ def get_transaction_hash(account, call_array, calldata, nonce, max_fee):
         StarknetChainId.TESTNET.value,
         [],
     )
+
+def print_position_array(position_array):
+    """Helper function to print out the positions"""
+    for position in position_array:
+        print("Market: ", position[0])
+        print("Direction: ", "long" if position[1] == 1 else "short")
+        print("Avg Execution Price: ", from64x61(position[2]))
+        print("Position Size: ", from64x61(position[3]))
+        print("Margin Amount: ", from64x61(position[4]))
+        print("Borrowed Amount: ", from64x61(position[5]))
+        print("\n")
+
+def print_collaterals_array(collateral_array):
+    """Helper function to print out the collaterals"""
+    for collateral in collateral_array:
+        print("Asset: ", collateral[0])
+        print("Balance: ", from64x61(collateral[1]))
+        print("\n")

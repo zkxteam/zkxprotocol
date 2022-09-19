@@ -23,15 +23,15 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 @external
 func set_balance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     assetID_ : felt, amount_ : felt
-):
+) -> (res : felt):
     let (curr_balance) = balance.read(assetID_)
     balance.write(assetID=assetID_, value=amount_)
     let (array_len) = collateral_array_len.read()
 
     if curr_balance == 0:
-        add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
-        return ()
+        let (result) = add_collateral(new_asset_id=assetID_, iterator=0, length=array_len)
+        return (result)
     else:
-        return ()
+        return (2)
     end
 end

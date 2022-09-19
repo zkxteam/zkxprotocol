@@ -63,6 +63,21 @@ end
 func registry_address() -> (contract_address : felt):
 end
 
+#################
+# To be removed #
+@storage_var
+func maintenance() -> (maintenance : felt):
+end
+
+@storage_var
+func acc_value() -> (acc_value : felt):
+end
+
+@storage_var
+func collateral_total() -> (collateral_total : felt):
+end
+#################
+
 ###############
 # Constructor #
 ###############
@@ -83,6 +98,36 @@ func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
     contract_version.write(value=version_)
     return ()
 end
+
+##################
+# View Functions #
+##################
+
+####################
+# To be removed    #
+@view
+func return_maintenance{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    res : felt
+):
+    let (_maintenance) = maintenance.read()
+    return (res=_maintenance)
+end
+
+@view
+func return_acc_value{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
+    res : felt
+):
+    let (_acc_value) = acc_value.read()
+    return (res=_acc_value)
+end
+
+@view
+func return_collateral_total{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    ) -> (res : felt):
+    let (_ct) = collateral_total.read()
+    return (res=_ct)
+end
+#####################
 
 ######################
 # External Functions #
@@ -318,6 +363,12 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         # Add the collateral value to the total_account_value
         local total_account_value_collateral = total_account_value + user_balance
 
+        # # To Remove
+        #######################
+        maintenance.write(total_maintenance_requirement)
+        acc_value.write(total_account_value_collateral)
+        #######################
+
         # Check if the maintenance margin is not satisfied
         let (is_liquidation) = is_le(total_account_value_collateral, total_maintenance_requirement)
 
@@ -519,20 +570,10 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
 
-    # Check if the list is empty
-    if prices_len == 0:
-        return ()
-    end
-
     # Fetch all the positions from the Account contract
     let (
         positions_len : felt, positions : PositionDetailsWithMarket*
     ) = IAccountManager.get_positions(contract_address=order.pub_key)
-
-    # Check if the list is empty
-    if positions_len == 0:
-        return ()
-    end
 
     # Fetch the maintanence margin requirement from asset contract
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
@@ -574,10 +615,11 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
             asset_id=order.collateralID,
             collateral_id=standard_collateral_id,
         )
+        # Get Market ID
         let (market_price : MarketPrice) = IMarketPrices.get_market_price(
             contract_address=market_price_address, id=market_id
         )
-        # Get Market from the corresponding Id
+        # Get Market price from the corresponding Id
         let (market_ttl : felt) = IMarkets.get_ttl_from_market(
             contract_address=market_address, market_id=market_id
         )
@@ -726,6 +768,7 @@ func populate_asset_prices_recurse{
             let (market_collateral_ttl : felt) = IMarkets.get_ttl_from_market(
                 contract_address=market_contract_address, market_id=market_id_collateral
             )
+
             # Calculate the timestamp
             tempvar ttl_collateral = market_collateral_ttl
             tempvar timestamp_collateral = market_price_collateral.timestamp
@@ -877,11 +920,6 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     let (
         positions_len : felt, positions : PositionDetailsWithMarket*
     ) = IAccountManager.get_positions(contract_address=account_address)
-
-    if positions_len == 0:
-        let (empty_positions_array : PriceData*) = alloc()
-        return (0, empty_positions_array)
-    end
 
     let (prices_array_len : felt, prices_array : PriceData*) = populate_asset_prices_recurse(
         market_contract_address=market_contract_address,

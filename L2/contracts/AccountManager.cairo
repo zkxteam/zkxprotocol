@@ -337,7 +337,7 @@ end
 
 # @notice view function to get deleveraged or liquidatable position
 # @return order_id - Id of an order, amount_to_be_sold - amount to be sold in a position
-# @view
+@view
 func get_deleveragable_or_liquidatable_position{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }() -> (market_id : felt, direction : felt, amount_to_be_sold : felt):
@@ -353,7 +353,8 @@ end
 func return_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     ) -> (array_list_len : felt, array_list : CollateralBalance*):
     let (array_list : CollateralBalance*) = alloc()
-    return populate_array_collaterals(0, array_list)
+    let (array_len : felt) = collateral_array_len.read()
+    return populate_array_collaterals(0, array_list, array_len)
 end
 
 # @notice view function to get withdrawal history
@@ -764,7 +765,7 @@ func execute_order{
                 amount_to_be_updated = updated_amount
             end
 
-            let updated_liquidatable_position : LiquidatablePosition  = LiquidatablePosition(
+            let updated_liquidatable_position : LiquidatablePosition = LiquidatablePosition(
                 market_id=market_id,
                 direction=parent_direction,
                 amount_to_be_sold=amount_to_be_updated,
@@ -1028,7 +1029,7 @@ end
 # @notice Function called by liquidate contract to mark the position as liquidated/deleveraged
 # @param position_ - Order Id of the position to be marked
 # @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
-# @external
+@external
 func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     position_ : PositionDetailsWithMarket, amount_to_be_sold_ : felt
 ):
@@ -1038,6 +1039,7 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     let (caller) = get_caller_address()
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
+
     let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Liquidate_INDEX, version=version
     )
@@ -1091,21 +1093,20 @@ end
 # @return array_list_len - Length of the array_list
 # @return array_list - Fully populated list of CollateralBalance
 func populate_array_collaterals{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    array_list_len_ : felt, array_list_ : CollateralBalance*
+    array_list_len_ : felt, array_list_ : CollateralBalance*, final_len_ : felt
 ) -> (array_list_len : felt, array_list : CollateralBalance*):
-    let (collateral_id) = collateral_array.read(index=array_list_len_)
-
-    if collateral_id == 0:
+    if array_list_len_ == final_len_:
         return (array_list_len_, array_list_)
     end
 
+    let (collateral_id) = collateral_array.read(index=array_list_len_)
     let (collateral_balance : felt) = balance.read(assetID=collateral_id)
     let collateral_balance_struct = CollateralBalance(
         assetID=collateral_id, balance=collateral_balance
     )
 
     assert array_list_[array_list_len_] = collateral_balance_struct
-    return populate_array_collaterals(array_list_len_ + 1, array_list_)
+    return populate_array_collaterals(array_list_len_ + 1, array_list_, final_len_)
 end
 
 # @notice Internal Function called by get_positions to recursively add active positions to the array and return it
@@ -1315,18 +1316,18 @@ end
 # @param length - length of collateral array
 func add_collateral{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     new_asset_id : felt, iterator : felt, length : felt
-):
+) -> (res : felt):
     alloc_locals
     if iterator == length:
         collateral_array.write(index=iterator, value=new_asset_id)
         collateral_array_len.write(iterator + 1)
-        return ()
+        return (1)
     end
 
     let (collateral_id) = collateral_array.read(index=iterator)
     local difference = collateral_id - new_asset_id
     if difference == 0:
-        return ()
+        return (0)
     end
 
     return add_collateral(new_asset_id=new_asset_id, iterator=iterator + 1, length=length)
