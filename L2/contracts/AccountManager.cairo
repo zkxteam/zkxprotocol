@@ -50,11 +50,12 @@ from contracts.Constants import (
 from contracts.DataTypes import (
     Asset,
     CollateralBalance,
+    LiquidatablePosition,
     Message,
-    PositionDetails,
-    PositionDetailsWithIDs,
     NetPositions,
     OrderRequest,
+    PositionDetails,
+    PositionDetailsWithMarket,
     Signature,
     WithdrawalHistory,
     WithdrawalRequestForHashing,
@@ -105,7 +106,7 @@ end
 
 # Event emitted whenever a position is marked to be liquidated/deleveraged
 @event
-func liquidate_deleverage(position_id : felt, amount : felt):
+func liquidate_deleverage(market_id : felt, direction : felt, amount_to_be_sold : felt):
 end
 
 # Event emitted whenever asset deposited in into account
@@ -194,7 +195,7 @@ end
 
 # Stores the position which is to be deleveraged or liquidated
 @storage_var
-func deleveraged_or_liquidatable_position() -> (order_id : felt):
+func deleveragable_or_liquidatable_position() -> (position : LiquidatablePosition):
 end
 
 # Stores all withdrawals made by the user
@@ -334,32 +335,16 @@ func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     return (res=res)
 end
 
-# @notice view function to get amount to be sold in a position
-# @param order_id_ - ID of an order
-# @return res - amount to be sold in a position
-@view
-func get_amount_to_be_sold{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    order_id_ : felt
-) -> (res : felt):
-    let (res) = amount_to_be_sold.read(order_id=order_id_)
-    return (res=res)
-end
-
 # @notice view function to get deleveraged or liquidatable position
 # @return order_id - Id of an order, amount_to_be_sold - amount to be sold in a position
 # @view
-# func get_deleveraged_or_liquidatable_position{
-#     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-# }() -> (order_id : felt, amount_to_be_sold : felt):
-#     let (order_id_) = deleveraged_or_liquidatable_position.read()
-#     let (order_details) = get_order_data(order_id_)
-#     if order_details.status == POSITION_TO_BE_DELEVERAGED:
-#         let (amount) = amount_to_be_sold.read(order_id=order_id_)
-#         return (order_id=order_id_, amount_to_be_sold=amount)
-#     else:
-#         return (order_id=order_id_, amount_to_be_sold=0)
-#     end
-# end
+func get_deleveragable_or_liquidatable_position{
+    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
+}() -> (market_id : felt, direction : felt, amount_to_be_sold : felt):
+    let (position : LiquidatablePosition) = deleveragable_or_liquidatable_position.read()
+
+    return (position.market_id, position.direction, position.amount_to_be_sold)
+end
 
 # @notice view function to get all use collaterals
 # @return array_list_len - Length of the array_list
@@ -592,14 +577,14 @@ end
 # @returns positions_array - Required array of positions
 @external
 func get_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    positions_array_len : felt, positions_array : PositionDetails*
+    positions_array_len : felt, positions_array : PositionDetailsWithMarket*
 ):
     alloc_locals
 
-    let (positions_array : PositionDetails*) = alloc()
+    let (positions_array : PositionDetailsWithMarket*) = alloc()
     let (array_len : felt) = index_to_market_array_len.read()
     return populate_positions(
-        positions_array_len_=0, positions_array_=positions_array, final_len_=array_len - 1
+        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     )
 end
 
@@ -765,33 +750,36 @@ func execute_order{
             let total_value = margin_amount + borrowed_amount
             let (leverage_) = Math64x61_div(total_value, margin_amount)
             new_leverage = leverage_
+
+            let (_, _, amount) = get_deleveragable_or_liquidatable_position()
+            let updated_amount = amount - size
+            let (positive_updated_amount) = abs_value(updated_amount)
+
+            # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
+            let (result) = is_le(updated_amount, 230584300)
+            local amount_to_be_updated
+            if result == TRUE:
+                amount_to_be_updated = 0
+            else:
+                amount_to_be_updated = updated_amount
+            end
+
+            let updated_liquidatable_position : LiquidatablePosition  = LiquidatablePosition(
+                market_id=market_id,
+                direction=parent_direction,
+                amount_to_be_sold=amount_to_be_updated,
+            )
+            deleveragable_or_liquidatable_position.write(value=updated_liquidatable_position)
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         else:
             new_leverage = parent_position_details.leverage
+            tempvar syscall_ptr = syscall_ptr
+            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+            tempvar range_check_ptr = range_check_ptr
         end
         tempvar range_check_ptr = range_check_ptr
-
-        # # Update the amount to be sold after deleveraging
-        # if orderDetails.status == ORDER_TO_BE_DELEVERAGED:
-        #     let (amount) = amount_to_be_sold.read(order_id=request.parentOrder)
-        #     let updated_amount = amount - size
-        #     let (positive_updated_amount) = abs_value(updated_amount)
-        #     # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
-        #     let (result) = is_le(updated_amount, 230584300)
-        #     local amount_to_be_updated
-        #     if result == TRUE:
-        #         amount_to_be_updated = 0
-        #     else:
-        #         amount_to_be_updated = updated_amount
-        #     end
-        #     amount_to_be_sold.write(order_id=request.parentOrder, value=amount_to_be_updated)
-        #     tempvar syscall_ptr = syscall_ptr
-        #     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        #     tempvar range_check_ptr = range_check_ptr
-        # else:
-        #     tempvar syscall_ptr = syscall_ptr
-        #     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-        #     tempvar range_check_ptr = range_check_ptr
-        # end
 
         # Create a new struct with the updated details
         let updated_position = PositionDetails(
@@ -1038,67 +1026,42 @@ func withdraw{
 end
 
 # @notice Function called by liquidate contract to mark the position as liquidated/deleveraged
-# @param id_ - Order Id of the position to be marked
+# @param position_ - Order Id of the position to be marked
 # @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
 # @external
-# func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-#     id_ : felt, amount_to_be_sold_ : felt
-# ):
-#     alloc_locals
+func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
+    position_ : PositionDetailsWithMarket, amount_to_be_sold_ : felt
+):
+    alloc_locals
 
-# let (order_details : OrderDetails) = order_mapping.read(orderID=id_)
+    # Check if the caller is the liquidator contract
+    let (caller) = get_caller_address()
+    let (registry) = registry_address.read()
+    let (version) = contract_version.read()
+    let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Liquidate_INDEX, version=version
+    )
 
-# with_attr error_message("Amount to be sold cannot be negative"):
-#         assert_nn(amount_to_be_sold_)
-#     end
-#     with_attr error_message("Amount to be sold should be less than or equal to the portion executed"):
-#         assert_le(amount_to_be_sold_, order_details.portionExecuted)
-#     end
+    with_attr error_message("Only liquidate contract is allowed to call for liquidation"):
+        assert caller = liquidate_address
+    end
 
-# # Check if the caller is the liquidator contract
-#     let (caller) = get_caller_address()
-#     let (registry) = registry_address.read()
-#     let (version) = contract_version.read()
-#     let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
-#         contract_address=registry, index=Liquidate_INDEX, version=version
-#     )
+    let liquidatable_position : LiquidatablePosition = LiquidatablePosition(
+        market_id=position_.market_id,
+        direction=position_.direction,
+        amount_to_be_sold=amount_to_be_sold_,
+    )
 
-# with_attr error_message("Only liquidate contract is allowed to call for liquidation"):
-#         assert caller = liquidate_address
-#     end
+    # Update deleveraged or liquidatable position
+    deleveragable_or_liquidatable_position.write(value=liquidatable_position)
 
-# local status_
-#     if amount_to_be_sold_ == 0:
-#         status_ = ORDER_TO_BE_LIQUIDATED
-#     else:
-#         status_ = ORDER_TO_BE_DELEVERAGED
-#     end
-
-# # Create a new struct with the updated details by setting toBeLiquidated flag to true
-#     let updated_order = OrderDetails(
-#         assetID=order_details.assetID,
-#         collateralID=order_details.collateralID,
-#         price=order_details.price,
-#         executionPrice=order_details.executionPrice,
-#         positionSize=order_details.positionSize,
-#         orderType=order_details.orderType,
-#         direction=order_details.direction,
-#         portionExecuted=order_details.portionExecuted,
-#         status=status_,
-#         marginAmount=order_details.marginAmount,
-#         borrowedAmount=order_details.borrowedAmount,
-#         leverage=order_details.leverage,
-#     )
-#     # Write to the mapping
-#     order_mapping.write(orderID=id_, value=updated_order)
-#     # Update deleveraged or liquidatable position
-#     deleveraged_or_liquidatable_position.write(value=id_)
-#     # Update amount_to_be_sold storage variable
-#     amount_to_be_sold.write(order_id=id_, value=amount_to_be_sold_)
-
-# liquidate_deleverage.emit(position_id = id_, amount = amount_to_be_sold_)
-#     return ()
-# end
+    liquidate_deleverage.emit(
+        market_id=position_.market_id,
+        direction=position_.direction,
+        amount_to_be_sold=amount_to_be_sold_,
+    )
+    return ()
+end
 
 ######################
 # Internal Functions #
@@ -1148,20 +1111,25 @@ end
 # @notice Internal Function called by get_positions to recursively add active positions to the array and return it
 # @param positions_array_len_ - Length of the array
 # @param positions_array_ - Required array of positions
+# @param iterator_ - Current length of traversed array
 # @param final_len_ - Length of the final array
 # @returns positions_array_len - Length of the positions array
 # @returns positions_array - Array with the positions
 func populate_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    positions_array_len_ : felt, positions_array_ : PositionDetails*, final_len_ : felt
-) -> (positions_array_len : felt, positions_array : PositionDetails*):
+    positions_array_len_ : felt,
+    positions_array_ : PositionDetailsWithMarket*,
+    iterator_ : felt,
+    final_len_ : felt,
+) -> (positions_array_len : felt, positions_array : PositionDetailsWithMarket*):
     alloc_locals
-    # If reached the end of the array, then return
-    if final_len_ == -1:
+
+    # If we reached the end of the array, then return
+    if final_len_ == iterator_:
         return (positions_array_len_, positions_array_)
     end
 
     # Get the market id at that position
-    let (curr_market_id : felt) = index_to_market_array.read(index=final_len_)
+    let (curr_market_id : felt) = index_to_market_array.read(index=iterator_)
 
     # Get Long position
     let (long_position : PositionDetails) = position_mapping.read(
@@ -1173,24 +1141,48 @@ func populate_positions{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         marketID=curr_market_id, direction=SHORT
     )
 
-    tempvar counter = positions_array_len_
+    local is_long
+    local is_short
 
     if long_position.position_size == 0:
+        assert is_long = 0
     else:
         # Store it in the array
-        assert positions_array_[counter] = long_position
-        counter = counter + 1
+        let curr_position = PositionDetailsWithMarket(
+            market_id=curr_market_id,
+            direction=LONG,
+            avg_execution_price=long_position.avg_execution_price,
+            position_size=long_position.position_size,
+            margin_amount=long_position.margin_amount,
+            borrowed_amount=long_position.borrowed_amount,
+            leverage=long_position.leverage,
+        )
+        assert positions_array_[positions_array_len_] = curr_position
+        assert is_long = 1
     end
 
     if short_position.position_size == 0:
+        assert is_short = 0
     else:
         # Store it in the array
-        assert positions_array_[counter] = short_position
-        counter = counter + 1
+        let curr_position = PositionDetailsWithMarket(
+            market_id=curr_market_id,
+            direction=SHORT,
+            avg_execution_price=short_position.avg_execution_price,
+            position_size=short_position.position_size,
+            margin_amount=short_position.margin_amount,
+            borrowed_amount=short_position.borrowed_amount,
+            leverage=short_position.leverage,
+        )
+        assert positions_array_[positions_array_len_ + is_long] = curr_position
+        assert is_short = 1
     end
 
     return populate_positions(
-        positions_array_len_=counter, positions_array_=positions_array_, final_len_=final_len_ - 1
+        positions_array_len_=positions_array_len_ + is_long + is_short,
+        positions_array_=positions_array_,
+        iterator_=iterator_ + 1,
+        final_len_=final_len_,
     )
 end
 
