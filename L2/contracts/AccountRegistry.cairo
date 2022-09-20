@@ -8,21 +8,12 @@ from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountDeployer_INDEX, MasterAdmin_ACTION, Trading_INDEX
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
 ###########
 # Storage #
 ###########
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of AuthorizedRegistry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
 
 # Stores all account contract addresses of users
 @storage_var
@@ -50,13 +41,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -124,8 +109,8 @@ func add_to_account_registry{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
 ):
     # Check whether the call is from account deployer contract
     let (caller) = get_caller_address()
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (account_deployer_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AccountDeployer_INDEX, version=version
     )
@@ -161,8 +146,8 @@ func remove_from_account_registry{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }(id_ : felt) -> ():
     with_attr error_message("Caller is not Master Admin"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
+        let (registry) = CommonLib.get_registry_address()
+        let (version) = CommonLib.get_contract_version()
         verify_caller_authority(registry, version, MasterAdmin_ACTION)
     end
 

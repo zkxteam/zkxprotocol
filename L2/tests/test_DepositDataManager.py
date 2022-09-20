@@ -110,19 +110,19 @@ async def test_registry_version_functions(adminAuth_factory):
     adminAuth, registry, deposit_data_manager, admin1, admin2 = adminAuth_factory
 
     result = await deposit_data_manager.get_registry_address().call()
-    result = result.result.address
+    result = result.result.registry_address
 
     assert result == registry.contract_address
 
-    result = await deposit_data_manager.get_current_version().call()
-    result = result.result.current_version
+    result = await deposit_data_manager.get_contract_version().call()
+    result = result.result.contract_version
 
     assert result == 1
 
     await signer1.send_transaction(admin1,
-                                   deposit_data_manager.contract_address, 'set_version', [2])
+                                   deposit_data_manager.contract_address, 'set_contract_version', [2])
 
-    result = await deposit_data_manager.get_current_version().call()
-    result = result.result.current_version
+    result = await deposit_data_manager.get_contract_version().call()
+    result = result.result.contract_version
 
     assert result == 2

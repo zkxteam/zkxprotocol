@@ -51,6 +51,7 @@ from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingFees import ITradingFees
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
 #############
@@ -69,19 +70,6 @@ func trade_execution(
     address : felt, request : OrderRequest, market_id : felt, execution_price : felt
 ):
 end
-###########
-# Storage #
-###########
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
 
 ###############
 # Constructor #
@@ -94,13 +82,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -125,8 +107,8 @@ func execute_batch{
 ) -> ():
     alloc_locals
 
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Calculate the timestamp
     let (current_timestamp) = get_block_timestamp()
@@ -235,8 +217,8 @@ func get_registry_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     liquidate_address : felt,
 ):
     # Read the registry and version
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Get ccount Registry address
     let (account_registry_address) = IAuthorizedRegistry.get_contract_address(

@@ -8,6 +8,7 @@ from contracts.Constants import Asset_INDEX, MasterAdmin_ACTION, ManageCollatera
 from contracts.DataTypes import Asset, CollateralPrice
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
@@ -29,16 +30,6 @@ end
 # Storage #
 ###########
 
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of AuthorizedRegistry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
 # Mapping between collateral ID and collateral Prices
 @storage_var
 func collateral_prices(id : felt) -> (res : CollateralPrice):
@@ -55,13 +46,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -90,8 +75,8 @@ end
 func update_collateral_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     collateral_id_ : felt, price_ : felt
 ):
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Auth check
     with_attr error_message("Caller is not authorized to update collateral prices"):
@@ -134,20 +119,5 @@ func update_collateral_price{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, r
     # update_collateral_price_called event is emitted
     update_collateral_price_called.emit(collateral_id=collateral_id_, price=price_)
 
-    return ()
-end
-
-# @notice external function to set contract version
-# @param new_version - new version of the contract
-@external
-func set_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    new_version : felt
-):
-    let (current_registry_address) = registry_address.read()
-    let (current_version) = contract_version.read()
-
-    verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION)
-    contract_version.write(new_version)
-    contract_version_changed.emit(new_version=new_version)
     return ()
 end

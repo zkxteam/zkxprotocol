@@ -10,6 +10,7 @@ from contracts.Constants import MasterAdmin_ACTION
 from contracts.interfaces.IABR import IABR
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import (
     Math64x61_add,
@@ -31,16 +32,6 @@ const NUM_8 = 18446744073709551616
 ###########
 # Storage #
 ###########
-
-# @notice Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# @notice Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
 
 # @notice Mapping of marketID to abr value
 @storage_var
@@ -76,13 +67,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     base_abr.write(28823037615171)
     bollinger_width.write(4611686018427387904)
     return ()
@@ -111,8 +96,8 @@ func modify_base_abr{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     new_base_abr : felt
 ):
     with_attr error_message("Caller does not have permission to update base abr value"):
-        let (version) = contract_version.read()
-        let (registry) = registry_address.read()
+        let (registry) = CommonLib.get_registry_address()
+        let (version) = CommonLib.get_contract_version()
         verify_caller_authority(registry, version, MasterAdmin_ACTION)
     end
 
@@ -126,8 +111,8 @@ func modify_bollinger_width{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ra
     new_bollinger_width : felt
 ):
     with_attr error_message("Caller does not have permission to update bollinger width"):
-        let (version) = contract_version.read()
-        let (registry) = registry_address.read()
+        let (registry) = CommonLib.get_registry_address()
+        let (version) = CommonLib.get_contract_version()
         verify_caller_authority(registry, version, MasterAdmin_ACTION)
     end
 

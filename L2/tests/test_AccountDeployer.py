@@ -145,14 +145,14 @@ async def test_unauthorized_changes_to_config(adminAuth_factory):
         user4, account_deployer.contract_address, 'set_account_class_hash', [12345]))
 
     await assert_revert(signer4.send_transaction(
-        user4, account_deployer.contract_address, 'set_version', [123456]))
+        user4, account_deployer.contract_address, 'set_contract_version', [123456]))
     
     result = await account_deployer.get_account_class_hash().call()
     assert result.result.class_hash == class_hash
 
     result = await account_deployer.get_registry_address().call()
 
-    assert result.result.address == auth_registry.contract_address
+    assert result.result.registry_address == auth_registry.contract_address
 
 
 @pytest.mark.asyncio

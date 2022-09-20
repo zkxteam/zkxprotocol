@@ -12,6 +12,7 @@ from contracts.DataTypes import Asset, AssetWID
 from contracts.Math_64x61 import Math64x61_assertPositive64x61
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Validation import assert_bool
 from contracts.libraries.Utils import verify_caller_authority
 
@@ -63,16 +64,6 @@ end
 # Storage #
 ###########
 
-# Contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Address of AuthorizedRegistry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
 # Version of Asset contract to refresh in node
 @storage_var
 func version() -> (res : felt):
@@ -119,15 +110,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    # Validate arguments
-    with_attr error_message("Registry address or version used for Asset deployment is 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    # Initialize storage
-    registry_address.write(registry_address_)
-    contract_version.write(version_)
+    CommonLib.initialize(registry_address_, version_)
 
     # Emit event
     let (contract_address) = get_contract_address()
@@ -452,8 +435,8 @@ func update_asset_on_L1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     assert message_payload[2] = asset_id_
 
     # Send asset update message to L1
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (L1_ZKX_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
     )
@@ -506,8 +489,8 @@ func verify_caller_authority_asset{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }():
     with_attr error_message("Caller not authorized to manage assets"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
+        let (registry) = CommonLib.get_registry_address()
+        let (version) = CommonLib.get_contract_version()
         verify_caller_authority(registry, version, ManageAssets_ACTION)
     end
     return ()

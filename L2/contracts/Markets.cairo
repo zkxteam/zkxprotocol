@@ -10,6 +10,7 @@ from contracts.Constants import Asset_INDEX, ManageMarkets_ACTION
 from contracts.DataTypes import Asset, Market, MarketWID
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
@@ -60,16 +61,6 @@ end
 # Stores the max ttl for a market in the system
 @storage_var
 func max_ttl() -> (ttl : felt):
-end
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
 end
 
 # Version of Market contract to refresh in node
@@ -123,13 +114,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     max_leverage.write(23058430092136939520)
     max_ttl.write(3600)
     return ()
@@ -362,8 +347,8 @@ func modify_tradable{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
 
     let (_market : Market) = market_by_id.read(market_id=id_)
 
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
@@ -517,8 +502,8 @@ func verify_caller_authority_market{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
 }():
     with_attr error_message("Caller not authorized to manage markets"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
+        let (registry) = CommonLib.get_registry_address()
+        let (version) = CommonLib.get_contract_version()
         verify_caller_authority(registry, version, ManageMarkets_ACTION)
     end
     return ()
@@ -626,8 +611,8 @@ func validate_market_properties{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*
     verify_tradable(market.tradable)
 
     # Getting asset details
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )

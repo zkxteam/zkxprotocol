@@ -31,6 +31,7 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.ICollateralPrices import ICollateralPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IMarketPrices import IMarketPrices
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_div, Math64x61_mul
 
 ##########
@@ -54,20 +55,6 @@ end
 func position_to_be_deleveraged(position : felt, amount_to_be_sold : felt):
 end
 
-###########
-# Storage #
-###########
-
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
 ###############
 # Constructor #
 ###############
@@ -79,13 +66,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -357,8 +338,8 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
     end
 
     # Fetch the maintatanence margin requirement from asset contract
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
@@ -450,8 +431,8 @@ func check_deleveraging{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
     )
 
     # Fetch the maintatanence margin requirement from asset contract
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     )
@@ -512,8 +493,8 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 ):
     alloc_locals
 
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Fetch all the positions from the Account contract
     let (
@@ -713,8 +694,8 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
 ) -> (prices_len : felt, prices : PriceData*):
     alloc_locals
 
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (prices : PriceData*) = alloc()
 
     # Get market price contract address

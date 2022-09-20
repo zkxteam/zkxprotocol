@@ -11,6 +11,7 @@ from contracts.DataTypes import WithdrawalRequest
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
 #############
@@ -40,16 +41,6 @@ end
 # Storage #
 ###########
 
-# Stores the contract version
-@storage_var
-func contract_version() -> (version : felt):
-end
-
-# Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address : felt):
-end
-
 # Maps request id to withdrawal request
 @storage_var
 func withdrawal_request_mapping(request_id : felt) -> (res : WithdrawalRequest):
@@ -66,13 +57,7 @@ end
 func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     registry_address_ : felt, version_ : felt
 ):
-    with_attr error_message("Registry address and version cannot be 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
-
-    registry_address.write(value=registry_address_)
-    contract_version.write(value=version_)
+    CommonLib.initialize(registry_address_, version_)
     return ()
 end
 
@@ -102,8 +87,8 @@ end
 func update_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     from_address : felt, request_id_ : felt
 ):
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
 
     # Get L1 ZKX contract address
     let (l1_zkx_address) = IAuthorizedRegistry.get_contract_address(
@@ -153,8 +138,8 @@ end
 func add_withdrawal_request{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     request_id_ : felt, user_l1_address_ : felt, ticker_ : felt, amount_ : felt
 ):
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    let (registry) = CommonLib.get_registry_address()
+    let (version) = CommonLib.get_contract_version()
     let (caller) = get_caller_address()
 
     # fetch account registry contract address
