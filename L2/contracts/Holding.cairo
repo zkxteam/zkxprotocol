@@ -5,97 +5,97 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import Trading_INDEX
 from contracts.libraries.FundLibrary import FundLib
 
-##########
-# Events #
-##########
+//#########
+// Events #
+//#########
 
-# Event emitted whenever fund() is called
+// Event emitted whenever fund() is called
 @event
-func fund_Holding_called(asset_id : felt, amount : felt):
-end
+func fund_Holding_called(asset_id: felt, amount: felt) {
+}
 
-# Event emitted whenever defund() is called
+// Event emitted whenever defund() is called
 @event
-func defund_Holding_called(asset_id : felt, amount : felt):
-end
+func defund_Holding_called(asset_id: felt, amount: felt) {
+}
 
-# Event emitted whenever deposit() is called
+// Event emitted whenever deposit() is called
 @event
-func deposit_Holding_called(asset_id : felt, amount : felt):
-end
+func deposit_Holding_called(asset_id: felt, amount: felt) {
+}
 
-# Event emitted whenever withdraw() is called
+// Event emitted whenever withdraw() is called
 @event
-func withdraw_Holding_called(asset_id : felt, amount : felt):
-end
+func withdraw_Holding_called(asset_id: felt, amount: felt) {
+}
 
-###############
-# Constructor #
-###############
+//##############
+// Constructor #
+//##############
 
-# @notice Constructor of the smart-contract
-# @param registry_address_ Address of the AuthorizedRegistry contract
-# @param version_ Version of this contract
+// @notice Constructor of the smart-contract
+// @param registry_address_ Address of the AuthorizedRegistry contract
+// @param version_ Version of this contract
 @constructor
-func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    registry_address_ : felt, version_ : felt
-):
-    FundLib.initialize(registry_address_, version_)
-    return ()
-end
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    registry_address_: felt, version_: felt
+) {
+    FundLib.initialize(registry_address_, version_);
+    return ();
+}
 
-######################
-# External Functions #
-######################
+//#####################
+// External Functions #
+//#####################
 
-# @notice Manually add amount to asset_id's balance
-# @param asset_id_ - target asset_id
-# @param amount_ - value to add to asset_id's balance
+// @notice Manually add amount to asset_id's balance
+// @param asset_id_ - target asset_id
+// @param amount_ - value to add to asset_id's balance
 @external
-func fund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt, amount_ : felt
-):
-    FundLib.fund_contract(asset_id_, amount_)
-    fund_Holding_called.emit(asset_id=asset_id_, amount=amount_)
+func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id_: felt, amount_: felt
+) {
+    FundLib.fund_contract(asset_id_, amount_);
+    fund_Holding_called.emit(asset_id=asset_id_, amount=amount_);
 
-    return ()
-end
+    return ();
+}
 
-# @notice Manually deduct amount from asset_id's balance
-# @param asset_id_ - target asset_id
-# @param amount_ - value to deduct from asset_id's balance
+// @notice Manually deduct amount from asset_id's balance
+// @param asset_id_ - target asset_id
+// @param amount_ - value to deduct from asset_id's balance
 @external
-func defund{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt, amount_ : felt
-):
-    FundLib.defund_contract(asset_id_, amount_)
-    defund_Holding_called.emit(asset_id=asset_id_, amount=amount_)
+func defund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id_: felt, amount_: felt
+) {
+    FundLib.defund_contract(asset_id_, amount_);
+    defund_Holding_called.emit(asset_id=asset_id_, amount=amount_);
 
-    return ()
-end
+    return ();
+}
 
-# @notice Deposit amount for a asset_id by an order
-# @parama asset_id_ - target asset_id
-# @param amount_ - value to deduct from asset_id's balance
+// @notice Deposit amount for a asset_id by an order
+// @parama asset_id_ - target asset_id
+// @param amount_ - value to deduct from asset_id's balance
 @external
-func deposit{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt, amount_ : felt
-):
-    FundLib.deposit_to_contract(asset_id_, amount_, Trading_INDEX)
-    deposit_Holding_called.emit(asset_id=asset_id_, amount=amount_)
+func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id_: felt, amount_: felt
+) {
+    FundLib.deposit_to_contract(asset_id_, amount_, Trading_INDEX);
+    deposit_Holding_called.emit(asset_id=asset_id_, amount=amount_);
 
-    return ()
-end
+    return ();
+}
 
-# @notice Withdraw amount for a asset_id by an order
-# @param asset_id_ - target asset_id
-# @param amount_ - value to deduct from asset_id's balance
+// @notice Withdraw amount for a asset_id by an order
+// @param asset_id_ - target asset_id
+// @param amount_ - value to deduct from asset_id's balance
 @external
-func withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id_ : felt, amount_ : felt
-):
-    FundLib.withdraw_from_contract(asset_id_, amount_, Trading_INDEX)
-    withdraw_Holding_called.emit(asset_id=asset_id_, amount=amount_)
+func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id_: felt, amount_: felt
+) {
+    FundLib.withdraw_from_contract(asset_id_, amount_, Trading_INDEX);
+    withdraw_Holding_called.emit(asset_id=asset_id_, amount=amount_);
 
-    return ()
-end
+    return ();
+}
