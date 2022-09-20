@@ -7,6 +7,8 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.public.abi import get_selector_from_name
 from starkware.starknet.definitions.general_config import StarknetChainId
 from starkware.starknet.public.abi import get_selector_from_name
+from starkware.starknet.services.api.gateway.transaction import InvokeFunction
+from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
 from math import trunc
 from starkware.starknet.core.os.transaction_hash.transaction_hash import (
     TransactionHashPrefix,
@@ -20,7 +22,7 @@ SCALE = 2**61
 PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481
 PRIME_HALF = PRIME/2
 PI = 7244019458077122842
-TRANSACTION_VERSION=0
+TRANSACTION_VERSION=1
 
 def from64x61(num):
     res = num
@@ -94,9 +96,6 @@ class Signer():
 
 
     async def send_transactions(self, account, calls, nonce=None, max_fee=0):
-        if nonce is None:
-            execution_info = await account.get_nonce().call()
-            nonce, = execution_info.result
 
         build_calls = []
         for call in calls:
@@ -104,13 +103,36 @@ class Signer():
             build_call[0] = hex(build_call[0])
             build_calls.append(build_call)
 
+        raw_invocation = get_raw_invoke(account, build_calls)
+        state = raw_invocation.state
+
+        if nonce is None:
+            nonce = await state.state.get_nonce_at(account.contract_address)
+
+
         (call_array, calldata, sig_r, sig_s) = self.sign_transaction(
             hex(account.contract_address), build_calls, nonce, max_fee)
 
-        temp = account.__execute__(call_array, calldata, nonce)
-        self.current_hash = calculate_transaction_hash_common(
+        #temp = account.__execute__(call_array, calldata, nonce)
+        external_tx = InvokeFunction(
+            contract_address=account.contract_address,
+            calldata=raw_invocation.calldata,
+            entry_point_selector=None,
+            signature=[sig_r, sig_s],
+            max_fee=max_fee,
+            version=TRANSACTION_VERSION,
+            nonce=nonce,
+        )
+
+        self.current_hash = external_tx.calculate_hash(state.general_config)
+        tx = InternalTransaction.from_external(
+            external_tx=external_tx, general_config=state.general_config
+        )
+        execution_info = await state.execute_tx(tx=tx)
+        return execution_info
+        """self.current_hash = calculate_transaction_hash_common(
             TransactionHashPrefix.INVOKE,
-            0,  # version
+            1,  # version
             account.contract_address,  # to
             get_selector_from_name('__execute__'),  # entry_point
             temp.calldata,  # calldata
@@ -118,7 +140,7 @@ class Signer():
             1536727068981429685321,  # chainid
             [],
         )
-        return await account.__execute__(call_array, calldata, nonce).invoke(signature=[sig_r, sig_s])
+        return await account.__execute__(call_array, calldata, nonce).invoke(signature=[sig_r, sig_s])"""
 
     async def send_transaction(self, account, to, selector_name, calldata, nonce=None, max_fee=0):
         return await self.send_transactions(account, [(to, selector_name, calldata)], nonce, max_fee)
@@ -200,20 +222,24 @@ def get_transaction_hash(account, call_array, calldata, nonce, max_fee):
         *[x for t in call_array for x in t],
         len(calldata),
         *calldata,
-        nonce,
     ]
 
     return calculate_transaction_hash_common(
         TransactionHashPrefix.INVOKE,
         TRANSACTION_VERSION,
         account,
-        get_selector_from_name("__execute__"),
+        0,
         execute_calldata,
         max_fee,
         StarknetChainId.TESTNET.value,
-        [],
+        [nonce],
     )
-    
+
+def get_raw_invoke(sender, calls):
+    """Return raw invoke, remove when test framework supports `invoke`."""
+    call_array, calldata = from_call_to_call_array(calls)
+    raw_invocation = sender.__execute__(call_array, calldata)
+    return raw_invocation
 
 def build_default_asset_properties(
     id,

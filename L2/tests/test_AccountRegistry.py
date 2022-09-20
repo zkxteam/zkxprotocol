@@ -67,7 +67,7 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
     await assert_revert(
-        signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [-2])
+        signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [200])
     )
 
     array_length_before = await account_registry.get_registry_len().call()
