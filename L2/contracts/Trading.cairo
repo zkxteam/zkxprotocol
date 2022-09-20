@@ -634,7 +634,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         # If it's just a close order
         if not_liquidation == TRUE:
-            liquidation_called.write(5)
             # Deduct funds from holding contract
             IHolding.withdraw(
                 contract_address=holding_address,
@@ -688,18 +687,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                 tempvar range_check_ptr = range_check_ptr
             end
         else:
-            liquidation_called.write(4)
-            let (
-                liquidatable_market_id : felt, liquidatable_direction : felt, amount_to_be_sold
-            ) = IAccountManager.get_deleveragable_or_liquidatable_position(
-                contract_address=temp_order.pub_key
-            )
-
-            with_attr error_message("position not marked as liquidatable/deleveragable"):
-                assert liquidatable_market_id = marketID
-                assert liquidatable_direction = parent_direction
-            end
-
             # Liquidation order
             if amount_to_be_sold == 0:
                 with_attr error_message("Wrong order type passed"):
@@ -743,7 +730,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                             amount=deficit,
                         )
 
-                        liquidation_called.write(1)
                         tempvar syscall_ptr = syscall_ptr
                         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                         tempvar range_check_ptr = range_check_ptr
@@ -763,7 +749,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                             position_id_=temp_order.orderID,
                         )
 
-                        liquidation_called.write(2)
                         tempvar syscall_ptr = syscall_ptr
                         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                         tempvar range_check_ptr = range_check_ptr
@@ -777,7 +762,6 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
                         position_id_=temp_order.orderID,
                     )
 
-                    liquidation_called.write(3)
                     tempvar syscall_ptr = syscall_ptr
                     tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
                     tempvar range_check_ptr = range_check_ptr

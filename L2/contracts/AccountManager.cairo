@@ -747,17 +747,30 @@ func execute_order{
 
         # Calculate the new leverage if it's a deleveraging order
         local new_leverage
-        if request.orderType == DELEVERAGING_ORDER:
-            let total_value = margin_amount + borrowed_amount
-            let (leverage_) = Math64x61_div(total_value, margin_amount)
-            new_leverage = leverage_
 
-            let (_, _, amount) = get_deleveragable_or_liquidatable_position()
-            let updated_amount = amount - size
-            let (positive_updated_amount) = abs_value(updated_amount)
+        # Check if it's liq/delveraging order
+        let (is_liq) = is_le(2, request.orderType)
+
+        if is_liq == 1:
+            # If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
+            let (
+                liq_market_id, liq_direction, liq_amount
+            ) = get_deleveragable_or_liquidatable_position()
+
+            with_attr error_message("The position not marked to be deleveraged/liquidated"):
+                assert liq_market_id = market_id
+                assert liq_direction = parent_direction
+            end
+
+            with_attr error_message("The size of order should be less than the marked one"):
+                assert_le(size, liq_amount)
+            end
+
+            let updated_amount = liq_amount - size
 
             # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
             let (result) = is_le(updated_amount, 230584300)
+
             local amount_to_be_updated
             if result == TRUE:
                 amount_to_be_updated = 0
@@ -765,12 +778,22 @@ func execute_order{
                 amount_to_be_updated = updated_amount
             end
 
+            # Create a struct with the updated details
             let updated_liquidatable_position : LiquidatablePosition = LiquidatablePosition(
                 market_id=market_id,
                 direction=parent_direction,
                 amount_to_be_sold=amount_to_be_updated,
             )
+
+            # Update the Liquidatable position
             deleveragable_or_liquidatable_position.write(value=updated_liquidatable_position)
+
+            # If it's a deleveraging order, calculate the new leverage
+            if request.orderType == DELEVERAGING_ORDER:
+                let total_value = margin_amount + borrowed_amount
+                let (leverage_) = Math64x61_div(total_value, margin_amount)
+                new_leverage = leverage_
+            end
             tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
@@ -780,7 +803,6 @@ func execute_order{
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
         end
-        tempvar range_check_ptr = range_check_ptr
 
         # Create a new struct with the updated details
         let updated_position = PositionDetails(
