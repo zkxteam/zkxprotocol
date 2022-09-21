@@ -95,7 +95,7 @@ async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
-    print("cairo rate", from64x61(abr_cairo.result.response[0]))
+    print("cairo rate", from64x61(abr_cairo.call_info.retdata[1]))
 
     abr_value = await abr.get_abr_value(1282193).call()
     print("abr value of the market is:",
@@ -105,7 +105,7 @@ async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
     print("The last timestamp is:",
           abr_value.result.timestamp)
     assert abr_python == pytest.approx(
-        from64x61(abr_cairo.result.response[0]), abs=1e-6)
+        from64x61(abr_cairo.call_info.retdata[1]), abs=1e-6)
 
 
 @ pytest.mark.asyncio
@@ -137,7 +137,7 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
-    print("cairo rate", from64x61(abr_cairo.result.response[0]))
+    print("cairo rate", from64x61(abr_cairo.call_info.retdata[1]))
 
     abr_value = await abr.get_abr_value(1282193).call()
     print("abr value of the market is:",
@@ -148,7 +148,7 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
           abr_value.result.timestamp)
 
     assert abr_python == pytest.approx(
-        from64x61(abr_cairo.result.response[0]), abs=1e-6)
+        from64x61(abr_cairo.call_info.retdata[1]), abs=1e-6)
 
 
 @ pytest.mark.asyncio
@@ -178,7 +178,7 @@ async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
     print("python rate", abr_python)
 
     abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
-    print("cairo rate", from64x61(abr_cairo.result.response[0]))
+    print("cairo rate", from64x61(abr_cairo.call_info.retdata[1]))
 
     abr_value = await abr.get_abr_value(1282198).call()
     print("abr value of the market is:",
@@ -189,4 +189,4 @@ async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
           abr_value.result.timestamp)
 
     assert abr_python == pytest.approx(
-        from64x61(abr_cairo.result.response[0]), abs=1e-6)
+        from64x61(abr_cairo.call_info.retdata[1]), abs=1e-6)
