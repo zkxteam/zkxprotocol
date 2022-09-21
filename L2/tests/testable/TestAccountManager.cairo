@@ -16,6 +16,7 @@ from contracts.AccountManager import (
     return_array_collaterals,
     get_withdrawal_history,
     timestamp_check,
+    deposit,
     transfer_from,
     transfer_from_abr,
     transfer_abr,

@@ -196,7 +196,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi,
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     result = await new_account_contract.get_balance(asset_id).call()
     assert result.result.res==0
@@ -304,7 +304,7 @@ async def test_withdraw_incorrect_payload(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi,
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     request_id=2
     collateral_id=asset_id
@@ -392,7 +392,7 @@ async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi,
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==3
@@ -455,7 +455,7 @@ async def test_withdraw_positive_flow_sponsored(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi,
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==3
