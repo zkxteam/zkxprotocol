@@ -14,7 +14,7 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
-from contracts.libraries.FundLibrary import FundLib, FundLib_balance_by_id
+from contracts.libraries.FundLibrary import balance, FundLib, FundLib_balance_by_id
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
