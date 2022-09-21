@@ -8,13 +8,14 @@ from starkware.starknet.public.abi import get_selector_from_name
 from starkware.starknet.definitions.general_config import StarknetChainId
 from starkware.starknet.public.abi import get_selector_from_name
 from starkware.starknet.services.api.gateway.transaction import InvokeFunction
-from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo
+from starkware.starknet.business_logic.transaction.objects import InternalTransaction, TransactionExecutionInfo, InternalDeclare
 from math import trunc
 from starkware.starknet.core.os.transaction_hash.transaction_hash import (
     TransactionHashPrefix,
     calculate_transaction_hash_common,
+    calculate_declare_transaction_hash
 )
-from starkware.starknet.business_logic.execution.objects import Event
+from starkware.starknet.business_logic.execution.objects import OrderedEvent
 
 MAX_UINT256 = (2**128 - 1, 2**128 - 1)
 
@@ -97,6 +98,7 @@ class Signer():
 
     async def send_transactions(self, account, calls, nonce=None, max_fee=0):
 
+        
         build_calls = []
         for call in calls:
             build_call = list(call)
@@ -190,12 +192,34 @@ async def assert_revert(fun, reverted_with=None):
         if reverted_with is not None:
             assert reverted_with in error['message']
 
-def assert_event_emitted(tx_exec_info, from_address, name, data):
-    assert Event(
-        from_address=from_address,
-        keys=[get_selector_from_name(name)],
-        data=data,
-    ) in tx_exec_info.raw_events
+# following event assertion functions directly from oz test utils
+def assert_event_emitted(tx_exec_info, from_address, name, data, order=0):
+    """Assert one single event is fired with correct data."""
+    assert_events_emitted(tx_exec_info, [(order, from_address, name, data)])
+
+
+def assert_events_emitted(tx_exec_info, events):
+    """Assert events are fired with correct data."""
+    for event in events:
+        order, from_address, name, data = event
+        event_obj = OrderedEvent(
+            order=order,
+            keys=[get_selector_from_name(name)],
+            data=data,
+        )
+
+        base = tx_exec_info.call_info.internal_calls[0]
+        if event_obj in base.events and from_address == base.contract_address:
+            return
+
+        try:
+            base2 = base.internal_calls[0]
+            if event_obj in base2.events and from_address == base2.contract_address:
+                return
+        except IndexError:
+            pass
+
+        raise BaseException("Event not fired or not fired correctly")
 
 
 def from_call_to_call_array(calls):

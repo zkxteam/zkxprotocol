@@ -130,3 +130,47 @@ namespace CommonLib {
         return ();
     }
 }
+//#################
+// View Functions #
+//#################
+
+// @notice view function to get current contract version
+// @return contract_version - version of the contract
+@view
+func get_contract_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ) -> (contract_version: felt) {
+    return CommonLib.get_contract_version();
+}
+
+// @notice view function to get the address of Authorized registry contract
+// @return registry_address - Address of Authorized registry contract
+@view
+func get_registry_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ) -> (registry_address: felt) {
+    
+    return CommonLib.get_registry_address();
+}
+
+//#####################
+// External Functions #
+//#####################
+
+// @notice external function to set contract version
+// @param new_version_ - new version of the contract
+@external
+func set_contract_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_version_: felt
+) {
+    CommonLib.set_contract_version(new_version_);
+    return();
+}
+
+// @notice external function to set authorized registry contract address
+// @param resgitry_address_ Address of the AuthorizedRegistry contract
+@external
+func set_registry_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    registry_address_: felt
+) {
+    CommonLib.set_registry_address(registry_address_);
+    return ();
+}

@@ -26,18 +26,22 @@ def event_loop():
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
 
-    # a contract definition has to be declared before we can use class hash
-    dec_class = await starknet_service.declare(ContractType.AccountManager)
-
-    global class_hash
-    class_hash=dec_class.class_hash
-
     # Deploy accounts
     account_factory = AccountFactory(starknet_service, 123, 0, 1)
     admin1 = await account_factory.deploy_account(signer1.public_key)
     admin2 = await account_factory.deploy_account(signer2.public_key)
     user4 = await account_factory.deploy_account(signer4.public_key)
 
+    # a contract definition has to be declared before we can use class hash
+    # can declare directly using state for tests
+    contract_class = starknet_service.contracts_holder.get_contract_class(ContractType.AccountManager)
+    global class_hash
+    #class_hash = await signer1.send_declare_transaction(admin1, contract_class, starknet_service.starknet.state)
+    class_hash, _ = await starknet_service.starknet.state.declare(contract_class)
+    direct_class_hash = compute_class_hash(contract_class)
+    class_hash = int.from_bytes(class_hash,'big')
+    assert direct_class_hash == class_hash
+    
     # Deploy contracts
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [
         admin1.contract_address,
@@ -56,6 +60,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, L1_ZKX_dummy_address])
     await signer1.send_transaction(admin1, 
     registry.contract_address, 'update_contract_registry', [20, 1, account_deployer.contract_address])
+
     return adminAuth, registry, account_registry, admin1, admin2, user4, account_deployer
 
 @pytest.mark.asyncio
@@ -79,7 +84,7 @@ async def test_deploy_account_contract(adminAuth_factory):
                                    account_deployer.contract_address,
                                    'set_account_class_hash',
                                    [class_hash])
-
+   
     assert_event_emitted(
         tx_exec_info,
         from_address = account_deployer.contract_address,
@@ -93,7 +98,7 @@ async def test_deploy_account_contract(adminAuth_factory):
     # get address of deployed contract
     deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, 123456).call()
     #print(deployed_address.result)
-    print(hex(deployed_address.result.address))
+   
     deployed_address=deployed_address.result.address
 
     assert_event_emitted(
@@ -117,7 +122,7 @@ async def test_deploy_account_contract(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi, 
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     # check that the account manager contract is deployed with the public key used in the deploy call
     result = await new_account_contract.get_public_key().call()
@@ -153,6 +158,7 @@ async def test_unauthorized_changes_to_config(adminAuth_factory):
     result = await account_deployer.get_registry_address().call()
 
     assert result.result.registry_address == auth_registry.contract_address
+
 
 
 @pytest.mark.asyncio
