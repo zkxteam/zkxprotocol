@@ -560,8 +560,8 @@ func verify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @notice Internal function to verify the ttl value
 // @param ttl - ttl value to verify
 func verify_ttl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(ttl_: felt) {
-    with_attr error_message("ttl cannot be zero") {
-        assert_not_zero(ttl_);
+    with_attr error_message("ttl cannot be less than 1") {
+        assert_le(1, ttl_);
     }
 
     let (maximum_ttl) = max_ttl.read();
