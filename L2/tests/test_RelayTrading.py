@@ -235,7 +235,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
 @pytest.mark.asyncio
 async def test_revert_balance_low(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
     alice_balance = to64x61(100)
     bob_balance = to64x61(100)
 

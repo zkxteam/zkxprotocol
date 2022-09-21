@@ -7,7 +7,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_position_array, print_collaterals_array
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_position_array, print_collaterals_array, felt_to_str
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -42,8 +42,8 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
-
     ### Deploy infrastructure (Part 1)
+    print(from64x61(2305843009213693952))
     admin1 = await starknet_service.deploy(
         ContractType.Account, [
             admin1_signer.public_key
@@ -227,6 +227,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
+    print("Alice: ", hex(alice.contract_address))
+    print("Bob: ", hex(bob.contract_address))
+    print("Liquidate:", hex(liquidate.contract_address))
+    print("Trading:", hex(trading.contract_address))
     # Set the balance of admin1 and admin2
     #await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
     #await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
@@ -370,7 +374,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     print(liquidate_result_alice.result.response)
 
     assert liquidate_result_alice.result.response[0] == 0
-    assert liquidate_result_alice.result.response[3: ] == res1
+    assert liquidate_result_alice.result.response[3:] == res1
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -569,7 +573,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
           liquidate_result_alice.result.response[1])
 
     assert liquidate_result_alice.result.response[0] == 0
-    # assert liquidate_result_alice.result.response[1] == order_id_3
+    assert liquidate_result_alice.result.response[3:] == res3
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -625,7 +629,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
           liquidate_result_bob.result.response[1])
 
     assert liquidate_result_bob.result.response[0] == 0
-    # assert liquidate_result_bob.result.response[1] == order_id_4
+    assert liquidate_result_alice.result.response[3:] == res4
 
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
     print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
@@ -686,9 +690,9 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
     print("liquidation result alice liquidated...", liquidate_result_alice.result.response[0], " ",
           liquidate_result_alice.result.response[1])
 
-    # assert liquidate_result_alice.result.response[1] == str_to_felt(
-    #     "343uofdsjxz")
     assert liquidate_result_alice.result.response[0] == 1
+    assert liquidate_result_alice.result.response[1] == BTC_USD_ID
+    assert liquidate_result_alice.result.response[2] == 0
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -712,8 +716,9 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
     assert from64x61(alice_acc_value.result.res) == -481.295275
 
     orderState1 = await alice.get_deleveragable_or_liquidatable_position().call()
-    res1 = list(orderState1.result)
-    print(res1)
+    res1 = orderState1.result.position
+    assert res1.market_id == liquidate_result_alice.result.response[1]
+    assert res1.direction == liquidate_result_alice.result.response[2]
 
 @pytest.mark.asyncio
 async def test_liquidation_flow(adminAuth_factory):
@@ -808,9 +813,6 @@ async def test_liquidation_flow(adminAuth_factory):
         leverage2
     ]
 
-    liq_called = await trading.return_liquidation_called().call()
-    print("Called? ",liq_called.result.res)
-
     print("Alice positions: ")
     alice_positions = await alice.get_positions().call()
     alice_parsed_positions = list(alice_positions.result.positions_array)
@@ -855,8 +857,8 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
           liquidate_result_charlie.result.response[0], " ", liquidate_result_charlie.result.response[1])
 
     assert liquidate_result_charlie.result.response[0] == 1
-    # assert liquidate_result_charlie.result.response[1] == str_to_felt(
-    #     "sadfjkh2178")
+    assert liquidate_result_charlie.result.response[1] == BTC_USD_ID
+    assert liquidate_result_charlie.result.response[2] == 0
 
     charlie_balance_usdc = await charlie.get_balance(USDC_ID).call()
     print("Charlie usdc balance is...", from64x61(
@@ -1127,8 +1129,8 @@ async def test_deleveraging_flow(adminAuth_factory):
           liquidate_result_eduard.result.response[0], " ", liquidate_result_eduard.result.response[1])
 
     assert liquidate_result_eduard.result.response[0] == 1
-    # assert liquidate_result_eduard.result.response[1] == str_to_felt(
-    #     "343uofdsjxz")
+    assert liquidate_result_eduard.result.response[1] == marketID_1
+    assert liquidate_result_eduard.result.response[2] == direction1
 
     eduard_maintenance = await liquidate.return_maintenance().call()
     print("eduard maintenance requirement:",
@@ -1142,18 +1144,15 @@ async def test_deleveraging_flow(adminAuth_factory):
     assert from64x61(eduard_acc_value.result.res) == 261.48150000000004
 
     eduard_amount_to_be_sold = await eduard.get_deleveragable_or_liquidatable_position().call()
-    print(eduard_amount_to_be_sold.result.amount_to_be_sold)
+    eduard_position = eduard_amount_to_be_sold.result.position
+    print(eduard_position.amount_to_be_sold)
     print("eduard amount to be sold is...", from64x61(
-        eduard_amount_to_be_sold.result.amount_to_be_sold))
-    assert from64x61(eduard_amount_to_be_sold.result.amount_to_be_sold) == 1.9454545454545453
-
-    print("eduard Position to be deleveraged is...",
-        eduard_amount_to_be_sold.result.market_id)
-    # assert eduard_amount_to_be_sold.result.order_id == str_to_felt(
-    #     "343uofdsjxz")
+        eduard_position.amount_to_be_sold))
+    assert from64x61(eduard_position.amount_to_be_sold) == 1.9454545454545453
 
     ####### Opening of Deleveraged Order #######
-    size2 = to64x61(1.9454545454545453)
+    size2 = 4485912763379367865
+    assert eduard_position.amount_to_be_sold == size2
     marketID_2 = BTC_USD_ID
 
     order_id_3 = str_to_felt("343uofdsswa")
@@ -1162,7 +1161,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     price3 = to64x61(1250)
     stopPrice3 = 0
     orderType3 = 4
-    position3 = to64x61(1.9454545454545453)
+    position3 = 4485912763379367865
     direction3 = 1
     closeOrder3 = 1
     leverage3 = to64x61(5)
@@ -1174,7 +1173,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     price4 = to64x61(1250)
     stopPrice4 = 0
     orderType4 = 0
-    position4 = to64x61(1.9454545454545453)
+    position4 = 4485912763379367865
     direction4 = 0
     closeOrder4 = 1
     leverage4 = to64x61(1)
@@ -1207,10 +1206,10 @@ async def test_deleveraging_flow(adminAuth_factory):
 
     assert res3 == [
         execution_price1,
-        to64x61(5 - 1.9454545454545453),
+        7043302282689101895,
         to64x61(1000),
-        5858937464320249856000,
-        to64x61(3.540909090909091)
+        5858937464320249909250,
+        8164780473533943861
     ]
 
     orderState4 = await daniel.get_position_data(market_id_ = marketID_1, direction_ = 1).call()
@@ -1219,8 +1218,8 @@ async def test_deleveraging_flow(adminAuth_factory):
 
     assert res4 == [
         execution_price1,
-        to64x61(5 - 1.9454545454545453),
-        7043302282689101825000,
+        7043302282689101895,
+        7043302282689101895000,
         to64x61(0),
         leverage4
     ]
@@ -1248,8 +1247,8 @@ async def test_deleveraging_flow(adminAuth_factory):
     assert from64x61(daniel_balance_usdc.result.res) == 2929.393181818182
 
     eduard_amount_to_be_sold = await eduard.get_deleveragable_or_liquidatable_position().call()
-    print("Amount to be sold after deleveraging:", from64x61(eduard_amount_to_be_sold.result.amount_to_be_sold))
-    # assert from64x61(eduard_amount_to_be_sold.result.amount_to_be_sold) == 0
+    eduard_position = eduard_amount_to_be_sold.result.position
+    assert from64x61(eduard_position.amount_to_be_sold) == 0
 
 
 @pytest.mark.asyncio
@@ -1292,8 +1291,6 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
           liquidate_result_eduard.result.response[0], " ", liquidate_result_eduard.result.response[1])
 
     assert liquidate_result_eduard.result.response[0] == 1
-    # assert liquidate_result_eduard.result.response[1] == str_to_felt(
-    #     "343uofdsjxz")
 
     eduard_maintenance = await liquidate.return_maintenance().call()
     print("eduard maintenance requirement:",
@@ -1307,21 +1304,14 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
     assert from64x61(eduard_acc_value.result.res) == -1502.5185000000001
 
     eduard_amount_to_be_sold = await eduard.get_deleveragable_or_liquidatable_position().call()
-    print(eduard_amount_to_be_sold.result)
-    print("eduard amount to be sold is...", from64x61(
-        eduard_amount_to_be_sold.result.amount_to_be_sold))
-    assert from64x61(eduard_amount_to_be_sold.result.amount_to_be_sold) == 0
-
-    print("eduard Position to be liquidated is...",
-        eduard_amount_to_be_sold.result.order_id)
-    assert eduard_amount_to_be_sold.result.order_id == str_to_felt("343uofdsjxz")
-
-    eduard_order_data = await eduard.get_order_data(orderID_=str_to_felt("343uofdsjxz")).call()
-    res3 = list(eduard_order_data.result.res)
-    print("eduard order data:", res3)
+    eduard_position = eduard_amount_to_be_sold.result.position
+    assert eduard_position.amount_to_be_sold == 7043302282689101895
+    assert eduard_position.market_id == BTC_USD_ID
+    assert eduard_position.direction == 0
+    assert eduard_position.liquidatable == 1
 
     ####### Liquidation Order #######
-    size = to64x61(5 - 1.9454545454545453)
+    size = 7043302282689101895
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("0jfds78324sjxz")
@@ -1371,48 +1361,34 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
         marketID_1,
         2,
         eduard.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         daniel.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ])
 
-    orderState1 = await eduard.get_order_data(orderID_=parentOrder1).call()
+    orderState1 = await eduard.get_position_data(market_id_ = marketID_1, direction_= 0).call()
     res1 = list(orderState1.result.res)
     print(res1)
     print(from64x61(res1[2]))
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
         to64x61(1000),
-        to64x61(1000),
-        to64x61(0),
-        0,
-        0,
-        to64x61(0),
-        7,
-        to64x61(0),
-        to64x61(0),
-        leverage1
+        71,
+        24000,
+        60982,
+        8164780473533943861
     ]
 
-    orderState2 = await daniel.get_order_data(orderID_=parentOrder2).call()
+    orderState2 = await daniel.get_position_data(market_id_ = marketID_1, direction_= 1).call()
     res2 = list(orderState2.result.res)
     print(res2)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
         to64x61(1000),
-        to64x61(1000),
+        71,
+        73310,
         to64x61(0),
-        orderType2,
-        1,
-        to64x61(0),
-        4,
-        to64x61(0),
-        to64x61(0),
-        leverage2
+        2305843009213693952
     ]
 
     insurance_balance = await insuranceFund.balance(asset_id_=USDC_ID).call()

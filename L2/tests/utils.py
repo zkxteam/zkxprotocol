@@ -231,3 +231,8 @@ def print_collaterals_array(collateral_array):
         print("Asset: ", collateral[0])
         print("Balance: ", from64x61(collateral[1]))
         print("\n")
+
+def felt_to_str(felt):
+    b_felt = felt.to_bytes(31, "big")
+    return b_felt.decode()
+

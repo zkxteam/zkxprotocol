@@ -336,14 +336,13 @@ func get_L1_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
 end
 
 # @notice view function to get deleveraged or liquidatable position
-# @return order_id - Id of an order, amount_to_be_sold - amount to be sold in a position
+# @return position - Returns a LiquidatablePosition struct
 @view
 func get_deleveragable_or_liquidatable_position{
     syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr
-}() -> (market_id : felt, direction : felt, amount_to_be_sold : felt):
+}() -> (position : LiquidatablePosition):
     let (position : LiquidatablePosition) = deleveragable_or_liquidatable_position.read()
-
-    return (position.market_id, position.direction, position.amount_to_be_sold)
+    return (position)
 end
 
 # @notice view function to get all use collaterals
@@ -730,15 +729,10 @@ func execute_order{
         end
 
         # Get the parent position details
-        let (parent_position_details) = position_mapping.read(
+        let (parent_position_details : PositionDetails) = position_mapping.read(
             marketID=market_id, direction=parent_direction
         )
         let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size)
-
-        # Assert that the parent position is open
-        with_attr error_message("The parent position size is 0"):
-            assert_not_zero(parent_position_details.position_size)
-        end
 
         # Assert that the size amount can be closed from the parent position
         with_attr error_message("The size of close order is more than the portionExecuted"):
@@ -753,36 +747,36 @@ func execute_order{
 
         if is_liq == 1:
             # If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
-            let (
-                liq_market_id, liq_direction, liq_amount
-            ) = get_deleveragable_or_liquidatable_position()
+            let liq_position : LiquidatablePosition = deleveragable_or_liquidatable_position.read()
 
             with_attr error_message("The position not marked to be deleveraged/liquidated"):
-                assert liq_market_id = market_id
-                assert liq_direction = parent_direction
+                assert liq_position.market_id = market_id
+                assert liq_position.direction = parent_direction
             end
 
-            with_attr error_message("The size of order should be less than the marked one"):
-                assert_le(size, liq_amount)
+            with_attr error_message(
+                    "The size of order should be less than or equal to the marked one"):
+                assert_le(size, liq_position.amount_to_be_sold)
             end
 
-            let updated_amount = liq_amount - size
+            let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size)
 
             # to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
             let (result) = is_le(updated_amount, 230584300)
 
             local amount_to_be_updated
             if result == TRUE:
-                amount_to_be_updated = 0
+                assert amount_to_be_updated = 0
             else:
-                amount_to_be_updated = updated_amount
+                assert amount_to_be_updated = updated_amount
             end
 
             # Create a struct with the updated details
             let updated_liquidatable_position : LiquidatablePosition = LiquidatablePosition(
-                market_id=market_id,
-                direction=parent_direction,
+                market_id=liq_position.market_id,
+                direction=liq_position.direction,
                 amount_to_be_sold=amount_to_be_updated,
+                liquidatable=liq_position.liquidatable,
             )
 
             # Update the Liquidatable position
@@ -790,15 +784,27 @@ func execute_order{
 
             # If it's a deleveraging order, calculate the new leverage
             if request.orderType == DELEVERAGING_ORDER:
+                with_attr error_message("Not marked as deleveragable"):
+                    assert liq_position.liquidatable = FALSE
+                end
                 let total_value = margin_amount + borrowed_amount
                 let (leverage_) = Math64x61_div(total_value, margin_amount)
-                new_leverage = leverage_
+                assert new_leverage = leverage_
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
+            else:
+                with_attr error_message("Not marked as liquidatable"):
+                    assert liq_position.liquidatable = TRUE
+                end
+
+                assert new_leverage = parent_position_details.leverage
+                tempvar syscall_ptr = syscall_ptr
+                tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
+                tempvar range_check_ptr = range_check_ptr
             end
-            tempvar syscall_ptr = syscall_ptr
-            tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
-            tempvar range_check_ptr = range_check_ptr
         else:
-            new_leverage = parent_position_details.leverage
+            assert new_leverage = parent_position_details.leverage
             tempvar syscall_ptr = syscall_ptr
             tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
             tempvar range_check_ptr = range_check_ptr
@@ -837,6 +843,7 @@ func execute_order{
         position_mapping.write(
             marketID=market_id, direction=parent_direction, value=updated_position
         )
+
         tempvar syscall_ptr = syscall_ptr
         tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         tempvar range_check_ptr = range_check_ptr
@@ -1070,19 +1077,28 @@ func liquidate_position{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_
         assert caller = liquidate_address
     end
 
+    local amount
+    local liquidatable
+    if amount_to_be_sold_ == 0:
+        assert amount = position_.position_size
+        assert liquidatable = TRUE
+    else:
+        assert amount = amount_to_be_sold_
+        assert liquidatable = FALSE
+    end
+
     let liquidatable_position : LiquidatablePosition = LiquidatablePosition(
         market_id=position_.market_id,
         direction=position_.direction,
-        amount_to_be_sold=amount_to_be_sold_,
+        amount_to_be_sold=amount,
+        liquidatable=liquidatable,
     )
 
     # Update deleveraged or liquidatable position
     deleveragable_or_liquidatable_position.write(value=liquidatable_position)
 
     liquidate_deleverage.emit(
-        market_id=position_.market_id,
-        direction=position_.direction,
-        amount_to_be_sold=amount_to_be_sold_,
+        market_id=position_.market_id, direction=position_.direction, amount_to_be_sold=amount
     )
     return ()
 end

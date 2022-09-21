@@ -146,6 +146,7 @@ struct LiquidatablePosition:
     member market_id : felt
     member direction : felt
     member amount_to_be_sold : felt
+    member liquidatable : felt
 end
 
 # @notice struct for sending the array of positions for ABR calculations

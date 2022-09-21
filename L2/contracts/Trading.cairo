@@ -18,6 +18,7 @@ from contracts.Constants import (
     InsuranceFund_INDEX,
     LIMIT_ORDER,
     Liquidate_INDEX,
+    LIQUIDATION_ORDER,
     LiquidityFund_INDEX,
     LONG,
     Market_INDEX,
@@ -62,26 +63,14 @@ const LEVERAGE_ONE = 2305843009213693952
 
 # Event emitted whenever a trade is executed
 @event
-func trade_execution(
+func trade_executed(
     address : felt, request : OrderRequest, market_id : felt, execution_price : felt
 ):
 end
+
 ###########
 # Storage #
 ###########
-
-# ## Remove ###
-@storage_var
-func liquidation_called() -> (res : felt):
-end
-
-@view
-func return_liquidation_called{
-    syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr, ecdsa_ptr : SignatureBuiltin*
-}() -> (res : felt):
-    let (res) = liquidation_called.read()
-    return (res)
-end
 
 # Stores the contract version
 @storage_var
@@ -446,18 +435,18 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
     if cmp_res == 1:
         # If yes, make the order_size to be size
-        assert order_size = size
+        order_size = size
     else:
         # If no, make order_size to be the positionSize̦
-        assert order_size = temp_order.positionSize
+        order_size = temp_order.positionSize
     end
 
     local sum_temp
 
     if temp_order.direction == LONG:
-        assert sum_temp = sum + order_size
+        sum_temp = sum + order_size
     else:
-        assert sum_temp = sum - order_size
+        sum_temp = sum - order_size
     end
 
     # If the order is to be opened
@@ -480,7 +469,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
 
         # calculate avg execution price
         if position_details.position_size == 0:
-            assert average_execution_price = execution_price
+            average_execution_price = execution_price
             tempvar range_check_ptr = range_check_ptr
         else:
             let (portion_executed_value) = Math64x61_mul(
@@ -490,7 +479,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             let cumulative_order_value = portion_executed_value + current_order_value
             let cumulative_order_size = position_details.position_size + order_size
             let (price) = Math64x61_div(cumulative_order_value, cumulative_order_size)
-            assert average_execution_price = price
+            average_execution_price = price
             tempvar range_check_ptr = range_check_ptr
         end
 
@@ -576,9 +565,9 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         local parent_direction
 
         if temp_order.direction == LONG:
-            assert parent_direction = SHORT
+            parent_direction = SHORT
         else:
-            assert parent_direction = LONG
+            parent_direction = LONG
         end
 
         # Get order details
@@ -688,10 +677,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             end
         else:
             # Liquidation order
-            if amount_to_be_sold == 0:
-                with_attr error_message("Wrong order type passed"):
-                    assert temp_order.orderType = 3
-                end
+            if temp_order.orderType == LIQUIDATION_ORDER:
                 # Withdraw the position from holding fund
                 IHolding.withdraw(
                     contract_address=holding_address,
@@ -769,7 +755,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
             else:
                 # Deleveraging order
                 with_attr error_message("Wrong order type passed"):
-                    assert temp_order.orderType = 4
+                    assert temp_order.orderType = DELEVERAGING_ORDER
                 end
 
                 # Withdraw the position from holding fund
@@ -826,7 +812,7 @@ func check_and_execute{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
         market_id=marketID,
     )
 
-    trade_execution.emit(
+    trade_executed.emit(
         address=temp_order.pub_key,
         request=temp_order_request,
         market_id=marketID,

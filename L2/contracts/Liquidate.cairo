@@ -415,7 +415,7 @@ func check_liquidation_recurse{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*,
         assert least_collateral_ratio_position_asset_price_ = price_details.assetPrice
     else:
         assert least_collateral_ratio_ = least_collateral_ratio
-        assert least_collateral_ratio_position_ = position_details
+        assert least_collateral_ratio_position_ = least_collateral_ratio_position
         assert least_collateral_ratio_position_collateral_price_ = least_collateral_ratio_position_collateral_price
         assert least_collateral_ratio_position_asset_price_ = least_collateral_ratio_position_asset_price
     end
