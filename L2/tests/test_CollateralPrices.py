@@ -9,6 +9,7 @@ from dummy_signers import signer1, signer2
 
 USDC_ID = str_to_felt("fghj3am52qpzsib")
 USDT_ID = str_to_felt("65ksgn23nv")
+PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481
 
 def build_default_asset_properties(id, ticker, name):
     return [
@@ -125,7 +126,7 @@ async def test_update_collateral_price_unauthorized_user(adminAuth_factory):
 async def test_update_negative_collateral_price(adminAuth_factory):
     adminAuth, collateral_prices, admin1, admin2 = adminAuth_factory
 
-    await assert_revert(signer1.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, -500]))
+    await assert_revert(signer1.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, -500%PRIME]))
 
 @pytest.mark.asyncio
 async def test_update_collateral_price(adminAuth_factory):

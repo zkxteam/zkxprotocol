@@ -6,7 +6,12 @@ from starkware.cairo.common.math import assert_not_zero
 
 from contracts.Constants import MasterAdmin_ACTION
 from contracts.DataTypes import DepositData
-from contracts.libraries.CommonLibrary import CommonLib
+from contracts.libraries.CommonLibrary import (
+CommonLib,
+get_contract_version, 
+get_registry_address, 
+set_contract_version
+)
 from contracts.libraries.Utils import verify_caller_authority
 
 //##########
