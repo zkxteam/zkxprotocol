@@ -43,7 +43,6 @@ def event_loop():
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
     ### Deploy infrastructure (Part 1)
-    print(from64x61(2305843009213693952))
     admin1 = await starknet_service.deploy(
         ContractType.Account, [
             admin1_signer.public_key
@@ -226,11 +225,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Fund the Liquidity fund contract
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [UST_ID, to64x61(1000000)])
-
-    print("Alice: ", hex(alice.contract_address))
-    print("Bob: ", hex(bob.contract_address))
-    print("Liquidate:", hex(liquidate.contract_address))
-    print("Trading:", hex(trading.contract_address))
     # Set the balance of admin1 and admin2
     #await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
     #await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])

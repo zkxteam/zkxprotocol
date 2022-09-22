@@ -519,20 +519,10 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
     let (registry) = registry_address.read()
     let (version) = contract_version.read()
 
-    # Check if the list is empty
-    if prices_len == 0:
-        return ()
-    end
-
     # Fetch all the positions from the Account contract
     let (
         positions_len : felt, positions : PositionDetailsWithMarket*
     ) = IAccountManager.get_positions(contract_address=order.pub_key)
-
-    # Check if the list is empty
-    if positions_len == 0:
-        return ()
-    end
 
     # Fetch the maintanence margin requirement from asset contract
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
@@ -574,10 +564,11 @@ func check_for_risk{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_chec
             asset_id=order.collateralID,
             collateral_id=standard_collateral_id,
         )
+        # Get Market ID
         let (market_price : MarketPrice) = IMarketPrices.get_market_price(
             contract_address=market_price_address, id=market_id
         )
-        # Get Market from the corresponding Id
+        # Get Market price from the corresponding Id
         let (market_ttl : felt) = IMarkets.get_ttl_from_market(
             contract_address=market_address, market_id=market_id
         )
@@ -726,6 +717,7 @@ func populate_asset_prices_recurse{
             let (market_collateral_ttl : felt) = IMarkets.get_ttl_from_market(
                 contract_address=market_contract_address, market_id=market_id_collateral
             )
+
             # Calculate the timestamp
             tempvar ttl_collateral = market_collateral_ttl
             tempvar timestamp_collateral = market_price_collateral.timestamp
@@ -877,11 +869,6 @@ func get_asset_prices{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_ch
     let (
         positions_len : felt, positions : PositionDetailsWithMarket*
     ) = IAccountManager.get_positions(contract_address=account_address)
-
-    if positions_len == 0:
-        let (empty_positions_array : PriceData*) = alloc()
-        return (0, empty_positions_array)
-    end
 
     let (prices_array_len : felt, prices_array : PriceData*) = populate_asset_prices_recurse(
         market_contract_address=market_contract_address,

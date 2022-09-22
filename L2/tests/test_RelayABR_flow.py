@@ -82,10 +82,10 @@ async def abr_factory(starknet_service: StarknetService):
         ContractType.MarketPrices, 
         [registry.contract_address, 1]
     )
-    # liquidate = await starknet_service.deploy(
-    #     ContractType.Liquidate, 
-    #     [registry.contract_address, 1]
-    # )
+    liquidate = await starknet_service.deploy(
+        ContractType.Liquidate, 
+        [registry.contract_address, 1]
+    )
 
     timestamp = int(time.time())
 
@@ -124,7 +124,7 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [18, 1, abr_fund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [19, 1, abr_payment.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
-    # await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
 
     # Add base fee and discount in Trading Fee contract

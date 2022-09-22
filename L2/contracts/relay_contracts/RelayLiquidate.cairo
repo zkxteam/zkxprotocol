@@ -6,7 +6,7 @@ from contracts.libraries.RelayLibrary import (
     get_inner_contract,
     initialize
 )
-from contracts.DataTypes import PriceData
+from contracts.DataTypes import PriceData, PositionDetailsWithMarket
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 
@@ -24,7 +24,7 @@ end
 @external
 func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
     account_address : felt, prices_len : felt, prices : PriceData*
-) -> (liq_result : felt, least_collateral_ratio_position : felt):
+) -> (liq_result : felt, least_collateral_ratio_position : PositionDetailsWithMarket):
 
     alloc_locals
 
@@ -33,7 +33,7 @@ func check_liquidation{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_c
     
     record_call_details('check_liquidation')
     let (inner_address)=get_inner_contract()
-    let (liq_result, least_collateral_ratio_position)=ILiquidate.check_liquidation(
+    let (liq_result, least_collateral_ratio_position : PositionDetailsWithMarket) =ILiquidate.check_liquidation(
                                                         inner_address, account_address, prices_len, prices)
     return(liq_result,least_collateral_ratio_position)
 end
