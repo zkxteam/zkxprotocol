@@ -4,7 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_block_timestamp
 
 from contracts.Constants import ABR_PAYMENT_INDEX
-from contracts.libraries.FundLibrary import FundLib
+from contracts.libraries.FundLibrary import balance, FundLib
 
 //#########
 // Events #
