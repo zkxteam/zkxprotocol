@@ -408,7 +408,7 @@ async def test_abr_payments(abr_factory):
 
     abr_to_pay = await fixed_math.Math64x61_mul(abr_result.result.price, abr_result.result.abr).call()
 
-    abr_tx = await admin1_signer.send_transaction(admin1, abr_payment.contract_address, "pay_abr", [2, alice.contract_address, bob.contract_address])xww
+    abr_tx = await admin1_signer.send_transaction(admin1, abr_payment.contract_address, "pay_abr", [2, alice.contract_address, bob.contract_address])
 
     # assert_events_emitted(
     #     abr_tx,
