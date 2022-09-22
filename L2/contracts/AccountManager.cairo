@@ -61,6 +61,7 @@ from contracts.DataTypes import (
     WithdrawalRequestForHashing,
 )
 
+from contracts.interfaces.IAccount import IAccount
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -261,7 +262,7 @@ func is_valid_signature_order{
     if (liquidator_address_ != 0) {
         // To-Do Verify whether call came from node operator
 
-        let (_public_key) = IAccountManager.get_public_key(contract_address=liquidator_address_);
+        let (_public_key) = IAccount.getPublicKey(contract_address=liquidator_address_);
         pub_key = _public_key;
 
         tempvar syscall_ptr = syscall_ptr;
