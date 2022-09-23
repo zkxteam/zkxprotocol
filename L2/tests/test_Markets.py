@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61, PRIME
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -61,40 +61,47 @@ async def test_add_new_market_not_admin(adminAuth_factory):
 async def test_add_new_market_invalid_leverage(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
         str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(11), 1, 0, 60]))
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
         str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(0), 1, 0, 60]))
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(-43), 1, 0, 60]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(-43)%PRIME, 1, 0, 60]),
+        "Leverage should be more than or equal to 1"
+        )
 
 @pytest.mark.asyncio
 async def test_add_new_market_invalid_ttl(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
         str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 0]))
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
         str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 36001]))
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, -60]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, -60%PRIME])
+        
+        )
 
 @pytest.mark.asyncio
 async def test_add_new_market_invalid_tradable(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 0, 0, 60]))
+    # commented out the following test since tradable parameter can be 0 as per smart contract code
+    # assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+    #    str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 0, 0, 60]))
 
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
         str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 3, 0, 60]))
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), -1, 0, 60]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), -1%PRIME, 0, 60]),
+        "Tradable cannot be less than zero"
+        )
 
 @pytest.mark.asyncio
 async def test_add_new_market_non_existent_asset(adminAuth_factory):

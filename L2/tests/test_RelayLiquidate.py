@@ -416,10 +416,8 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         0,
         to64x61(0.05)
     ])
-    print("liquidation resul...", liquidate_result_alice.result.response[0], " ",
-          liquidate_result_alice.result.response[1])
 
-    assert liquidate_result_alice.result.response[1] == order_id_1
+    assert liquidate_result_alice.call_info.retdata[2] == order_id_1
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -458,11 +456,8 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         to64x61(0.05)
     ])
 
-    print("liquidation resul...", liquidate_result_bob.result.response[0],
-          liquidate_result_bob.result.response[1])
-
-    assert liquidate_result_bob.result.response[0] == 0
-    assert liquidate_result_bob.result.response[1] == order_id_2
+    assert liquidate_result_bob.call_info.retdata[1] == 0
+    assert liquidate_result_bob.call_info.retdata[2] == order_id_2
 
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
     print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
@@ -601,11 +596,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         0,
         to64x61(0.05)
     ])
-    print("liquidation resul...", liquidate_result_alice.result.response[0], " ",
-          liquidate_result_alice.result.response[1])
 
-    assert liquidate_result_alice.result.response[0] == 0
-    assert liquidate_result_alice.result.response[1] == order_id_3
+    assert liquidate_result_alice.call_info.retdata[1] == 0
+    assert liquidate_result_alice.call_info.retdata[2] == order_id_3
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -648,11 +641,8 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         to64x61(0.05)
     ])
 
-    print("liquidation resul...", liquidate_result_bob.result.response[0],
-          liquidate_result_bob.result.response[1])
-
-    assert liquidate_result_bob.result.response[0] == 0
-    assert liquidate_result_bob.result.response[1] == order_id_4
+    assert liquidate_result_bob.call_info.retdata[1] == 0
+    assert liquidate_result_bob.call_info.retdata[2] == order_id_4
 
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
     print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
@@ -698,12 +688,10 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
         0,
         to64x61(0.05)
     ])
-    print("liquidation result alice liquidated...", liquidate_result_alice.result.response[0], " ",
-          liquidate_result_alice.result.response[1])
 
-    assert liquidate_result_alice.result.response[1] == str_to_felt(
+    assert liquidate_result_alice.call_info.retdata[2] == str_to_felt(
         "343uofdsjxz")
-    assert liquidate_result_alice.result.response[0] == 1
+    assert liquidate_result_alice.call_info.retdata[1] == 1
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -717,7 +705,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
 
   
 
-    order_state = await alice.get_order_data(orderID_=liquidate_result_alice.result.response[1]).call()
+    order_state = await alice.get_order_data(orderID_=liquidate_result_alice.call_info.retdata[2]).call()
     res4 = list(order_state.result.res)
     print(res4)
 
@@ -866,11 +854,9 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         0,
         to64x61(1.05),
     ])
-    print("liquidation result of charlie...",
-          liquidate_result_charlie.result.response[0], " ", liquidate_result_charlie.result.response[1])
 
-    assert liquidate_result_charlie.result.response[0] == 1
-    assert liquidate_result_charlie.result.response[1] == str_to_felt(
+    assert liquidate_result_charlie.call_info.retdata[1] == 1
+    assert liquidate_result_charlie.call_info.retdata[2] == str_to_felt(
         "sadfjkh2178")
 
     charlie_balance_usdc = await charlie.get_balance(USDC_ID).call()
@@ -1002,40 +988,6 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
 
     assert charlie_curr_balance.result.res == to64x61(0)
 
-
-
-@pytest.mark.asyncio
-async def test_should_not_allow_non_liquidators(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
-    ##############################################
-    ######## Bob's liquidation result 3 ##########
-    ##############################################
-    await (admin3_signer.send_transaction(admin3, liquidate.contract_address, "check_liquidation", [
-        bob.contract_address,
-        # 2 Position + 2 Collaterals
-        4,
-        # Position 1 - BTC long
-        BTC_ID,
-        USDC_ID,
-        to64x61(6000),
-        to64x61(1.05),
-        # Position 2 -
-        #  ETH long
-        ETH_ID,
-        USDC_ID,
-        to64x61(86),
-        to64x61(1.05),
-        # Collateral 1 - USDC
-        0,
-        USDC_ID,
-        0,
-        to64x61(1.05),
-        # Collateral 2 - UST
-        0,
-        UST_ID,
-        0,
-        to64x61(0.05)
-    ]))
 
 
 @pytest.mark.asyncio
@@ -1195,11 +1147,9 @@ async def test_deleveraging_flow(adminAuth_factory):
         0,
         to64x61(1.05),
     ])
-    print("liquidation result of eduard...",
-          liquidate_result_eduard.result.response[0], " ", liquidate_result_eduard.result.response[1])
 
-    assert liquidate_result_eduard.result.response[0] == 1
-    assert liquidate_result_eduard.result.response[1] == str_to_felt(
+    assert liquidate_result_eduard.call_info.retdata[1] == 1
+    assert liquidate_result_eduard.call_info.retdata[2] == str_to_felt(
         "343uofdsjxz")
 
    
@@ -1368,11 +1318,9 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
         0,
         to64x61(1.05),
     ])
-    print("liquidation result of eduard...",
-          liquidate_result_eduard.result.response[0], " ", liquidate_result_eduard.result.response[1])
 
-    assert liquidate_result_eduard.result.response[0] == 1
-    assert liquidate_result_eduard.result.response[1] == str_to_felt(
+    assert liquidate_result_eduard.call_info.retdata[1] == 1
+    assert liquidate_result_eduard.call_info.retdata[2] == str_to_felt(
         "343uofdsjxz")
 
   

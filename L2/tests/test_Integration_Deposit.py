@@ -179,7 +179,7 @@ async def test_deposit_positive_flow(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi,
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     result = await new_account_contract.get_balance(asset_id).call()
     assert result.result.res==0
@@ -233,7 +233,7 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi,
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==2
@@ -306,7 +306,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi,
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==2
@@ -372,7 +372,7 @@ async def test_deposit_incorrect_L1_address(adminAuth_factory):
     new_account_contract = StarknetContract(state=account_registry.state,
                                             abi=abi,
                                             contract_address=deployed_address,
-                                            deploy_execution_info=None)
+                                            deploy_call_info=None)
 
     result = await new_account_contract.get_balance(asset_id).call()
     assert from64x61(result.result.res)==2

@@ -13,6 +13,7 @@ signer4 = Signer(123456789987654324)
 signer5 = Signer(123456789987654325)
 
 L1_dummy_address = 0x01234567899876543210
+PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481
 
 
 @pytest.fixture(scope='module')
@@ -57,7 +58,7 @@ async def test_get_min_num_admins(adminAuth_factory):
 async def test_set_min_num_admins(adminAuth_factory):
     adminAuth, admin1, admin2, user1, user2, user3 = adminAuth_factory
     # cannot set negative number for min admins
-    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'set_min_num_admins', [-1]))
+    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'set_min_num_admins', [-1%PRIME]), "Incorrect value for minimum number of admins - should be >=2")
     # cannot set any number less than 2
     await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'set_min_num_admins', [1]))
     # only admin can call this function

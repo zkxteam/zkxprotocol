@@ -1,264 +1,264 @@
 %lang starknet
 
-# @notice struct to store details of markets
-struct Market:
-    member asset : felt
-    member assetCollateral : felt
-    member leverage : felt
-    member tradable : felt
-    member archived : felt
-    member ttl : felt
-end
+// @notice struct to store details of markets
+struct Market {
+    asset: felt,
+    assetCollateral: felt,
+    leverage: felt,
+    tradable: felt,
+    archived: felt,
+    ttl: felt,
+}
 
-# @notice struct to store details of markets with IDs
-struct MarketWID:
-    member id : felt
-    member asset : felt
-    member assetCollateral : felt
-    member leverage : felt
-    member tradable : felt
-    member archived : felt
-    member ttl : felt
-end
+// @notice struct to store details of markets with IDs
+struct MarketWID {
+    id: felt,
+    asset: felt,
+    assetCollateral: felt,
+    leverage: felt,
+    tradable: felt,
+    archived: felt,
+    ttl: felt,
+}
 
-# @notice struct to store details of assets
-struct Asset:
-    member asset_version : felt
-    member ticker : felt
-    member short_name : felt
-    member tradable : felt
-    member collateral : felt
-    member token_decimal : felt
-    member metadata_id : felt
-    member tick_size : felt
-    member step_size : felt
-    member minimum_order_size : felt
-    member minimum_leverage : felt
-    member maximum_leverage : felt
-    member currently_allowed_leverage : felt
-    member maintenance_margin_fraction : felt
-    member initial_margin_fraction : felt
-    member incremental_initial_margin_fraction : felt
-    member incremental_position_size : felt
-    member baseline_position_size : felt
-    member maximum_position_size : felt
-end
+// @notice struct to store details of assets
+struct Asset {
+    asset_version: felt,
+    ticker: felt,
+    short_name: felt,
+    tradable: felt,
+    collateral: felt,
+    token_decimal: felt,
+    metadata_id: felt,
+    tick_size: felt,
+    step_size: felt,
+    minimum_order_size: felt,
+    minimum_leverage: felt,
+    maximum_leverage: felt,
+    currently_allowed_leverage: felt,
+    maintenance_margin_fraction: felt,
+    initial_margin_fraction: felt,
+    incremental_initial_margin_fraction: felt,
+    incremental_position_size: felt,
+    baseline_position_size: felt,
+    maximum_position_size: felt,
+}
 
-# @notice struct to store details of assets with IDs
-struct AssetWID:
-    member id : felt
-    member asset_version : felt
-    member ticker : felt
-    member short_name : felt
-    member tradable : felt
-    member collateral : felt
-    member token_decimal : felt
-    member metadata_id : felt
-    member tick_size : felt
-    member step_size : felt
-    member minimum_order_size : felt
-    member minimum_leverage : felt
-    member maximum_leverage : felt
-    member currently_allowed_leverage : felt
-    member maintenance_margin_fraction : felt
-    member initial_margin_fraction : felt
-    member incremental_initial_margin_fraction : felt
-    member incremental_position_size : felt
-    member baseline_position_size : felt
-    member maximum_position_size : felt
-end
+// @notice struct to store details of assets with IDs
+struct AssetWID {
+    id: felt,
+    asset_version: felt,
+    ticker: felt,
+    short_name: felt,
+    tradable: felt,
+    collateral: felt,
+    token_decimal: felt,
+    metadata_id: felt,
+    tick_size: felt,
+    step_size: felt,
+    minimum_order_size: felt,
+    minimum_leverage: felt,
+    maximum_leverage: felt,
+    currently_allowed_leverage: felt,
+    maintenance_margin_fraction: felt,
+    initial_margin_fraction: felt,
+    incremental_initial_margin_fraction: felt,
+    incremental_position_size: felt,
+    baseline_position_size: felt,
+    maximum_position_size: felt,
+}
 
-# @notice Struct to store base fee percentage for each tier for maker and taker
-struct BaseFee:
-    member numberOfTokens : felt
-    member makerFee : felt
-    member takerFee : felt
-end
+// @notice Struct to store base fee percentage for each tier for maker and taker
+struct BaseFee {
+    numberOfTokens: felt,
+    makerFee: felt,
+    takerFee: felt,
+}
 
-# @notice Struct to store discount percentage for each tier
-struct Discount:
-    member numberOfTokens : felt
-    member discount : felt
-end
+// @notice Struct to store discount percentage for each tier
+struct Discount {
+    numberOfTokens: felt,
+    discount: felt,
+}
 
-# Struct to pass orders+signatures in a batch in the execute_batch fn
-struct MultipleOrder:
-    member pub_key : felt
-    member sig_r : felt
-    member sig_s : felt
-    member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member stopPrice : felt
-    member orderType : felt
-    member positionSize : felt
-    member direction : felt
-    member closeOrder : felt
-    member leverage : felt
-    member liquidatorAddress : felt
-    member parentOrder : felt
-    member side : felt
-end
+// Struct to pass orders+signatures in a batch in the execute_batch fn
+struct MultipleOrder {
+    pub_key: felt,
+    sig_r: felt,
+    sig_s: felt,
+    orderID: felt,
+    assetID: felt,
+    collateralID: felt,
+    price: felt,
+    stopPrice: felt,
+    orderType: felt,
+    positionSize: felt,
+    direction: felt,
+    closeOrder: felt,
+    leverage: felt,
+    liquidatorAddress: felt,
+    parentOrder: felt,
+    side: felt,
+}
 
-# @notice struct to pass price data to the contract
-struct PriceData:
-    member assetID : felt
-    member collateralID : felt
-    member assetPrice : felt
-    member collateralPrice : felt
-end
+// @notice struct to pass price data to the contract
+struct PriceData {
+    assetID: felt,
+    collateralID: felt,
+    assetPrice: felt,
+    collateralPrice: felt,
+}
 
-# @notice struct for passing the order request to Account Contract
-struct OrderRequest:
-    member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member stopPrice : felt
-    member orderType : felt
-    member positionSize : felt
-    member direction : felt
-    member closeOrder : felt
-    member leverage : felt
-    member liquidatorAddress : felt
-    member parentOrder : felt
-end
+// @notice struct for passing the order request to Account Contract
+struct OrderRequest {
+    orderID: felt,
+    assetID: felt,
+    collateralID: felt,
+    price: felt,
+    stopPrice: felt,
+    orderType: felt,
+    positionSize: felt,
+    direction: felt,
+    closeOrder: felt,
+    leverage: felt,
+    liquidatorAddress: felt,
+    parentOrder: felt,
+}
 
-# @notice struct for storing the order data to Account Contract
-struct OrderDetails:
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
-    member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
-    member leverage : felt
-end
+// @notice struct for storing the order data to Account Contract
+struct OrderDetails {
+    assetID: felt,
+    collateralID: felt,
+    price: felt,
+    executionPrice: felt,
+    positionSize: felt,
+    orderType: felt,
+    direction: felt,
+    portionExecuted: felt,
+    status: felt,
+    marginAmount: felt,
+    borrowedAmount: felt,
+    leverage: felt,
+}
 
-# Struct for passing signature to Account Contract
-struct Signature:
-    member r_value : felt
-    member s_value : felt
-end
+// Struct for passing signature to Account Contract
+struct Signature {
+    r_value: felt,
+    s_value: felt,
+}
 
-# Struct for Withdrawal Request
-struct WithdrawalRequest:
-    member user_l1_address : felt
-    member user_l2_address : felt
-    member ticker : felt
-    member amount : felt
-end
+// Struct for Withdrawal Request
+struct WithdrawalRequest {
+    user_l1_address: felt,
+    user_l2_address: felt,
+    ticker: felt,
+    amount: felt,
+}
 
-# Struct to pass the transactions to the contract
-struct Message:
-    member sender : felt
-    member to : felt
-    member selector : felt
-    member calldata : felt*
-    member calldata_size : felt
-    member nonce : felt
-end
+// Struct to pass the transactions to the contract
+struct Message {
+    sender: felt,
+    to: felt,
+    selector: felt,
+    calldata: felt*,
+    calldata_size: felt,
+    nonce: felt,
+}
 
-# status 0: initiated
-# status 1: partial
-# status 2: executed
-# status 3: close partial
-# status 4: close
-# status 5: toBeDeleveraged
-# status 6: toBeLiquidated
-# status 7: fullyLiquidated
-struct OrderDetailsWithIDs:
-    member orderID : felt
-    member assetID : felt
-    member collateralID : felt
-    member price : felt
-    member executionPrice : felt
-    member positionSize : felt
-    member orderType : felt
-    member direction : felt
-    member portionExecuted : felt
-    member status : felt
-    member marginAmount : felt
-    member borrowedAmount : felt
-end
+// status 0: initiated
+// status 1: partial
+// status 2: executed
+// status 3: close partial
+// status 4: close
+// status 5: toBeDeleveraged
+// status 6: toBeLiquidated
+// status 7: fullyLiquidated
+struct OrderDetailsWithIDs {
+    orderID: felt,
+    assetID: felt,
+    collateralID: felt,
+    price: felt,
+    executionPrice: felt,
+    positionSize: felt,
+    orderType: felt,
+    direction: felt,
+    portionExecuted: felt,
+    status: felt,
+    marginAmount: felt,
+    borrowedAmount: felt,
+}
 
-# Struct to store collateral balances
-struct CollateralBalance:
-    member assetID : felt
-    member balance : felt
-end
+// Struct to store collateral balances
+struct CollateralBalance {
+    assetID: felt,
+    balance: felt,
+}
 
-# Struct to store withdrawal details
-# status 0: initiated
-# status 1: withdrawal succcessful
-struct WithdrawalHistory:
-    member request_id : felt
-    member collateral_id : felt
-    member amount : felt
-    member timestamp : felt
-    member node_operator_L2_address : felt
-    member fee : felt
-    member status : felt
-end
+// Struct to store withdrawal details
+// status 0: initiated
+// status 1: withdrawal succcessful
+struct WithdrawalHistory {
+    request_id: felt,
+    collateral_id: felt,
+    amount: felt,
+    timestamp: felt,
+    node_operator_L2_address: felt,
+    fee: felt,
+    status: felt,
+}
 
-# Struct for hashing withdrawal request
-struct WithdrawalRequestForHashing:
-    member request_id : felt
-    member collateral_id : felt
-    member amount : felt
-end
+// Struct for hashing withdrawal request
+struct WithdrawalRequestForHashing {
+    request_id: felt,
+    collateral_id: felt,
+    amount: felt,
+}
 
-# Struct to store Market price
-struct MarketPrice:
-    member asset_id : felt
-    member collateral_id : felt
-    member timestamp : felt
-    member price : felt
-end
+// Struct to store Market price
+struct MarketPrice {
+    asset_id: felt,
+    collateral_id: felt,
+    timestamp: felt,
+    price: felt,
+}
 
-# Struct for message to consume for quoting fee in L1
-struct QuoteL1Message:
-    member user_l1_address : felt
-    member ticker : felt
-    member amount : felt
-    member timestamp : felt
-    member L1_fee_amount : felt
-    member L1_fee_ticker : felt
-end
+// Struct for message to consume for quoting fee in L1
+struct QuoteL1Message {
+    user_l1_address: felt,
+    ticker: felt,
+    amount: felt,
+    timestamp: felt,
+    L1_fee_amount: felt,
+    L1_fee_ticker: felt,
+}
 
-struct CoreFunctionCall:
-    member index: felt
-    member version: felt
-    member nonce: felt
-    member function_selector: felt
-    member calldata_len: felt
-    member calldata: felt*
-end
+struct CoreFunctionCall {
+    index: felt,
+    version: felt,
+    nonce: felt,
+    function_selector: felt,
+    calldata_len: felt,
+    calldata: felt*,
+}
 
-struct CoreFunction:
-    member index: felt
-    member version: felt
-    member function_selector: felt
-end
-# struct to store deposit payload information (for L1->L2 interaction) + other useful data
-struct DepositData:
-    member user_L1_address : felt
-    member user_L2_address : felt
-    member ticker : felt
-    member amount : felt
-    member nonce : felt
-    member message_hash : felt
-    member timestamp : felt
-end
+struct CoreFunction {
+    index: felt,
+    version: felt,
+    function_selector: felt,
+}
+// struct to store deposit payload information (for L1->L2 interaction) + other useful data
+struct DepositData {
+    user_L1_address: felt,
+    user_L2_address: felt,
+    ticker: felt,
+    amount: felt,
+    nonce: felt,
+    message_hash: felt,
+    timestamp: felt,
+}
 
-# Struct to store Collateral price
-struct CollateralPrice:
-    member timestamp : felt
-    member price_in_usd : felt
-end
+// Struct to store Collateral price
+struct CollateralPrice {
+    timestamp: felt,
+    price_in_usd: felt,
+}
