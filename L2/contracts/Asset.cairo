@@ -13,270 +13,257 @@ from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
 
-#############
-# Constants #
-#############
+//############
+// Constants #
+//############
 
-const ADD_ASSET = 1
-const REMOVE_ASSET = 2
+const ADD_ASSET = 1;
+const REMOVE_ASSET = 2;
 
-##########
-# Events #
-##########
+//#########
+// Events #
+//#########
 
-# Event emitted on Asset contract deployment
+// Event emitted on Asset contract deployment
 @event
 func Asset_Contract_Created(
-    contract_address : felt, registry_address : felt, version : felt, caller_address : felt
-):
-end
+    contract_address: felt, registry_address: felt, version: felt, caller_address: felt
+) {
+}
 
-# Event emitted whenever new asset is added
+// Event emitted whenever new asset is added
 @event
-func Asset_Added(
-    asset_id : felt, ticker : felt, caller_address : felt
-):
-end
+func Asset_Added(asset_id: felt, ticker: felt, caller_address: felt) {
+}
 
-# Event emitted whenever asset is removed
+// Event emitted whenever asset is removed
 @event
-func Asset_Removed(
-    asset_id : felt, ticker : felt, caller_address : felt
-):
-end
+func Asset_Removed(asset_id: felt, ticker: felt, caller_address: felt) {
+}
 
-# Event emitted whenever asset core settings are updated
+// Event emitted whenever asset core settings are updated
 @event
-func Asset_Core_Settings_Update(
-    asset_id : felt, ticker : felt, caller_address : felt
-):
-end
+func Asset_Core_Settings_Update(asset_id: felt, ticker: felt, caller_address: felt) {
+}
 
-# Event emitted whenever asset trade settings are updated
+// Event emitted whenever asset trade settings are updated
 @event
 func Asset_Trade_Settings_Update(
-    asset_id : felt, ticker : felt, new_contract_version : felt, new_asset_version : felt, caller_address : felt
-):
-end
+    asset_id: felt,
+    ticker: felt,
+    new_contract_version: felt,
+    new_asset_version: felt,
+    caller_address: felt,
+) {
+}
 
-###########
-# Storage #
-###########
+//##########
+// Storage #
+//##########
 
-# Contract version
+// Contract version
 @storage_var
-func contract_version() -> (version : felt):
-end
+func contract_version() -> (version: felt) {
+}
 
-# Address of AuthorizedRegistry contract
+// Address of AuthorizedRegistry contract
 @storage_var
-func registry_address() -> (contract_address : felt):
-end
+func registry_address() -> (contract_address: felt) {
+}
 
-# Version of Asset contract to refresh in node
+// Version of Asset contract to refresh in node
 @storage_var
-func version() -> (res : felt):
-end
+func version() -> (res: felt) {
+}
 
-# Length of assets array
+// Length of assets array
 @storage_var
-func assets_array_len() -> (len : felt):
-end
+func assets_array_len() -> (len: felt) {
+}
 
-# Array of asset IDs
+// Array of asset IDs
 @storage_var
-func asset_id_by_index(index : felt) -> (asset_id : felt):
-end
+func asset_id_by_index(index: felt) -> (asset_id: felt) {
+}
 
-# Mapping between asset ID and asset's index
+// Mapping between asset ID and asset's index
 @storage_var
-func asset_index_by_id(asset_id : felt) -> (index : felt):
-end
+func asset_index_by_id(asset_id: felt) -> (index: felt) {
+}
 
-# Mapping between asset ID and asset's data
+// Mapping between asset ID and asset's data
 @storage_var
-func asset_by_id(asset_id : felt) -> (res : Asset):
-end
+func asset_by_id(asset_id: felt) -> (res: Asset) {
+}
 
-# Bool indicating if ID already exists
+// Bool indicating if ID already exists
 @storage_var
-func asset_id_exists(asset_id : felt) -> (res : felt):
-end
+func asset_id_exists(asset_id: felt) -> (res: felt) {
+}
 
-# Bool indicating if ticker already exists
+// Bool indicating if ticker already exists
 @storage_var
-func asset_ticker_exists(ticker : felt) -> (res : felt):
-end
+func asset_ticker_exists(ticker: felt) -> (res: felt) {
+}
 
-###############
-# Constructor #
-###############
+//##############
+// Constructor #
+//##############
 
-# @notice Constructor of the smart-contract
-# @param registry_address_ Address of the AuthorizedRegistry contract
-# @param version_ Version of this contract
+// @notice Constructor of the smart-contract
+// @param registry_address_ Address of the AuthorizedRegistry contract
+// @param version_ Version of this contract
 @constructor
-func constructor{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    registry_address_ : felt, version_ : felt
-):
-    # Validate arguments
-    with_attr error_message("Registry address or version used for Asset deployment is 0"):
-        assert_not_zero(registry_address_)
-        assert_not_zero(version_)
-    end
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    registry_address_: felt, version_: felt
+) {
+    // Validate arguments
+    with_attr error_message("Registry address or version used for Asset deployment is 0") {
+        assert_not_zero(registry_address_);
+        assert_not_zero(version_);
+    }
 
-    # Initialize storage
-    registry_address.write(registry_address_)
-    contract_version.write(version_)
+    // Initialize storage
+    registry_address.write(registry_address_);
+    contract_version.write(version_);
 
-    # Emit event
-    let (contract_address) = get_contract_address()
-    let (caller_address) = get_caller_address()
-    Asset_Contract_Created.emit(
-        contract_address, 
-        registry_address_, 
-        version_,
-        caller_address
-    )
+    // Emit event
+    let (contract_address) = get_contract_address();
+    let (caller_address) = get_caller_address();
+    Asset_Contract_Created.emit(contract_address, registry_address_, version_, caller_address);
 
-    return ()
-end
+    return ();
+}
 
-##################
-# View functions #
-##################
+//#################
+// View functions #
+//#################
 
-# @notice View function for Assets
-# @param id - random string generated by zkxnode's mongodb
-# @return currAsset - Returns the requested asset
+// @notice View function for Assets
+// @param id - random string generated by zkxnode's mongodb
+// @return currAsset - Returns the requested asset
 @view
-func getAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt
-) -> (currAsset : Asset):
-    _verify_asset_id_exists(id, should_exist=TRUE)
-    let (asset : Asset) = asset_by_id.read(id)
-    return (asset)
-end
+func getAsset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) -> (
+    currAsset: Asset
+) {
+    _verify_asset_id_exists(id, should_exist=TRUE);
+    let (asset: Asset) = asset_by_id.read(id);
+    return (asset,);
+}
 
-# @notice View function to get the maintenance margin for the asset
-# @param id - Id of the asset
-# @return maintenance_margin - Returns the maintenance margin of the asset
+// @notice View function to get the maintenance margin for the asset
+// @param id - Id of the asset
+// @return maintenance_margin - Returns the maintenance margin of the asset
 @view
-func get_maintenance_margin{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt
-) -> (maintenance_margin : felt):
-    _verify_asset_id_exists(id, should_exist=TRUE)
-    let (asset : Asset) = asset_by_id.read(id)
-    return (asset.maintenance_margin_fraction)
-end
+func get_maintenance_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    id: felt
+) -> (maintenance_margin: felt) {
+    _verify_asset_id_exists(id, should_exist=TRUE);
+    let (asset: Asset) = asset_by_id.read(id);
+    return (asset.maintenance_margin_fraction,);
+}
 
-# @notice View function for getting version
-# @return - Returns the version
+// @notice View function for getting version
+// @return - Returns the version
 @view
-func get_version{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    version : felt
-):
-    let (res) = version.read()
-    return (res)
-end
+func get_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    version: felt
+) {
+    let (res) = version.read();
+    return (res,);
+}
 
-# @notice View function to return all the assets with ids in an array
-# @return array_list_len - Number of assets
-# @return array_list - Fully populated list of assets
+// @notice View function to return all the assets with ids in an array
+// @return array_list_len - Number of assets
+// @return array_list - Fully populated list of assets
 @view
-func returnAllAssets{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}() -> (
-    array_list_len : felt, array_list : AssetWID*
-):
-    let (final_len) = assets_array_len.read()
-    let (asset_list : AssetWID*) = alloc()
-    return _populate_asset_list(0, final_len, asset_list)
-end
+func returnAllAssets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    array_list_len: felt, array_list: AssetWID*
+) {
+    let (final_len) = assets_array_len.read();
+    let (asset_list: AssetWID*) = alloc();
+    return _populate_asset_list(0, final_len, asset_list);
+}
 
-######################
-# External functions #
-######################
+//#####################
+// External functions #
+//#####################
 
-# @notice Add asset function
-# @param id - random string generated by zkxnode's mongodb
-# @param new_asset - Asset struct variable with the required details
+// @notice Add asset function
+// @param id - random string generated by zkxnode's mongodb
+// @param new_asset - Asset struct variable with the required details
 @external
-func addAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt, new_asset : Asset
-):
-    alloc_locals
+func addAsset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    id: felt, new_asset: Asset
+) {
+    alloc_locals;
 
-    # Verify authority, state and input
-    assert_not_zero(id)
-    _verify_caller_authority()
-    _verify_asset_id_exists(id, should_exist=FALSE)
-    _verify_ticker_exists(new_asset.ticker, should_exist=FALSE)
-    _validate_asset_properties(new_asset)
+    // Verify authority, state and input
+    assert_not_zero(id);
+    _verify_caller_authority();
+    _verify_asset_id_exists(id, should_exist=FALSE);
+    _verify_ticker_exists(new_asset.ticker, should_exist=FALSE);
+    _validate_asset_properties(new_asset);
 
-    # Save asset_id
-    let (curr_len) = assets_array_len.read()
-    asset_id_by_index.write(curr_len, id)
-    asset_index_by_id.write(id, curr_len)
-    assets_array_len.write(curr_len + 1)
+    // Save asset_id
+    let (curr_len) = assets_array_len.read();
+    asset_id_by_index.write(curr_len, id);
+    asset_index_by_id.write(id, curr_len);
+    assets_array_len.write(curr_len + 1);
 
-    # Update id & ticker existence
-    asset_id_exists.write(id, TRUE)
-    asset_ticker_exists.write(new_asset.ticker, TRUE)
+    // Update id & ticker existence
+    asset_id_exists.write(id, TRUE);
+    asset_ticker_exists.write(new_asset.ticker, TRUE);
 
-    # Save new_asset struct
-    asset_by_id.write(id, new_asset)
+    // Save new_asset struct
+    asset_by_id.write(id, new_asset);
 
-    # Trigger asset update on L1
-    _update_asset_on_L1(
-        asset_id=id, 
-        ticker=new_asset.ticker, 
-        action=ADD_ASSET
-    )
+    // Trigger asset update on L1
+    _update_asset_on_L1(asset_id=id, ticker=new_asset.ticker, action=ADD_ASSET);
 
-    # Emit event
-    let (caller_address) = get_caller_address()
-    Asset_Added.emit(
-        asset_id=id, 
-        ticker=new_asset.ticker, 
-        caller_address=caller_address
-    )
-    
-    return ()
-end
+    // Emit event
+    let (caller_address) = get_caller_address();
+    Asset_Added.emit(asset_id=id, ticker=new_asset.ticker, caller_address=caller_address);
 
-# @notice Remove asset function
-# @param id_to_remove - random string generated by zkxnode's mongodb
+    return ();
+}
+
+// @notice Remove asset function
+// @param id_to_remove - random string generated by zkxnode's mongodb
 @external
-func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id_to_remove : felt
-):
-    alloc_locals
+func removeAsset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    id_to_remove: felt
+) {
+    alloc_locals;
 
-    # Verify authority and state
-    _verify_caller_authority()
-    _verify_asset_id_exists(id_to_remove, should_exist=TRUE)
-    
-    # Prepare necessary data
-    let (asset_to_remove : Asset) = asset_by_id.read(id_to_remove)
-    local ticker_to_remove = asset_to_remove.ticker
-    let (local index_to_remove) = asset_index_by_id.read(id_to_remove)
-    let (local curr_len) = assets_array_len.read()
-    local last_asset_index = curr_len - 1
-    let (local last_asset_id) = asset_id_by_index.read(last_asset_index)
+    // Verify authority and state
+    _verify_caller_authority();
+    _verify_asset_id_exists(id_to_remove, should_exist=TRUE);
 
-    # Replace id_to_remove with last_asset_id
-    asset_id_by_index.write(index_to_remove, last_asset_id)
-    asset_index_by_id.write(last_asset_id, index_to_remove)
+    // Prepare necessary data
+    let (asset_to_remove: Asset) = asset_by_id.read(id_to_remove);
+    local ticker_to_remove = asset_to_remove.ticker;
+    let (local index_to_remove) = asset_index_by_id.read(id_to_remove);
+    let (local curr_len) = assets_array_len.read();
+    local last_asset_index = curr_len - 1;
+    let (local last_asset_id) = asset_id_by_index.read(last_asset_index);
 
-    # Delete id_to_remove
-    asset_id_by_index.write(last_asset_index, 0)
-    assets_array_len.write(curr_len - 1)
+    // Replace id_to_remove with last_asset_id
+    asset_id_by_index.write(index_to_remove, last_asset_id);
+    asset_index_by_id.write(last_asset_id, index_to_remove);
 
-    # Mark id & ticker as non-existing
-    asset_id_exists.write(id_to_remove, FALSE)
-    asset_ticker_exists.write(ticker_to_remove, FALSE)
+    // Delete id_to_remove
+    asset_id_by_index.write(last_asset_index, 0);
+    assets_array_len.write(curr_len - 1);
 
-    # Delete asset struct
-    asset_by_id.write(id_to_remove, Asset(
+    // Mark id & ticker as non-existing
+    asset_id_exists.write(id_to_remove, FALSE);
+    asset_ticker_exists.write(ticker_to_remove, FALSE);
+
+    // Delete asset struct
+    asset_by_id.write(
+        id_to_remove,
+        Asset(
         asset_version=0,
         ticker=0,
         short_name=0,
@@ -296,50 +283,45 @@ func removeAsset{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_p
         incremental_position_size=0,
         baseline_position_size=0,
         maximum_position_size=0
-    ))
+        ),
+    );
 
-    # Trigger asset update on L1
-    _update_asset_on_L1(
-        asset_id=id_to_remove, 
-        ticker=ticker_to_remove, 
-        action=REMOVE_ASSET
-    )
+    // Trigger asset update on L1
+    _update_asset_on_L1(asset_id=id_to_remove, ticker=ticker_to_remove, action=REMOVE_ASSET);
 
-    # Emit event
-    let (caller_address) = get_caller_address()
+    // Emit event
+    let (caller_address) = get_caller_address();
     Asset_Removed.emit(
-        asset_id=id_to_remove,
-        ticker=ticker_to_remove, 
-        caller_address=caller_address
-    )
+        asset_id=id_to_remove, ticker=ticker_to_remove, caller_address=caller_address
+    );
 
-    return ()
-end
+    return ();
+}
 
-# @notice Modify core settings of asset function
-# @param id - random string generated by zkxnode's mongodb
-# @param short_name - new short_name for the asset
-# @param tradable - new tradable flag value for the asset
-# @param collateral - new collateral falg value for the asset
-# @param token_decimal - It represents decimal point value of the token
-# @param metadata_id - ID generated by asset metadata collection in zkx node
+// @notice Modify core settings of asset function
+// @param id - random string generated by zkxnode's mongodb
+// @param short_name - new short_name for the asset
+// @param tradable - new tradable flag value for the asset
+// @param collateral - new collateral falg value for the asset
+// @param token_decimal - It represents decimal point value of the token
+// @param metadata_id - ID generated by asset metadata collection in zkx node
 @external
-func modify_core_settings {syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} (
-    id : felt,
-    short_name : felt,
-    tradable : felt,
-    collateral : felt,
-    token_decimal : felt,
-    metadata_id : felt,
-):
-    alloc_locals
+func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    id: felt,
+    short_name: felt,
+    tradable: felt,
+    collateral: felt,
+    token_decimal: felt,
+    metadata_id: felt,
+) {
+    alloc_locals;
 
-    # Verify authority and state
-    _verify_caller_authority()
-    _verify_asset_id_exists(id, should_exist=TRUE)
-    
-    # Create updated_asset
-    let (asset : Asset) = asset_by_id.read(id)
+    // Verify authority and state
+    _verify_caller_authority();
+    _verify_asset_id_exists(id, should_exist=TRUE);
+
+    // Create updated_asset
+    let (asset: Asset) = asset_by_id.read(id);
     local updated_asset: Asset = Asset(
         asset_version=asset.asset_version,
         ticker=asset.ticker,
@@ -360,62 +342,60 @@ func modify_core_settings {syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
         incremental_position_size=asset.incremental_position_size,
         baseline_position_size=asset.baseline_position_size,
         maximum_position_size=asset.maximum_position_size
-    )
+        );
 
-    # Validate and save updated asset
-    _validate_asset_properties(updated_asset)
-    asset_by_id.write(id, updated_asset)
+    // Validate and save updated asset
+    _validate_asset_properties(updated_asset);
+    asset_by_id.write(id, updated_asset);
 
-    # Emit event
-    let (caller_address) = get_caller_address()
+    // Emit event
+    let (caller_address) = get_caller_address();
     Asset_Core_Settings_Update.emit(
-        asset_id=id,
-        ticker=updated_asset.ticker,
-        caller_address=caller_address
-    )
+        asset_id=id, ticker=updated_asset.ticker, caller_address=caller_address
+    );
 
-    return ()
-end
+    return ();
+}
 
-# @notice Modify core settings of asset function
-# @param id - random string generated by zkxnode's mongodb
-# @param tick_size - new tradable flag value for the asset
-# @param step_size - new collateral flag value for the asset
-# @param minimum_order_size - new minimum_order_size value for the asset
-# @param minimum_leverage - new minimum_leverage value for the asset
-# @param maximum_leverage - new maximum_leverage value for the asset
-# @param currently_allowed_leverage - new currently_allowed_leverage value for the asset
-# @param maintenance_margin_fraction - new maintenance_margin_fraction value for the asset
-# @param initial_margin_fraction - new initial_margin_fraction value for the asset
-# @param incremental_initial_margin_fraction - new incremental_initial_margin_fraction value for the asset
-# @param incremental_position_size - new incremental_position_size value for the asset
-# @param baseline_position_size - new baseline_position_size value for the asset
-# @param maximum_position_size - new maximum_position_size value for the asset
+// @notice Modify core settings of asset function
+// @param id - random string generated by zkxnode's mongodb
+// @param tick_size - new tradable flag value for the asset
+// @param step_size - new collateral flag value for the asset
+// @param minimum_order_size - new minimum_order_size value for the asset
+// @param minimum_leverage - new minimum_leverage value for the asset
+// @param maximum_leverage - new maximum_leverage value for the asset
+// @param currently_allowed_leverage - new currently_allowed_leverage value for the asset
+// @param maintenance_margin_fraction - new maintenance_margin_fraction value for the asset
+// @param initial_margin_fraction - new initial_margin_fraction value for the asset
+// @param incremental_initial_margin_fraction - new incremental_initial_margin_fraction value for the asset
+// @param incremental_position_size - new incremental_position_size value for the asset
+// @param baseline_position_size - new baseline_position_size value for the asset
+// @param maximum_position_size - new maximum_position_size value for the asset
 @external
-func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    id : felt,
-    tick_size : felt,
-    step_size : felt,
-    minimum_order_size : felt,
-    minimum_leverage : felt,
-    maximum_leverage : felt,
-    currently_allowed_leverage : felt,
-    maintenance_margin_fraction : felt,
-    initial_margin_fraction : felt,
-    incremental_initial_margin_fraction : felt,
-    incremental_position_size : felt,
-    baseline_position_size : felt,
-    maximum_position_size : felt,
-):
-    alloc_locals
+func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    id: felt,
+    tick_size: felt,
+    step_size: felt,
+    minimum_order_size: felt,
+    minimum_leverage: felt,
+    maximum_leverage: felt,
+    currently_allowed_leverage: felt,
+    maintenance_margin_fraction: felt,
+    initial_margin_fraction: felt,
+    incremental_initial_margin_fraction: felt,
+    incremental_position_size: felt,
+    baseline_position_size: felt,
+    maximum_position_size: felt,
+) {
+    alloc_locals;
 
-    # Verify authority and state
-    _verify_caller_authority()
-    _verify_asset_id_exists(id, should_exist=TRUE)
+    // Verify authority and state
+    _verify_caller_authority();
+    _verify_asset_id_exists(id, should_exist=TRUE);
 
-    # Create updated_asset
-    let (asset : Asset) = asset_by_id.read(id)
-    local updated_asset : Asset = Asset(
+    // Create updated_asset
+    let (asset: Asset) = asset_by_id.read(id);
+    local updated_asset: Asset = Asset(
         asset_version=asset.asset_version + 1,
         ticker=asset.ticker,
         short_name=asset.short_name,
@@ -435,72 +415,72 @@ func modify_trade_settings{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, ran
         incremental_position_size=incremental_position_size,
         baseline_position_size=baseline_position_size,
         maximum_position_size=maximum_position_size
-    )
+        );
 
-    # Validate and save updated asset
-    _validate_asset_properties(updated_asset)
-    asset_by_id.write(id, updated_asset)
+    // Validate and save updated asset
+    _validate_asset_properties(updated_asset);
+    asset_by_id.write(id, updated_asset);
 
-    # Bump version
-    let (local curr_ver) = version.read()
-    version.write(curr_ver + 1)
+    // Bump version
+    let (local curr_ver) = version.read();
+    version.write(curr_ver + 1);
 
-    # Emit event
-    let (caller_address) = get_caller_address()
+    // Emit event
+    let (caller_address) = get_caller_address();
     Asset_Trade_Settings_Update.emit(
         asset_id=id,
         ticker=updated_asset.ticker,
         new_contract_version=curr_ver + 1,
         new_asset_version=updated_asset.asset_version,
-        caller_address=caller_address
-    )
+        caller_address=caller_address,
+    );
 
-    return ()
-end
+    return ();
+}
 
-######################
-# Internal functions #
-######################
+//#####################
+// Internal functions #
+//#####################
 
-# @notice Internal function to update asset list in L1
-# @param asset_id - random string generated by zkxnode's mongodb
-# @param ticker - Ticker of the asset
-# @param action - It could be ADD_ASSET or REMOVE_ASSET action
-func _update_asset_on_L1{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id : felt, ticker : felt, action : felt
-):
-    # Build message payload
-    let (message_payload : felt*) = alloc()
-    assert message_payload[0] = action
-    assert message_payload[1] = ticker
-    assert message_payload[2] = asset_id
+// @notice Internal function to update asset list in L1
+// @param asset_id - random string generated by zkxnode's mongodb
+// @param ticker - Ticker of the asset
+// @param action - It could be ADD_ASSET or REMOVE_ASSET action
+func _update_asset_on_L1{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id: felt, ticker: felt, action: felt
+) {
+    // Build message payload
+    let (message_payload: felt*) = alloc();
+    assert message_payload[0] = action;
+    assert message_payload[1] = ticker;
+    assert message_payload[2] = asset_id;
 
-    # Send asset update message to L1
-    let (registry) = registry_address.read()
-    let (version) = contract_version.read()
+    // Send asset update message to L1
+    let (registry) = registry_address.read();
+    let (version) = contract_version.read();
     let (L1_ZKX_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
-    )
-    send_message_to_l1(to_address=L1_ZKX_address, payload_size=3, payload=message_payload)
+    );
+    send_message_to_l1(to_address=L1_ZKX_address, payload_size=3, payload=message_payload);
 
-    return ()
-end
+    return ();
+}
 
-# @notice Internal Function called by returnAllAssets to recursively add assets to the array and return it
-# @param current_len - current length of array being populated
-# @param final_len - final length of array being populated
-# @param asset_array - array being populated with assets
-# @return array_list_len - Iterator used to populate array
-# @return array_list - Fully populated array of AssetWID
-func _populate_asset_list{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    current_len : felt, final_len : felt, asset_array : AssetWID*
-) -> (array_list_len : felt, array_list : AssetWID*):
-    alloc_locals
-    if current_len == final_len:
-        return (final_len, asset_array)
-    end
-    let (id) = asset_id_by_index.read(current_len)
-    let (asset : Asset) = asset_by_id.read(id)
+// @notice Internal Function called by returnAllAssets to recursively add assets to the array and return it
+// @param current_len - current length of array being populated
+// @param final_len - final length of array being populated
+// @param asset_array - array being populated with assets
+// @return array_list_len - Iterator used to populate array
+// @return array_list - Fully populated array of AssetWID
+func _populate_asset_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    current_len: felt, final_len: felt, asset_array: AssetWID*
+) -> (array_list_len: felt, array_list: AssetWID*) {
+    alloc_locals;
+    if (current_len == final_len) {
+        return (final_len, asset_array);
+    }
+    let (id) = asset_id_by_index.read(current_len);
+    let (asset: Asset) = asset_by_id.read(id);
     assert asset_array[current_len] = AssetWID(
         id=id,
         asset_version=asset.asset_version,
@@ -522,42 +502,42 @@ func _populate_asset_list{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, rang
         incremental_position_size=asset.incremental_position_size,
         baseline_position_size=asset.baseline_position_size,
         maximum_position_size=asset.maximum_position_size,
-    )
-    return _populate_asset_list(current_len + 1, final_len, asset_array)
-end
+        );
+    return _populate_asset_list(current_len + 1, final_len, asset_array);
+}
 
-func _verify_caller_authority{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}():
-    with_attr error_message("Caller not authorized to manage assets"):
-        let (registry) = registry_address.read()
-        let (version) = contract_version.read()
-        verify_caller_authority(registry, version, ManageAssets_ACTION)
-    end
-    return ()
-end
+func _verify_caller_authority{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
+    with_attr error_message("Caller not authorized to manage assets") {
+        let (registry) = registry_address.read();
+        let (version) = contract_version.read();
+        verify_caller_authority(registry, version, ManageAssets_ACTION);
+    }
+    return ();
+}
 
-func _verify_asset_id_exists{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset_id : felt, should_exist : felt
-):
-    with_attr error_message("asset_id existence mismatch"):
-        let (id_exists) = asset_id_exists.read(asset_id)
-        assert id_exists = should_exist
-    end
-    return ()
-end
+func _verify_asset_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id: felt, should_exist: felt
+) {
+    with_attr error_message("asset_id existence mismatch") {
+        let (id_exists) = asset_id_exists.read(asset_id);
+        assert id_exists = should_exist;
+    }
+    return ();
+}
 
-func _verify_ticker_exists{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    ticker : felt, should_exist : felt
-):
-    with_attr error_message("ticker existence mismatch"):
-        let (ticker_exists) = asset_ticker_exists.read(ticker)
-        assert ticker_exists = should_exist
-    end
-    return ()
-end
+func _verify_ticker_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ticker: felt, should_exist: felt
+) {
+    with_attr error_message("ticker existence mismatch") {
+        let (ticker_exists) = asset_ticker_exists.read(ticker);
+        assert ticker_exists = should_exist;
+    }
+    return ();
+}
 
-func _validate_asset_properties{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr}(
-    asset : Asset
-):  
-    # TODO: add asset properties validation https://thalidao.atlassian.net/browse/ZKX-623
-    return ()
-end
+func _validate_asset_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset: Asset
+) {
+    // TODO: add asset properties validation https://thalidao.atlassian.net/browse/ZKX-623
+    return ();
+}
