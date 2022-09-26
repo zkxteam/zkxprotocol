@@ -18,6 +18,7 @@ from contracts.Constants import (
     InsuranceFund_INDEX,
     LIMIT_ORDER,
     Liquidate_INDEX,
+    LIQUIDATION_ORDER,
     LiquidityFund_INDEX,
     LONG,
     Market_INDEX,
@@ -541,6 +542,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     local diff;
     local actual_execution_price;
+    local net_acc_value;
 
     // current order is short order
     if (order_.direction == SHORT) {
@@ -555,7 +557,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Calculate pnl and net account value
     let (pnl) = Math64x61_mul(parent_position.position_size, diff);
-    tempvar net_acc_value = margin_amount + pnl;
+    net_acc_value = margin_amount + pnl;
 
     // Total value of the asset at current price
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
@@ -576,9 +578,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Check if the position is to be liquidated
     let not_liquidation = is_le(order_.orderType, 2);
-
-    // TODO : Add liquidation checks
-    local not_liquidation = TRUE;
 
     // If it's just a close order
     if (not_liquidation == TRUE) {
@@ -635,22 +634,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             tempvar range_check_ptr = range_check_ptr;
         }
     } else {
-        let (
-            liquidatable_market_id: felt, liquidatable_direction: felt, amount_to_be_sold
-        ) = IAccountManager.get_deleveragable_or_liquidatable_position(
-            contract_address=order_.pub_key
-        );
-
-        with_attr error_message("Parent position not marked as liquidatable/deleveragable") {
-            assert liquidatable_market_id = market_id_;
-            assert liquidatable_direction = parent_direction;
-        }
-
         // Liquidation order
-        if (amount_to_be_sold == 0) {
-            with_attr error_message("Wrong order type passed") {
-                assert order_.orderType = 3;
-            }
+        if (order_.orderType == LIQUIDATION_ORDER) {
             // Withdraw the position from holding fund
             IHolding.withdraw(
                 contract_address=holding_address_,
@@ -688,6 +673,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                         assetID_=order_.collateralID,
                         amount=deficit,
                     );
+
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                     tempvar range_check_ptr = range_check_ptr;
@@ -719,6 +705,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     amount=net_acc_value,
                     position_id_=order_.orderID,
                 );
+
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -726,7 +713,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         } else {
             // Deleveraging order
             with_attr error_message("Wrong order type passed") {
-                assert order_.orderType = 4;
+                assert order_.orderType = DELEVERAGING_ORDER;
             }
 
             // Withdraw the position from holding fund

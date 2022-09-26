@@ -61,8 +61,7 @@ from contracts.DataTypes import (
     WithdrawalRequestForHashing,
 )
 
-from contracts.interfaces.IAccount import IAccount
-from contracts.interfaces.IAccountManager import IAccountManager
+from contracts.interfaces.IAccountLiquidator import IAccountLiquidator
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
@@ -119,16 +118,6 @@ func deposited(asset_id: felt, amount: felt) {
 //##########
 // Storage #
 //##########
-
-// Stores the contract version
-@storage_var
-func contract_version() -> (version: felt) {
-}
-
-// Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address: felt) {
-}
 
 // Stores public key associated with an account
 @storage_var
@@ -284,7 +273,7 @@ func is_valid_signature_order{
 
     if (liquidator_address_ != 0) {
         // Verify whether call came from node operator
-        let (_public_key) = IAccount.getPublicKey(contract_address=liquidator_address_);
+        let (_public_key) = IAccountLiquidator.getPublicKey(contract_address=liquidator_address_);
         pub_key = _public_key;
 
         tempvar syscall_ptr = syscall_ptr;
@@ -338,14 +327,13 @@ func get_L1_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 }
 
 // @notice view function to get deleveraged or liquidatable position
-// @return order_id - Id of an order, amount_to_be_sold - amount to be sold in a position
-// @view
+//  @return position - Returns a LiquidatablePosition struct
+@view
 func get_deleveragable_or_liquidatable_position{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}() -> (market_id: felt, direction: felt, amount_to_be_sold: felt) {
-    let (position: LiquidatablePosition) = deleveragable_or_liquidatable_position.read();
-
-    return (position.market_id, position.direction, position.amount_to_be_sold);
+}() -> (position: LiquidatablePosition) {
+    let position = deleveragable_or_liquidatable_position.read();
+    return position;
 }
 
 // @notice view function to get all use collaterals
@@ -355,7 +343,8 @@ func get_deleveragable_or_liquidatable_position{
 func return_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     ) -> (array_list_len: felt, array_list: CollateralBalance*) {
     let (array_list: CollateralBalance*) = alloc();
-    return populate_array_collaterals(0, array_list);
+    let (array_len: felt) = collateral_array_len.read();
+    return populate_array_collaterals(0, array_list, array_len);
 }
 
 // @notice view function to get withdrawal history
@@ -734,33 +723,69 @@ func execute_order{
 
         // Calculate the new leverage if it's a deleveraging order
         local new_leverage;
-        if (request.orderType == DELEVERAGING_ORDER) {
-            let total_value = margin_amount + borrowed_amount;
-            let (leverage_) = Math64x61_div(total_value, margin_amount);
-            new_leverage = leverage_;
 
-            let (_, _, amount) = get_deleveragable_or_liquidatable_position();
-            let updated_amount = amount - size;
-            let positive_updated_amount = abs_value(updated_amount);
+        // Check if it's liq/delveraging order
+        let is_liq = is_le(2, request.orderType);
+
+        if (is_liq == 1) {
+            // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
+            let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read();
+
+            with_attr error_message("The position not marked to be deleveraged/liquidated") {
+                assert liq_position.market_id = market_id;
+                assert liq_position.direction = parent_direction;
+            }
+
+            with_attr error_message(
+                    "The size of order should be less than or equal to the marked one") {
+                assert_le(size, liq_position.amount_to_be_sold);
+            }
+
+            let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
 
             // to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
             let result = is_le(updated_amount, 230584300);
+
             local amount_to_be_updated;
+
             if (result == TRUE) {
-                amount_to_be_updated = 0;
+                assert amount_to_be_updated = 0;
             } else {
-                amount_to_be_updated = updated_amount;
+                assert amount_to_be_updated = updated_amount;
             }
 
+            // Create a struct with the updated details
             let updated_liquidatable_position: LiquidatablePosition = LiquidatablePosition(
-                market_id=market_id,
-                direction=parent_direction,
+                market_id=liq_position.market_id,
+                direction=liq_position.direction,
                 amount_to_be_sold=amount_to_be_updated,
+                liquidatable=liq_position.liquidatable,
             );
+
+            // Update the Liquidatable position
             deleveragable_or_liquidatable_position.write(value=updated_liquidatable_position);
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
+
+            // If it's a deleveraging order, calculate the new leverage
+            if (request.orderType == DELEVERAGING_ORDER) {
+                with_attr error_message("Not marked as deleveragable") {
+                    assert liq_position.liquidatable = FALSE;
+                }
+                let total_value = margin_amount + borrowed_amount;
+                let (leverage_) = Math64x61_div(total_value, margin_amount);
+                assert new_leverage = leverage_;
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                with_attr error_message("Not marked as liquidatable") {
+                    assert liq_position.liquidatable = TRUE;
+                }
+
+                assert new_leverage = parent_position_details.leverage;
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            }
         } else {
             new_leverage = parent_position_details.leverage;
             tempvar syscall_ptr = syscall_ptr;
@@ -969,7 +994,7 @@ func withdraw{
 // @notice Function called by liquidate contract to mark the position as liquidated/deleveraged
 // @param position_ - Order Id of the position to be marked
 // @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
-// @external
+@external
 func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     position_: PositionDetailsWithMarket, amount_to_be_sold_: felt
 ) {
@@ -987,19 +1012,28 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         assert caller = liquidate_address;
     }
 
+    local amount;
+    local liquidatable;
+    if (amount_to_be_sold_ == 0) {
+        assert amount = position_.position_size;
+        assert liquidatable = TRUE;
+    } else {
+        assert amount = amount_to_be_sold_;
+        assert liquidatable = FALSE;
+    }
+
     let liquidatable_position: LiquidatablePosition = LiquidatablePosition(
         market_id=position_.market_id,
         direction=position_.direction,
-        amount_to_be_sold=amount_to_be_sold_,
+        amount_to_be_sold=amount,
+        liquidatable=liquidatable,
     );
 
     // Update deleveraged or liquidatable position
     deleveragable_or_liquidatable_position.write(value=liquidatable_position);
 
     liquidate_deleverage.emit(
-        market_id=position_.market_id,
-        direction=position_.direction,
-        amount_to_be_sold=amount_to_be_sold_,
+        market_id=position_.market_id, direction=position_.direction, amount_to_be_sold=amount
     );
     return ();
 }
@@ -1032,21 +1066,20 @@ func populate_withdrawals_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 // @return array_list_len - Length of the array_list
 // @return array_list - Fully populated list of CollateralBalance
 func populate_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    array_list_len_: felt, array_list_: CollateralBalance*
+    array_list_len_: felt, array_list_: CollateralBalance*, final_len_
 ) -> (array_list_len: felt, array_list: CollateralBalance*) {
-    let (collateral_id) = collateral_array.read(index=array_list_len_);
-
-    if (collateral_id == 0) {
+    if (array_list_len_ == final_len_) {
         return (array_list_len_, array_list_);
     }
 
+    let (collateral_id) = collateral_array.read(index=array_list_len_);
     let (collateral_balance: felt) = balance.read(assetID=collateral_id);
     let collateral_balance_struct = CollateralBalance(
         assetID=collateral_id, balance=collateral_balance
     );
 
     assert array_list_[array_list_len_] = collateral_balance_struct;
-    return populate_array_collaterals(array_list_len_ + 1, array_list_);
+    return populate_array_collaterals(array_list_len_ + 1, array_list_, final_len_);
 }
 
 // @notice Internal Function called by get_positions to recursively add active positions to the array and return it

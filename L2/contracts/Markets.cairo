@@ -195,6 +195,29 @@ func get_ttl_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     return (currMarket.ttl,);
 }
 
+// @notice View function to return markets by their state with ids in an array
+// @param tradable - tradable flag
+// @param archived - archived flag
+// @returns array_list_len - Length of the array_list
+// @returns array_list - Fully populated list of MarketWID
+@view
+func get_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    tradable_: felt, archived_: felt
+) -> (array_list_len: felt, array_list: MarketWID*) {
+    alloc_locals;
+
+    let (array_list: MarketWID*) = alloc();
+    let (array_list_len) = markets_array_len.read();
+    return populate_markets_by_state(
+        iterator=0,
+        index=0,
+        tradable=tradable_,
+        archived=archived_,
+        array_list_len=array_list_len,
+        array_list=array_list,
+    );
+}
+
 //#####################
 // External Functions #
 //#####################

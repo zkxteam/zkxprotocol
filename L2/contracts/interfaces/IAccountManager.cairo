@@ -2,6 +2,7 @@
 
 from contracts.DataTypes import (
     CollateralBalance,
+    LiquidatablePosition,
     NetPositions,
     OrderRequest,
     PositionDetails,
@@ -60,11 +61,9 @@ namespace IAccountManager {
     func return_array_collaterals() -> (array_list_len: felt, array_list: CollateralBalance*) {
     }
 
-    func liquidate_position(position_: PositionDetailsWithMarket, amount_to_be_sold_: felt) -> () {
+    func liquidate_position(position_: PositionDetailsWithMarket, amount_to_be_sold_: felt) {
     }
 
-    func get_deleveragable_or_liquidatable_position() -> (
-        market_id: felt, direction: felt, amount_to_be_sold: felt
-    ) {
+    func get_deleveragable_or_liquidatable_position() -> (position: LiquidatablePosition) {
     }
 }

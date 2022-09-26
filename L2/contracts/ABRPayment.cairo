@@ -33,18 +33,6 @@ from contracts.libraries.CommonLibrary import CommonLib
 func abr_payment_called_user_position(market_id: felt, account_address: felt, timestamp: felt) {
 }
 
-//##########
-// Storage #
-//##########
-// Stores the authregistry address
-@storage_var
-func registry_address() -> (contract_address: felt) {
-}
-// Stores tbe contract version
-@storage_var
-func contract_version() -> (version: felt) {
-}
-
 //##############
 // Constructor #
 //##############
