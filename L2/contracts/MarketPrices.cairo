@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
+from starkware.cairo.common.math import assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import (
@@ -16,16 +16,13 @@ from contracts.DataTypes import Market, MarketPrice
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.Math_64x61 import Math64x61_assert64x61
 
 //#########
 // Events #
 //#########
-
-// Event emitted whenever set_standard_collateral() is called
-@event
-func set_standard_collateral_called(collateral_id: felt) {
-}
 
 // Event emitted whenever update_market_price() is called
 @event
@@ -36,24 +33,9 @@ func update_market_price_called(market_id: felt, price: felt) {
 // Storage #
 //##########
 
-// Stores the contract version
-@storage_var
-func contract_version() -> (version: felt) {
-}
-
-// Stores the address of AuthorizedRegistry contract
-@storage_var
-func registry_address() -> (contract_address: felt) {
-}
-
 // Mapping between market ID and Market Prices
 @storage_var
 func market_prices(id: felt) -> (res: MarketPrice) {
-}
-
-// Stores the address of AuthorizedRegistry contract
-@storage_var
-func standard_collateral() -> (collateral_id: felt) {
 }
 
 //##############
@@ -67,13 +49,7 @@ func standard_collateral() -> (collateral_id: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Registry address and version cannot be 0") {
-        assert_not_zero(registry_address_);
-        assert_not_zero(version_);
-    }
-
-    registry_address.write(value=registry_address_);
-    contract_version.write(value=version_);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -91,40 +67,9 @@ func get_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (market_price=res);
 }
 
-// @notice function to get standard collateral
-// return collateral_id - standard collateral's collateral_id
-@view
-func get_standard_collateral{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    collateral_id: felt
-) {
-    let (res) = standard_collateral.read();
-    return (collateral_id=res);
-}
-
 //#####################
 // External Functions #
 //#####################
-
-// @notice function to set standard collateral
-// @param collateral_id_ - standard collateral's collateral_id in the system
-@external
-func set_standard_collateral{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    collateral_id_: felt
-) {
-    // Check auth
-    with_attr error_message("Caller is not authorized to set collateral price") {
-        let (registry) = registry_address.read();
-        let (version) = contract_version.read();
-        verify_caller_authority(registry, version, MasterAdmin_ACTION);
-    }
-
-    standard_collateral.write(value=collateral_id_);
-
-    // set_standard_collateral_called event is emitted
-    set_standard_collateral_called.emit(collateral_id=collateral_id_);
-
-    return ();
-}
 
 // @notice function to update market price
 // @param market_id_ - Id of the market
@@ -134,8 +79,8 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     market_id_: felt, price_: felt
 ) {
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AdminAuth_INDEX, version=version
@@ -165,8 +110,8 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
     // Calculate the timestamp
     let (timestamp_) = get_block_timestamp();
@@ -177,9 +122,21 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     );
 
     // Get Market from the corresponding Id
-    let (market: Market) = IMarkets.getMarket(
+    let (market: Market) = IMarkets.get_market(
         contract_address=market_contract_address, id=market_id_
     );
+
+    with_attr error_message("Price cannot be negative") {
+        assert_nn(price_);
+    }
+
+    with_attr error_message("Price should be within 64x61 range") {
+        Math64x61_assert64x61(price_);
+    }
+
+    with_attr error_message("Market does not exist") {
+        assert_not_zero(market.asset);
+    }
 
     // Create a struct object for the market prices
     tempvar new_market_price: MarketPrice = MarketPrice(

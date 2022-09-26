@@ -9,6 +9,13 @@ from starkware.starknet.common.syscalls import deploy
 from contracts.Constants import AccountRegistry_INDEX, MasterAdmin_ACTION
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonLibrary import (
+    CommonLib,
+    get_contract_version,
+    get_registry_address,
+    set_contract_version,
+    set_registry_address,
+)
 from contracts.libraries.Utils import verify_caller_authority
 
 //##########
@@ -44,16 +51,6 @@ func pubkey_L1_to_address(pubkey: felt, L1_address: felt) -> (address: felt) {
 func account_class_hash() -> (class_hash: felt) {
 }
 
-// stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (address: felt) {
-}
-
-// stores contract version
-@storage_var
-func version() -> (res: felt) {
-}
-
 //##############
 // Constructor #
 //##############
@@ -65,13 +62,7 @@ func version() -> (res: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Registry address and version cannot be 0") {
-        assert_not_zero(registry_address_);
-        assert_not_zero(version_);
-    }
-
-    registry_address.write(registry_address_);
-    version.write(version_);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -101,26 +92,6 @@ func get_pubkey_L1_to_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     return (address,);
 }
 
-// @notice view function to get the address of Authorized registry contract
-// @return address - Address of Authorized registry contract
-@view
-func get_registry_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    address: felt
-) {
-    let (current_registry_address) = registry_address.read();
-    return (current_registry_address,);
-}
-
-// @notice view function to get current contract version
-// @return current_version - version of the contract
-@view
-func get_current_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    current_version: felt
-) {
-    let (current_version) = version.read();
-    return (current_version,);
-}
-
 //#####################
 // External Functions #
 //#####################
@@ -133,8 +104,8 @@ func deploy_account{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     public_key: felt, L1_address: felt
 ) {
     let (hash) = account_class_hash.read();
-    let (current_registry_address) = registry_address.read();
-    let (current_version) = version.read();
+    let (current_registry_address) = CommonLib.get_registry_address();
+    let (current_version) = CommonLib.get_contract_version();
 
     with_attr error_message("Class hash cannot be 0") {
         assert_not_zero(hash);
@@ -172,7 +143,7 @@ func deploy_account{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     );
 
     // getting a return value from the add_to_account_registry function means that it was successful
-    let (res) = IAccountRegistry.add_to_account_registry(account_registry, deployed_address);
+    IAccountRegistry.add_to_account_registry(account_registry, deployed_address);
 
     account_deployed.emit(
         pubkey=public_key, L1_address=L1_address, account_address=deployed_address
@@ -186,8 +157,8 @@ func deploy_account{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 func set_account_class_hash{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     class_hash: felt
 ) {
-    let (current_registry_address) = registry_address.read();
-    let (current_version) = version.read();
+    let (current_registry_address) = CommonLib.get_registry_address();
+    let (current_version) = CommonLib.get_contract_version();
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION);
 
@@ -198,20 +169,5 @@ func set_account_class_hash{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     account_class_hash.write(class_hash);
     class_hash_changed.emit(class_hash=class_hash);
 
-    return ();
-}
-
-// @notice external function to set contract version
-// @param new_version - new version of the contract
-@external
-func set_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_version: felt
-) {
-    let (current_registry_address) = registry_address.read();
-    let (current_version) = version.read();
-
-    verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION);
-    version.write(new_version);
-    version_changed.emit(new_version=new_version);
     return ();
 }

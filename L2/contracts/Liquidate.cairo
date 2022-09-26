@@ -9,9 +9,15 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
-from contracts.Constants import Asset_INDEX, Market_INDEX, MarketPrices_INDEX
+from contracts.Constants import (
+    Asset_INDEX,
+    CollateralPrices_INDEX,
+    Market_INDEX,
+    MarketPrices_INDEX,
+)
 from contracts.DataTypes import (
     CollateralBalance,
+    CollateralPrice,
     Market,
     MarketPrice,
     MultipleOrder,
@@ -22,9 +28,11 @@ from contracts.DataTypes import (
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.ICollateralPrices import ICollateralPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IMarketPrices import IMarketPrices
-from contracts.Math_64x61 import Math64x61_div, Math64x61_mul
+from contracts.libraries.CommonLibrary import CommonLib
+from contracts.Math_64x61 import Math64x61_div, Math64x61_mul, Math64x61_add, Math64x61_sub
 
 //#########
 // Events #
@@ -49,20 +57,6 @@ func can_order_be_opened(order: MultipleOrder) {
 func position_to_be_deleveraged(position: PositionDetailsWithMarket, amount_to_be_sold: felt) {
 }
 
-//##########
-// Storage #
-//##########
-
-// Stores the contract version
-@storage_var
-func contract_version() -> (version: felt) {
-}
-
-// Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address: felt) {
-}
-
 //##############
 // Constructor #
 //##############
@@ -74,13 +68,7 @@ func registry_address() -> (contract_address: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Registry address and version cannot be 0") {
-        assert_not_zero(registry_address_);
-        assert_not_zero(version_);
-    }
-
-    registry_address.write(value=registry_address_);
-    contract_version.write(value=version_);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -117,8 +105,9 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Get the market & asset addresses
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     );
@@ -249,13 +238,15 @@ func find_collateral_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         collateral_details.balance, price_details.collateralPrice
     );
 
+    let (new_total_account_value) = Math64x61_add(total_value, collateral_value_usd);
+
     // Recurse over the next element
     return find_collateral_balance(
         prices_len=prices_len - 1,
         prices=prices + PriceData.SIZE,
         collaterals_len=collaterals_len - 1,
         collaterals=collaterals + CollateralBalance.SIZE,
-        total_value=total_value + collateral_value_usd,
+        total_value=new_total_account_value,
     );
 }
 
@@ -316,7 +307,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         );
 
         // Add the collateral value to the total_account_value
-        local total_account_value_collateral = total_account_value + user_balance;
+        let (total_account_value_collateral) = Math64x61_add(total_account_value, user_balance);
 
         // Check if the maintenance margin is not satisfied
         let is_liquidation = is_le(total_account_value_collateral, total_maintenance_requirement);
@@ -381,23 +372,24 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // Calculate pnl to check if it is the least collateralized position
     local price_diff_;
     if (position_details.direction == 1) {
-        tempvar price_diff = price_details.assetPrice - position_details.avg_execution_price;
-        price_diff_ = price_diff;
+        let (diff) = Math64x61_sub(price_details.assetPrice, position_details.avg_execution_price);
+        price_diff_ = diff;
     } else {
-        tempvar price_diff = position_details.avg_execution_price - price_details.assetPrice;
-        price_diff_ = price_diff;
+        let (diff) = Math64x61_sub(position_details.avg_execution_price, price_details.assetPrice);
+        price_diff_ = diff;
     }
 
     let (pnl) = Math64x61_mul(price_diff_, position_details.position_size);
 
     // Calculate the value of the current account margin in usd
-    local position_value = maintenance_position - position_details.borrowed_amount + pnl;
+    let (borrowed_and_pnl) = Math64x61_add(position_details.borrowed_amount, pnl);
+    let (position_value) = Math64x61_sub(maintenance_position, borrowed_and_pnl);
     let (net_position_value_usd: felt) = Math64x61_mul(
         position_value, price_details.collateralPrice
     );
 
     // Margin ratio calculation
-    local numerator = position_details.margin_amount + pnl;
+    let (numerator) = Math64x61_add(position_details.margin_amount, pnl);
     let (denominator) = Math64x61_mul(position_details.position_size, price_details.assetPrice);
     let (collateral_ratio_position) = Math64x61_div(numerator, denominator);
 
@@ -420,6 +412,12 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         assert least_collateral_ratio_position_asset_price_ = least_collateral_ratio_position_asset_price;
     }
 
+    let (new_total_maintenance_requirement) = Math64x61_add(
+        total_maintenance_requirement, maintenance_requirement_usd
+    );
+
+    let (new_total_account_value) = Math64x61_add(total_account_value, net_position_value_usd);
+
     // Recurse over to the next position
     return check_liquidation_recurse(
         account_address=account_address,
@@ -427,10 +425,10 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         positions=positions + PositionDetailsWithMarket.SIZE,
         prices_len=prices_len - 1,
         prices=prices + PriceData.SIZE,
-        total_account_value=total_account_value + net_position_value_usd,
+        total_account_value=new_total_account_value,
         market_address=market_address,
         asset_address=asset_address,
-        total_maintenance_requirement=total_maintenance_requirement + maintenance_requirement_usd,
+        total_maintenance_requirement=new_total_maintenance_requirement,
         least_collateral_ratio=least_collateral_ratio_,
         least_collateral_ratio_position=least_collateral_ratio_position_,
         least_collateral_ratio_position_collateral_price=least_collateral_ratio_position_collateral_price_,
@@ -469,23 +467,27 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     local price_diff;
     if (position_.direction == 1) {
-        price_diff = asset_price_ - position_.avg_execution_price;
+        let (diff) = Math64x61_sub(asset_price_, position_.avg_execution_price);
+        price_diff = diff;
     } else {
-        price_diff = position_.avg_execution_price - asset_price_;
+        let (diff) = Math64x61_sub(position_.avg_execution_price, asset_price_);
+        price_diff = diff;
     }
 
     // Calcculate amount to be sold for deleveraging
     let (margin_amount_in_usd) = Math64x61_mul(margin_amount, collateral_price_);
     let (maintenance_requirement_in_usd) = Math64x61_mul(req_margin, asset_price_);
-    let price_diff_in_usd = maintenance_requirement_in_usd - price_diff;
+    let (price_diff_in_usd) = Math64x61_sub(maintenance_requirement_in_usd, price_diff);
     let (amount_to_be_present) = Math64x61_div(margin_amount_in_usd, price_diff_in_usd);
-    let amount_to_be_sold = position_size - amount_to_be_present;
+    let (amount_to_be_sold) = Math64x61_sub(position_size, amount_to_be_present);
 
     // Calculate the leverage after deleveraging
-    let position_value = margin_amount + borrowed_amount;
+    let (position_value) = Math64x61_add(margin_amount, borrowed_amount);
     let (position_value_in_usd) = Math64x61_mul(position_value, collateral_price_);
     let (amount_to_be_sold_value_in_usd) = Math64x61_mul(amount_to_be_sold, asset_price_);
-    let remaining_position_value_in_usd = position_value_in_usd - amount_to_be_sold_value_in_usd;
+    let (remaining_position_value_in_usd) = Math64x61_sub(
+        position_value_in_usd, amount_to_be_sold_value_in_usd
+    );
     let (leverage_after_deleveraging) = Math64x61_div(
         remaining_position_value_in_usd, margin_amount_in_usd
     );
@@ -512,8 +514,8 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 ) {
     alloc_locals;
 
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
     // Check if the list is empty
     if (prices_len == 0) {
@@ -535,75 +537,35 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         contract_address=registry, index=Asset_INDEX, version=version
     );
 
-    let (req_margin) = IAsset.get_maintenance_margin(
-        contract_address=asset_address, id=order.assetID
-    );
-
-    // Get market price contract address
-    let (market_price_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=MarketPrices_INDEX, version=version
-    );
-
-    // Get market contract address
     let (market_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Market_INDEX, version=version
     );
 
-    // Get standard collateral ID
-    let (standard_collateral_id) = IMarketPrices.get_standard_collateral(
-        contract_address=market_price_address
+    let (req_margin) = IAsset.get_maintenance_margin(
+        contract_address=asset_address, id=order.assetID
     );
 
-    // Calculate the required margin
-    local leveraged_position_value_collateral;
+    // Get collateral price contract address
+    let (collateral_price_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=CollateralPrices_INDEX, version=version
+    );
+
+    let (collateral_price: CollateralPrice) = ICollateralPrices.get_collateral_price(
+        contract_address=collateral_price_address, id=order.collateralID
+    );
+
     let (leveraged_position_value) = Math64x61_mul(execution_price, size);
 
-    if (standard_collateral_id == order.collateralID) {
-        leveraged_position_value_collateral = leveraged_position_value;
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        // Get the market id from market contract
-        let (market_id) = IMarkets.getMarket_from_assets(
-            contract_address=market_address,
-            asset_id=order.collateralID,
-            collateral_id=standard_collateral_id,
-        );
-        let (market_price: MarketPrice) = IMarketPrices.get_market_price(
-            contract_address=market_price_address, id=market_id
-        );
-        // Get Market from the corresponding Id
-        let (market_ttl: felt) = IMarkets.get_ttl_from_market(
-            contract_address=market_address, market_id=market_id
-        );
-        // Calculate the timestamp
-        let (current_timestamp) = get_block_timestamp();
-        tempvar ttl = market_ttl;
-        tempvar timestamp = market_price.timestamp;
-        tempvar time_difference = current_timestamp - timestamp;
-        let status = is_le(time_difference, ttl);
-
-        if (status == TRUE) {
-            let (leveraged_position_value_temp) = Math64x61_mul(
-                leveraged_position_value, market_price.price
-            );
-            leveraged_position_value_collateral = leveraged_position_value_temp;
-        } else {
-            return ();
-        }
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    }
-    tempvar syscall_ptr = syscall_ptr;
-    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    tempvar range_check_ptr = range_check_ptr;
+    let (leveraged_position_value_collateral) = Math64x61_mul(
+        leveraged_position_value, collateral_price.price_in_usd
+    );
 
     let (total_position_value) = Math64x61_div(leveraged_position_value_collateral, order.leverage);
-    tempvar amount_to_be_borrowed = leveraged_position_value_collateral - total_position_value;
+    let (amount_to_be_borrowed) = Math64x61_sub(
+        leveraged_position_value_collateral, total_position_value
+    );
 
-    tempvar account_value = leveraged_position_value_collateral - amount_to_be_borrowed;
+    let (account_value) = Math64x61_sub(leveraged_position_value_collateral, amount_to_be_borrowed);
     let (maintenance_requirement) = Math64x61_mul(req_margin, leveraged_position_value_collateral);
 
     // Recurse through all positions to see if it needs to liquidated
@@ -640,6 +602,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 // @notice Internal function to populate prices
 // @param market_contract_address - Address of Market contract
 // @param market_price_address - Address of Market Price contract
+// @param collateral_price_address - Address of Collateral Price contract
 // @param iterator - Index of the position_array currently pointing to
 // @param positions_len - Length of the positions array
 // @param postions - Array with all the position details
@@ -650,6 +613,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_contract_address: felt,
     market_price_address: felt,
+    collateral_price_address: felt,
     iterator: felt,
     positions_len: felt,
     positions: PositionDetailsWithMarket*,
@@ -661,15 +625,11 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
         return (prices_len, prices);
     }
 
-    // Get the standard collateral from MarketPrices contract
-    let (standard_collateral_id) = IMarketPrices.get_standard_collateral(
-        contract_address=market_price_address
-    );
-
     // Get the asset & collateral ID from market contract
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
         contract_address=market_contract_address, market_id=[positions].market_id
     );
+
     let (market_price: MarketPrice) = IMarketPrices.get_market_price(
         contract_address=market_price_address, id=[positions].market_id
     );
@@ -677,6 +637,11 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     // Get the market ttl from the market contract
     let (market_ttl: felt) = IMarkets.get_ttl_from_market(
         contract_address=market_contract_address, market_id=[positions].market_id
+    );
+
+    // Get the collateral price from the CollateralPrice contract
+    let (collateral_price: CollateralPrice) = ICollateralPrices.get_collateral_price(
+        contract_address=collateral_price_address, id=collateral_id
     );
 
     // Calculate the timestamp
@@ -687,77 +652,32 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 
     let status = is_le(time_difference, ttl);
     if (status == TRUE) {
-        if (standard_collateral_id == collateral_id) {
-            // to64x61(1) == 2305843009213693952
-            let price_data = PriceData(
-                assetID=asset_id,
-                collateralID=collateral_id,
-                assetPrice=market_price.price,
-                collateralPrice=2305843009213693952,
-            );
-            assert prices[prices_len] = price_data;
+        let (asset_price_in_usd) = Math64x61_mul(market_price.price, collateral_price.price_in_usd);
+        let price_data = PriceData(
+            assetID=asset_id,
+            collateralID=collateral_id,
+            assetPrice=asset_price_in_usd,
+            collateralPrice=collateral_price.price_in_usd,
+        );
+        assert prices[prices_len] = price_data;
 
-            return populate_asset_prices_recurse(
-                market_contract_address,
-                market_price_address,
-                iterator + 1,
-                positions_len,
-                positions + PositionDetailsWithMarket.SIZE,
-                prices_len + 1,
-                prices,
-            );
-        } else {
-            // Get the market id from market contract
-            let (market_id_collateral) = IMarkets.getMarket_from_assets(
-                contract_address=market_contract_address,
-                asset_id=collateral_id,
-                collateral_id=standard_collateral_id,
-            );
-            let (market_price_collateral: MarketPrice) = IMarketPrices.get_market_price(
-                contract_address=market_price_address, id=market_id_collateral
-            );
-            // Get Market from the corresponding Id
-            let (market_collateral_ttl: felt) = IMarkets.get_ttl_from_market(
-                contract_address=market_contract_address, market_id=market_id_collateral
-            );
-            // Calculate the timestamp
-            tempvar ttl_collateral = market_collateral_ttl;
-            tempvar timestamp_collateral = market_price_collateral.timestamp;
-            tempvar time_difference_collateral = current_timestamp - timestamp_collateral;
-            let status = is_le(time_difference_collateral, ttl_collateral);
-            if (status == TRUE) {
-                let (asset_price_standard_collateral) = Math64x61_mul(
-                    market_price.price, market_price_collateral.price
-                );
-                let price_data = PriceData(
-                    assetID=asset_id,
-                    collateralID=collateral_id,
-                    assetPrice=asset_price_standard_collateral,
-                    collateralPrice=market_price_collateral.price,
-                );
-                assert prices[prices_len] = price_data;
-                return populate_asset_prices_recurse(
-                    market_contract_address,
-                    market_price_address,
-                    iterator + 1,
-                    positions_len,
-                    positions + PositionDetailsWithMarket.SIZE,
-                    prices_len + 1,
-                    prices,
-                );
-            } else {
-                let (empty_price_array: PriceData*) = alloc();
-                return (0, empty_price_array);
-            }
-        }
+        return populate_asset_prices_recurse(
+            market_contract_address,
+            market_price_address,
+            collateral_price_address,
+            iterator + 1,
+            positions_len,
+            positions + PositionDetailsWithMarket.SIZE,
+            prices_len + 1,
+            prices,
+        );
     }
     let (empty_price_array: PriceData*) = alloc();
     return (0, empty_price_array);
 }
 
 // @notice Internal function to populate collateral prices
-// @param market_contract_address - Address of Market contract
-// @param market_price_address - Address of Market Price contract
+// @param collateral_price_address - Address of Collateral Price contract
 // @param iterator - Index of the position_array currently pointing to
 // @param collaterals_len - Length of the collaterals array
 // @param collaterals - Array with all the collateral details
@@ -768,8 +688,7 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 func populate_collateral_prices_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
-    market_contract_address: felt,
-    market_price_address: felt,
+    collateral_price_address: felt,
     iterator: felt,
     collaterals_len: felt,
     collaterals: CollateralBalance*,
@@ -780,68 +699,27 @@ func populate_collateral_prices_recurse{
     if (iterator == collaterals_len) {
         return (prices_len, prices);
     }
-    let (standard_collateral_id) = IMarketPrices.get_standard_collateral(
-        contract_address=market_price_address
+
+    let (collateral_price: CollateralPrice) = ICollateralPrices.get_collateral_price(
+        contract_address=collateral_price_address, id=[collaterals].assetID
     );
-    if (standard_collateral_id == [collaterals].assetID) {
-        // to64x61(1) == 2305843009213693952
-        let price_data = PriceData(
-            assetID=0,
-            collateralID=[collaterals].assetID,
-            assetPrice=0,
-            collateralPrice=2305843009213693952,
-        );
-        assert prices[prices_len] = price_data;
-        return populate_collateral_prices_recurse(
-            market_contract_address,
-            market_price_address,
-            iterator + 1,
-            collaterals_len,
-            collaterals + CollateralBalance.SIZE,
-            prices_len + 1,
-            prices,
-        );
-    } else {
-        // Get the market id from market contract
-        let (market_id) = IMarkets.getMarket_from_assets(
-            contract_address=market_contract_address,
-            asset_id=[collaterals].assetID,
-            collateral_id=standard_collateral_id,
-        );
-        let (market_price: MarketPrice) = IMarketPrices.get_market_price(
-            contract_address=market_price_address, id=market_id
-        );
-        // Get Market from the corresponding Id
-        let (market: Market) = IMarkets.getMarket(
-            contract_address=market_contract_address, id=market_id
-        );
-        // Calculate the timestamp
-        let (current_timestamp) = get_block_timestamp();
-        tempvar ttl = market.ttl;
-        tempvar timestamp = market_price.timestamp;
-        tempvar time_difference = current_timestamp - timestamp;
-        let status = is_le(time_difference, ttl);
-        if (status == TRUE) {
-            let price_data = PriceData(
-                assetID=0,
-                collateralID=[collaterals].assetID,
-                assetPrice=0,
-                collateralPrice=market_price.price,
-            );
-            assert prices[prices_len] = price_data;
-            return populate_collateral_prices_recurse(
-                market_contract_address,
-                market_price_address,
-                iterator + 1,
-                collaterals_len,
-                collaterals + CollateralBalance.SIZE,
-                prices_len + 1,
-                prices,
-            );
-        }
-    }
-    let (empty_price_array: PriceData*) = alloc();
-    return (0, empty_price_array);
+
+    let price_data = PriceData(
+        assetID=0,
+        collateralID=[collaterals].assetID,
+        assetPrice=0,
+        collateralPrice=collateral_price.price_in_usd,
+    );
+
+    assert prices[prices_len] = price_data;
+    return populate_collateral_prices_recurse(
+        collateral_price_address,
+        iterator + 1,
+        collaterals_len,
+        collaterals + CollateralBalance.SIZE,
+        prices_len + 1,
+        prices,
+    );
 }
 
 // @notice Internal function to get asset prices
@@ -853,8 +731,8 @@ func get_asset_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 ) -> (prices_len: felt, prices: PriceData*) {
     alloc_locals;
 
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     let (prices: PriceData*) = alloc();
 
     // Get market price contract address
@@ -865,6 +743,11 @@ func get_asset_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     // Get market contract address
     let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    // Get collateral price contract address
+    let (collateral_prices_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=CollateralPrices_INDEX, version=version
     );
 
     // Fetch all the positions from the Account contract
@@ -880,6 +763,7 @@ func get_asset_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let (prices_array_len: felt, prices_array: PriceData*) = populate_asset_prices_recurse(
         market_contract_address=market_contract_address,
         market_price_address=market_prices_address,
+        collateral_price_address=collateral_prices_address,
         iterator=0,
         positions_len=positions_len,
         positions=positions,
@@ -902,8 +786,7 @@ func get_asset_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     }
 
     return populate_collateral_prices_recurse(
-        market_contract_address=market_contract_address,
-        market_price_address=market_prices_address,
+        collateral_price_address=collateral_prices_address,
         iterator=0,
         collaterals_len=collaterals_len,
         collaterals=collaterals,

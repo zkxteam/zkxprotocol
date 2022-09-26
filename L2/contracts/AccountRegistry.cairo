@@ -7,23 +7,13 @@ from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountDeployer_INDEX, MasterAdmin_ACTION, Trading_INDEX
-
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
 //##########
 // Storage #
 //##########
-
-// Stores the contract version
-@storage_var
-func contract_version() -> (version: felt) {
-}
-
-// Stores the address of AuthorizedRegistry contract
-@storage_var
-func registry_address() -> (contract_address: felt) {
-}
 
 // Stores all account contract addresses of users
 @storage_var
@@ -51,8 +41,7 @@ func account_present(address: felt) -> (present: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    registry_address.write(value=registry_address_);
-    contract_version.write(value=version_);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -90,19 +79,17 @@ func get_registry_len{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func get_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     starting_index_: felt, num_accounts_: felt
 ) -> (account_registry_len: felt, account_registry: felt*) {
-    alloc_locals;
-
-    with_attr error_message("starting index cannot be negative") {
+    with_attr error_message("Starting index cannot be negative") {
         assert_nn(starting_index_);
     }
 
-    with_attr error_message("number of accounts cannot be negative or zero") {
+    with_attr error_message("Number of accounts cannot be negative or zero") {
         assert_lt(0, num_accounts_);
     }
 
     let ending_index = starting_index_ + num_accounts_;
     let (reg_len) = account_registry_len.read();
-    with_attr error_message("cannot retrieve the specified num of accounts") {
+    with_attr error_message("Cannot retrieve the specified num of accounts") {
         assert_le(ending_index, reg_len);
     }
 
@@ -116,20 +103,23 @@ func get_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
 // @notice add to account registry
 // @param address_ - L2 account contract address of the user
-// @return 1 - If successfully added
 @external
 func add_to_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     address_: felt
-) -> (res: felt) {
+) {
     // Check whether the call is from account deployer contract
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     let (account_deployer_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AccountDeployer_INDEX, version=version
     );
     with_attr error_message("Caller is not authorized to add account to registry") {
         assert caller = account_deployer_address;
+    }
+
+    with_attr error_message("Address cannot be zero") {
+        assert_not_zero(address_);
     }
 
     let (is_present) = account_present.read(address=address_);
@@ -146,7 +136,7 @@ func add_to_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-    return (1,);
+    return ();
 }
 
 // @notice External function called to remove account address from registry
@@ -155,10 +145,9 @@ func add_to_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 func remove_from_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id_: felt
 ) -> () {
-    alloc_locals;
     with_attr error_message("Caller is not Master Admin") {
-        let (registry) = registry_address.read();
-        let (version) = contract_version.read();
+        let (registry) = CommonLib.get_registry_address();
+        let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
@@ -206,8 +195,6 @@ func remove_from_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
 func populate_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     iterator_, starting_index_: felt, ending_index_: felt, account_registry_list_: felt*
 ) -> (account_registry_len: felt, account_registry: felt*) {
-    alloc_locals;
-
     if (starting_index_ == ending_index_) {
         return (iterator_, account_registry_list_);
     }

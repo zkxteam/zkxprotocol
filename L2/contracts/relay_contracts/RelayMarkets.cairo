@@ -5,8 +5,19 @@ from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
     initialize,
+    get_current_version,
+    get_caller_hash_status,
+    get_call_counter,
+    get_registry_address_at_relay,
+    get_self_index,
+    get_caller_hash_list,
+    set_current_version,
+    mark_caller_hash_paid,
+    reset_call_counter,
+    set_self_index,
     verify_caller_authority,
 )
+
 from contracts.DataTypes import Market, MarketWID
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import ManageMarkets_ACTION
@@ -23,44 +34,44 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @notice - All the following are mirror functions for Markets.cairo - just record call details and forward call
 
 @external
-func addMarket{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id: felt, newMarket: Market
 ) {
     verify_caller_authority(ManageMarkets_ACTION);
-    record_call_details('addMarket');
+    record_call_details('add_market');
     let (inner_address) = get_inner_contract();
-    IMarkets.addMarket(contract_address=inner_address, id=id, newMarket=newMarket);
+    IMarkets.add_market(contract_address=inner_address, id=id, newMarket=newMarket);
     return ();
 }
 
 @external
-func removeMarket{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) {
+func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) {
     verify_caller_authority(ManageMarkets_ACTION);
-    record_call_details('removeMarket');
+    record_call_details('remove_market');
     let (inner_address) = get_inner_contract();
-    IMarkets.removeMarket(contract_address=inner_address, id=id);
+    IMarkets.remove_market(contract_address=inner_address, id=id);
     return ();
 }
 
 @external
-func modifyLeverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id: felt, leverage: felt
 ) {
     verify_caller_authority(ManageMarkets_ACTION);
-    record_call_details('modifyLeverage');
+    record_call_details('modify_leverage');
     let (inner_address) = get_inner_contract();
-    IMarkets.modifyLeverage(contract_address=inner_address, id=id, leverage=leverage);
+    IMarkets.modify_leverage(contract_address=inner_address, id=id, leverage=leverage);
     return ();
 }
 
 @external
-func modifyTradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id: felt, tradable: felt
 ) {
     verify_caller_authority(ManageMarkets_ACTION);
-    record_call_details('modifyTradable');
+    record_call_details('modify_tradable');
     let (inner_address) = get_inner_contract();
-    IMarkets.modifyTradable(contract_address=inner_address, id=id, tradable=tradable);
+    IMarkets.modify_tradable(contract_address=inner_address, id=id, tradable=tradable);
     return ();
 }
 
@@ -87,31 +98,31 @@ func change_max_ttl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 }
 
 @view
-func getMarket{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) -> (
+func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) -> (
     currMarket: Market
 ) {
     let (inner_address) = get_inner_contract();
-    let (currMarket) = IMarkets.getMarket(contract_address=inner_address, id=id);
+    let (currMarket) = IMarkets.get_market(contract_address=inner_address, id=id);
     return (currMarket,);
 }
 
 @view
-func getMarket_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func get_market_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id: felt, collateral_id: felt
 ) -> (market_id: felt) {
     let (inner_address) = get_inner_contract();
-    let (market_id) = IMarkets.getMarket_from_assets(
+    let (market_id) = IMarkets.get_market_from_assets(
         contract_address=inner_address, asset_id=asset_id, collateral_id=collateral_id
     );
     return (market_id,);
 }
 
 @view
-func returnAllMarkets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     array_list_len: felt, array_list: MarketWID*
 ) {
     let (inner_address) = get_inner_contract();
-    let (array_list_len, array_list: MarketWID*) = IMarkets.returnAllMarkets(
+    let (array_list_len, array_list: MarketWID*) = IMarkets.get_all_markets(
         contract_address=inner_address
     );
     return (array_list_len, array_list);

@@ -5,10 +5,8 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import Signer, str_to_felt, MAX_UINT256, from64x61, to64x61
-from helpers import StarknetService, ContractType
-
-alice_signer = Signer(123456789987654323)
-signer1 = Signer(12345)
+from helpers import StarknetService, ContractType, AccountFactory
+from dummy_signers import signer1, signer2
 
 BTC_ID = str_to_felt("32f0406jz7qj8")
 ETH_ID = str_to_felt("65ksgn23nv")
@@ -31,17 +29,11 @@ def event_loop():
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
     
-    alice = await starknet_service.deploy(ContractType.AccountManager, [
-        alice_signer.public_key,
-        L1_dummy_address,
-        0,
-        1
-    ])
-
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, 1, 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
-        signer1.public_key,
-        
+        signer1.public_key
     ])
+    alice = await account_factory.deploy_ZKX_account(signer2.public_key)
 
     return alice, admin1
 

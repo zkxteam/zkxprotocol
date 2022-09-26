@@ -92,6 +92,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ContractType.MarketPrices, 
         [registry.contract_address, 1]
     )
+    collateral_prices = await starknet_service.deploy(
+        ContractType.CollateralPrices, 
+        [registry.contract_address, 1]
+    )
     timestamp = int(time.time())
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
@@ -146,6 +150,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidityFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insuranceFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, collateral_prices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
     
@@ -184,22 +189,16 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # give full permissions to relays
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_trading.contract_address, 0, 1])
     
-    
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_asset.contract_address, 1, 1])
     
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_holding.contract_address, 5, 1])
 
-    
-   
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_feeBalance.contract_address, 4, 1])
    
-
-   
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_fees.contract_address, 4, 1])
+
+    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 7, 1])
    
-
-  
-
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
     base_fee_taker1 = to64x61(0.0005)
@@ -220,32 +219,32 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [ETH_ID, 0, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [BTC_ID, 0, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [ETH_ID, 0, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
 
     call_counter = await relay_asset.get_call_counter(
-        admin1.contract_address,str_to_felt('addAsset')).call()
+        admin1.contract_address,str_to_felt('add_asset')).call()
     
     print(call_counter.result)
 
     assert call_counter.result.count == 2
 
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'addAsset', [UST_ID, 0, str_to_felt("UST"), str_to_felt("UST"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [USDC_ID, 0, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', [UST_ID, 0, str_to_felt("UST"), str_to_felt("UST"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000])
 
     hash_list=await relay_asset.get_caller_hash_list(admin1.contract_address).call()
     print(hash_list.result)
     assert len(hash_list.result.hash_list) == 4
 
     call_counter = await relay_asset.get_call_counter(
-        admin1.contract_address,str_to_felt('addAsset')).call()
+        admin1.contract_address,str_to_felt('add_asset')).call()
     
     print(call_counter.result)
 
     assert call_counter.result.count == 4
 
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 60])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'addMarket', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 60])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 0, 60])
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, relay_holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
@@ -254,6 +253,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Fund the Liquidity fund contract
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [UST_ID, to64x61(1000000)])
+
+    # Update collateral prices
+    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, to64x61(1)])
+    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [UST_ID, to64x61(1)])
 
     # Set the balance of admin1 and admin2
     #await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
@@ -413,10 +416,8 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         0,
         to64x61(0.05)
     ])
-    print("liquidation resul...", liquidate_result_alice.result.response[0], " ",
-          liquidate_result_alice.result.response[1])
 
-    assert liquidate_result_alice.result.response[1] == order_id_1
+    assert liquidate_result_alice.call_info.retdata[2] == order_id_1
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -455,11 +456,8 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         to64x61(0.05)
     ])
 
-    print("liquidation resul...", liquidate_result_bob.result.response[0],
-          liquidate_result_bob.result.response[1])
-
-    assert liquidate_result_bob.result.response[0] == 0
-    assert liquidate_result_bob.result.response[1] == order_id_2
+    assert liquidate_result_bob.call_info.retdata[1] == 0
+    assert liquidate_result_bob.call_info.retdata[2] == order_id_2
 
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
     print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
@@ -598,11 +596,9 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         0,
         to64x61(0.05)
     ])
-    print("liquidation resul...", liquidate_result_alice.result.response[0], " ",
-          liquidate_result_alice.result.response[1])
 
-    assert liquidate_result_alice.result.response[0] == 0
-    assert liquidate_result_alice.result.response[1] == order_id_3
+    assert liquidate_result_alice.call_info.retdata[1] == 0
+    assert liquidate_result_alice.call_info.retdata[2] == order_id_3
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -645,11 +641,8 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         to64x61(0.05)
     ])
 
-    print("liquidation resul...", liquidate_result_bob.result.response[0],
-          liquidate_result_bob.result.response[1])
-
-    assert liquidate_result_bob.result.response[0] == 0
-    assert liquidate_result_bob.result.response[1] == order_id_4
+    assert liquidate_result_bob.call_info.retdata[1] == 0
+    assert liquidate_result_bob.call_info.retdata[2] == order_id_4
 
     bob_balance_usdc = await bob.get_balance(USDC_ID).call()
     print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
@@ -695,12 +688,10 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
         0,
         to64x61(0.05)
     ])
-    print("liquidation result alice liquidated...", liquidate_result_alice.result.response[0], " ",
-          liquidate_result_alice.result.response[1])
 
-    assert liquidate_result_alice.result.response[1] == str_to_felt(
+    assert liquidate_result_alice.call_info.retdata[2] == str_to_felt(
         "343uofdsjxz")
-    assert liquidate_result_alice.result.response[0] == 1
+    assert liquidate_result_alice.call_info.retdata[1] == 1
 
     alice_balance_usdc = await alice.get_balance(USDC_ID).call()
     print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
@@ -714,7 +705,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
 
   
 
-    order_state = await alice.get_order_data(orderID_=liquidate_result_alice.result.response[1]).call()
+    order_state = await alice.get_order_data(orderID_=liquidate_result_alice.call_info.retdata[2]).call()
     res4 = list(order_state.result.res)
     print(res4)
 
@@ -863,11 +854,9 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         0,
         to64x61(1.05),
     ])
-    print("liquidation result of charlie...",
-          liquidate_result_charlie.result.response[0], " ", liquidate_result_charlie.result.response[1])
 
-    assert liquidate_result_charlie.result.response[0] == 1
-    assert liquidate_result_charlie.result.response[1] == str_to_felt(
+    assert liquidate_result_charlie.call_info.retdata[1] == 1
+    assert liquidate_result_charlie.call_info.retdata[2] == str_to_felt(
         "sadfjkh2178")
 
     charlie_balance_usdc = await charlie.get_balance(USDC_ID).call()
@@ -999,40 +988,6 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
 
     assert charlie_curr_balance.result.res == to64x61(0)
 
-
-
-@pytest.mark.asyncio
-async def test_should_not_allow_non_liquidators(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, admin3 = adminAuth_factory
-    ##############################################
-    ######## Bob's liquidation result 3 ##########
-    ##############################################
-    await (admin3_signer.send_transaction(admin3, liquidate.contract_address, "check_liquidation", [
-        bob.contract_address,
-        # 2 Position + 2 Collaterals
-        4,
-        # Position 1 - BTC long
-        BTC_ID,
-        USDC_ID,
-        to64x61(6000),
-        to64x61(1.05),
-        # Position 2 -
-        #  ETH long
-        ETH_ID,
-        USDC_ID,
-        to64x61(86),
-        to64x61(1.05),
-        # Collateral 1 - USDC
-        0,
-        USDC_ID,
-        0,
-        to64x61(1.05),
-        # Collateral 2 - UST
-        0,
-        UST_ID,
-        0,
-        to64x61(0.05)
-    ]))
 
 
 @pytest.mark.asyncio
@@ -1192,11 +1147,9 @@ async def test_deleveraging_flow(adminAuth_factory):
         0,
         to64x61(1.05),
     ])
-    print("liquidation result of eduard...",
-          liquidate_result_eduard.result.response[0], " ", liquidate_result_eduard.result.response[1])
 
-    assert liquidate_result_eduard.result.response[0] == 1
-    assert liquidate_result_eduard.result.response[1] == str_to_felt(
+    assert liquidate_result_eduard.call_info.retdata[1] == 1
+    assert liquidate_result_eduard.call_info.retdata[2] == str_to_felt(
         "343uofdsjxz")
 
    
@@ -1365,11 +1318,9 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
         0,
         to64x61(1.05),
     ])
-    print("liquidation result of eduard...",
-          liquidate_result_eduard.result.response[0], " ", liquidate_result_eduard.result.response[1])
 
-    assert liquidate_result_eduard.result.response[0] == 1
-    assert liquidate_result_eduard.result.response[1] == str_to_felt(
+    assert liquidate_result_eduard.call_info.retdata[1] == 1
+    assert liquidate_result_eduard.call_info.retdata[2] == str_to_felt(
         "343uofdsjxz")
 
   

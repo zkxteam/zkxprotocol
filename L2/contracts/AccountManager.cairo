@@ -1,7 +1,5 @@
 %lang starknet
 
-%builtins pedersen range_check ecdsa
-
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
@@ -46,6 +44,8 @@ from contracts.Constants import (
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
     WithdrawalRequest_INDEX,
+    WITHDRAWAL_INITIATED,
+    WITHDRAWAL_SUCCEEDED,
 )
 from contracts.DataTypes import (
     Asset,
@@ -61,18 +61,20 @@ from contracts.DataTypes import (
     WithdrawalRequestForHashing,
 )
 
+from contracts.interfaces.IAccount import IAccount
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_div,
-    Math64x61_fromFelt,
+    Math64x61_fromDecimalFelt,
+    Math64x61_toDecimalFelt,
     Math64x61_mul,
     Math64x61_sub,
-    Math64x61_toFelt,
 )
 
 //#########
@@ -216,14 +218,15 @@ func withdrawal_history_array_len() -> (len: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     public_key_: felt, L1_address_: felt, registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Registry address and version cannot be 0") {
-        assert_not_zero(version_);
+    with_attr error_message("Public key and L1 address cannot be 0") {
+        assert_not_zero(public_key_);
+        assert_not_zero(L1_address_);
     }
 
     public_key.write(public_key_);
     L1_address.write(L1_address_);
-    registry_address.write(value=registry_address_);
-    contract_version.write(value=version_);
+
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -280,9 +283,8 @@ func is_valid_signature_order{
     local pub_key;
 
     if (liquidator_address_ != 0) {
-        // To-Do Verify whether call came from node operator
-
-        let (_public_key) = IAccountManager.get_public_key(contract_address=liquidator_address_);
+        // Verify whether call came from node operator
+        let (_public_key) = IAccount.getPublicKey(contract_address=liquidator_address_);
         pub_key = _public_key;
 
         tempvar syscall_ptr = syscall_ptr;
@@ -403,45 +405,32 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 ) {
     alloc_locals;
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
-
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     // Get L1 ZKX contract address
     let (L1_ZKX_contract_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
     );
-
     // Make sure the message was sent by the intended L1 contract
     with_attr error_message("Message must be sent by approved ZKX address") {
         assert from_address = L1_ZKX_contract_address;
     }
-
     let (stored_L1_address) = L1_address.read();
-
     with_attr error_message("Only the user can initiate deposits") {
         assert stored_L1_address = user;
     }
-
     // Get asset contract address
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     );
-    // Reading token decimal field of an asset
-    let (asset: Asset) = IAsset.getAsset(contract_address=asset_address, id=assetID_);
-    tempvar decimal = asset.token_decimal;
-
-    let (ten_power_decimal) = pow(10, decimal);
-    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal);
-
-    let (amount_in_64x61_format) = Math64x61_fromFelt(amount);
-    let (amount_in_decimal_representation) = Math64x61_div(
-        amount_in_64x61_format, decimal_in_64x61_format
+    // Converting asset amount to Math64x61 format
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=assetID_);
+    let (amount_in_decimal_representation) = Math64x61_fromDecimalFelt(
+        amount, decimals=asset.token_decimal
     );
-
     let (array_len) = collateral_array_len.read();
     // Read the current balance.
     let (balance_collateral) = balance.read(assetID=assetID_);
-
     if (balance_collateral == 0) {
         add_collateral(new_asset_id=assetID_, iterator=0, length=array_len);
         tempvar syscall_ptr = syscall_ptr;
@@ -452,11 +441,9 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-
     // Compute and update the new balance.
     tempvar new_balance = balance_collateral + amount_in_decimal_representation;
     balance.write(assetID=assetID_, value=new_balance);
-
     deposited.emit(asset_id=assetID_, amount=amount_in_decimal_representation);
     return ();
 }
@@ -474,8 +461,8 @@ func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 ) -> () {
     // Check if the caller is trading contract
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     let (balance_) = balance.read(assetID=assetID_);
 
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
@@ -502,8 +489,8 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) {
     // Check if the caller is ABR Payment
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
@@ -535,8 +522,8 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 ) {
     // Check if the caller is trading contract
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
@@ -597,8 +584,8 @@ func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     assetID_: felt, amount: felt
 ) -> () {
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
@@ -643,8 +630,8 @@ func execute_order{
 
     // Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
@@ -831,50 +818,28 @@ func update_withdrawal_history{
 }(request_id_: felt) {
     alloc_locals;
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
-
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     // Get asset contract address
     let (withdrawal_request_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=WithdrawalRequest_INDEX, version=version
     );
-
     with_attr error_message("Caller is not authorized to update withdrawal history") {
         assert caller = withdrawal_request_address;
     }
-
     let (arr_len) = withdrawal_history_array_len.read();
     let (index) = find_index_to_be_updated_recurse(request_id_, arr_len);
     local index_to_be_updated = index;
     if (index_to_be_updated != -1) {
         let (history) = withdrawal_history_array.read(index=index_to_be_updated);
-        let (registry) = registry_address.read();
-        let (version) = contract_version.read();
-        // Get asset contract address
-        let (asset_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=Asset_INDEX, version=version
-        );
-        let (asset: Asset) = IAsset.getAsset(
-            contract_address=asset_address, id=history.collateral_id
-        );
-        tempvar decimal = asset.token_decimal;
-
-        let (ten_power_decimal) = pow(10, decimal);
-        let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal);
-
-        let (temp_amount_in_64x61_format) = Math64x61_fromFelt(history.amount);
-        let (amount_in_64x61_format) = Math64x61_div(
-            temp_amount_in_64x61_format, decimal_in_64x61_format
-        );
-
         let updated_history = WithdrawalHistory(
             request_id=history.request_id,
             collateral_id=history.collateral_id,
-            amount=amount_in_64x61_format,
+            amount=history.amount,
             timestamp=history.timestamp,
             node_operator_L2_address=history.node_operator_L2_address,
             fee=history.fee,
-            status=1,
+            status=WITHDRAWAL_SUCCEEDED,
         );
         withdrawal_history_array.write(index=index_to_be_updated, value=updated_history);
         return ();
@@ -902,39 +867,32 @@ func withdraw{
 ) {
     alloc_locals;
     let (__fp__, _) = get_fp_and_pc();
-
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
-
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     let (signature_: felt*) = alloc();
     assert signature_[0] = sig_r_;
     assert signature_[1] = sig_s_;
-
     // Create withdrawal request for hashing
     local hash_withdrawal_request_: WithdrawalRequestForHashing = WithdrawalRequestForHashing(
         request_id=request_id_,
         collateral_id=collateral_id_,
         amount=amount_,
         );
-
     // hash the parameters
     let (hash) = hash_withdrawal_request(&hash_withdrawal_request_);
-
     // check if Tx is signed by the user
     is_valid_signature(hash, 2, signature_);
-
     let (arr_len) = withdrawal_history_array_len.read();
     let (result) = check_for_withdrawal_replay(request_id_, arr_len);
     with_attr error_message("Same withdrawal request exists") {
         assert_nn(result);
     }
-
     // Make sure 'amount' is positive.
-    assert_nn(amount_);
-
+    with_attr error_message("Withdrawal amount requested cannot be negative") {
+        assert_nn(amount_);
+    }
     // get L2 Account contract address
     let (user_l2_address) = get_contract_address();
-
     // Update the fees to be paid by user in withdrawal fee balance contract
     let (withdrawal_fee_balance_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=WithdrawalFeeBalance_INDEX, version=version
@@ -942,7 +900,6 @@ func withdraw{
     let (standard_fee, fee_collateral_id) = IWithdrawalFeeBalance.get_standard_withdraw_fee(
         contract_address=withdrawal_fee_balance_address
     );
-
     // Compute current balance
     let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id);
     with_attr error_message(
@@ -950,48 +907,34 @@ func withdraw{
         assert_le(standard_fee, fee_collateral_balance);
     }
     tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee;
-
     // Update the new fee collateral balance
     balance.write(assetID=fee_collateral_id, value=new_fee_collateral_balance);
-
     IWithdrawalFeeBalance.update_withdrawal_fee_mapping(
         contract_address=withdrawal_fee_balance_address,
-        user_l2_address_=user_l2_address,
         collateral_id_=fee_collateral_id,
         fee_to_add_=standard_fee,
     );
-
     // Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_);
-    with_attr error_message("Withdrawal amount requested should be less than balance") {
+    with_attr error_message(
+            "Withdrawal amount requested should be less than or equal to the current balance") {
         assert_le(amount_, current_balance);
     }
     tempvar new_balance = current_balance - amount_;
-
     // Update the new balance
     balance.write(assetID=collateral_id_, value=new_balance);
-
     // Calculate the timestamp
     let (timestamp_) = get_block_timestamp();
-
-    // Get asset contract address
+    // Get asset
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     );
-    // Reading token decimal field of an asset
-    let (asset: Asset) = IAsset.getAsset(contract_address=asset_address, id=collateral_id_);
-    tempvar decimal = asset.token_decimal;
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
     tempvar ticker = asset.ticker;
-
-    let (ten_power_decimal) = pow(10, decimal);
-    let (decimal_in_64x61_format) = Math64x61_fromFelt(ten_power_decimal);
-
-    let (amount_times_ten_power_decimal) = Math64x61_mul(amount_, decimal_in_64x61_format);
-    let (amount_in_felt) = Math64x61_toFelt(amount_times_ten_power_decimal);
-
+    // Convert amount from Math64x61 format to felt
+    let (amount_in_felt) = Math64x61_toDecimalFelt(amount_, decimals=asset.token_decimal);
     // Get the L1 wallet address of the user
     let (user_l1_address) = L1_address.read();
-
     // Add Withdrawal Request to WithdrawalRequest Contract
     let (withdrawal_request_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=WithdrawalRequest_INDEX, version=version
@@ -1003,23 +946,20 @@ func withdraw{
         ticker_=ticker,
         amount_=amount_in_felt,
     );
-
     // Create a withdrawal history object
     local withdrawal_history_: WithdrawalHistory = WithdrawalHistory(
         request_id=request_id_,
         collateral_id=collateral_id_,
-        amount=amount_in_felt,
+        amount=amount_,
         timestamp=timestamp_,
         node_operator_L2_address=node_operator_L2_address_,
         fee=standard_fee,
-        status=0
+        status=WITHDRAWAL_INITIATED
         );
-
     // Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read();
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_);
     withdrawal_history_array_len.write(array_len + 1);
-
     withdrawal_request.emit(
         collateral_id=collateral_id_, amount=amount_, node_operator_l2=node_operator_L2_address_
     );
@@ -1037,8 +977,8 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Check if the caller is the liquidator contract
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Liquidate_INDEX, version=version
     );

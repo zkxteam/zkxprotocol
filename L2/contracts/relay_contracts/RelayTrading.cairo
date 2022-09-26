@@ -1,7 +1,23 @@
 %lang starknet
 
 from contracts.interfaces.ITrading import ITrading
-from contracts.libraries.RelayLibrary import record_call_details, get_inner_contract, initialize
+from contracts.libraries.RelayLibrary import (
+    record_call_details,
+    get_inner_contract,
+    initialize,
+    get_current_version,
+    get_caller_hash_status,
+    get_call_counter,
+    get_registry_address_at_relay,
+    get_self_index,
+    get_caller_hash_list,
+    set_current_version,
+    mark_caller_hash_paid,
+    reset_call_counter,
+    set_self_index,
+    verify_caller_authority,
+)
+
 from contracts.DataTypes import MultipleOrder
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 
@@ -19,12 +35,12 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func execute_batch{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
-    size: felt,
-    execution_price: felt,
-    marketID: felt,
+    size_: felt,
+    execution_price_: felt,
+    marketID_: felt,
     request_list_len: felt,
     request_list: MultipleOrder*,
-) -> (res: felt) {
+) {
     alloc_locals;
 
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -33,8 +49,8 @@ func execute_batch{
 
     record_call_details('execute_batch');
     let (inner_address) = get_inner_contract();
-    let (res) = ITrading.execute_batch(
-        inner_address, size, execution_price, marketID, request_list_len, request_list
+    ITrading.execute_batch(
+        inner_address, size_, execution_price_, marketID_, request_list_len, request_list
     );
-    return (res,);
+    return ();
 }

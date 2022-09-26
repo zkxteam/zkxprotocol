@@ -11,19 +11,14 @@ namespace IAsset {
     func set_L1_zkx_address(l1_zkx_address: felt) {
     }
 
-    func addAsset(id: felt, new_asset: Asset) {
+    func add_asset(id: felt, new_asset: Asset) {
     }
 
-    func removeAsset(id_to_remove: felt) {
+    func remove_asset(id_to_remove: felt) {
     }
 
     func modify_core_settings(
-        id: felt,
-        short_name: felt,
-        tradable: felt,
-        collateral: felt,
-        token_decimal: felt,
-        metadata_id: felt,
+        id: felt, short_name: felt, tradable: felt, collateral: felt, metadata_id: felt
     ) {
     }
 
@@ -51,7 +46,7 @@ namespace IAsset {
     func get_L1_zkx_address() -> (res: felt) {
     }
 
-    func getAsset(id: felt) -> (currAsset: Asset) {
+    func get_asset(id: felt) -> (currAsset: Asset) {
     }
 
     func get_maintenance_margin(id: felt) -> (maintenance_margin: felt) {
@@ -60,6 +55,6 @@ namespace IAsset {
     func get_version() -> (version: felt) {
     }
 
-    func returnAllAssets() -> (array_list_len: felt, array_list: AssetWID*) {
+    func return_all_assets() -> (array_list_len: felt, array_list: AssetWID*) {
     }
 }

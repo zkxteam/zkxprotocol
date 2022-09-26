@@ -1,7 +1,21 @@
 %lang starknet
 
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
-from contracts.libraries.RelayLibrary import record_call_details, get_inner_contract, initialize
+from contracts.libraries.RelayLibrary import (
+    record_call_details,
+    get_inner_contract,
+    initialize,
+    get_current_version,
+    get_caller_hash_status,
+    get_call_counter,
+    get_registry_address_at_relay,
+    get_self_index,
+    get_caller_hash_list,
+    set_current_version,
+    mark_caller_hash_paid,
+    reset_call_counter,
+    set_self_index,
+)
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
@@ -18,11 +32,11 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 @external
 func add_to_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     address_: felt
-) -> (res: felt) {
+) {
     record_call_details('add_to_account_registry');
     let (inner_address) = get_inner_contract();
-    let (res) = IAccountRegistry.add_to_account_registry(inner_address, address_);
-    return (res,);
+    IAccountRegistry.add_to_account_registry(inner_address, address_);
+    return ();
 }
 
 @external

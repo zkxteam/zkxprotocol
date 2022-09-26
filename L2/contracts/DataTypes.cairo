@@ -6,6 +6,7 @@ struct Market {
     assetCollateral: felt,
     leverage: felt,
     tradable: felt,
+    archived: felt,
     ttl: felt,
 }
 
@@ -16,6 +17,7 @@ struct MarketWID {
     assetCollateral: felt,
     leverage: felt,
     tradable: felt,
+    archived: felt,
     ttl: felt,
 }
 
@@ -231,4 +233,25 @@ struct DepositData {
     nonce: felt,
     message_hash: felt,
     timestamp: felt,
+}
+
+// Struct to store Collateral price
+struct CollateralPrice {
+    timestamp: felt,
+    price_in_usd: felt,
+}
+
+struct CoreFunctionCall {
+    index: felt,
+    version: felt,
+    nonce: felt,
+    function_selector: felt,
+    calldata_len: felt,
+    calldata: felt*,
+}
+
+struct CoreFunction {
+    index: felt,
+    version: felt,
+    function_selector: felt,
 }

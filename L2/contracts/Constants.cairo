@@ -13,7 +13,7 @@ const LiquidityFund_INDEX = 9;
 const InsuranceFund_INDEX = 10;
 const Liquidate_INDEX = 11;
 const L1_ZKX_Address_INDEX = 12;
-const LiquidatorAddress_INDEX = 13;
+const CollateralPrices_INDEX = 13;
 const AccountRegistry_INDEX = 14;
 const WithdrawalFeeBalance_INDEX = 15;
 const WithdrawalRequest_INDEX = 16;
@@ -22,6 +22,8 @@ const ABR_FUNDS_INDEX = 18;
 const ABR_PAYMENT_INDEX = 19;
 const AccountDeployer_INDEX = 20;
 const MarketPrices_INDEX = 21;
+const PubkeyWhitelister_INDEX = 22;
+const SigRequirementsManager_INDEX = 23;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
@@ -38,7 +40,7 @@ const RelayInsuranceFund_INDEX = 1000;
 const RelayLiquidate_INDEX = 1100;
 const RelayAccountRegistry_INDEX = 1400;
 const RelayABR_INDEX = 1700;
-const RelayABRpayment_INDEX = 1900;
+const RelayABRPayment_INDEX = 1900;
 
 const MasterAdmin_ACTION = 0;
 const ManageAssets_ACTION = 1;
@@ -47,6 +49,7 @@ const ManageAuthRegistry_ACTION = 3;
 const ManageFeeDetails_ACTION = 4;
 const ManageFunds_ACTION = 5;
 const ManageGovernanceToken_ACTION = 6;
+const ManageCollateralPrices_ACTION = 7;
 
 const POSITION_OPENED = 1;
 const POSITION_TO_BE_DELEVERAGED = 2;
@@ -61,3 +64,6 @@ const DELEVERAGING_ORDER = 4;
 
 const LONG = 1;
 const SHORT = 0;
+
+const WITHDRAWAL_INITIATED = 0;
+const WITHDRAWAL_SUCCEEDED = 1;

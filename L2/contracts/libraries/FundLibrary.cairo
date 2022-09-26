@@ -287,3 +287,16 @@ namespace FundLib {
         return ();
     }
 }
+//#################
+// View Functions #
+//#################
+
+// @notice Gets the amount of the balance for the asset_id(asset)
+// @param asset_id_ - Target asset_id
+// @return amount - Balance amount corresponding to the asset_id
+@view
+func balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(asset_id_: felt) -> (
+    amount: felt
+) {
+    return FundLib.balance(asset_id_);
+}

@@ -11,6 +11,6 @@ namespace ITrading {
         marketID: felt,
         request_list_len: felt,
         request_list: MultipleOrder*,
-    ) -> (res: felt) {
+    ) -> () {
     }
 }

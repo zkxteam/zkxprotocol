@@ -3,6 +3,7 @@
 @contract_interface
 namespace IEmergencyFund {
     // external functions
+
     func fund(asset_id_: felt, amount: felt) {
     }
 

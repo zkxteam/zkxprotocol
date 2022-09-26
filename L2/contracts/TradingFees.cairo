@@ -7,6 +7,7 @@ from starkware.cairo.common.math_cmp import is_le, is_nn
 from contracts.Constants import FeeDiscount_INDEX, ManageFeeDetails_ACTION
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IFeeDiscount import IFeeDiscount
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_mul
 
@@ -45,16 +46,6 @@ func update_discount_called(tier: felt, discount_details: Discount) {
 // Storage #
 //##########
 
-// Stores the contract version
-@storage_var
-func contract_version() -> (version: felt) {
-}
-
-// Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address: felt) {
-}
-
 // Stores the maximum base fee tier
 @storage_var
 func max_base_fee_tier() -> (value: felt) {
@@ -86,13 +77,7 @@ func discount_tiers(tier: felt) -> (value: Discount) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Registry address and version cannot be 0") {
-        assert_not_zero(registry_address_);
-        assert_not_zero(version_);
-    }
-
-    registry_address.write(value=registry_address_);
-    contract_version.write(value=version_);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -152,8 +137,8 @@ func get_user_fee_and_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     address_: felt, side_: felt
 ) -> (fee: felt) {
     alloc_locals;
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     let (fee_discount_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=FeeDiscount_INDEX, version=version
     );
@@ -200,8 +185,8 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     alloc_locals;
     // Auth check
     with_attr error_message("Caller is not authorized to manage fee details") {
-        let (registry) = registry_address.read();
-        let (version) = contract_version.read();
+        let (registry) = CommonLib.get_registry_address();
+        let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, ManageFeeDetails_ACTION);
     }
 
@@ -275,8 +260,8 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     alloc_locals;
     // Auth check
     with_attr error_message("Caller is not authorized to manage fee details") {
-        let (registry) = registry_address.read();
-        let (version) = contract_version.read();
+        let (registry) = CommonLib.get_registry_address();
+        let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, ManageFeeDetails_ACTION);
     }
 

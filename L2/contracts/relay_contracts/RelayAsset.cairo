@@ -5,8 +5,19 @@ from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
     initialize,
+    get_current_version,
+    get_caller_hash_status,
+    get_call_counter,
+    get_registry_address_at_relay,
+    get_self_index,
+    get_caller_hash_list,
+    set_current_version,
+    mark_caller_hash_paid,
+    reset_call_counter,
+    set_self_index,
     verify_caller_authority,
 )
+
 from contracts.DataTypes import Asset, AssetWID
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import ManageAssets_ACTION
@@ -27,40 +38,33 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 //#####################
 
 @external
-func addAsset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id: felt, new_asset: Asset
 ) {
     verify_caller_authority(ManageAssets_ACTION);
-    record_call_details('addAsset');
+    record_call_details('add_asset');
     let (inner_address) = get_inner_contract();
-    IAsset.addAsset(inner_address, id, new_asset);
+    IAsset.add_asset(inner_address, id, new_asset);
     return ();
 }
 
 @external
-func removeAsset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) {
+func remove_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) {
     verify_caller_authority(ManageAssets_ACTION);
-    record_call_details('removeAsset');
+    record_call_details('remove_asset');
     let (inner_address) = get_inner_contract();
-    IAsset.removeAsset(inner_address, id);
+    IAsset.remove_asset(inner_address, id);
     return ();
 }
 
 @external
 func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt,
-    short_name: felt,
-    tradable: felt,
-    collateral: felt,
-    token_decimal: felt,
-    metadata_id: felt,
+    id: felt, short_name: felt, tradable: felt, collateral: felt, metadata_id: felt
 ) {
     verify_caller_authority(ManageAssets_ACTION);
     record_call_details('modify_core_settings');
     let (inner_address) = get_inner_contract();
-    IAsset.modify_core_settings(
-        inner_address, id, short_name, tradable, collateral, token_decimal, metadata_id
-    );
+    IAsset.modify_core_settings(inner_address, id, short_name, tradable, collateral, metadata_id);
     return ();
 }
 
@@ -107,11 +111,11 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 //#################
 
 @view
-func getAsset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) -> (
+func get_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) -> (
     currAsset: Asset
 ) {
     let (inner_address) = get_inner_contract();
-    let (res) = IAsset.getAsset(inner_address, id);
+    let (res) = IAsset.get_asset(inner_address, id);
     return (res,);
 }
 
@@ -134,10 +138,10 @@ func get_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }
 
 @view
-func returnAllAssets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+func return_all_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     array_list_len: felt, array_list: AssetWID*
 ) {
     let (inner_address) = get_inner_contract();
-    let (array_list_len, array_list: AssetWID*) = IAsset.returnAllAssets(inner_address);
+    let (array_list_len, array_list: AssetWID*) = IAsset.return_all_assets(inner_address);
     return (array_list_len, array_list);
 }

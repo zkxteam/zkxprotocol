@@ -4,7 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le
 
 from contracts.Constants import Trading_INDEX
-from contracts.libraries.FundLibrary import FundLib
+from contracts.libraries.FundLibrary import balance, FundLib
 from contracts.Math_64x61 import Math64x61_assert64x61
 
 //#########
@@ -116,7 +116,7 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     );
     let updated_liq_amount: felt = current_liq_amount + amount_;
 
-    with_attr error_message("updated amount must be in 64x61 range") {
+    with_attr error_message("Updated amount must be in 64x61 range") {
         Math64x61_assert64x61(updated_liq_amount);
     }
 

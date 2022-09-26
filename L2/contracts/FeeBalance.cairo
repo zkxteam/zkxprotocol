@@ -7,6 +7,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import Trading_INDEX, MasterAdmin_ACTION
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
@@ -34,16 +35,6 @@ func FeeBalance_withdraw_called(
 // Storage #
 //##########
 
-// Stores the contract version
-@storage_var
-func contract_version() -> (version: felt) {
-}
-
-// Stores the address of Authorized Registry contract
-@storage_var
-func registry_address() -> (contract_address: felt) {
-}
-
 // Stores <address, assetID> to fee mapping
 @storage_var
 func fee_mapping(address: felt, assetID: felt) -> (fee: felt) {
@@ -65,8 +56,7 @@ func total_fee_per_asset(assetID: felt) -> (accumulated_fee: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    registry_address.write(value=registry_address_);
-    contract_version.write(value=version_);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -110,8 +100,8 @@ func update_fee_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     address: felt, assetID_: felt, fee_to_add_: felt
 ) {
     let (caller) = get_caller_address();
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
     );
@@ -161,8 +151,8 @@ func update_fee_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     assetID_: felt, amount_to_withdraw_: felt
 ) {
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
     // Auth check
     with_attr error_message("Caller is not Master Admin") {

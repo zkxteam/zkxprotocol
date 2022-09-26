@@ -1,5 +1,4 @@
 %lang starknet
-%builtins pedersen range_check ecdsa
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
@@ -23,6 +22,7 @@ from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.libraries.CommonLibrary import CommonLib
 
 //#########
 // Events #
@@ -55,12 +55,7 @@ func contract_version() -> (version: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, contract_version_: felt
 ) {
-    with_attr error_message("Registry address and version cannot be 0") {
-        assert_not_zero(contract_version_);
-        assert_not_zero(registry_address_);
-    }
-    registry_address.write(registry_address_);
-    contract_version.write(contract_version_);
+    CommonLib.initialize(registry_address_, contract_version_);
     return ();
 }
 
@@ -75,16 +70,19 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_addresses_len: felt, account_addresses: felt*
 ) {
     // ## Signature checks go here ####
+
     // Get the account registry smart-contract
-    let (registry) = registry_address.read();
-    let (version) = contract_version.read();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
     let (account_registry) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AccountRegistry_INDEX, version=version
     );
+
     // Get the market smart-contract
     let (market_contract) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Market_INDEX, version=version
     );
+
     // Get the ABR smart-contract
     let (abr_contract) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=ABR_INDEX, version=version
