@@ -36,24 +36,23 @@ func asset_contract_created(
 
 // Event emitted whenever new asset is added
 @event
-func asset_added(asset_id: felt, ticker: felt, caller_address: felt) {
+func asset_added(asset_id: felt, caller_address: felt) {
 }
 
 // Event emitted whenever asset is removed
 @event
-func asset_removed(asset_id: felt, ticker: felt, caller_address: felt) {
+func asset_removed(asset_id: felt, caller_address: felt) {
 }
 
 // Event emitted whenever asset core settings are updated
 @event
-func asset_core_settings_update(asset_id: felt, ticker: felt, caller_address: felt) {
+func asset_core_settings_update(asset_id: felt, caller_address: felt) {
 }
 
 // Event emitted whenever asset trade settings are updated
 @event
 func asset_trade_settings_update(
     asset_id: felt,
-    ticker: felt,
     new_contract_version: felt,
     new_asset_version: felt,
     caller_address: felt,
@@ -92,11 +91,6 @@ func asset_by_id(asset_id: felt) -> (res: Asset) {
 // Bool indicating if ID already exists
 @storage_var
 func asset_id_exists(asset_id: felt) -> (res: felt) {
-}
-
-// Bool indicating if ticker already exists
-@storage_var
-func asset_ticker_exists(ticker: felt) -> (res: felt) {
 }
 
 //##############
@@ -187,7 +181,6 @@ func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     assert_not_zero(id_);
     verify_caller_authority_asset();
     verify_asset_id_exists(id_, should_exist_=FALSE);
-    verify_ticker_exists(new_asset_.ticker, should_exist_=FALSE);
     validate_asset_properties(new_asset_);
 
     // Save asset_id
@@ -196,19 +189,18 @@ func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_index_by_id.write(id_, curr_len);
     assets_array_len.write(curr_len + 1);
 
-    // Update id & ticker existence
+    // Update id existence
     asset_id_exists.write(id_, TRUE);
-    asset_ticker_exists.write(new_asset_.ticker, TRUE);
 
     // Save new_asset struct
     asset_by_id.write(id_, new_asset_);
 
     // Trigger asset update on L1
-    update_asset_on_L1(asset_id_=id_, ticker_=new_asset_.ticker, action_=ADD_ASSET);
+    update_asset_on_L1(asset_id_=id_, action_=ADD_ASSET);
 
     // Emit event
     let (caller_address) = get_caller_address();
-    asset_added.emit(asset_id=id_, ticker=new_asset_.ticker, caller_address=caller_address);
+    asset_added.emit(asset_id=id_, caller_address=caller_address);
 
     return ();
 }
@@ -227,7 +219,6 @@ func remove_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
     // Prepare necessary data
     let (asset_to_remove: Asset) = asset_by_id.read(id_to_remove_);
-    local ticker_to_remove = asset_to_remove.ticker;
     let (local index_to_remove) = asset_index_by_id.read(id_to_remove_);
     let (local curr_len) = assets_array_len.read();
     local last_asset_index = curr_len - 1;
@@ -241,16 +232,14 @@ func remove_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     asset_id_by_index.write(last_asset_index, 0);
     assets_array_len.write(curr_len - 1);
 
-    // Mark id & ticker as non-existing
+    // Mark id as non-existing
     asset_id_exists.write(id_to_remove_, FALSE);
-    asset_ticker_exists.write(ticker_to_remove, FALSE);
 
     // Delete asset struct
     asset_by_id.write(
         id_to_remove_,
         Asset(
         asset_version=0,
-        ticker=0,
         short_name=0,
         tradable=0,
         collateral=0,
@@ -272,12 +261,12 @@ func remove_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     );
 
     // Trigger asset update on L1
-    update_asset_on_L1(asset_id_=id_to_remove_, ticker_=ticker_to_remove, action_=REMOVE_ASSET);
+    update_asset_on_L1(asset_id_=id_to_remove_, action_=REMOVE_ASSET);
 
     // Emit event
     let (caller_address) = get_caller_address();
     asset_removed.emit(
-        asset_id=id_to_remove_, ticker=ticker_to_remove, caller_address=caller_address
+        asset_id=id_to_remove_, caller_address=caller_address
     );
 
     return ();
@@ -303,7 +292,6 @@ func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (asset: Asset) = asset_by_id.read(id_);
     local updated_asset: Asset = Asset(
         asset_version=asset.asset_version,
-        ticker=asset.ticker,
         short_name=short_name_,
         tradable=tradable_,
         collateral=collateral_,
@@ -330,7 +318,7 @@ func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Emit event
     let (caller_address) = get_caller_address();
     asset_core_settings_update.emit(
-        asset_id=id_, ticker=updated_asset.ticker, caller_address=caller_address
+        asset_id=id_, caller_address=caller_address
     );
 
     return ();
@@ -376,7 +364,6 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     let (asset: Asset) = asset_by_id.read(id_);
     local updated_asset: Asset = Asset(
         asset_version=asset.asset_version + 1,
-        ticker=asset.ticker,
         short_name=asset.short_name,
         tradable=asset.tradable,
         collateral=asset.collateral,
@@ -408,7 +395,6 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     let (caller_address) = get_caller_address();
     asset_trade_settings_update.emit(
         asset_id=id_,
-        ticker=updated_asset.ticker,
         new_contract_version=curr_ver + 1,
         new_asset_version=updated_asset.asset_version,
         caller_address=caller_address,
@@ -423,16 +409,14 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
 // @notice Internal function to update asset list in L1
 // @param asset_id_ - random string generated by zkxnode's mongodb
-// @param ticker_ - Ticker of the asset
 // @param action_ - It could be ADD_ASSET or REMOVE_ASSET action
 func update_asset_on_L1{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_id_: felt, ticker_: felt, action_: felt
+    asset_id_: felt, action_: felt
 ) {
     // Build message payload
     let (message_payload: felt*) = alloc();
     assert message_payload[0] = action_;
-    assert message_payload[1] = ticker_;
-    assert message_payload[2] = asset_id_;
+    assert message_payload[1] = asset_id_;
 
     // Send asset update message to L1
     let (registry) = CommonLib.get_registry_address();
@@ -463,7 +447,7 @@ func populate_asset_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert asset_array_[current_len_] = AssetDTO(
         id=id,
         asset_version=asset.asset_version,
-        ticker=asset.ticker,
+        ticker=id,
         short_name=asset.short_name,
         tradable=asset.tradable,
         collateral=asset.collateral,
@@ -501,16 +485,6 @@ func verify_asset_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     with_attr error_message("asset_id existence mismatch") {
         let (id_exists) = asset_id_exists.read(asset_id_);
         assert id_exists = should_exist_;
-    }
-    return ();
-}
-
-func verify_ticker_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    ticker_: felt, should_exist_: felt
-) {
-    with_attr error_message("Ticker existence mismatch") {
-        let (ticker_exists) = asset_ticker_exists.read(ticker_);
-        assert ticker_exists = should_exist_;
     }
     return ();
 }
