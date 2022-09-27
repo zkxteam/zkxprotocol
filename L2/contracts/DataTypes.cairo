@@ -258,3 +258,15 @@ struct CoreFunction {
     version: felt,
     function_selector: felt,
 }
+
+struct OrderVolume {
+    size: felt,
+    price: felt,
+    timestamp: felt
+}
+
+struct VolumeMetaData {
+    season_id: felt,
+    pair_id: felt, 
+    order_type: felt, // open/close
+}
