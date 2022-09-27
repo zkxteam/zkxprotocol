@@ -24,6 +24,7 @@ const AccountDeployer_INDEX = 20;
 const MarketPrices_INDEX = 21;
 const PubkeyWhitelister_INDEX = 22;
 const SigRequirementsManager_INDEX = 23;
+const Hightide_INDEX = 24;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
