@@ -262,7 +262,7 @@ struct CoreFunction {
 struct OrderVolume {
     size: felt,
     price: felt,
-    timestamp: felt
+    timestamp: felt,
 }
 
 struct VolumeMetaData {
