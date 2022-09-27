@@ -8,7 +8,9 @@ from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, hash_order, assert_event_emitted, to64x61, convertTo64x61, assert_revert
 from helpers import StarknetService, ContractType, AccountFactory
+from starkware.starknet.business_logic.execution.objects import OrderedEvent
 from dummy_addresses import L1_dummy_address
+from starkware.starknet.public.abi import get_selector_from_name
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
