@@ -262,3 +262,16 @@ struct CollateralPrice {
     timestamp: felt,
     price_in_usd: felt,
 }
+
+struct OrderVolume {
+
+    size: felt,
+    price: felt,
+    timestamp: felt
+}
+
+struct VolumeMetaData {
+    season_id: felt,
+    pair_id: felt, 
+    order_type: felt, // open/close
+}
