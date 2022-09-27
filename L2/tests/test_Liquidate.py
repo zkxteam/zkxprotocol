@@ -235,20 +235,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
-    print("Liquidator signer: ", hex(liquidator.contract_address))
-    print("Liquidate: ", hex(liquidate.contract_address))
-    print("Trading: ", hex(trading.contract_address))
-    print("Liquidity fund: ", hex(liquidityFund.contract_address))
-    print("Holding: ", hex(holding.contract_address))
-    print("Insurance fund: ", hex(insuranceFund.contract_address))
-    print("Fees: ", hex(fees.contract_address))
-    print("Asset: ", hex(asset.contract_address))
-    print("Market: ",hex(market.contract_address))
-    print("FeeDiscount: ", hex(feeDiscount.contract_address))
-    print("FeeBalance: ", hex(feeBalance.contract_address))
-    print("Alice: ", hex(alice.contract_address))
-    print("Charlie: ", hex(charlie.contract_address))
-
     # Set the balance of admin1 and admin2
     #await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
     #await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
