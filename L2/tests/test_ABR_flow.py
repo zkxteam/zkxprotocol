@@ -417,12 +417,12 @@ async def test_abr_payments(abr_factory):
     assert_events_emitted_from_all_calls(
         abr_tx,
         [
-            [0, abr_fund.contract_address, 'withdraw_ABR_called', [order_id_1, alice.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
-            [1, alice.contract_address, 'transferred_abr', [order_id_1, USDC_ID, marketID_1, abr_to_pay.result.res, initial_timestamp]],
-            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [order_id_1, alice.contract_address, initial_timestamp]],
-            [3, bob.contract_address, 'transferred_from_abr', [ order_id_2, USDC_ID, marketID_1, abr_to_pay.result.res, initial_timestamp]],
-            [4, abr_fund.contract_address, 'deposit_ABR_called', [order_id_2, bob.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
-            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [order_id_2, bob.contract_address, initial_timestamp]]
+            [0, abr_fund.contract_address, 'withdraw_ABR_called', [alice.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [1, alice.contract_address, 'transferred_abr', [marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, alice.contract_address, initial_timestamp]],
+            [3, bob.contract_address, 'transferred_from_abr', [marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [4, abr_fund.contract_address, 'deposit_ABR_called', [bob.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, bob.contract_address, initial_timestamp]]
         ]
     )
     
@@ -478,18 +478,15 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
     
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("343uofdsjnv")
-    order_id_2 = str_to_felt("wer4iljerw")
-
     assert_events_emitted_from_all_calls(
         abr_tx,
         [
-            [0, abr_fund.contract_address, 'withdraw_ABR_called', [order_id_1, alice.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
-            [1, alice.contract_address, 'transferred_abr', [order_id_1, USDC_ID, marketID_1, abr_to_pay.result.res, timestamp]],
-            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [order_id_1, alice.contract_address, timestamp]],
-            [3, bob.contract_address, 'transferred_from_abr', [ order_id_2, USDC_ID, marketID_1, abr_to_pay.result.res, timestamp]],
-            [4, abr_fund.contract_address, 'deposit_ABR_called', [order_id_2, bob.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
-            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [order_id_2, bob.contract_address, timestamp]]
+            [0, abr_fund.contract_address, 'withdraw_ABR_called', [alice.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
+            [1, alice.contract_address, 'transferred_abr', [marketID_1, abr_to_pay.result.res, timestamp]],
+            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, alice.contract_address, timestamp]],
+            [3, bob.contract_address, 'transferred_from_abr', [marketID_1, abr_to_pay.result.res, timestamp]],
+            [4, abr_fund.contract_address, 'deposit_ABR_called', [bob.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
+            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, bob.contract_address, timestamp]]
         ]
     )
   

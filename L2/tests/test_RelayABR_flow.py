@@ -314,71 +314,15 @@ async def test_abr_payments(abr_factory):
 
     abr_tx = await admin1_signer.send_transaction(admin1, abr_payment.contract_address, "pay_abr", [2, alice.contract_address, bob.contract_address])
 
-    assert_event_emitted(
+    assert_events_emitted_from_all_calls(
         abr_tx,
-        from_address=abr_payment.contract_address,
-        name="abr_payment_called_user_position",
-        data=[
-            marketID_1,
-            alice.contract_address,
-            initial_timestamp
-        ]
-    )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=abr_payment.contract_address,
-        name="abr_payment_called_user_position",
-        data=[
-            marketID_1,
-            bob.contract_address,
-            initial_timestamp
-        ]
-    )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=abr_fund.contract_address,
-        name="withdraw_ABR_called",
-        data=[
-            alice.contract_address,
-            marketID_1,
-            abr_to_pay.result.res,
-            initial_timestamp
-        ]
-    )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=abr_fund.contract_address,
-        name="deposit_ABR_called",
-        data=[
-            bob.contract_address,
-            marketID_1,
-            abr_to_pay.result.res,
-            initial_timestamp
-        ]
-    )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=alice.contract_address,
-        name="transferred_abr",
-        data=[
-            marketID_1,
-            abr_to_pay.result.res,
-            initial_timestamp
-        ]
-    )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=bob.contract_address,
-        name="transferred_from_abr",
-        data=[
-            marketID_1,
-            abr_to_pay.result.res,
-            initial_timestamp
+        [
+            [0, abr_fund.contract_address, 'withdraw_ABR_called', [alice.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [1, alice.contract_address, 'transferred_abr', [marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, alice.contract_address, initial_timestamp]],
+            [3, bob.contract_address, 'transferred_from_abr', [marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [4, abr_fund.contract_address, 'deposit_ABR_called', [bob.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, bob.contract_address, initial_timestamp]]
         ]
     )
 
@@ -431,73 +375,20 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
     abr_to_pay = await fixed_math.Math64x61_mul(abr_result.result.price, abr_result.result.abr).call()
     abr_tx = await admin1_signer.send_transaction(admin1, abr_payment.contract_address, "pay_abr", [2, alice.contract_address, bob.contract_address])
     
-    assert_event_emitted(
-        abr_tx,
-        from_address=abr_payment.contract_address,
-        name="abr_payment_called_user_position",
-        data=[
-            BTC_USD_ID,
-            alice.contract_address,
-            timestamp
-        ]
-    )
+    marketID_1 = BTC_USD_ID
 
-    assert_event_emitted(
+    assert_events_emitted_from_all_calls(
         abr_tx,
-        from_address=abr_payment.contract_address,
-        name="abr_payment_called_user_position",
-        data=[
-            BTC_USD_ID,
-            bob.contract_address,
-            timestamp
+        [
+            [0, abr_fund.contract_address, 'withdraw_ABR_called', [alice.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
+            [1, alice.contract_address, 'transferred_abr', [marketID_1, abr_to_pay.result.res, timestamp]],
+            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, alice.contract_address, timestamp]],
+            [3, bob.contract_address, 'transferred_from_abr', [marketID_1, abr_to_pay.result.res, timestamp]],
+            [4, abr_fund.contract_address, 'deposit_ABR_called', [bob.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
+            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, bob.contract_address, timestamp]]
         ]
     )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=abr_fund.contract_address,
-        name="withdraw_ABR_called",
-        data=[
-            alice.contract_address,
-            BTC_USD_ID,
-            abr_to_pay.result.res,
-            timestamp
-        ]
-    )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=abr_fund.contract_address,
-        name="deposit_ABR_called",
-        data=[
-            bob.contract_address,
-            BTC_USD_ID,
-            abr_to_pay.result.res,
-            timestamp
-        ]
-    )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=alice.contract_address,
-        name="transferred_abr",
-        data=[
-            BTC_USD_ID,
-            abr_to_pay.result.res,
-            timestamp
-        ]
-    )
-
-    assert_event_emitted(
-        abr_tx,
-        from_address=bob.contract_address,
-        name="transferred_from_abr",
-        data=[
-            BTC_USD_ID,
-            abr_to_pay.result.res,
-            timestamp
-        ]
-    )
+  
     alice_balance_after = await alice.get_balance(USDC_ID).call()
     bob_balance_after = await bob.get_balance(USDC_ID).call()
     abr_fund_balance_after = await abr_fund.balance(BTC_USD_ID).call()
@@ -506,3 +397,26 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
     assert bob_balance.result.res == bob_balance_after.result.res + abr_to_pay.result.res
     assert abr_fund_balance.result.amount == abr_fund_balance_after.result.amount
 
+def assert_events_emitted_from_all_calls(tx_exec_info, events):
+    """Assert events are fired with correct data."""
+    for event in events:
+        order, from_address, name, data = event
+        event_obj = OrderedEvent(
+            order=order,
+            keys=[get_selector_from_name(name)],
+            data=data,
+        )
+
+        base = tx_exec_info.call_info.internal_calls[0]
+        if event_obj in base.events and from_address == base.contract_address:
+            return
+
+        try:
+            internal_calls = base.internal_calls
+            for base2 in internal_calls:
+                if event_obj in base2.events and from_address == base2.contract_address:
+                    return
+        except IndexError:
+            pass
+
+        raise BaseException("Event not fired or not fired correctly")
