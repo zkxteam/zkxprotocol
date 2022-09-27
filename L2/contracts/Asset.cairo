@@ -8,7 +8,7 @@ from starkware.starknet.common.messages import send_message_to_l1
 from starkware.starknet.common.syscalls import get_caller_address, get_contract_address
 
 from contracts.Constants import AdminAuth_INDEX, L1_ZKX_Address_INDEX, ManageAssets_ACTION
-from contracts.DataTypes import Asset, AssetWID
+from contracts.DataTypes import Asset, AssetDTO
 from contracts.Math_64x61 import Math64x61_assertPositive64x61
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -163,10 +163,10 @@ func get_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @return array_list - Fully populated list of assets
 @view
 func return_all_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    array_list_len: felt, array_list: AssetWID*
+    array_list_len: felt, array_list: AssetDTO*
 ) {
     let (final_len) = assets_array_len.read();
-    let (asset_list: AssetWID*) = alloc();
+    let (asset_list: AssetDTO*) = alloc();
     return populate_asset_list(0, final_len, asset_list);
 }
 
@@ -450,17 +450,17 @@ func update_asset_on_L1{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param final_len_ - final length of array being populated
 // @param asset_array_ - array being populated with assets
 // @return array_list_len - Iterator used to populate array
-// @return array_list - Fully populated array of AssetWID
+// @return array_list - Fully populated array of AssetDTO (Asset Data Transfet Object)
 func populate_asset_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    current_len_: felt, final_len_: felt, asset_array_: AssetWID*
-) -> (array_list_len: felt, array_list: AssetWID*) {
+    current_len_: felt, final_len_: felt, asset_array_: AssetDTO*
+) -> (array_list_len: felt, array_list: AssetDTO*) {
     alloc_locals;
     if (current_len_ == final_len_) {
         return (final_len_, asset_array_);
     }
     let (id) = asset_id_by_index.read(current_len_);
     let (asset: Asset) = asset_by_id.read(id);
-    assert asset_array_[current_len_] = AssetWID(
+    assert asset_array_[current_len_] = AssetDTO(
         id=id,
         asset_version=asset.asset_version,
         ticker=asset.ticker,
