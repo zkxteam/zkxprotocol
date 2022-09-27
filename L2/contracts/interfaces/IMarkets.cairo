@@ -5,7 +5,7 @@ from contracts.DataTypes import Market
 @contract_interface
 namespace IMarkets {
     // external functions
-    func add_market(id: felt, newMarket: Market) {
+    func add_market(newMarket: Market) {
     }
 
     func remove_market(id: felt) {

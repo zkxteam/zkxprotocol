@@ -35,12 +35,12 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt, newMarket: Market
+    newMarket: Market
 ) {
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('add_market');
     let (inner_address) = get_inner_contract();
-    IMarkets.add_market(contract_address=inner_address, id=id, newMarket=newMarket);
+    IMarkets.add_market(contract_address=inner_address, newMarket=newMarket);
     return ();
 }
 
