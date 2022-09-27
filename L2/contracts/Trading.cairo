@@ -937,7 +937,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         }
 
         with_attr error_message("market is non tradable in trading contract.") {
-            assert_not_zero(market.tradable);
+            assert_not_zero(market.is_tradable);
         }
 
         with_attr error_message(
