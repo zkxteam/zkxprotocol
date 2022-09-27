@@ -275,3 +275,10 @@ struct VolumeMetaData {
     pair_id: felt, 
     order_type: felt, // open/close
 }
+
+struct TradingSeason {
+
+    start_timestamp: felt,
+    end_timestamp: felt,
+    num_trading_days: felt,
+}
