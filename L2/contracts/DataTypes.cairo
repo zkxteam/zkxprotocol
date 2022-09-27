@@ -24,7 +24,6 @@ struct MarketWID {
 // @notice struct to store details of assets
 struct Asset {
     asset_version: felt,
-    ticker: felt,
     short_name: felt,
     tradable: felt,
     collateral: felt,
