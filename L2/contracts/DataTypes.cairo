@@ -45,7 +45,7 @@ struct Asset {
 }
 
 // @notice struct to store details of assets with IDs
-struct AssetWID {
+struct AssetDTO {
     id: felt,
     asset_version: felt,
     ticker: felt,

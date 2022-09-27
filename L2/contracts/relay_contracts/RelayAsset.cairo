@@ -18,7 +18,7 @@ set_self_index,
 verify_caller_authority
 )
 
-from contracts.DataTypes import Asset, AssetWID
+from contracts.DataTypes import Asset, AssetDTO
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import ManageAssets_ACTION
 
@@ -139,9 +139,9 @@ func get_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @view
 func return_all_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    array_list_len: felt, array_list: AssetWID*
+    array_list_len: felt, array_list: AssetDTO*
 ) {
     let (inner_address) = get_inner_contract();
-    let (array_list_len, array_list: AssetWID*) = IAsset.return_all_assets(inner_address);
+    let (array_list_len, array_list: AssetDTO*) = IAsset.return_all_assets(inner_address);
     return (array_list_len, array_list);
 }

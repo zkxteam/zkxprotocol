@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.DataTypes import Asset, AssetWID
+from contracts.DataTypes import Asset, AssetDTO
 
 @contract_interface
 namespace IAsset {
@@ -55,6 +55,6 @@ namespace IAsset {
     func get_version() -> (version: felt) {
     }
 
-    func return_all_assets() -> (array_list_len: felt, array_list: AssetWID*) {
+    func return_all_assets() -> (array_list_len: felt, array_list: AssetDTO*) {
     }
 }
