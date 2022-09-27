@@ -2,23 +2,25 @@
 
 // @notice struct to store details of markets
 struct Market {
-    asset: felt,
-    assetCollateral: felt,
-    leverage: felt,
-    tradable: felt,
-    archived: felt,
-    ttl: felt,
-}
-
-// @notice struct to store details of markets with IDs
-struct MarketWID {
     id: felt,
     asset: felt,
-    assetCollateral: felt,
+    asset_collateral: felt,
     leverage: felt,
-    tradable: felt,
-    archived: felt,
+    is_tradable: felt,
+    is_archived: felt,
     ttl: felt,
+    tick_size: felt,
+    step_size: felt,
+    minimum_order_size: felt,
+    minimum_leverage: felt,
+    maximum_leverage: felt,
+    currently_allowed_leverage: felt,
+    maintenance_margin_fraction: felt,
+    initial_margin_fraction: felt,
+    incremental_initial_margin_fraction: felt,
+    incremental_position_size: felt,
+    baseline_position_size: felt,
+    maximum_position_size: felt,
 }
 
 // @notice struct to store details of assets
