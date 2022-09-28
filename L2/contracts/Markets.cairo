@@ -174,7 +174,7 @@ func get_collateral_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     market_id: felt
 ) -> (collateral_id: felt) {
     let (currMarket) = market_by_id.read(market_id=market_id);
-    return (currMarket.assetCollateral,);
+    return (currMarket.asset_collateral,);
 }
 
 // @notice Getter function to get asset & collateral pair from market_id
@@ -186,7 +186,7 @@ func get_asset_collateral_from_market{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(market_id: felt) -> (asset_id: felt, collateral_id: felt) {
     let (currMarket) = market_by_id.read(market_id=market_id);
-    return (currMarket.asset, currMarket.assetCollateral);
+    return (currMarket.asset, currMarket.asset_collateral);
 }
 
 // @notice Getter function to get ttl of a market
