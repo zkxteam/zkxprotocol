@@ -368,4 +368,77 @@ async def test_get_all_archived_tradable_markets(adminAuth_factory):
     markets_new = await market.get_markets_by_state(1, 1).call()
     print("New Market list:", markets_new.result.array_list)
 
-    assert len(list(markets_new.result.array_list)) == len(list(markets.result.array_list)) - 6   
+    assert len(list(markets_new.result.array_list)) == len(list(markets.result.array_list)) - 6  
+
+@pytest.mark.asyncio
+async def test_modifying_trade_settings_by_admin(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    market_id = str_to_felt("2dsyfdj289fdw")
+    new_tick_size = to64x61(2)
+    new_step_size = to64x61(2)
+    new_minimum_order_size = to64x61(0.25)
+    new_minimum_leverage = to64x61(2)
+    new_maximum_leverage = to64x61(100)
+    new_currently_allowed_leverage = to64x61(100)
+    new_maintenance_margin_fraction = to64x61(2)
+    new_initial_margin_fraction = to64x61(2)
+    new_incremental_initial_margin_fraction = to64x61(2)
+    new_incremental_position_size = to64x61(200)
+    new_baseline_position_size = to64x61(2000)
+    new_maximum_position_size = to64x61(20000)
+
+    modify_tx = await signer1.send_transaction(admin1, market.contract_address, 'modify_trade_settings', [
+        market_id, 
+        new_tick_size, 
+        new_step_size, 
+        new_minimum_order_size, 
+        new_minimum_leverage, 
+        new_maximum_leverage, 
+        new_currently_allowed_leverage, 
+        new_maintenance_margin_fraction, 
+        new_initial_margin_fraction, 
+        new_incremental_initial_margin_fraction, 
+        new_incremental_position_size, 
+        new_baseline_position_size, 
+        new_maximum_position_size
+    ])
+
+    execution_info = await market.get_market(market_id).call()
+    fetched_market = execution_info.result.currMarket
+
+    assert fetched_market.tick_size == new_tick_size
+    assert fetched_market.step_size == new_step_size
+    assert fetched_market.minimum_order_size == new_minimum_order_size
+    assert fetched_market.minimum_leverage == new_minimum_leverage
+    assert fetched_market.maximum_leverage == new_maximum_leverage
+    assert fetched_market.currently_allowed_leverage == new_currently_allowed_leverage
+    assert fetched_market.maintenance_margin_fraction == new_maintenance_margin_fraction
+    assert fetched_market.initial_margin_fraction == new_initial_margin_fraction
+    assert fetched_market.incremental_initial_margin_fraction == new_incremental_initial_margin_fraction
+    assert fetched_market.incremental_position_size == new_incremental_position_size
+    assert fetched_market.baseline_position_size == new_baseline_position_size
+    assert fetched_market.maximum_position_size == new_maximum_position_size
+
+@pytest.mark.asyncio
+async def test_modifying_trade_settings_by_unauthorized_user(adminAuth_factory):
+    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
+
+    market_id = str_to_felt("2dsyfdj289fdw")
+    assert_revert(lambda: 
+        signer3.send_transaction(user1, market.contract_address, 'modify_trade_settings', [
+            market_id, 
+            to64x61(2), # tick_size 
+            to64x61(2), # step_size
+            to64x61(0.25), # minimum_order_size
+            to64x61(2), # minimum_leverage
+            to64x61(100), # maximum_leverage
+            to64x61(100), # currently_allowed_leverage
+            to64x61(2), # maintenance_margin_fraction
+            to64x61(2), # initial_margin_fraction
+            to64x61(2), # incremental_initial_margin_fraction
+            to64x61(200), # incremental_position_size
+            to64x61(2000), # baseline_position_size
+            to64x61(20000) # maximum_position_size
+        ])
+    ) 
