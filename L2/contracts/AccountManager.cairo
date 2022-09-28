@@ -201,7 +201,7 @@ func withdrawal_history_array_len() -> (len: felt) {
 
 // Stores the order_id to hash mapping
 @storage_var
-func order_id_mapping(order_id: felt) -> (res: felt) {
+func order_id_mapping(order_id: felt) -> (hash: felt) {
 }
 
 //##############
