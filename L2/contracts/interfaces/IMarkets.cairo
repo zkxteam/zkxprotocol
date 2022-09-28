@@ -22,7 +22,19 @@ namespace IMarkets {
 
     func change_max_leverage(new_max_leverage: felt) {
     }
+
     // view functions
+    func get_collateral_from_market(market_id: felt) -> (collateral_id: felt) {
+    }
+
+    func get_asset_collateral_from_market(market_id: felt) -> (
+        asset_id: felt, collateral_id: felt
+    ) {
+    }
+
+    func get_ttl_from_market(market_id: felt) -> (ttl: felt) {
+    }
+
     func get_market(id: felt) -> (currMarket: Market) {
     }
 

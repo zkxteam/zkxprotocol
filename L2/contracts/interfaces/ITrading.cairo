@@ -5,7 +5,6 @@ from contracts.DataTypes import MultipleOrder
 @contract_interface
 namespace ITrading {
     // external functions
-
     func execute_batch(
         size: felt,
         execution_price: felt,
