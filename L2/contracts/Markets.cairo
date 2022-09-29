@@ -12,7 +12,8 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
-from contracts.Math_64x61 import Math64x61_assert64x61
+from contracts.libraries.Validation import assert_bool
+from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61
 
 //############
 // Constants #
@@ -273,6 +274,7 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     verify_caller_authority_market();
     verify_market_id_exists(new_market_.id, should_exist_=FALSE);
     verify_market_pair_exists(new_market_.asset, new_market_.asset_collateral, should_exist_=FALSE);
+    validate_market_trade_settings(new_market_);
     let (new_tradable) = validate_market_properties(new_market_);
 
     market_by_id.write(
@@ -576,14 +578,15 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     baseline_position_size_: felt,
     maximum_position_size_: felt,
 ) {
+    alloc_locals;
+
     verify_caller_authority_market();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
 
     let (market: Market) = market_by_id.read(market_id=market_id_);
 
-    market_by_id.write(
-        market_id=market_id_,
-        value=Market(id=market.id,
+    local updated_market: Market = Market(
+        id=market.id,
         asset=market.asset, 
         asset_collateral=market.asset_collateral, 
         leverage=market.leverage, 
@@ -602,8 +605,11 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         incremental_position_size=incremental_position_size_,
         baseline_position_size=baseline_position_size_,
         maximum_position_size=maximum_position_size_
-        )
     );
+
+    // Validate and save updated market
+    validate_market_trade_settings(updated_market);
+    market_by_id.write(market_id_, updated_market);
 
     // Emit event
     market_trade_settings_updated.emit(market_id=market_id_, market=market);
@@ -844,6 +850,7 @@ func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     verify_leverage(market.leverage);
     verify_ttl(market.ttl);
     verify_tradable(market.is_tradable);
+    verify_archived(market.is_archived);
 
     // Getting asset details
     let (registry) = CommonLib.get_registry_address();
@@ -876,4 +883,36 @@ func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
             return (0,);
         }
     }
+}
+
+func validate_market_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_: Market
+) {
+    with_attr error_message("Market: Invalid trade settings") {
+        Math64x61_assertPositive64x61(market_.tick_size);
+        Math64x61_assertPositive64x61(market_.step_size);
+        Math64x61_assertPositive64x61(market_.minimum_order_size);
+        Math64x61_assertPositive64x61(market_.maintenance_margin_fraction);
+        Math64x61_assertPositive64x61(market_.initial_margin_fraction);
+        Math64x61_assertPositive64x61(market_.incremental_initial_margin_fraction);
+    }
+    with_attr error_message("Market: Invalid min leverage") {
+        Math64x61_assertPositive64x61(market_.minimum_leverage);
+    }
+    with_attr error_message("Market: Invalid max leverage") {
+        Math64x61_assertPositive64x61(market_.maximum_leverage);
+        assert_le(market_.minimum_leverage, market_.maximum_leverage);
+    }
+    with_attr error_message("Market: Invalid currently allowed leverage") {
+        Math64x61_assertPositive64x61(market_.currently_allowed_leverage);
+        assert_le(market_.minimum_leverage, market_.currently_allowed_leverage);
+        assert_le(market_.currently_allowed_leverage, market_.maximum_leverage);
+    }
+    with_attr error_message("market: Invalid position size settings") {
+        Math64x61_assertPositive64x61(market_.incremental_position_size);
+        Math64x61_assertPositive64x61(market_.baseline_position_size);
+        Math64x61_assertPositive64x61(market_.maximum_position_size);
+        assert_le(market_.baseline_position_size, market_.maximum_position_size);
+    }
+    return ();
 }
