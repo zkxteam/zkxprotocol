@@ -13,13 +13,13 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61
+from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61, Math64x61_ONE
 
 //############
 // Constants #
 //############
 const MAX_TRADABLE = 2;
-const MIN_LEVERAGE = 2305843009213693952;
+const MIN_LEVERAGE = Math64x61_ONE;
 
 //#########
 // Events #
@@ -121,7 +121,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     registry_address_: felt, version_: felt
 ) {
     CommonLib.initialize(registry_address_, version_);
-    max_leverage.write(23058430092136939520);
+    max_leverage.write(10 * Math64x61_ONE);
     max_ttl.write(3600);
     return ();
 }
@@ -266,13 +266,18 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 ) {
     alloc_locals;
 
-    // Validation
-    assert_not_zero(new_market_.id);
+    // Verification
     verify_market_manager_authority();
     verify_market_id_exists(new_market_.id, should_exist_=FALSE);
-    verify_market_pair_exists(new_market_.asset, new_market_.asset_collateral, should_exist_=FALSE);
-    validate_market_trading_settings(new_market_);
+    with_attr error_message("Markets: Market pair existence check failed") {
+        let (pair_exists) = market_pair_exists.read(new_market_.asset_, new_market_.asset_collateral_);
+        assert pair_exists = FALSE;
+    }
+
+    // Validation
     validate_market_properties(new_market_);
+    validate_market_trading_settings(new_market_);
+    
     let (new_tradable) = resolve_tradable_status(new_market_);
 
     // Save market to storage
@@ -328,7 +333,7 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 ) {
     alloc_locals;
 
-    // Auth Check
+    // Verification
     verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
 
@@ -340,7 +345,7 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     let (local last_market_id) = market_id_by_index.read(last_market_index);
 
     with_attr error_message("Markets: Tradable market cannot be removed") {
-        assert_le(market_to_remove.is_tradable, 0);
+        assert market_to_remove.is_tradable = FALSE;
     }
 
     // Replace market_id_ with last_market_id
@@ -382,7 +387,9 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         maximum_position_size=0),
     );
 
+    // Emit event
     market_removed.emit(market_id=market_id_);
+
     return ();
 }
 
@@ -637,10 +644,9 @@ func populate_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     }
 
     let (market_id) = market_id_by_index.read(index=iterator);
-
     let (market_details: Market) = market_by_id.read(market_id=market_id);
-
     let (id_exists) = market_id_exists.read(market_id);
+
     if (id_exists == FALSE) {
         return populate_markets(iterator + 1, array_list_len, array_list);
     } else {
@@ -763,20 +769,6 @@ func verify_market_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     return ();
 }
 
-// @notice Internal function to check if a market pair exists and returns the required boolean value
-// @param asset - Asset of the market pair
-// @param asset_collateral - Collateral of the market pair
-// @param should_exist - boolean value to assert against
-func verify_market_pair_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_: felt, asset_collateral_: felt, should_exist_: felt
-) {
-    with_attr error_message("Markets: Market pair existence check failed") {
-        let (pair_exists) = market_pair_exists.read(asset_, asset_collateral_);
-        assert pair_exists = should_exist_;
-    }
-    return ();
-}
-
 // @notice Internal function to validate the leverage value
 // @param leverage - Leverage value to validate
 func validate_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -834,6 +826,10 @@ func resolve_tradable_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market: Market
 ) {
+    // Validate Market properties
+    with_attr error_message("Markets: market id can't be zero") {
+        assert_not_zero(market.id);
+    }
     validate_leverage(market.leverage);
 
     with_attr error_message("Markets: ttl must be in range [1...max_ttl]") {
@@ -862,7 +858,7 @@ func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         id=market.asset_collateral
     );
 
-    // Validate asset existence and collateral status
+    // Verify assets exist and validate collateral's status
     with_attr error_message("Markets: Asset 1 is not registred as an asset") {
         assert_not_zero(asset1.id);
     }

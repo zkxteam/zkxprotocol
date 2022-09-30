@@ -133,7 +133,7 @@ func get_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 ) {
     verify_asset_id_exists(id_, should_exist_=TRUE);
     let (asset: Asset) = asset_by_id.read(id_);
-    return (asset,);
+    return (asset);
 }
 
 // @notice View function for getting version
@@ -143,7 +143,7 @@ func get_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     version: felt
 ) {
     let (res) = version.read();
-    return (res,);
+    return (res);
 }
 
 // @notice View function to return all the assets with ids in an array
