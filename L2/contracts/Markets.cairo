@@ -234,12 +234,11 @@ func get_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 func change_max_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_max_leverage_: felt
 ) {
-    verify_caller_authority_market();
-
-    with_attr error_message("Max leverage should be more than or equal to 1") {
+    verify_market_manager_authority();
+    with_attr error_message("Markets: Max leverage must be >= 1 and >= MIN leverage") {
         assert_le(1, new_max_leverage_);
+        assert_le(MIN_LEVERAGE, new_max_leverage_);
     }
-
     max_leverage.write(new_max_leverage_);
     return ();
 }
@@ -250,12 +249,10 @@ func change_max_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 func change_max_ttl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_max_ttl_: felt
 ) {
-    verify_caller_authority_market();
-
-    with_attr error_message("Max ttl cannot be 0") {
+    verify_market_manager_authority();
+    with_attr error_message("Markets: Max ttl cannot be 0") {
         assert_not_zero(new_max_ttl_);
     }
-
     max_ttl.write(new_max_ttl_);
     return ();
 }
@@ -269,14 +266,16 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 ) {
     alloc_locals;
 
-    // Auth Check
+    // Validation
     assert_not_zero(new_market_.id);
-    verify_caller_authority_market();
+    verify_market_manager_authority();
     verify_market_id_exists(new_market_.id, should_exist_=FALSE);
     verify_market_pair_exists(new_market_.asset, new_market_.asset_collateral, should_exist_=FALSE);
-    validate_market_trade_settings(new_market_);
-    let (new_tradable) = validate_market_properties(new_market_);
+    validate_market_trading_settings(new_market_);
+    validate_market_properties(new_market_);
+    let (new_tradable) = resolve_tradable_status(new_market_);
 
+    // Save market to storage
     market_by_id.write(
         market_id=new_market_.id,
         value=Market(id=new_market_.id,
@@ -300,23 +299,24 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
         maximum_position_size=new_market_.maximum_position_size)
     );
 
-    // Save it to storage
-    let (curr_len) = markets_array_len.read();
+    // Update markets array and mappings
+    let (local curr_len) = markets_array_len.read();
     market_id_by_index.write(curr_len, new_market_.id);
     market_index_by_id.write(new_market_.id, curr_len);
     markets_array_len.write(curr_len + 1);
     market_mapping.write(
-        asset_id=new_market_.asset, collateral_id=new_market_.asset_collateral, value=new_market_.id
+        asset_id=new_market_.asset, 
+        collateral_id=new_market_.asset_collateral, 
+        value=new_market_.id
     );
 
     // Update id & market pair existence
     market_id_exists.write(new_market_.id, TRUE);
     market_pair_exists.write(new_market_.asset, new_market_.asset_collateral, TRUE);
 
-    // Save new_market_ struct
-    market_by_id.write(market_id=new_market_.id, value=new_market_);
-
+    // Emit event
     market_added.emit(market_id=new_market_.id, market=new_market_);
+
     return ();
 }
 
@@ -329,7 +329,7 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     alloc_locals;
 
     // Auth Check
-    verify_caller_authority_market();
+    verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
 
     // Prepare necessary data
@@ -339,7 +339,7 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     local last_market_index = curr_len - 1;
     let (local last_market_id) = market_id_by_index.read(last_market_index);
 
-    with_attr error_message("Tradable market cannot be removed") {
+    with_attr error_message("Markets: Tradable market cannot be removed") {
         assert_le(market_to_remove.is_tradable, 0);
     }
 
@@ -393,9 +393,9 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, leverage_: felt
 ) {
-    verify_caller_authority_market();
+    verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
-    verify_leverage(leverage_);
+    validate_leverage(leverage_);
 
     let (market: Market) = market_by_id.read(market_id=market_id_);
 
@@ -434,13 +434,12 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     market_id_: felt, is_tradable_: felt
 ) {
     alloc_locals;
-    // Auth Check
-    verify_caller_authority_market();
+
+    verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
     verify_tradable(is_tradable_);
 
-    let (market: Market) = market_by_id.read(market_id=market_id_);
-
+    let (market: Market) = market_by_id.read(market_id_);
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
@@ -455,7 +454,7 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
             asset=market.asset, 
             asset_collateral=market.asset_collateral, 
             leverage=market.leverage, 
-            is_tradable=asset1.tradable, 
+            is_tradable=asset1.is_tradable, 
             is_archived=market.is_archived, 
             ttl=market.ttl,
             tick_size=market.tick_size,
@@ -476,8 +475,8 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         return ();
     } else {
         if (is_tradable_ == 1) {
-            with_attr error_message("Asset 1 is not tradable") {
-                assert_not_zero(asset1.tradable);
+            with_attr error_message("Markets: Asset 1 is not tradable") {
+                assert asset1.is_tradable = TRUE;
             }
         }
         market_by_id.write(
@@ -515,9 +514,11 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 func modify_archived_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, is_archived_: felt
 ) {
-    verify_caller_authority_market();
+    verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
-    verify_archived(is_archived_);
+    with_attr error_message("Markets: is_archived_ value must be bool") {
+        assert_bool(is_archived_);
+    }
 
     let (market: Market) = market_by_id.read(market_id=market_id_);
 
@@ -580,11 +581,10 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 ) {
     alloc_locals;
 
-    verify_caller_authority_market();
+    verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
 
-    let (market: Market) = market_by_id.read(market_id=market_id_);
-
+    let (market: Market) = market_by_id.read(market_id_);
     local updated_market: Market = Market(
         id=market.id,
         asset=market.asset, 
@@ -608,7 +608,7 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     );
 
     // Validate and save updated market
-    validate_market_trade_settings(updated_market);
+    validate_market_trading_settings(updated_market);
     market_by_id.write(market_id_, updated_market);
 
     // Emit event
@@ -739,10 +739,10 @@ func populate_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 }
 
 // @notice Internal function to check authorization
-func verify_caller_authority_market{
+func verify_market_manager_authority{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }() {
-    with_attr error_message("Caller not authorized to manage markets") {
+    with_attr error_message("Markets: Caller not authorized to manage markets") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, ManageMarkets_ACTION);
@@ -756,7 +756,7 @@ func verify_caller_authority_market{
 func verify_market_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, should_exist_: felt
 ) {
-    with_attr error_message("market_id existence mismatch") {
+    with_attr error_message("Markets: market_id existence check failed") {
         let (id_exists) = market_id_exists.read(market_id_);
         assert id_exists = should_exist_;
     }
@@ -770,125 +770,116 @@ func verify_market_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 func verify_market_pair_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_: felt, asset_collateral_: felt, should_exist_: felt
 ) {
-    with_attr error_message("Market pair existence mismatch") {
+    with_attr error_message("Markets: Market pair existence check failed") {
         let (pair_exists) = market_pair_exists.read(asset_, asset_collateral_);
         assert pair_exists = should_exist_;
     }
     return ();
 }
 
-// @notice Internal function to verify the leverage value
-// @param leverage - Leverage value to verify
-func verify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+// @notice Internal function to validate the leverage value
+// @param leverage - Leverage value to validate
+func validate_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     leverage_: felt
 ) {
-    with_attr error_message("Leverage should be in 64x61 format") {
+    with_attr error_message("Markets: Leverage must be in 64x61 format") {
         Math64x61_assert64x61(leverage_);
     }
-
-    with_attr error_message("Leverage should be more than or equal to 1") {
+    with_attr error_message("Markets: Leverage must be >= MIN leverage") {
         assert_le(MIN_LEVERAGE, leverage_);
     }
-
-    let (maximum_leverage) = max_leverage.read();
-    with_attr error_message("Leverage should be less than or equal to max leverage") {
+    with_attr error_message("Markets: Leverage must be <= MAX leverage") {
+        let (maximum_leverage) = max_leverage.read();
         assert_le(leverage_, maximum_leverage);
     }
-
     return ();
 }
 
-// @notice Internal function to verify the ttl value
-// @param ttl - ttl value to verify
-func verify_ttl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(ttl_: felt) {
-    with_attr error_message("ttl cannot be less than 1") {
-        assert_le(1, ttl_);
-    }
-
-    let (maximum_ttl) = max_ttl.read();
-    with_attr error_message("ttl should be less than or equal to max ttl") {
-        assert_le(ttl_, maximum_ttl);
-    }
-
-    return ();
-}
-
-// @param Internal function to verify the tradable value
-// @praram tradable - tradable value to verify
-func verify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    tradable_: felt
-) {
-    with_attr error_message("Tradable cannot be less than zero") {
-        assert_le(0, tradable_);
-    }
-
-    with_attr error_message("Tradable should be less than or equal to max trabele") {
-        assert_le(tradable_, MAX_TRADABLE);
-    }
-
-    return ();
-}
-
-// @param Internal function to verify archived value
-// @praram archived - archived value to verify
-func verify_archived{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    archived_: felt
-) {
-    with_attr error_message("Archived value can be either 0 or 1") {
-        assert_nn(archived_);
-        assert_le(archived_, 1);
-    }
-
-    return ();
-}
-
-// @param Internal function to verify the market propeties b
+// @param Internal function to resolve updated market tradable status
 // @praram market - struct of type Market
-func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func resolve_tradable_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market: Market
-) -> (newTradable: felt) {
-    verify_leverage(market.leverage);
-    verify_ttl(market.ttl);
-    verify_tradable(market.is_tradable);
-    verify_archived(market.is_archived);
+) -> (new_tradable: felt) {
 
-    // Getting asset details
+    // Get both assets details
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     );
-    let (asset1: Asset) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
+    let (asset1: Asset) = IAsset.get_asset(
+        contract_address=asset_address, 
+        id=market.asset
+    );
     let (asset2: Asset) = IAsset.get_asset(
-        contract_address=asset_address, id=market.asset_collateral
+        contract_address=asset_address, 
+        id=market.asset_collateral
     );
 
-    with_attr error_message("Asset 2 is not a collateral") {
-        assert_not_zero(asset2.collateral);
-    }
-
-    with_attr error_message("Asset 1 is not registred as an asset") {
-        assert_not_zero(asset1.ticker);
-    }
-
+    // Resolve trading status
     if (market.is_tradable == 2) {
-        return (asset1.tradable,);
-    } else {
-        if (market.is_tradable == 1) {
-            with_attr error_message("Asset 1 tradable cannot be 0 when market tradable is 1") {
-                assert_not_zero(asset1.tradable);
-            }
-            return (1,);
-        } else {
-            return (0,);
+        return (asset1.is_tradable);
+    }
+    if (market.is_tradable == 1) {
+        with_attr error_message("Markets: Asset 1 tradable cannot be 0 when market tradable is 1") {
+            assert asset1.is_tradable = TRUE;
         }
+        return (TRUE);
+    }
+    return (FALSE);
+}
+
+// @param Internal function to validate market core propeties
+// @praram market - struct of type Market
+func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market: Market
+) {
+    validate_leverage(market.leverage);
+
+    with_attr error_message("Markets: ttl must be in range [1...max_ttl]") {
+        let (maximum_ttl) = max_ttl.read();
+        assert_in_range(market.ttl, 1, maximum_ttl);
+    }
+    with_attr error_message("Markets: is_tradable must be bool") {
+        assert_bool(market.is_tradable);
+    }
+    with_attr error_message("Markets: is_archived must be bool") {
+        assert_bool(market.is_archived);
+    }
+
+    // Getting both assets details
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+    let (asset1: Asset) = IAsset.get_asset(
+        contract_address=asset_address, 
+        id=market.asset
+    );
+    let (asset2: Asset) = IAsset.get_asset(
+        contract_address=asset_address, 
+        id=market.asset_collateral
+    );
+
+    // Validate asset existence and collateral status
+    with_attr error_message("Markets: Asset 1 is not registred as an asset") {
+        assert_not_zero(asset1.id);
+    }
+    with_attr error_message("Asset 2 is not registred as an asset") {
+        assert_not_zero(asset2.id);
+    }
+    with_attr error_message("Asset 2 is not a collateral") {
+        assert asset2.is_collateral = TRUE;
     }
 }
 
-func validate_market_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+// @param Internal function to validate market trading propeties
+// @praram market - struct of type Market
+func validate_market_trading_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_: Market
 ) {
-    with_attr error_message("Market: Invalid trade settings") {
+    with_attr error_message("Markets: Invalid trade settings") {
         Math64x61_assertPositive64x61(market_.tick_size);
         Math64x61_assertPositive64x61(market_.step_size);
         Math64x61_assertPositive64x61(market_.minimum_order_size);
@@ -896,19 +887,19 @@ func validate_market_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuilti
         Math64x61_assertPositive64x61(market_.initial_margin_fraction);
         Math64x61_assertPositive64x61(market_.incremental_initial_margin_fraction);
     }
-    with_attr error_message("Market: Invalid min leverage") {
+    with_attr error_message("Markets: Invalid min leverage") {
         Math64x61_assertPositive64x61(market_.minimum_leverage);
     }
-    with_attr error_message("Market: Invalid max leverage") {
+    with_attr error_message("Markets: Invalid max leverage") {
         Math64x61_assertPositive64x61(market_.maximum_leverage);
         assert_le(market_.minimum_leverage, market_.maximum_leverage);
     }
-    with_attr error_message("Market: Invalid currently allowed leverage") {
+    with_attr error_message("Markets: Invalid currently allowed leverage") {
         Math64x61_assertPositive64x61(market_.currently_allowed_leverage);
         assert_le(market_.minimum_leverage, market_.currently_allowed_leverage);
         assert_le(market_.currently_allowed_leverage, market_.maximum_leverage);
     }
-    with_attr error_message("market: Invalid position size settings") {
+    with_attr error_message("Markets: Invalid position size settings") {
         Math64x61_assertPositive64x61(market_.incremental_position_size);
         Math64x61_assertPositive64x61(market_.baseline_position_size);
         Math64x61_assertPositive64x61(market_.maximum_position_size);
