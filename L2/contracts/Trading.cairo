@@ -52,13 +52,12 @@ from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.CommonLibrary import CommonLib
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_ONE
 
 //############
 // Constants #
 //############
 const TWO_PERCENT = 46116860184273879;
-const LEVERAGE_ONE = 2305843009213693952;
 
 //#########
 // Events #
@@ -460,7 +459,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     );
 
     // Deduct the amount from liquidity funds if order is leveraged
-    let is_non_leveraged = is_le(order_.leverage, LEVERAGE_ONE);
+    let is_non_leveraged = is_le(order_.leverage, Math64x61_ONE);
 
     if (is_non_leveraged == FALSE) {
         ILiquidityFund.withdraw(
@@ -581,8 +580,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         );
 
         // If no leverage is used
-        // to64x61(1) == 2305843009213693952
-        if (order_.leverage == LEVERAGE_ONE) {
+        if (order_.leverage == Math64x61_ONE) {
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
