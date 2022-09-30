@@ -32,7 +32,7 @@ from contracts.interfaces.ICollateralPrices import ICollateralPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.libraries.CommonLibrary import CommonLib
-from contracts.Math_64x61 import Math64x61_div, Math64x61_mul, Math64x61_add, Math64x61_sub
+from contracts.Math_64x61 import Math64x61_div, Math64x61_mul, Math64x61_add, Math64x61_sub, Math64x61_ONE
 
 //#########
 // Events #
@@ -131,7 +131,7 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         market_address=market_address,
         asset_address=asset_address,
         total_maintenance_requirement=0,
-        least_collateral_ratio=2305843009213693952,
+        least_collateral_ratio=Math64x61_ONE,
         least_collateral_ratio_position=PositionDetailsWithMarket(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_collateral_price=0,
         least_collateral_ratio_position_asset_price=0,
@@ -567,7 +567,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         market_address=market_address,
         asset_address=asset_address,
         total_maintenance_requirement=maintenance_requirement,
-        least_collateral_ratio=2305843009213693952,
+        least_collateral_ratio=Math64x61_ONE,
         least_collateral_ratio_position=PositionDetailsWithMarket(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_collateral_price=0,
         least_collateral_ratio_position_asset_price=0,
