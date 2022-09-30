@@ -1,11 +1,11 @@
 %lang starknet
 
-from contracts.DataTypes import Market, MarketWID
+from contracts.DataTypes import Market
 
 @contract_interface
 namespace IMarkets {
     // external functions
-    func add_market(id: felt, newMarket: Market) {
+    func add_market(newMarket: Market) {
     }
 
     func remove_market(id: felt) {
@@ -41,6 +41,6 @@ namespace IMarkets {
     func get_market_from_assets(asset_id: felt, collateral_id: felt) -> (market_id: felt) {
     }
 
-    func get_all_markets() -> (array_list_len: felt, array_list: MarketWID*) {
+    func get_all_markets() -> (array_list_len: felt, array_list: Market*) {
     }
 }

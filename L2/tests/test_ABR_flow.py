@@ -247,7 +247,8 @@ async def abr_factory(starknet_service: StarknetService):
         to64x61(10), # leverage
         1, # tradable
         0, # archived
-        10 # ttl
+        10, # ttl
+        1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000
     ])
 
     # Fund the Holding contract
