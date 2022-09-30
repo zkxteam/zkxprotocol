@@ -18,7 +18,7 @@ namespace IAsset {
     }
 
     func modify_core_settings(
-        id: felt, short_name: felt, tradable: felt, collateral: felt, metadata_id: felt
+        id: felt, short_name: felt, is_tradable: felt, is_collateral: felt, metadata_id: felt
     ) {
     }
 

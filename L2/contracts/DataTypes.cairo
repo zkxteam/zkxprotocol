@@ -23,10 +23,11 @@ struct MarketWID {
 
 // @notice struct to store details of assets
 struct Asset {
+    id: felt,
     asset_version: felt,
     short_name: felt,
-    tradable: felt,
-    isCollateral: felt,
+    is_tradable: felt,
+    is_collateral: felt,
     token_decimal: felt,
     metadata_id: felt,
     tick_size: felt,

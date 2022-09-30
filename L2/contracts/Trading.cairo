@@ -929,15 +929,15 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         );
         let (market: Market) = IMarkets.get_market(contract_address=market_address_, id=marketID_);
 
-        with_attr error_message("asset is non tradable in trading contract.") {
-            assert_not_zero(asset.tradable);
+        with_attr error_message("Trading: asset is non tradable.") {
+            assert asset.is_tradable = TRUE;
         }
 
-        with_attr error_message("asset is non collaterable in trading contract.") {
-            assert_not_zero(collateral.collateral);
+        with_attr error_message("Trading: collateral asset is non collaterable.") {
+            assert collateral.is_collateral = TRUE;
         }
 
-        with_attr error_message("market is non tradable in trading contract.") {
+        with_attr error_message("Trading: market is non tradable.") {
             assert_not_zero(market.tradable);
         }
 
