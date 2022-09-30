@@ -31,19 +31,7 @@ struct Asset {
     is_tradable: felt,
     is_collateral: felt,
     token_decimal: felt,
-    metadata_id: felt,
-    tick_size: felt,
-    step_size: felt,
-    minimum_order_size: felt,
-    minimum_leverage: felt,
-    maximum_leverage: felt,
-    currently_allowed_leverage: felt,
-    maintenance_margin_fraction: felt,
-    initial_margin_fraction: felt,
-    incremental_initial_margin_fraction: felt,
-    incremental_position_size: felt,
-    baseline_position_size: felt,
-    maximum_position_size: felt,
+    metadata_id: felt
 }
 
 // @notice Struct to store base fee percentage for each tier for maker and taker
