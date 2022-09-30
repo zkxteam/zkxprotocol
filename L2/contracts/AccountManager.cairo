@@ -199,6 +199,11 @@ func withdrawal_history_array(index: felt) -> (res: WithdrawalHistory) {
 func withdrawal_history_array_len() -> (len: felt) {
 }
 
+// Stores the order_id to hash mapping
+@storage_var
+func order_id_mapping(order_id: felt) -> (hash: felt) {
+}
+
 //##############
 // Constructor #
 //##############
@@ -632,6 +637,9 @@ func execute_order{
 
     // hash the parameters
     let (hash) = hash_order(&request);
+
+    // Check for hash collision
+    order_hash_check(request.orderID, hash);
 
     // check if signed by the user/liquidator
     is_valid_signature_order(hash, signature, request.liquidatorAddress);
@@ -1218,6 +1226,26 @@ func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res
         let pedersen_ptr = hash_ptr;
         return (res=res);
     }
+}
+
+// @notice Internal function to check for hash collisions
+// @param order_id - Order ID of the request
+// @param order_hash - Hash of the corresponding order
+func order_hash_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    order_id: felt, order_hash: felt
+) {
+    // Get the hash of the order associated with the order_id
+    let (existing_hash) = order_id_mapping.read(order_id=order_id);
+    // If the hash isn't stored in the contract yet
+    if (existing_hash == 0) {
+        order_id_mapping.write(order_id=order_id, value=order_hash);
+        return ();
+    }
+
+    with_attr error_message("hash mismatch") {
+        assert existing_hash = order_hash;
+    }
+    return ();
 }
 
 // @notice Internal function to hash the withdrawal request parameters
