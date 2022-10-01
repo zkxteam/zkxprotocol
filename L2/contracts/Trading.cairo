@@ -54,23 +54,24 @@ from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_ONE
 
-//############
-// Constants #
-//############
+///////////////
+// Constants //
+///////////////
+
 const TWO_PERCENT = 46116860184273879;
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted whenever a new market is added
 @event
 func trade_execution(address: felt, request: OrderRequest, market_id: felt, execution_price: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -83,9 +84,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+//////////////
+// External //
+//////////////
 
 // @notice Function to execute multiple orders in a batch
 // @param size_ - Size of the order to be executed
@@ -116,7 +117,7 @@ func execute_batch{
     );
 
     // Get Market from the corresponding Id
-    let (market: Market) = IMarkets.get_market(contract_address=market_address, id=marketID_);
+    let (market: Market) = IMarkets.get_market(contract_address=market_address, market_id_=marketID_);
 
     tempvar ttl = market.ttl;
 
@@ -189,9 +190,9 @@ func execute_batch{
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+//////////////
+// Internal //
+//////////////
 
 // @notice Internal function to retrieve contract addresses from the Auth Registry
 // @returns account_registry_address - Address of the Account Registry contract
@@ -925,7 +926,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let (collateral: Asset) = IAsset.get_asset(
             contract_address=asset_address_, id=temp_order.collateralID
         );
-        let (market: Market) = IMarkets.get_market(contract_address=market_address_, id=marketID_);
+        let (market: Market) = IMarkets.get_market(contract_address=market_address_, market_id_=marketID_);
 
         with_attr error_message("Trading: asset is non tradable.") {
             assert asset.is_tradable = TRUE;

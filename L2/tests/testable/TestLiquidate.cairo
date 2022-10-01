@@ -551,9 +551,8 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     );
 
     if (liq_result == TRUE) {
-        with_attr error_message(
-                "Current order will make the total account value to go below maintenance requirement") {
-            assert liq_result = FALSE;
+        with_attr error_message("Total account balance will go below maintenance requirement with the Order") {
+            assert 0 = 1;
         }
     }
     return ();
@@ -581,7 +580,7 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     prices: PriceData*,
 ) -> (prices_len: felt, prices: PriceData*) {
     alloc_locals;
-
+    
     if (iterator == positions_len) {
         return (prices_len, prices);
     }

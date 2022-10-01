@@ -23,18 +23,19 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted when abr payment called for a position
 @event
 func abr_payment_called_user_position(position_id: felt, account_address: felt, timestamp: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
+
 // @notice
 // @param registry_address_ - Address of the auth registry
 // @param contract_version_ Version of the contract
@@ -46,9 +47,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+//////////////
+// External //
+//////////////
 
 // @notice Function to be called by the node
 // @param account_addresses_len - Length of thee account_addresses array being passed
@@ -91,9 +92,9 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     );
 }
 
-//#####################
-// Internal Functions #
-//#####################
+//////////////
+// Internal //
+//////////////
 
 // @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
 // @param account_address - Address of the user of whom the positions are passed

@@ -33,9 +33,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 // @notice - All the following are mirror functions for Asset.cairo - just record call details and forward call
 
-//#####################
-// External functions #
-//#####################
+//////////////
+// External //
+//////////////
 
 @external
 func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -106,9 +106,9 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return ();
 }
 
-//#################
-// View functions #
-//#################
+//////////
+// View //
+//////////
 
 @view
 func get_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) -> (
@@ -116,15 +116,6 @@ func get_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 ) {
     let (inner_address) = get_inner_contract();
     let (res) = IAsset.get_asset(inner_address, id);
-    return (res,);
-}
-
-@view
-func get_maintenance_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt
-) -> (maintenance_margin: felt) {
-    let (inner_address) = get_inner_contract();
-    let (res) = IAsset.get_maintenance_margin(inner_address, id);
     return (res,);
 }
 
