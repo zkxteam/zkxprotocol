@@ -939,7 +939,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         }
 
         with_attr error_message("Trading: too high leverage") {
-            assert_le(temp_order.leverage, asset.currently_allowed_leverage);
+            assert_le(temp_order.leverage, market.currently_allowed_leverage);
         }
 
         // Recursive call with the ticker and price to compare against
@@ -961,7 +961,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidate_address_,
             liquidity_fund_address_,
             insurance_fund_address_,
-            asset.currently_allowed_leverage,
+            market.currently_allowed_leverage,
         );
     }
 
