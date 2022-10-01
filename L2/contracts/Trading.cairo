@@ -930,18 +930,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         with_attr error_message("Trading: asset is non tradable.") {
             assert asset.is_tradable = TRUE;
         }
-
         with_attr error_message("Trading: collateral asset is non collaterable.") {
             assert collateral.is_collateral = TRUE;
         }
-
         with_attr error_message("Trading: market is non tradable.") {
             assert_not_zero(market.tradable);
         }
-
-        with_attr error_message(
-                "leverage is not less than currently allowed leverage of the asset") {
-            assert_le(temp_order.leverage, asset.currently_allowed_leverage);
+        with_attr error_message("Trading: too high leverage") {
+            assert_le(temp_order.leverage, market.currently_allowed_leverage);
         }
 
         // Recursive call with the ticker and price to compare against
@@ -963,7 +959,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidate_address_,
             liquidity_fund_address_,
             insurance_fund_address_,
-            asset.currently_allowed_leverage,
+            market.currently_allowed_leverage,
         );
     }
 

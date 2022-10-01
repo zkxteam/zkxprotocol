@@ -16,9 +16,9 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Validation import assert_bool
 from contracts.libraries.Utils import verify_caller_authority
 
-//############
+// ############
 // Constants #
-//############
+// ############
 
 const ADD_ASSET = 1;
 const REMOVE_ASSET = 2;
@@ -127,7 +127,7 @@ func get_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 ) {
     verify_asset_id_exists(id_, should_exist_=TRUE);
     let (asset: Asset) = asset_by_id.read(id_);
-    return (asset);
+    return (asset,);
 }
 
 // @notice View function for getting version
@@ -137,7 +137,7 @@ func get_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     version: felt
 ) {
     let (res) = version.read();
-    return (res);
+    return (res,);
 }
 
 // @notice View function to return all the assets with ids in an array
@@ -225,6 +225,7 @@ func remove_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
     // Delete asset struct
     asset_by_id.write(id_to_remove_, Asset(
+        id=0,
         asset_version=0,
         short_name=0,
         is_tradable=0,
@@ -264,24 +265,13 @@ func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Create updated_asset
     let (asset: Asset) = asset_by_id.read(id_);
     local updated_asset: Asset = Asset(
+        id=asset.id,
         asset_version=asset.asset_version,
         short_name=short_name_,
         is_tradable=is_tradable_,
         is_collateral=is_collateral_,
         token_decimal=asset.token_decimal,
-        metadata_id=metadata_id_,
-        tick_size=asset.tick_size,
-        step_size=asset.step_size,
-        minimum_order_size=asset.minimum_order_size,
-        minimum_leverage=asset.minimum_leverage,
-        maximum_leverage=asset.maximum_leverage,
-        currently_allowed_leverage=asset.currently_allowed_leverage,
-        maintenance_margin_fraction=asset.maintenance_margin_fraction,
-        initial_margin_fraction=asset.initial_margin_fraction,
-        incremental_initial_margin_fraction=asset.incremental_initial_margin_fraction,
-        incremental_position_size=asset.incremental_position_size,
-        baseline_position_size=asset.baseline_position_size,
-        maximum_position_size=asset.maximum_position_size
+        metadata_id=metadata_id_
     );
 
     // Validate and save updated asset

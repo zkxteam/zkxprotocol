@@ -232,7 +232,7 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     verify_market_manager_authority();
     verify_market_id_exists(new_market_.id, should_exist_=FALSE);
     with_attr error_message("Markets: Market pair existence check failed") {
-        let (pair_exists) = market_pair_exists.read(new_market_.asset_, new_market_.asset_collateral_);
+        let (pair_exists) = market_pair_exists.read(new_market_.asset, new_market_.asset_collateral);
         assert pair_exists = FALSE;
     }
 
@@ -359,7 +359,9 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     verify_market_manager_authority();
     verify_market_id_exists(id_, should_exist_=TRUE);
-    verify_tradable(is_tradable_);
+    with_attr error_message("Markets: is_tradable_ value must be bool") {
+        assert_bool(is_tradable_);
+    }
 
     let (market: Market) = market_by_id.read(id_);
     let (registry) = CommonLib.get_registry_address();
@@ -395,7 +397,7 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
             ),
         );
 
-        market_tradable_modified.emit(market_id=id_, tradable=asset1.tradable);
+        market_tradable_modified.emit(market_id=id_, is_tradable=asset1.is_tradable);
         return ();
     } else {
         if (is_tradable_ == 1) {
@@ -667,15 +669,15 @@ func resolve_tradable_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // Resolve trading status
     if (market.is_tradable == 2) {
-        return (asset1.is_tradable);
+        return (asset1.is_tradable,);
     }
     if (market.is_tradable == 1) {
         with_attr error_message("Markets: Asset 1 tradable cannot be 0 when market tradable is 1") {
             assert asset1.is_tradable = TRUE;
         }
-        return (TRUE);
+        return (TRUE,);
     }
-    return (FALSE);
+    return (FALSE,);
 }
 
 // @param Internal function to validate market core propeties
@@ -726,6 +728,7 @@ func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     with_attr error_message("Asset 2 is not a collateral") {
         assert asset2.is_collateral = TRUE;
     }
+    return ();
 }
 
 // @param Internal function to validate market trading propeties
