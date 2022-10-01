@@ -26,7 +26,8 @@ jobs:
       - name: Install tox and any other packages
         run: |
           python -m pip install --upgrade pip
-          pip install pytest tox cairo-lang
+          pip install pytest tox 
+          pip install -I cairo-lang==0.10.0
           npm install -g ganache-cli@^6.12.2
 
       - name: Run tox
