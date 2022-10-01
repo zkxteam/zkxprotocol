@@ -15,15 +15,16 @@ from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
 from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61, Math64x61_ONE
 
-//############
-// Constants #
-//############
+///////////////
+// Constants //
+///////////////
+
 const MAX_TRADABLE = 2;
 const MIN_LEVERAGE = Math64x61_ONE;
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted whenever a new market is added
 @event
@@ -55,9 +56,9 @@ func market_archived_state_modified(market_id: felt, is_archived: felt) {
 func market_trade_settings_updated(market_id: felt, market: Market) {
 }
 
-//##########
-// Storage #
-//##########
+/////////////
+// Storage //
+/////////////
 
 // Stores the max leverage possible in the system
 @storage_var
@@ -109,9 +110,9 @@ func market_mapping(asset_id: felt, collateral_id: felt) -> (res: felt) {
 func market_pair_exists(asset: felt, asset_collateral: felt) -> (res: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -126,13 +127,13 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+//////////
+// View //
+//////////
 
-// @notice View function to return all the markets with ids in an array
-// @returns array_list_len - Length of the array_list
-// @returns array_list - Fully populated list of Markets
+// @notice Gets a list of all markets
+// @returns array_list_len - Length of the markets list
+// @returns array_list - Fully populated list of markets
 @view
 func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     array_list_len: felt, array_list: Market*
@@ -144,71 +145,82 @@ func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return populate_markets(iterator=0, array_list_len=array_list_len, array_list=array_list);
 }
 
-// @notice Getter function for Markets
-// @param market_id_ - string to felt value of selected market
-// @return currMarket - Returns the requested market
+// @notice Gets Market struct by its ID
+// @param market_id_ - Market ID
+// @return currMarket - Returns the requested Market struct
 @view
-func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(market_id_: felt) -> (
-    currMarket: Market
-) {
-    let (currMarket) = market_by_id.read(market_id=market_id_);
+func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (currMarket: Market) {
+    let (currMarket) = market_by_id.read(market_id_);
     return (currMarket,);
 }
 
-// @notice Getter function for Markets from assetID and collateralID
-// @param asset_id_ - Id of the asset
-// @param collateral_id_ - Id of the collateral
-// @return currMarket - Returns the requested market
+// @notice Gets a maintenance margin for a market
+// @param market_id_ - Market ID
+// @return maintenance_margin - Returns a maintenance margin of the market
 @view
-func get_market_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func get_maintenance_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (maintenance_margin: felt) {
+    let (currMarket) = market_by_id.read(market_id_);
+    return (currMarket.maintenance_margin_fraction,);
+}
+
+// @notice Gets market ID for associated Asset and Collateral IDs
+// @param asset_id_ - Asset ID
+// @param collateral_id_ - Collateral ID
+// @return market_id - Returns the requested market ID
+@view
+func get_market_id_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, collateral_id_: felt
 ) -> (market_id: felt) {
-    let (currMarket) = market_mapping.read(asset_id=asset_id_, collateral_id=collateral_id_);
-    return (currMarket,);
+    let (market_id) = market_mapping.read(asset_id=asset_id_, collateral_id=collateral_id_);
+    return (market_id,);
 }
 
-// @notice Getter function to get collateral asset from market_id
-// @param market_id - Market Id
-// @returns collateral_id - Collateral Id of the market
+// @notice Gets collateral asset by market ID
+// @param market_id_ - Market ID
+// @returns collateral_id - Collateral ID of the market
 @view
 func get_collateral_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt
+    market_id_: felt
 ) -> (collateral_id: felt) {
-    let (currMarket) = market_by_id.read(market_id=market_id);
+    let (currMarket) = market_by_id.read(market_id_);
     return (currMarket.asset_collateral,);
 }
 
-// @notice Getter function to get asset & collateral pair from market_id
-// @param market_id - Market Id
-// @returns asset_id - Asset Id of the market
-// @returns collateral_id - Collateral Id of the market
+// @notice Gets asset-collateral pair IDs by market ID
+// @param market_id_ - Market ID
+// @returns asset_id - Asset ID of the market
+// @returns collateral_id - Collateral ID of the market
 @view
-func get_asset_collateral_from_market{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(market_id: felt) -> (asset_id: felt, collateral_id: felt) {
-    let (currMarket) = market_by_id.read(market_id=market_id);
+func get_asset_collateral_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (asset_id: felt, collateral_id: felt) {
+    let (currMarket) = market_by_id.read(market_id_);
     return (currMarket.asset, currMarket.asset_collateral);
 }
 
-// @notice Getter function to get ttl of a market
-// @param market_id - Market Id
+// @notice Gets a ttl value of the market
+// @param market_id_ - Market ID
 // @returns ttl - ttl of the market
 @view
 func get_ttl_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt
+    market_id_: felt
 ) -> (ttl: felt) {
-    let (currMarket) = market_by_id.read(market_id=market_id);
+    let (currMarket) = market_by_id.read(market_id_);
     return (currMarket.ttl,);
 }
 
-// @notice View function to return markets by their state with ids in an array
-// @param tradable_ - tradable flag
-// @param archived_ - archived flag
+// @notice Gets all markets with matching tradable and archived state with IDs in a list
+// @param is_tradable_ - tradable flag
+// @param is_archived_ - archived flag
 // @returns array_list_len - Length of the array_list
 // @returns array_list - Fully populated list of Market
 @view
-func get_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    tradable_: felt, archived_: felt
+func get_all_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    is_tradable_: felt, is_archived_: felt
 ) -> (array_list_len: felt, array_list: Market*) {
     alloc_locals;
 
@@ -217,16 +229,16 @@ func get_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return populate_markets_by_state(
         iterator=0,
         index=0,
-        is_tradable=tradable_,
-        is_archived=archived_,
+        is_tradable=is_tradable_,
+        is_archived=is_archived_,
         array_list_len=array_list_len,
         array_list=array_list,
     );
 }
 
-//#####################
-// External Functions #
-//#####################
+//////////////
+// External //
+//////////////
 
 // @notice Function called by admin to change the max leverage allowed in the system
 // @param new_max_leverage - New maximmum leverage
@@ -626,9 +638,9 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+//////////////
+// Internal //
+//////////////
 
 // @notice Internal Function called by get_all_markets to recursively add assets to the array and return it
 // @param iterator - Current index being populated

@@ -49,9 +49,6 @@ namespace IAsset {
     func get_asset(id: felt) -> (currAsset: Asset) {
     }
 
-    func get_maintenance_margin(id: felt) -> (maintenance_margin: felt) {
-    }
-
     func get_version() -> (version: felt) {
     }
 

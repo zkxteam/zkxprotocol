@@ -365,7 +365,7 @@ async def test_get_all_archived_tradable_markets(adminAuth_factory):
     print("Market list:", markets.result.array_list)
     print("Market list length:", len(list(markets.result.array_list)))
 
-    markets_new = await market.get_markets_by_state(1, 1).call()
+    markets_new = await market.get_all_markets_by_state(1, 1).call()
     print("New Market list:", markets_new.result.array_list)
 
     assert len(list(markets_new.result.array_list)) == len(list(markets.result.array_list)) - 6  
