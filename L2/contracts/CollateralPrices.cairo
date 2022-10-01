@@ -102,7 +102,7 @@ func update_collateral_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     );
 
     with_attr error_message("Asset does not exist") {
-        assert_not_zero(asset.ticker);
+        assert_not_zero(asset.id);
     }
 
     // Calculate the timestamp
