@@ -33,6 +33,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 // @notice - All the following are mirror functions for Markets.cairo - just record call details and forward call
 
+//////////////
+// External //
+//////////////
+
 @external
 func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     newMarket: Market
@@ -97,22 +101,26 @@ func change_max_ttl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     return ();
 }
 
+//////////
+// View //
+//////////
+
 @view
 func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id: felt) -> (
     currMarket: Market
 ) {
     let (inner_address) = get_inner_contract();
-    let (currMarket) = IMarkets.get_market(contract_address=inner_address, id=id);
+    let (currMarket) = IMarkets.get_market(contract_address=inner_address, market_id_=id);
     return (currMarket,);
 }
 
 @view
-func get_market_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func get_market_id_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id: felt, collateral_id: felt
 ) -> (market_id: felt) {
     let (inner_address) = get_inner_contract();
-    let (market_id) = IMarkets.get_market_from_assets(
-        contract_address=inner_address, asset_id=asset_id, collateral_id=collateral_id
+    let (market_id) = IMarkets.get_market_id_from_assets(
+        contract_address=inner_address, asset_id_=asset_id, collateral_id_=collateral_id
     );
     return (market_id,);
 }
