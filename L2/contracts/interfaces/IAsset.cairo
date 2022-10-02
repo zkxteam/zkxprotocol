@@ -4,9 +4,10 @@ from contracts.DataTypes import Asset
 
 @contract_interface
 namespace IAsset {
-    //#####################
-    // External functions #
-    //#####################
+    
+    //////////////
+    // External //
+    //////////////
 
     func set_L1_zkx_address(l1_zkx_address: felt) {
     }
@@ -39,9 +40,9 @@ namespace IAsset {
     ) {
     }
 
-    //#################
-    // View functions #
-    //#################
+    //////////
+    // View //
+    //////////
 
     func get_L1_zkx_address() -> (res: felt) {
     }

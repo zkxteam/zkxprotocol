@@ -16,16 +16,16 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Validation import assert_bool
 from contracts.libraries.Utils import verify_caller_authority
 
-// ############
-// Constants #
-// ############
+///////////////
+// Constants //
+///////////////
 
 const ADD_ASSET = 1;
 const REMOVE_ASSET = 2;
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted on Asset contract deployment
 @event
@@ -59,9 +59,9 @@ func asset_trade_settings_update(
 ) {
 }
 
-//##########
-// Storage #
-//##########
+/////////////
+// Storage //
+/////////////
 
 // Version of Asset contract to refresh in node
 @storage_var
@@ -93,8 +93,8 @@ func asset_by_id(asset_id: felt) -> (res: Asset) {
 func asset_id_exists(asset_id: felt) -> (res: felt) {
 }
 
-//##############
-// Constructor #
+/
+// Constructor //
 //##############
 
 // @notice Constructor of the smart-contract
