@@ -1,6 +1,7 @@
 %lang starknet
 %builtins pedersen range_check
 
+from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 /////////////
@@ -8,11 +9,11 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 /////////////
 
 @storage_var
-func string_len(type: felt, id: felt) -> (res: felt) {
+func string_len_mapping(type: felt, id: felt) -> (res: felt) {
 }
 
 @storage_var
-func string_chars(type: felt, id: felt, index: felt) -> (res: felt) {
+func string_chars_mapping(type: felt, id: felt, index: felt) -> (res: felt) {
 }
 
 namespace StringLib {
@@ -20,51 +21,50 @@ namespace StringLib {
     // Library functions //
     ///////////////////////
 
-    func read_string{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        type_: felt, id_: felt
-    ) -> (string_len: felt, string_chars: felt*) {
-        let (string_len) = string_len.read(type_, id_);
-        let (string_chars: felt*) = alloc();
-        recurse_populate_string(
-            type_=type_,
-            id_=id_,
-            current_len_=0,
-            final_len_=string_len,
-            chars_=string_chars
+    func read_string {syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        type: felt, id: felt
+    ) -> (string_len: felt, string: felt*) {
+        let (string_len) = string_len_mapping.read(type, id);
+        let (string: felt*) = alloc();
+        return _recurse_populate_string(
+            type=type,
+            id=id,
+            iterator=0,
+            string_len=string_len,
+            string=string
         );
-        return (link_len, link_chars,);
     }
 
-    func save_string{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        type_: felt, id_: felt, string_len_: felt, string_chars_: felt*
+    func save_string {syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        type: felt, id: felt, string_len: felt, string: felt*
     ) {
-        string_len.write(type_, id_, string_len_);
-        return recurse_save_chars(
-            type_,
-            id_,
-            iterator_=0,
+        string_len_mapping.write(type, id, string_len);
+        return _recurse_save_string(
+            type=type,
+            id=id,
+            iterator=0,
             string_len,
-            string_chars_
+            string
         );
     }
 
-    func remove_existing_string{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        type_: felt, id_: felt
+    func remove_existing_string {syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        type: felt, id: felt
     ) {
-        let (string_len) = string_len.read(type_, id_);
-        if (link_len == 0) {
+        let (string_len) = string_len_mapping.read(type, id);
+        if (string_len == 0) {
             return ();
         }
-        string_len.write(
-            type=type_, 
-            id=id_, 
+        string_len_mapping.write(
+            type=type, 
+            id=id, 
             value=0
         );
-        return recurse_remove_chars(
-            type_, 
-            id_, 
-            iterator_=0, 
-            final_length_=string_len
+        return _recurse_remove_string(
+            type, 
+            id, 
+            iterator=0, 
+            string_len=string_len
         );
     }
 }
@@ -73,61 +73,65 @@ namespace StringLib {
 // Helper functions //
 //////////////////////
 
-func _recurse_populate_string{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    type_: felt, id_: felt, iterator_: felt, final_len_: felt, chars_: felt*
-) -> () {
-    if (iterator_ == final_len_) {
-        return ();
+func _recurse_populate_string {syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    type: felt, id: felt, iterator: felt, string_len: felt, string: felt*
+) -> (string_len: felt, string: felt*) {
+    if (iterator == string_len) {
+        return (string_len, string);
     }
-    let (char) = string_chars.read(type_, id_, iterator_);
-    assert chars_[iterator_] = char;
-    return recurse_populate_string(
-        type_,
-        id_,
-        iterator_ + 1, 
-        final_len_, 
-        chars_
+    let (char) = string_chars_mapping.read(
+        type=type, 
+        id=id, 
+        index=iterator
+    );
+    assert string[iterator] = char;
+    return _recurse_populate_string(
+        type,
+        id,
+        iterator + 1, 
+        string_len,
+        string
     );
 }
 
-func _recurse_save_chars{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    type_: felt, id_: felt, iterator_: felt, string_len_: felt, string_chars_: felt*
+func _recurse_save_string {syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    type: felt, id: felt, iterator: felt, string_len: felt, string: felt*
 ) {
-    if (iterator_ == string_len_) {
+    if (iterator == string_len) {
         return ();
     }
     // let (char) = string_chars_[iterator_];
-    string_chars.write(
-        type=type_, 
-        id=id_, 
-        index=iterator_, 
-        value=string_chars_[iterator_]
+    string_chars_mapping.write(
+        type=type, 
+        id=id, 
+        index=iterator, 
+        value=string[iterator]
     );
-    return recurse_save_chars(
-        type_,
-        id_,
-        iterator_ + 1,
-        string_len_,
-        string_chars_
+    return _recurse_save_string(
+        type,
+        id,
+        iterator + 1,
+        string_len,
+        string
     );
 }
 
-func _recurse_remove_chars{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    type_: felt, id_: felt, iterator_: felt, final_length_: felt
+func _recurse_remove_string {syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    type: felt, id: felt, iterator: felt, string_len: felt
 ) {
-    if (iterator_ == final_length_) {
+    if (iterator == string_len) {
         return ();
     }
-    string_chars.write(
-        type=type_,
-        id=id_,
-        index=iterator_,
+    string_chars_mapping.write(
+        type=type,
+        id=id,
+        index=iterator,
         value=0
     );
-    return recurse_remove_chars(
-        type_,
-        id_,
-        iterator_+1,
-        final_length_
+    return _recurse_remove_string(
+        type,
+        id,
+        iterator + 1,
+        string_len
     );
 }
