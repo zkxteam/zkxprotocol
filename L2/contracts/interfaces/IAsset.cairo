@@ -25,9 +25,7 @@ namespace IAsset {
     func remove_asset(id_to_remove: felt) {
     }
 
-    func modify_core_settings(
-        id: felt, short_name: felt, is_tradable: felt, is_collateral: felt, metadata_id: felt
-    ) {
+    func modify_core_settings(id: felt, short_name: felt, is_tradable: felt, is_collateral: felt) {
     }
 
     func update_icon_link(asset_id: felt, link_len: felt, link: felt*) {

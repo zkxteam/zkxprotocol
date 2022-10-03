@@ -74,13 +74,13 @@ func remove_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
 @external
 func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt, short_name: felt, is_tradable: felt, is_collateral: felt, metadata_id: felt
+    id: felt, short_name: felt, is_tradable: felt, is_collateral: felt
 ) {
     alloc_locals;
     verify_caller_authority(ManageAssets_ACTION);
     record_call_details('modify_core_settings');
     let (local inner_address) = get_inner_contract();
-    IAsset.modify_core_settings(inner_address, id, short_name, is_tradable, is_collateral, metadata_id);
+    IAsset.modify_core_settings(inner_address, id, short_name, is_tradable, is_collateral);
     return ();
 }
 
