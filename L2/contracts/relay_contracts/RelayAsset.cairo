@@ -39,12 +39,17 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt, new_asset: Asset
+    id_: felt, 
+    new_asset_: Asset, 
+    icon_link_len_: felt,
+    icon_link_: felt*,
+    metadata_link_len_: felt,
+    metadata_link_: felt*
 ) {
     verify_caller_authority(ManageAssets_ACTION);
     record_call_details('add_asset');
     let (inner_address) = get_inner_contract();
-    IAsset.add_asset(inner_address, id, new_asset);
+    IAsset.add_asset(id_, new_asset_, icon_link_len_, icon_link_, metadata_link_len_, metadata_link_);
     return ();
 }
 
@@ -106,6 +111,28 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return ();
 }
 
+@external
+func update_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id_: felt, icon_link_len_: felt, icon_link_: felt*
+) {
+    verify_caller_authority(ManageAssets_ACTION);
+    record_call_details('update_icon_link');
+    let (inner_address) = get_inner_contract();
+    IAsset.update_icon_link(inner_address, asset_id_, icon_link_len_, icon_link_);
+    return ();
+}
+
+@external
+func update_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id_: felt, metadata_link_len_: felt, metadata_link_: felt*
+) {
+    verify_caller_authority(ManageAssets_ACTION);
+    record_call_details('update_metadata_link');
+    let (inner_address) = get_inner_contract();
+    IAsset.update_metadata_link(inner_address, asset_id_, icon_link_len_, icon_link_);
+    return ();
+}
+
 //////////
 // View //
 //////////
@@ -135,4 +162,22 @@ func return_all_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (inner_address) = get_inner_contract();
     let (array_list_len, array_list: AssetWID*) = IAsset.return_all_assets(inner_address);
     return (array_list_len, array_list);
+}
+
+@view
+func get_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    id: felt
+) -> (icon_link_len: felt, icon_link: felt*) {
+    let (inner_address) = get_inner_contract();
+    let (icon_link_len, icon_link) = IAsset.get_icon_link(inner_address, id);
+    return (icon_link_len, icon_link,);
+}
+
+@view
+func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    id: felt
+) -> (metadata_link_len: felt, metadata_link: felt*) {
+    let (inner_address) = get_inner_contract();
+    let (metadata_link_len, metadata_link) = IAsset.get_metadata_link(inner_address, id);
+    return (metadata_link_len, metadata_link,);
 }
