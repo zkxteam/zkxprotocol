@@ -47,10 +47,10 @@ namespace IAsset {
     ) {
     }
 
-    func update_icon_link(asset_id: felt, icon_link_len: felt, icon_link: felt*) {
+    func update_icon_link(asset_id: felt, link_len: felt, link: felt*) {
     }
 
-    func update_metadata_link(asset_id: felt, metadata_link_len: felt, metadata_link: felt*) {
+    func update_metadata_link(asset_id: felt, link_len: felt, link: felt*) {
     }
 
     //////////
@@ -63,10 +63,10 @@ namespace IAsset {
     func get_asset(id: felt) -> (currAsset: Asset) {
     }
 
-    func get_icon_link(id: felt) -> (icon_link_len: felt, icon_link: felt*) {
+    func get_icon_link(id: felt) -> (link_len: felt, link: felt*) {
     }
 
-    func get_metadata_link(id: felt) -> (metadata_link_len: felt, metadata_link: felt*) {
+    func get_metadata_link(id: felt) -> (link_len: felt, link: felt*) {
     }
 
     func get_version() -> (version: felt) {

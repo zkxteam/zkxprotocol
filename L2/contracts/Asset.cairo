@@ -165,20 +165,26 @@ func return_all_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return populate_asset_list(0, final_len, asset_list);
 }
 
+// @notice View function to read asset icon link
+// @return link_len - Length of link string
+// @return link - Link characters
 @view
 func get_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id: felt
-) -> (icon_link_len: felt, icon_link: felt*) {
-    let (icon_link_len, icon_link) = StringLib.read_string(type=ICON_LINK_TYPE, id);
-    return (icon_link_len, icon_link,);
+) -> (link_len: felt, link: felt*) {
+    let (link_len, link) = StringLib.read_string(type=ICON_LINK_TYPE, id=id);
+    return (link_len, link);
 }
 
+// @notice View function to read asset metadata link
+// @return link_len - Length of link string
+// @return link - Link characters
 @view
 func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id: felt
-) -> (metadata_link_len: felt, metadata_link: felt*) {
-    let (metadata_link_len, metadata_link) = StringLib.read_string(type=METADATA_LINK_TYPE, id);
-    return (metadata_link_len, metadata_link,);
+) -> (link_len: felt, link: felt*) {
+    let (link_len, link) = StringLib.read_string(type=METADATA_LINK_TYPE, id=id);
+    return (link_len, link);
 }
 
 //////////////
@@ -341,18 +347,18 @@ func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
 // @notice Update asset's icon link
 // @param asset_id - ID of Asset to be updated
-// @param icon_link_len - length of a link
-// @param icon_link - link characters
+// @param link_len - Length of a link
+// @param link - Link characters
 @external
 func update_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_id: felt, icon_link_len: felt, icon_link: felt*
+    asset_id: felt, link_len: felt, link: felt*
 ) {
-    StringLib.remove_existing_string(type_=ICON_LINK_TYPE, id_=asset_id);
+    StringLib.remove_existing_string(type=ICON_LINK_TYPE, id=asset_id);
     StringLib.save_string(
         type=ICON_LINK_TYPE, 
         id=asset_id,
-        string_len=icon_link_len,
-        string=icon_link
+        string_len=link_len,
+        string=link
     );
     asset_icon_link_update.emit(asset_id);
     return ();
@@ -360,18 +366,18 @@ func update_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
 // @notice Update asset's metadata link
 // @param asset_id - ID of Asset to be updated
-// @param metadata_link_len - length of a link
-// @param metadata_link - link characters
+// @param link_len - Length of a link
+// @param link - Link characters
 @external
 func update_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_id: felt, metadata_link_len: felt, metadata_link: felt*
+    asset_id: felt, link_len: felt, link: felt*
 ) {
-    StringLib.remove_existing_string(type=METADATA_LINK_TYPE, id=asset_id_);
+    StringLib.remove_existing_string(type=METADATA_LINK_TYPE, id=asset_id);
     StringLib.save_string(
         type=METADATA_LINK_TYPE, 
-        id=asset_id_, 
-        string_len=metadata_link_len,
-        string=metadata_link
+        id=asset_id, 
+        string_len=link_len,
+        string=link
     );
     asset_metadata_link_update.emit(asset_id);
     return ();

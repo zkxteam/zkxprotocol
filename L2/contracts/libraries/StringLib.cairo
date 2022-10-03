@@ -1,5 +1,4 @@
 %lang starknet
-%builtins pedersen range_check
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
@@ -38,13 +37,17 @@ namespace StringLib {
     func save_string {syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         type: felt, id: felt, string_len: felt, string: felt*
     ) {
-        string_len_mapping.write(type, id, string_len);
+        string_len_mapping.write(
+            type=type, 
+            id=id, 
+            value=string_len
+        );
         return _recurse_save_string(
             type=type,
             id=id,
             iterator=0,
-            string_len,
-            string
+            string_len=string_len,
+            string=string
         );
     }
 
@@ -61,9 +64,9 @@ namespace StringLib {
             value=0
         );
         return _recurse_remove_string(
-            type, 
-            id, 
-            iterator=0, 
+            type=type,
+            id=id,
+            iterator=0,
             string_len=string_len
         );
     }
