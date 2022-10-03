@@ -125,25 +125,25 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
 @external
 func update_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_id: felt, icon_link_len: felt, icon_link: felt*
+    asset_id: felt, link_len: felt, link: felt*
 ) {
     alloc_locals;
     verify_caller_authority(ManageAssets_ACTION);
     record_call_details('update_icon_link');
     let (local inner_address) = get_inner_contract();
-    IAsset.update_icon_link(inner_address, asset_id, icon_link_len, icon_link);
+    IAsset.update_icon_link(inner_address, asset_id, link_len, link);
     return ();
 }
 
 @external
 func update_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_id: felt, metadata_link_len: felt, metadata_link: felt*
+    asset_id: felt, link_len: felt, link: felt*
 ) {
     alloc_locals;
     verify_caller_authority(ManageAssets_ACTION);
     record_call_details('update_metadata_link');
     let (local inner_address) = get_inner_contract();
-    IAsset.update_metadata_link(inner_address, asset_id, metadata_link_len, metadata_link);
+    IAsset.update_metadata_link(inner_address, asset_id, link_len, link);
     return ();
 }
 
@@ -181,10 +181,10 @@ func return_all_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 @view
 func get_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id: felt
-) -> (icon_link_len: felt, icon_link: felt*) {
+) -> (link_len: felt, link: felt*) {
     let (inner_address) = get_inner_contract();
-    let (icon_link_len, icon_link) = IAsset.get_icon_link(inner_address, id);
-    return (icon_link_len, icon_link,);
+    let (link_len, link) = IAsset.get_icon_link(inner_address, id);
+    return (link_len, link);
 }
 
 @view
@@ -192,6 +192,6 @@ func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     id: felt
 ) -> (metadata_link_len: felt, metadata_link: felt*) {
     let (inner_address) = get_inner_contract();
-    let (metadata_link_len, metadata_link) = IAsset.get_metadata_link(inner_address, id);
-    return (metadata_link_len, metadata_link,);
+    let (link_len, link) = IAsset.get_metadata_link(inner_address, id);
+    return (link_len, link);
 }
