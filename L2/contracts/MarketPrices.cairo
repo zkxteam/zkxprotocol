@@ -141,7 +141,7 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // Create a struct object for the market prices
     tempvar new_market_price: MarketPrice = MarketPrice(
         asset_id=market.asset,
-        collateral_id=market.assetCollateral,
+        collateral_id=market.asset_collateral,
         timestamp=timestamp_,
         price=price_,
         );

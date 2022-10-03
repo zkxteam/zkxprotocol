@@ -2,23 +2,23 @@
 
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.RelayLibrary import (
-record_call_details, 
-get_inner_contract, 
-initialize,
-get_current_version,
-get_caller_hash_status,
-get_call_counter,
-get_registry_address_at_relay,
-get_self_index,
-get_caller_hash_list,
-set_current_version,
-mark_caller_hash_paid,
-reset_call_counter,
-set_self_index,
-verify_caller_authority
+    record_call_details,
+    get_inner_contract,
+    initialize,
+    get_current_version,
+    get_caller_hash_status,
+    get_call_counter,
+    get_registry_address_at_relay,
+    get_self_index,
+    get_caller_hash_list,
+    set_current_version,
+    mark_caller_hash_paid,
+    reset_call_counter,
+    set_self_index,
+    verify_caller_authority,
 )
 
-from contracts.DataTypes import Market, MarketWID
+from contracts.DataTypes import Market
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import ManageMarkets_ACTION
 
@@ -35,12 +35,12 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt, newMarket: Market
+    newMarket: Market
 ) {
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('add_market');
     let (inner_address) = get_inner_contract();
-    IMarkets.add_market(contract_address=inner_address, id=id, newMarket=newMarket);
+    IMarkets.add_market(contract_address=inner_address, newMarket=newMarket);
     return ();
 }
 
@@ -119,10 +119,10 @@ func get_market_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
 @view
 func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    array_list_len: felt, array_list: MarketWID*
+    array_list_len: felt, array_list: Market*
 ) {
     let (inner_address) = get_inner_contract();
-    let (array_list_len, array_list: MarketWID*) = IMarkets.get_all_markets(
+    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets(
         contract_address=inner_address
     );
     return (array_list_len, array_list);

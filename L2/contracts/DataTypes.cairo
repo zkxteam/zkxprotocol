@@ -2,23 +2,25 @@
 
 // @notice struct to store details of markets
 struct Market {
-    asset: felt,
-    assetCollateral: felt,
-    leverage: felt,
-    tradable: felt,
-    archived: felt,
-    ttl: felt,
-}
-
-// @notice struct to store details of markets with IDs
-struct MarketWID {
     id: felt,
     asset: felt,
-    assetCollateral: felt,
+    asset_collateral: felt,
     leverage: felt,
-    tradable: felt,
-    archived: felt,
+    is_tradable: felt,
+    is_archived: felt,
     ttl: felt,
+    tick_size: felt,
+    step_size: felt,
+    minimum_order_size: felt,
+    minimum_leverage: felt,
+    maximum_leverage: felt,
+    currently_allowed_leverage: felt,
+    maintenance_margin_fraction: felt,
+    initial_margin_fraction: felt,
+    incremental_initial_margin_fraction: felt,
+    incremental_position_size: felt,
+    baseline_position_size: felt,
+    maximum_position_size: felt,
 }
 
 // @notice struct to store details of assets
@@ -97,7 +99,6 @@ struct MultipleOrder {
     closeOrder: felt,
     leverage: felt,
     liquidatorAddress: felt,
-    parentOrder: felt,
     side: felt,
 }
 
@@ -122,23 +123,40 @@ struct OrderRequest {
     closeOrder: felt,
     leverage: felt,
     liquidatorAddress: felt,
-    parentOrder: felt,
 }
 
 // @notice struct for storing the order data to Account Contract
-struct OrderDetails {
-    assetID: felt,
-    collateralID: felt,
-    price: felt,
-    executionPrice: felt,
-    positionSize: felt,
-    orderType: felt,
-    direction: felt,
-    portionExecuted: felt,
-    status: felt,
-    marginAmount: felt,
-    borrowedAmount: felt,
+struct PositionDetails {
+    avg_execution_price: felt,
+    position_size: felt,
+    margin_amount: felt,
+    borrowed_amount: felt,
     leverage: felt,
+}
+
+// Struct to be used for liquidation calls
+struct PositionDetailsWithMarket {
+    market_id: felt,
+    direction: felt,
+    avg_execution_price: felt,
+    position_size: felt,
+    margin_amount: felt,
+    borrowed_amount: felt,
+    leverage: felt,
+}
+
+// Struct to store the position that is to be Liquidated/Deleveraged
+struct LiquidatablePosition {
+    market_id: felt,
+    direction: felt,
+    amount_to_be_sold: felt,
+    liquidatable: felt,
+}
+
+// @notice struct for sending the array of positions for ABR calculations
+struct NetPositions {
+    market_id: felt,
+    position_size: felt,
 }
 
 // Struct for passing signature to Account Contract
@@ -163,29 +181,6 @@ struct Message {
     calldata: felt*,
     calldata_size: felt,
     nonce: felt,
-}
-
-// status 0: initiated
-// status 1: partial
-// status 2: executed
-// status 3: close partial
-// status 4: close
-// status 5: toBeDeleveraged
-// status 6: toBeLiquidated
-// status 7: fullyLiquidated
-struct OrderDetailsWithIDs {
-    orderID: felt,
-    assetID: felt,
-    collateralID: felt,
-    price: felt,
-    executionPrice: felt,
-    positionSize: felt,
-    orderType: felt,
-    direction: felt,
-    portionExecuted: felt,
-    status: felt,
-    marginAmount: felt,
-    borrowedAmount: felt,
 }
 
 // Struct to store collateral balances
@@ -232,20 +227,6 @@ struct QuoteL1Message {
     L1_fee_ticker: felt,
 }
 
-struct CoreFunctionCall {
-    index: felt,
-    version: felt,
-    nonce: felt,
-    function_selector: felt,
-    calldata_len: felt,
-    calldata: felt*,
-}
-
-struct CoreFunction {
-    index: felt,
-    version: felt,
-    function_selector: felt,
-}
 // struct to store deposit payload information (for L1->L2 interaction) + other useful data
 struct DepositData {
     user_L1_address: felt,
@@ -279,4 +260,19 @@ struct TradingSeason {
     start_timestamp: felt,
     end_timestamp: felt,
     num_trading_days: felt,
+}
+
+struct CoreFunctionCall {
+    index: felt,
+    version: felt,
+    nonce: felt,
+    function_selector: felt,
+    calldata_len: felt,
+    calldata: felt*,
+}
+
+struct CoreFunction {
+    index: felt,
+    version: felt,
+    function_selector: felt,
 }

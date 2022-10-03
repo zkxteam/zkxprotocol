@@ -2,23 +2,23 @@
 
 from contracts.interfaces.ILiquidate import ILiquidate
 from contracts.libraries.RelayLibrary import (
-record_call_details, 
-get_inner_contract, 
-initialize,
-get_current_version,
-get_caller_hash_status,
-get_call_counter,
-get_registry_address_at_relay,
-get_self_index,
-get_caller_hash_list,
-set_current_version,
-mark_caller_hash_paid,
-reset_call_counter,
-set_self_index,
-verify_caller_authority
+    record_call_details,
+    get_inner_contract,
+    initialize,
+    get_current_version,
+    get_caller_hash_status,
+    get_call_counter,
+    get_registry_address_at_relay,
+    get_self_index,
+    get_caller_hash_list,
+    set_current_version,
+    mark_caller_hash_paid,
+    reset_call_counter,
+    set_self_index,
+    verify_caller_authority,
 )
 
-from contracts.DataTypes import PriceData
+from contracts.DataTypes import PriceData, PositionDetailsWithMarket
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
@@ -35,7 +35,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 @external
 func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address: felt, prices_len: felt, prices: PriceData*
-) -> (liq_result: felt, least_collateral_ratio_position: felt) {
+) -> (liq_result: felt, least_collateral_ratio_position: PositionDetailsWithMarket) {
     alloc_locals;
 
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -43,8 +43,8 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     record_call_details('check_liquidation');
     let (inner_address) = get_inner_contract();
-    let (liq_result, least_collateral_ratio_position) = ILiquidate.check_liquidation(
-        inner_address, account_address, prices_len, prices
-    );
+    let (
+        liq_result, least_collateral_ratio_position: PositionDetailsWithMarket
+    ) = ILiquidate.check_liquidation(inner_address, account_address, prices_len, prices);
     return (liq_result, least_collateral_ratio_position);
 }
