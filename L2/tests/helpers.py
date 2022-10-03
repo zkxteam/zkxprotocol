@@ -56,6 +56,10 @@ class ContractType(Enum):
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
     TestAsset = "tests/contracts/Asset.cairo"
 
+    # High-Tide
+    HighTideMock = "contracts/hightide/MockHighTide.cairo"
+    TradingStats = "contracts/hightide/TradingStats.cairo"
+
 class OptimizedStarknetState(StarknetState):
 
     def copy(self) -> "OptimizedStarknetState":

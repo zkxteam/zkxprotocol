@@ -33,7 +33,7 @@ func get_current_season_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     season_id: felt
 ) {
     let (season_id: felt) = curr_season_id.read();
-    return (1);
+    return (season_id,);
 }
 
 @external
@@ -41,5 +41,5 @@ func get_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     season_id: felt
 ) -> (trading_season: TradingSeason) {
     let (season: TradingSeason) = curr_season.read(season_id=season_id);
-    return season;
+    return (season,);
 }
