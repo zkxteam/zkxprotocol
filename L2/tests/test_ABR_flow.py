@@ -197,20 +197,7 @@ async def abr_factory(starknet_service: StarknetService):
         short_name = str_to_felt("Bitcoin"),
         tradable = 1,
         collateral = 0,
-        token_decimal = 8,
-        metadata_id = 0,
-        tick_size = to64x61(0.000000001),
-        step_size = to64x61(0.000001),
-        minimum_order_size = to64x61(0.001),
-        minimum_leverage = to64x61(1),
-        maximum_leverage = to64x61(10),
-        currently_allowed_leverage = to64x61(10),
-        maintenance_margin_fraction = to64x61(1),
-        initial_margin_fraction = to64x61(1),
-        incremental_initial_margin_fraction = to64x61(1),
-        incremental_position_size = to64x61(100),
-        baseline_position_size = to64x61(1000),
-        maximum_position_size = to64x61(10000)
+        token_decimal = 8
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_settings)
 
@@ -222,20 +209,7 @@ async def abr_factory(starknet_service: StarknetService):
         short_name = str_to_felt("USDC"),
         tradable = 0,
         collateral = 1,
-        token_decimal = 6,
-        metadata_id = 0,
-        tick_size = to64x61(0.01),
-        step_size = to64x61(0.1),
-        minimum_order_size = to64x61(1),
-        minimum_leverage = to64x61(1),
-        maximum_leverage = to64x61(5),
-        currently_allowed_leverage = to64x61(3),
-        maintenance_margin_fraction = to64x61(1),
-        initial_margin_fraction = to64x61(1),
-        incremental_initial_margin_fraction = to64x61(1),
-        incremental_position_size = to64x61(100),
-        baseline_position_size = to64x61(1000),
-        maximum_position_size = to64x61(10000)
+        token_decimal = 6
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_settings)
 
