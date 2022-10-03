@@ -264,7 +264,6 @@ struct CollateralPrice {
 }
 
 struct OrderVolume {
-
     size: felt,
     price: felt,
     timestamp: felt,
@@ -272,12 +271,11 @@ struct OrderVolume {
 
 struct VolumeMetaData {
     season_id: felt,
-    pair_id: felt, 
-    order_type: felt, // open/close
+    pair_id: felt,
+    order_type: felt,  // open/close
 }
 
 struct TradingSeason {
-
     start_timestamp: felt,
     end_timestamp: felt,
     num_trading_days: felt,
