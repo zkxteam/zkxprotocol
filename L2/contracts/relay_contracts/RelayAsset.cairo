@@ -85,45 +85,6 @@ func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 }
 
 @external
-func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt,
-    tick_size: felt,
-    step_size: felt,
-    minimum_order_size: felt,
-    minimum_leverage: felt,
-    maximum_leverage: felt,
-    currently_allowed_leverage: felt,
-    maintenance_margin_fraction: felt,
-    initial_margin_fraction: felt,
-    incremental_initial_margin_fraction: felt,
-    incremental_position_size: felt,
-    baseline_position_size: felt,
-    maximum_position_size: felt,
-) {
-    alloc_locals;
-    verify_caller_authority(ManageAssets_ACTION);
-    record_call_details('modify_trade_settings');
-    let (local inner_address) = get_inner_contract();
-    IAsset.modify_trade_settings(
-        inner_address,
-        id,
-        tick_size,
-        step_size,
-        minimum_order_size,
-        minimum_leverage,
-        maximum_leverage,
-        currently_allowed_leverage,
-        maintenance_margin_fraction,
-        initial_margin_fraction,
-        incremental_initial_margin_fraction,
-        incremental_position_size,
-        baseline_position_size,
-        maximum_position_size,
-    );
-    return ();
-}
-
-@external
 func update_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id: felt, link_len: felt, link: felt*
 ) {
