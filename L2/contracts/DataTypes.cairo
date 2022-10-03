@@ -30,8 +30,7 @@ struct Asset {
     short_name: felt,
     is_tradable: felt,
     is_collateral: felt,
-    token_decimal: felt,
-    metadata_id: felt,
+    token_decimal: felt
 }
 
 // @notice Struct to store base fee percentage for each tier for maker and taker
