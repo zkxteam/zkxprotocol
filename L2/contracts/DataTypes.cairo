@@ -28,31 +28,8 @@ struct Asset {
     asset_version: felt,
     ticker: felt,
     short_name: felt,
-    tradable: felt,
-    collateral: felt,
-    token_decimal: felt,
-    tick_size: felt,
-    step_size: felt,
-    minimum_order_size: felt,
-    minimum_leverage: felt,
-    maximum_leverage: felt,
-    currently_allowed_leverage: felt,
-    maintenance_margin_fraction: felt,
-    initial_margin_fraction: felt,
-    incremental_initial_margin_fraction: felt,
-    incremental_position_size: felt,
-    baseline_position_size: felt,
-    maximum_position_size: felt,
-}
-
-// @notice struct to store details of assets with IDs
-struct AssetWID {
-    id: felt,
-    asset_version: felt,
-    ticker: felt,
-    short_name: felt,
-    tradable: felt,
-    collateral: felt,
+    is_tradable: felt,
+    is_collateral: felt,
     token_decimal: felt
 }
 

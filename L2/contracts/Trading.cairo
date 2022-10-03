@@ -985,7 +985,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         );
     }
 
-    // Assert that the order has the same ticker and price as the first order
+    // Assert that the order has the same asset ID and price as the first order
     with_attr error_message(
             "assetID is not same as opposite order's assetID in trading contract.") {
         assert assetID_ = temp_order.assetID;
