@@ -52,17 +52,6 @@ func asset_removed(asset_id: felt, ticker: felt, caller_address: felt) {
 func asset_core_settings_update(asset_id: felt, ticker: felt, caller_address: felt) {
 }
 
-// Event emitted whenever asset trade settings are updated
-@event
-func asset_trade_settings_update(
-    asset_id: felt,
-    ticker: felt,
-    new_contract_version: felt,
-    new_asset_version: felt,
-    caller_address: felt,
-) {
-}
-
 // Event emitted when asset icon link is updated
 @event
 func asset_icon_link_update(asset_id: felt) {

@@ -30,23 +30,6 @@ namespace IAsset {
     ) {
     }
 
-    func modify_trade_settings(
-        id: felt,
-        tick_size: felt,
-        step_size: felt,
-        minimum_order_size: felt,
-        minimum_leverage: felt,
-        maximum_leverage: felt,
-        currently_allowed_leverage: felt,
-        maintenance_margin_fraction: felt,
-        initial_margin_fraction: felt,
-        incremental_initial_margin_fraction: felt,
-        incremental_position_size: felt,
-        baseline_position_size: felt,
-        maximum_position_size: felt,
-    ) {
-    }
-
     func update_icon_link(asset_id: felt, link_len: felt, link: felt*) {
     }
 
