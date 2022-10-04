@@ -5,7 +5,7 @@ from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.starknet.common.syscalls import get_block_timestamp
 
 from contracts.Constants import ManageHighTide_ACTION, Trading_INDEX
-from contracts.DataTypes import TradingSeason
+from contracts.DataTypes import Constants, Multipliers, TradingSeason
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
@@ -26,6 +26,16 @@ func trading_season_by_id(season_id: felt) -> (trading_season: TradingSeason) {
 // Bool indicating if season id already exists
 @storage_var
 func season_id_exists(season_id: felt) -> (res: felt) {
+}
+
+// Stores multipliers used to calculate total reward to be split between traders
+@storage_var
+func multipliers_to_calculate_reward() -> (multipliers: Multipliers) {
+}
+
+// Stores constants used to calculate individual trader score
+@storage_var
+func constants_to_calculate_trader_score() -> (constants: Constants) {
 }
 
 //##############
@@ -73,30 +83,100 @@ func get_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // External Functions #
 //#####################
 
-// @notice - This function is used for seeting up trade season
+// @notice - This function is used for setting up trade season
+// @param season_id - id of the season
+// @param start_timestamp - start timestamp of the season
 // @param num_trading_days - number of trading days
 @external
 func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt, num_trading_days: felt
+    season_id: felt, start_timestamp: felt, num_trading_days: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not authorized to setup trading") {
+    with_attr error_message("Caller is not authorized to setup trade season") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
     verify_season_id_exists(season_id, FALSE);
-    
-    let (current_timestamp) = get_block_timestamp();
+
     // Create Trading season struct to store
     let trading_season: TradingSeason = TradingSeason(
-        start_timestamp=current_timestamp, num_trading_days=num_trading_days
+        start_timestamp=start_timestamp, num_trading_days=num_trading_days
     );
 
     trading_season_by_id.write(season_id, trading_season);
-    current_trading_season.write(season_id);
     season_id_exists.write(season_id, TRUE);
+    return ();
+}
+
+// @notice - This function is used for starting trade season
+// @param season_id - id of the season
+@external
+func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("Caller is not authorized to start trade season") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+    verify_season_id_exists(season_id, TRUE);
+
+    current_trading_season.write(season_id);
+    return ();
+}
+
+// @notice - This function is used for setting multipliers
+// @param a1 - alpha1 value
+// @param a2 - alpha2 value
+// @param a3 - alpha3 value
+// @param a4 - alpha4 value
+@external
+func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    a1: felt, a2: felt, a3: felt, a4: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("Caller is not authorized to set multipliers") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+    
+    // Create Multipliers struct to store
+    let multipliers: Multipliers = Multipliers(
+        a1=a1, a2=a2, a3=a3, a4=a4
+    );
+    multipliers_to_calculate_reward.write(multipliers);
+    return ();
+}
+
+// @notice - This function is used for setting constants
+// @param a - a value
+// @param b - b value
+// @param c - c value
+// @param z - z value
+// @param e - e value
+@external
+func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    a: felt, b: felt, c: felt, z: felt, e: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("Caller is not authorized to set constants") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+    
+    // Create Constants struct to store
+    let constants: Constants = Constants(
+        a=a, b=b, c=c, z=z, e=e
+    );
+    constants_to_calculate_trader_score.write(constants);
     return ();
 }
 
