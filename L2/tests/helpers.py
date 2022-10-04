@@ -36,6 +36,7 @@ class ContractType(Enum):
     ValidatorRouter = "contracts/signature_infra/ValidatorRouter.cairo"
     SigRequirementsManager = "contracts/signature_infra/SigRequirementsManager.cairo"
     PubkeyWhitelister = "contracts/signature_infra/PubkeyWhitelister.cairo"
+    HighTide = "contracts/hightide/HighTide.cairo"
 
     # Relay contracts
     RelayABR = "contracts/relay_contracts/RelayABR.cairo"
