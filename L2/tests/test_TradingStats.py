@@ -34,6 +34,10 @@ UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
+initial_timestamp = int(time.time())
+timestamp2 = int(time.time()) + (60*60*24) + 60
+timestamp3 = int(time.time()) + (60*60*24)*2 + 60
+timestamp4 = int(time.time()) + (60*60*24)*3 + 60
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -67,10 +71,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
     dave = await account_factory.deploy_account(dave_signer.public_key)
 
-    timestamp = int(time.time())
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
-        block_timestamp=timestamp, 
+        block_timestamp=initial_timestamp, 
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
         starknet_version = STARKNET_VERSION
@@ -180,5 +183,370 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
-    return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate
+    return starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate, trading_stats, hightide_mock
 
+@pytest.mark.asyncio
+async def test_closing_orders_day_0(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide_mock = adminAuth_factory
+
+    alice_balance = to64x61(50000)
+    bob_balance = to64x61(50000)
+
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+
+    ####### Opening of Orders #######
+    size1 = to64x61(1)
+    marketID_1 = BTC_USD_ID
+
+    order_id_1 = str_to_felt("sdj324hka8kaedf")
+    assetID_1 = BTC_ID
+    collateralID_1 = USDC_ID
+    price1 = to64x61(5000)
+    stopPrice1 = 0
+    orderType1 = 0
+    position1 = to64x61(1)
+    direction1 = 0
+    closeOrder1 = 0
+    parentOrder1 = 0
+    leverage1 = to64x61(1)
+    liquidatorAddress1 = 0
+
+    order_id_2 = str_to_felt("wer4iljerw")
+    assetID_2 = BTC_ID
+    collateralID_2 = USDC_ID
+    price2 = to64x61(5000)
+    stopPrice2 = 0
+    orderType2 = 0
+    position2 = to64x61(1)
+    direction2 = 1
+    closeOrder2 = 0
+    parentOrder2 = 0
+    leverage2 = to64x61(1)
+    liquidatorAddress2 = 0
+
+    execution_price1 = to64x61(5000)
+
+    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
+    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
+
+    signed_message1 = alice_signer.sign(hash_computed1)
+    signed_message2 = bob_signer.sign(hash_computed2)
+
+    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size1,
+        execution_price1,
+        marketID_1,
+        2,
+        alice.contract_address, signed_message1[0], signed_message1[
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
+        bob.contract_address, signed_message2[0], signed_message2[
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
+    ])
+
+    season_id = 1
+    pair_id = marketID_1
+
+    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    assert days_traded.result.res == 1
+
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 0).call()
+    assert num_trades_in_a_day.result.res == 2
+
+    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    assert active_traders.result.res == 2
+
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    assert trade_frequency.result.frequency == [2]
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 0), 2, 0).call()
+    assert order_volume.result.volume == [(size1, execution_price1, initial_timestamp),(size1, execution_price1, initial_timestamp)]
+
+@pytest.mark.asyncio
+async def test_closing_orders_day_1(adminAuth_factory):
+    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide_mock = adminAuth_factory
+    
+    # increment to next day
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp2, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
+    #### Open orders ##############
+    size1 = to64x61(1)
+    execution_price1 = to64x61(5000)
+
+    #### Closing Of Orders ########
+    size2 = to64x61(1)
+    marketID_2 = BTC_USD_ID
+
+    order_id_3 = str_to_felt("rlbrj32414hd")
+    assetID_3 = BTC_ID
+    collateralID_3 = USDC_ID
+    price3 = to64x61(6000)
+    stopPrice3 = 0
+    orderType3 = 0
+    position3 = to64x61(1)
+    direction3 = 1
+    closeOrder3 = 1
+    leverage3 = to64x61(1)
+    liquidatorAddress3 = 0
+
+    order_id_4 = str_to_felt("tew243sdf2334")
+    assetID_4 = BTC_ID
+    collateralID_4 = USDC_ID
+    price4 = to64x61(6000)
+    stopPrice4 = 0
+    orderType4 = 0
+    position4 = to64x61(1)
+    direction4 = 0
+    closeOrder4 = 1
+    leverage4 = to64x61(1)
+    liquidatorAddress4 = 0
+
+    execution_price2 = to64x61(6000)
+
+    hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3,
+                                price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3)
+    hash_computed4 = hash_order(order_id_4, assetID_4, collateralID_4,
+                                price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4)
+
+    signed_message3 = alice_signer.sign(hash_computed3)
+    signed_message4 = bob_signer.sign(hash_computed4)
+
+    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size2,
+        execution_price2,
+        marketID_2,
+        2,
+        alice.contract_address, signed_message3[0], signed_message3[
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
+        bob.contract_address, signed_message4[0], signed_message4[
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
+    ])
+
+    season_id = 1
+    pair_id = marketID_2
+
+    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    assert days_traded.result.res == 2
+
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 1).call()
+    assert num_trades_in_a_day.result.res == 2
+
+    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    assert active_traders.result.res == 2
+
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    assert trade_frequency.result.frequency == [2, 2]
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 0), 2, 0).call()
+    assert order_volume.result.volume == [(size1, execution_price1, initial_timestamp),(size1, execution_price1, initial_timestamp)]
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 1), 2, 0).call()
+    assert order_volume.result.volume == [(size2, execution_price2, timestamp2),(size2, execution_price2, timestamp2)]
+
+@pytest.mark.asyncio
+async def test_opening_orders_day_2(adminAuth_factory):
+    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide_mock = adminAuth_factory
+
+    # increment to next day
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp3, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
+    #### Open orders ##############
+    size1 = to64x61(1)
+    execution_price1 = to64x61(5000)
+
+    size2 = to64x61(1)
+    execution_price2 = to64x61(6000)
+    ####### Opening of Orders #######
+    size3 = to64x61(1)
+    marketID_1 = BTC_USD_ID
+
+    order_id_1 = str_to_felt("sdj343234df")
+    assetID_1 = BTC_ID
+    collateralID_1 = USDC_ID
+    price1 = to64x61(6500)
+    stopPrice1 = 0
+    orderType1 = 0
+    position1 = to64x61(1)
+    direction1 = 0
+    closeOrder1 = 0
+    parentOrder1 = 0
+    leverage1 = to64x61(4)
+    liquidatorAddress1 = 0
+
+    order_id_2 = str_to_felt("432342dfd23dff")
+    assetID_2 = BTC_ID
+    collateralID_2 = USDC_ID
+    price2 = to64x61(6500)
+    stopPrice2 = 0
+    orderType2 = 0
+    position2 = to64x61(1)
+    direction2 = 1
+    closeOrder2 = 0
+    parentOrder2 = 0
+    leverage2 = to64x61(2)
+    liquidatorAddress2 = 0
+
+    execution_price3 = to64x61(6500)
+
+    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
+    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
+
+    signed_message1 = alice_signer.sign(hash_computed1)
+    signed_message2 = bob_signer.sign(hash_computed2)
+
+    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size3,
+        execution_price3,
+        marketID_1,
+        2,
+        alice.contract_address, signed_message1[0], signed_message1[
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
+        bob.contract_address, signed_message2[0], signed_message2[
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
+    ])
+
+    season_id = 1
+    pair_id = marketID_1
+
+    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    print(days_traded.result.res)
+    assert days_traded.result.res == 3
+
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 2).call()
+    print(num_trades_in_a_day.result.res)
+    assert num_trades_in_a_day.result.res == 2
+
+    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    print(active_traders.result.res)
+    assert active_traders.result.res == 2
+
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    print(trade_frequency.result.frequency)
+    assert trade_frequency.result.frequency == [2, 2, 2]
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 0), 4, 0).call()
+    print(order_volume.result.volume)   
+    assert order_volume.result.volume == [(size1, execution_price1, initial_timestamp),(size1, execution_price1, initial_timestamp), (size3, execution_price3, timestamp3), (size3, execution_price3, timestamp3)]
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 1), 2, 0).call()
+    print("real", order_volume.result.volume)
+    print("expected", [(size2, execution_price2, timestamp2),(size2, execution_price2, timestamp2)])
+    assert order_volume.result.volume == [(size2, execution_price2, timestamp2),(size2, execution_price2, timestamp2)]
+
+
+@pytest.mark.asyncio
+async def test_opening_orders_day_3(adminAuth_factory):
+    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide_mock = adminAuth_factory
+
+    # increment to next day
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp4, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
+    #### Open orders ##############
+    size1 = to64x61(1)
+    execution_price1 = to64x61(5000)
+
+    size2 = to64x61(1)
+    execution_price2 = to64x61(6000)
+
+    size3 = to64x61(1)
+    execution_price3 = to64x61(6500)
+    ####### Opening of Orders #######
+    size4 = to64x61(1)
+    marketID_1 = BTC_USD_ID
+
+    order_id_1 = str_to_felt("y7whd873i2jkfd")
+    assetID_1 = BTC_ID
+    collateralID_1 = USDC_ID
+    price1 = to64x61(7000)
+    stopPrice1 = 0
+    orderType1 = 0
+    position1 = to64x61(1)
+    direction1 = 0
+    closeOrder1 = 0
+    parentOrder1 = 0
+    leverage1 = to64x61(4)
+    liquidatorAddress1 = 0
+
+    order_id_2 = str_to_felt("287fj1hjksaskjh")
+    assetID_2 = BTC_ID
+    collateralID_2 = USDC_ID
+    price2 = to64x61(7000)
+    stopPrice2 = 0
+    orderType2 = 0
+    position2 = to64x61(1)
+    direction2 = 1
+    closeOrder2 = 0
+    parentOrder2 = 0
+    leverage2 = to64x61(2)
+    liquidatorAddress2 = 0
+
+    execution_price4 = to64x61(7000)
+
+    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
+    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
+
+    signed_message1 = alice_signer.sign(hash_computed1)
+    signed_message2 = bob_signer.sign(hash_computed2)
+
+    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size4,
+        execution_price4,
+        marketID_1,
+        2,
+        alice.contract_address, signed_message1[0], signed_message1[
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
+        bob.contract_address, signed_message2[0], signed_message2[
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
+    ])
+
+    season_id = 1
+    pair_id = marketID_1
+
+    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    assert days_traded.result.res == 3
+
+    await assert_revert(trading_stats.get_num_trades_in_day(season_id, pair_id, 3).call())
+
+    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    assert active_traders.result.res == 2
+
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    assert trade_frequency.result.frequency == [2, 2, 2]
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 0), 4, 0).call()
+    assert order_volume.result.volume == [(size1, execution_price1, initial_timestamp),(size1, execution_price1, initial_timestamp), (size3, execution_price3, timestamp3), (size3, execution_price3, timestamp3)]
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 1), 2, 0).call()
+    assert order_volume.result.volume == [(size2, execution_price2, timestamp2),(size2, execution_price2, timestamp2)]
+
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 0), 4, 0).call()
+    print(order_volume.result.volume)   
+    assert order_volume.result.volume == [(size1, execution_price1, initial_timestamp),(size1, execution_price1, initial_timestamp), (size3, execution_price3, timestamp3), (size3, execution_price3, timestamp3)]
+
+    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 1), 2, 0).call()
+    assert order_volume.result.volume == [(size2, execution_price2, timestamp2),(size2, execution_price2, timestamp2)]

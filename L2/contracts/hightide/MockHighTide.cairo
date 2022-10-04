@@ -20,7 +20,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     let season: TradingSeason = TradingSeason(
         start_timestamp=current_timestamp,
         end_timestamp=current_timestamp + 604800,
-        num_trading_days=7,
+        num_trading_days=3,
     );
 
     curr_season_id.write(value=1);
