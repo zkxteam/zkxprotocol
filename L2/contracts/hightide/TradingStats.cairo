@@ -9,7 +9,7 @@ from contracts.Constants import Hightide_INDEX, AccountRegistry_INDEX
 from contracts.DataTypes import VolumeMetaData, OrderVolume, TradingSeason
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IHightideAdmin import IHightideAdmin
+from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import (
 CommonLib, 
 get_contract_version, 
@@ -208,7 +208,7 @@ func record_trade_stats{
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(registry_address, Hightide_INDEX, version);
 
     // Get current season id from hightide
-    let (season_id_) = IHightideAdmin.get_current_season_id(hightide_address); 
+    let (season_id_) = IHighTide.get_current_season_id(hightide_address); 
     // Record volume data <size, price>
     let volume_metadata:VolumeMetaData = VolumeMetaData(
                                          season_id = season_id_,
@@ -230,7 +230,7 @@ func record_trade_stats{
     // emit event for off-chain consumers
     trade_recorded.emit(season_id_, pair_id_, trader_address, order_type_, order_size_, execution_price_);
     // Get trading season data
-    let (season: TradingSeason) = IHightideAdmin.get_season(hightide_address, season_id_);
+    let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
 
     local time_since_start = current_timestamp-season.start_timestamp;
 
@@ -339,7 +339,7 @@ func get_current_day{
 
     alloc_locals;
      // Get trading season data
-    let (season: TradingSeason) = IHightideAdmin.get_season(hightide_address, season_id_);
+    let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
     let (current_timestamp) = get_block_timestamp();
     local time_since_start = current_timestamp-season.start_timestamp;
 
