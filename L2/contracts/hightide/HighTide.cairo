@@ -145,11 +145,9 @@ func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     with_attr error_message("Caller is not authorized to set multipliers") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    
+
     // Create Multipliers struct to store
-    let multipliers: Multipliers = Multipliers(
-        a1=a1, a2=a2, a3=a3, a4=a4
-    );
+    let multipliers: Multipliers = Multipliers(a1=a1, a2=a2, a3=a3, a4=a4);
     multipliers_to_calculate_reward.write(multipliers);
     return ();
 }
@@ -171,11 +169,9 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     with_attr error_message("Caller is not authorized to set constants") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    
+
     // Create Constants struct to store
-    let constants: Constants = Constants(
-        a=a, b=b, c=c, z=z, e=e
-    );
+    let constants: Constants = Constants(a=a, b=b, c=c, z=z, e=e);
     constants_to_calculate_trader_score.write(constants);
     return ();
 }
