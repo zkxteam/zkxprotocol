@@ -4,7 +4,6 @@ from contracts.DataTypes import TradingSeason
 
 @contract_interface
 namespace IHighTide {
-
     func get_current_season_id() -> (season_id: felt) {
     }
 
