@@ -102,6 +102,13 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
     assert fetched_trading_season.num_trading_days == to64x61(30)
 
 @pytest.mark.asyncio
+async def test_start_trade_season_unauthorized_user(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'start_trade_season', [
+        str_to_felt("100")]))
+
+@pytest.mark.asyncio
 async def test_get_season_with_invalid_season_id(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
 

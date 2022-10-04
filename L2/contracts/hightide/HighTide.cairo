@@ -2,12 +2,36 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.bool import FALSE, TRUE
-from starkware.starknet.common.syscalls import get_block_timestamp
+from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import ManageHighTide_ACTION, Trading_INDEX
 from contracts.DataTypes import Constants, Multipliers, TradingSeason
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
+
+//#########
+// Events #
+//#########
+
+// Event emitted whenever mutipliers are set
+@event
+func multipliers_for_rewards_added(caller: felt, multipliers: Multipliers) {
+}
+
+// Event emitted whenever constants are set
+@event
+func constants_for_trader_score_added(caller: felt, constants: Constants) {
+}
+
+// Event emitted whenever trading season is set up
+@event
+func trading_season_set_up(caller: felt, trading_season: TradingSeason) {
+}
+
+// Event emitted whenever trading season is started
+@event
+func trading_season_started(caller: felt, season_id: felt) {
+}
 
 //##########
 // Storage #
@@ -127,6 +151,10 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     trading_season_by_id.write(season_id, trading_season);
     season_id_exists.write(season_id, TRUE);
+
+    // Emit event
+    let (caller) = get_caller_address();
+    trading_season_set_up.emit(caller, trading_season);
     return ();
 }
 
@@ -146,6 +174,10 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     verify_season_id_exists(season_id, TRUE);
 
     current_trading_season.write(season_id);
+
+    // Emit event
+    let (caller) = get_caller_address();
+    trading_season_started.emit(caller, season_id);
     return ();
 }
 
@@ -169,6 +201,10 @@ func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     // Create Multipliers struct to store
     let multipliers: Multipliers = Multipliers(a1=a1, a2=a2, a3=a3, a4=a4);
     multipliers_to_calculate_reward.write(multipliers);
+
+    // Emit event
+    let (caller) = get_caller_address();
+    multipliers_for_rewards_added.emit(caller, multipliers);
     return ();
 }
 
@@ -193,6 +229,10 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     // Create Constants struct to store
     let constants: Constants = Constants(a=a, b=b, c=c, z=z, e=e);
     constants_to_calculate_trader_score.write(constants);
+
+    // Emit event
+    let (caller) = get_caller_address();
+    constants_for_trader_score_added.emit(caller, constants);
     return ();
 }
 
