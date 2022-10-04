@@ -79,6 +79,26 @@ func get_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     return (trading_season,);
 }
 
+// @notice View function to get multipliers used to calculate total reward
+// @returns multipliers - structure of Multipliers
+@view
+func get_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    multipliers: Multipliers
+) {
+    let (multipliers) = multipliers_to_calculate_reward.read();
+    return (multipliers,);
+}
+
+// @notice View function to get constants to calculate individual trader score
+// @returns constants - structure of Constants
+@view
+func get_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    constants: Constants
+) {
+    let (constants) = constants_to_calculate_trader_score.read();
+    return (constants,);
+}
+
 //#####################
 // External Functions #
 //#####################
