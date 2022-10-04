@@ -275,3 +275,18 @@ struct TradingSeason {
     start_timestamp: felt,
     num_trading_days: felt,
 }
+
+struct Multipliers {
+    a1: felt,
+    a2: felt,
+    a3: felt,
+    a4: felt,
+}
+
+struct Constants {
+    a: felt,
+    b: felt,
+    c: felt,
+    z: felt,
+    e: felt,
+}
