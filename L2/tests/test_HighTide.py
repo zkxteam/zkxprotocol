@@ -35,6 +35,51 @@ async def adminAuth_factory(starknet_service: StarknetService):
     return adminAuth, hightide, admin1, admin2, user1
 
 @pytest.mark.asyncio
+async def test_set_multipliers_unauthorized_user(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'set_multipliers', [
+        1, 2, 3, 4]))
+
+@pytest.mark.asyncio
+async def test_set_multipliers_authorized_admin(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, hightide.contract_address, 'set_multipliers', [
+        1, 2, 3, 4])
+
+    execution_info = await hightide.get_multipliers().call()
+    fetched_multipliers = execution_info.result.multipliers
+
+    assert fetched_multipliers.a1 == 1
+    assert fetched_multipliers.a2 == 2
+    assert fetched_multipliers.a3 == 3
+    assert fetched_multipliers.a4 == 4
+
+@pytest.mark.asyncio
+async def test_set_constants_unauthorized_user(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'set_constants', [
+        1, 2, 3, 4, 5]))
+
+@pytest.mark.asyncio
+async def test_set_constants_authorized_admin(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+
+    await signer1.send_transaction(admin1, hightide.contract_address, 'set_constants', [
+        1, 2, 3, 4, 5])
+
+    execution_info = await hightide.get_constants().call()
+    fetched_constants = execution_info.result.constants
+
+    assert fetched_constants.a == 1
+    assert fetched_constants.b == 2
+    assert fetched_constants.c == 3
+    assert fetched_constants.z == 4
+    assert fetched_constants.e == 5
+
+@pytest.mark.asyncio
 async def test_setup_trading_season_unauthorized_user(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
 
@@ -55,3 +100,9 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
 
     assert fetched_trading_season.start_timestamp == timestamp
     assert fetched_trading_season.num_trading_days == to64x61(30)
+
+@pytest.mark.asyncio
+async def test_get_season_with_invalid_season_id(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+
+    await assert_revert(hightide.get_season(str_to_felt("200")).call())
