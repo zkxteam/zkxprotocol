@@ -267,91 +267,35 @@ def get_raw_invoke(sender, calls):
 
 def build_default_asset_properties(
     id,
-    ticker,
     short_name,
     asset_version = 1,
     tradable = 0,
     collateral = 0,
-    token_decimal = 18,
-    metadata_id = 0,
-    tick_size = to64x61(0.01),
-    step_size = to64x61(0.1),
-    minimum_order_size = to64x61(1),
-    minimum_leverage = to64x61(1),
-    maximum_leverage = to64x61(10),
-    currently_allowed_leverage = to64x61(3),
-    maintenance_margin_fraction = to64x61(1),
-    initial_margin_fraction = to64x61(1),
-    incremental_initial_margin_fraction = to64x61(1),
-    incremental_position_size = to64x61(100),
-    baseline_position_size = to64x61(1000),
-    maximum_position_size = to64x61(10000)
+    token_decimal = 18
 ):
     return [
         id, 
         asset_version, 
-        ticker, 
         short_name, 
         tradable, 
         collateral, 
-        token_decimal, 
-        metadata_id, 
-        tick_size, 
-        step_size, 
-        minimum_order_size,
-        minimum_leverage,
-        maximum_leverage,
-        currently_allowed_leverage,
-        maintenance_margin_fraction,
-        initial_margin_fraction,
-        incremental_initial_margin_fraction,
-        incremental_position_size,
-        baseline_position_size,
-        maximum_position_size
+        token_decimal
     ]
 
 
 def build_asset_properties(
     id,
     asset_version,
-    ticker,
     short_name,
     tradable,
     collateral,
-    token_decimal,
-    metadata_id,
-    tick_size,
-    step_size,
-    minimum_order_size,
-    minimum_leverage,
-    maximum_leverage,
-    currently_allowed_leverage,
-    maintenance_margin_fraction,
-    initial_margin_fraction,
-    incremental_initial_margin_fraction,
-    incremental_position_size,
-    baseline_position_size,
-    maximum_position_size
+    token_decimal
 ):
     return [
         id, 
         asset_version, 
-        ticker, 
         short_name, 
         tradable, 
         collateral, 
-        token_decimal, 
-        metadata_id, 
-        tick_size, 
-        step_size, 
-        minimum_order_size,
-        minimum_leverage,
-        maximum_leverage,
-        currently_allowed_leverage,
-        maintenance_margin_fraction,
-        initial_margin_fraction,
-        incremental_initial_margin_fraction,
-        incremental_position_size,
-        baseline_position_size,
-        maximum_position_size
+        token_decimal
     ]

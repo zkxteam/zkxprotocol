@@ -11,30 +11,6 @@ USDC_ID = str_to_felt("fghj3am52qpzsib")
 USDT_ID = str_to_felt("65ksgn23nv")
 PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481
 
-def build_default_asset_properties(id, ticker, name):
-    return [
-        id, # id
-        1, # asset_version
-        ticker, # ticker
-        name, # short_name
-        1, # tradable
-        0, # collateral
-        6, # token_decimal
-        0, # metadata_id
-        to64x61(1), # tick_size
-        to64x61(1), # step_size
-        to64x61(10), # minimum_order_size
-        to64x61(1), # minimum_leverage
-        to64x61(5), # maximum_leverage
-        to64x61(3), # currently_allowed_leverage
-        to64x61(1), # maintenance_margin_fraction
-        to64x61(1), # initial_margin_fraction
-        to64x61(1), # incremental_initial_margin_fraction
-        to64x61(100), # incremental_position_size
-        to64x61(1000), # baseline_position_size
-        to64x61(10000) # maximum_position_size
-    ]
-
 @pytest.fixture(scope='module')
 def event_loop():
     return asyncio.new_event_loop()
@@ -67,48 +43,20 @@ async def adminAuth_factory(starknet_service: StarknetService):
     USDT_properties = [
         USDT_ID, # id
         1, # asset_version
-        str_to_felt("USDT"), # ticker
         str_to_felt("USDT"), # short_name
         1, # tradable
         0, # collateral
-        6, # token_decimal
-        0, # metadata_id
-        to64x61(1), # tick_size
-        to64x61(1), # step_size
-        to64x61(10), # minimum_order_size
-        to64x61(1), # minimum_leverage
-        to64x61(5), # maximum_leverage
-        to64x61(3), # currently_allowed_leverage
-        to64x61(1), # maintenance_margin_fraction
-        to64x61(1), # initial_margin_fraction
-        to64x61(1), # incremental_initial_margin_fraction
-        to64x61(100), # incremental_position_size
-        to64x61(1000), # baseline_position_size
-        to64x61(10000) # maximum_position_size
+        6 # token_decimal
     ]
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', USDT_properties)
     
     USDC_properties = [
         USDC_ID, # id
         1, # asset_version
-        str_to_felt("USDC"), # ticker
         str_to_felt("USDC"), # short_name
         0, # tradable
         1, # collateral
-        6, # token_decimal
-        0, # metadata_id
-        to64x61(1), # tick_size
-        to64x61(1), # step_size
-        to64x61(10), # minimum_order_size
-        to64x61(1), # minimum_leverage
-        to64x61(5), # maximum_leverage
-        to64x61(3), # currently_allowed_leverage
-        to64x61(1), # maintenance_margin_fraction
-        to64x61(1), # initial_margin_fraction
-        to64x61(1), # incremental_initial_margin_fraction
-        to64x61(100), # incremental_position_size
-        to64x61(1000), # baseline_position_size
-        to64x61(10000) # maximum_position_size
+        6 # token_decimal
     ]
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
 
