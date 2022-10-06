@@ -19,28 +19,23 @@ const L2_WITHDRAWAL_ADDRESS =
   "0x054a91922c368c98503e3820330b997babaaf2beb05d96f5d9283bd2285fcbdb";
 
 const ETH_ASSET = {
-  ticker: 4543560,
-  collateralID: 2012314141,
+  assetId: 4543560,
 };
 
 const ZKX_ASSET = {
-  ticker: 1431520323,
-  collateralID: 90986567876,
+  assetId: 90986567876,
 };
 
 const ASSET_1 = {
-  ticker: 123,
-  collateralID: 90001,
+  assetId: 90001,
   tokenAddress: "0x1111111111111111111111111111111111111111",
 };
 const ASSET_2 = {
-  ticker: 234,
-  collateralID: 90002,
+  assetId: 90002,
   tokenAddress: "0x2222222222222222222222222222222222222222",
 };
 const ASSET_3 = {
-  ticker: 345,
-  collateralID: 90003,
+  assetId: 90003,
   tokenAddress: "0x3333333333333333333333333333333333333333",
 };
 
@@ -109,7 +104,7 @@ async function prepareStarknetToAdd(
   starknetMock = starknetCoreMock,
   assetAddress = L2_ASSET_ADDRESS
 ) {
-  const payload = [INDEX.ADD_ASSET, asset.ticker, asset.collateralID];
+  const payload = [INDEX.ADD_ASSET, asset.assetId];
   await starknetMock.addL2ToL1Message(
     assetAddress,
     zkxContract.address,
@@ -124,7 +119,7 @@ async function addAsset(
   assetAddress = L2_ASSET_ADDRESS
 ) {
   await prepareStarknetToAdd(asset, zkxContract, starknetMock, assetAddress);
-  await zkxContract.updateAssetListInL1(asset.ticker, asset.collateralID);
+  await zkxContract.updateAssetListInL1(asset.assetId);
 }
 
 async function prepareStarknetToRemove(
@@ -133,7 +128,7 @@ async function prepareStarknetToRemove(
   starknetMock = starknetCoreMock,
   assetAddress = L2_ASSET_ADDRESS
 ) {
-  const payload = [INDEX.REMOVE_ASSET, asset.ticker, asset.collateralID];
+  const payload = [INDEX.REMOVE_ASSET, asset.assetId];
   await starknetMock.addL2ToL1Message(
     assetAddress,
     zkxContract.address,
@@ -145,7 +140,7 @@ async function prepareStarknetToWithdraw(asset, recipient, amount, requestID) {
   const payload = [
     INDEX.WITHDRAWAL,
     recipient.address,
-    asset.ticker,
+    asset.assetId,
     amount,
     requestID,
   ];
@@ -174,17 +169,13 @@ describe("Asset management", function () {
 
     // When
     await L1ZKXContract.updateAssetListInL1(
-      ETH_ASSET.ticker,
-      ETH_ASSET.collateralID
+      ETH_ASSET.assetId
     );
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();
     expect(assetList.length).to.be.eq(1);
-    expect(assetList[0]).to.be.eq(ETH_ASSET.ticker);
-    expect(await L1ZKXContract.assetID(ETH_ASSET.ticker)).to.be.eq(
-      ETH_ASSET.collateralID
-    );
+    expect(assetList[0]).to.be.eq(ETH_ASSET.assetId);
   });
 
   it("Add ZKXToken", async function () {
@@ -192,23 +183,14 @@ describe("Asset management", function () {
     await prepareStarknetToAdd(ZKX_ASSET);
 
     // When
-    await L1ZKXContract.updateAssetListInL1(
-      ZKX_ASSET.ticker,
-      ZKX_ASSET.collateralID
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.updateAssetListInL1(ZKX_ASSET.assetId);
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();
     expect(assetList.length).to.be.eq(1);
-    expect(assetList[0]).to.be.eq(ZKX_ASSET.ticker);
-    expect(await L1ZKXContract.assetID(ZKX_ASSET.ticker)).to.be.eq(
-      ZKX_ASSET.collateralID
-    );
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(
+    expect(assetList[0]).to.be.eq(ZKX_ASSET.assetId);
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(
       ZKXToken.address
     );
   });
@@ -219,31 +201,16 @@ describe("Asset management", function () {
     await prepareStarknetToAdd(ZKX_ASSET);
 
     // When
-    await L1ZKXContract.updateAssetListInL1(
-      ETH_ASSET.ticker,
-      ETH_ASSET.collateralID
-    );
-    await L1ZKXContract.updateAssetListInL1(
-      ZKX_ASSET.ticker,
-      ZKX_ASSET.collateralID
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.updateAssetListInL1(ETH_ASSET.assetId);
+    await L1ZKXContract.updateAssetListInL1(ZKX_ASSET.assetId);
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();
     expect(assetList.length).to.be.eq(2);
-    expect(assetList[0]).to.be.eq(ETH_ASSET.ticker);
-    expect(assetList[1]).to.be.eq(ZKX_ASSET.ticker);
-    expect(await L1ZKXContract.assetID(ETH_ASSET.ticker)).to.be.eq(
-      ETH_ASSET.collateralID
-    );
-    expect(await L1ZKXContract.assetID(ZKX_ASSET.ticker)).to.be.eq(
-      ZKX_ASSET.collateralID
-    );
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(
+    expect(assetList[0]).to.be.eq(ETH_ASSET.assetId);
+    expect(assetList[1]).to.be.eq(ZKX_ASSET.assetId);
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(
       ZKXToken.address
     );
   });
@@ -252,27 +219,17 @@ describe("Asset management", function () {
     // Given
     await addAsset(ETH_ASSET);
     await addAsset(ZKX_ASSET);
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
     await prepareStarknetToRemove(ETH_ASSET);
 
     // When
-    await L1ZKXContract.removeAssetFromList(
-      ETH_ASSET.ticker,
-      ETH_ASSET.collateralID
-    );
+    await L1ZKXContract.removeAssetFromList(ETH_ASSET.assetId);
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();
     expect(assetList.length).to.be.eq(1);
-    expect(assetList[0]).to.be.eq(ZKX_ASSET.ticker);
-    expect(await L1ZKXContract.assetID(ETH_ASSET.ticker)).to.be.eq(0);
-    expect(await L1ZKXContract.assetID(ZKX_ASSET.ticker)).to.be.eq(
-      ZKX_ASSET.collateralID
-    );
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(
+    // expect(assetList[0]).to.be.eq(ZKX_ASSET.assetId);
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(
       ZKXToken.address
     );
   });
@@ -281,27 +238,17 @@ describe("Asset management", function () {
     // Given
     await addAsset(ETH_ASSET);
     await addAsset(ZKX_ASSET);
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
     await prepareStarknetToRemove(ZKX_ASSET);
 
     // When
-    await L1ZKXContract.removeAssetFromList(
-      ZKX_ASSET.ticker,
-      ZKX_ASSET.collateralID
-    );
+    await L1ZKXContract.removeAssetFromList(ZKX_ASSET.assetId);
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();
     expect(assetList.length).to.be.eq(1);
-    expect(assetList[0]).to.be.eq(ETH_ASSET.ticker);
-    expect(await L1ZKXContract.assetID(ETH_ASSET.ticker)).to.be.eq(
-      ETH_ASSET.collateralID
-    );
-    expect(await L1ZKXContract.assetID(ZKX_ASSET.ticker)).to.be.eq(0);
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(
+    expect(assetList[0]).to.be.eq(ETH_ASSET.assetId);
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(
       ZERO_ADDRESS
     );
   });
@@ -310,19 +257,13 @@ describe("Asset management", function () {
     // Given
     await addAsset(ETH_ASSET);
     await addAsset(ZKX_ASSET);
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
     await prepareStarknetToAdd(ETH_ASSET);
 
     // When
     await expect(
-      L1ZKXContract.updateAssetListInL1(
-        ETH_ASSET.ticker,
-        ETH_ASSET.collateralID
-      )
-    ).to.be.revertedWith("Failed to add asset: Ticker already exists");
+      L1ZKXContract.updateAssetListInL1(ETH_ASSET.assetId)
+    ).to.be.revertedWith("Failed to add asset: Asset ID already exists");
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();
@@ -333,19 +274,13 @@ describe("Asset management", function () {
     // Given
     await addAsset(ETH_ASSET);
     await addAsset(ZKX_ASSET);
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
     await prepareStarknetToAdd(ZKX_ASSET);
 
     // When
     await expect(
-      L1ZKXContract.updateAssetListInL1(
-        ZKX_ASSET.ticker,
-        ZKX_ASSET.collateralID
-      )
-    ).to.be.revertedWith("Failed to add asset: Ticker already exists");
+      L1ZKXContract.updateAssetListInL1(ZKX_ASSET.assetId)
+    ).to.be.revertedWith("Failed to add asset: Asset ID already exists");
 
     // Then
     const assetList = await L1ZKXContract.getAssetList();
@@ -355,11 +290,11 @@ describe("Asset management", function () {
   it("NOT possible to set token address for non-existing asset", async function () {
     // When
     await expect(
-      L1ZKXContract.setTokenContractAddress(ZKX_ASSET.ticker, ZKXToken.address)
+      L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address)
     ).to.be.revertedWith("Failed to set token address: non-registered asset");
 
     // Then
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(
       ZERO_ADDRESS
     );
   });
@@ -370,11 +305,11 @@ describe("Asset management", function () {
 
     // When
     await expect(
-      L1ZKXContract.setTokenContractAddress(ZKX_ASSET.ticker, ZERO_ADDRESS)
+      L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZERO_ADDRESS)
     ).to.be.revertedWith("Failed to set token address: zero address provided");
 
     // Then
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(
       ZERO_ADDRESS
     );
   });
@@ -382,18 +317,15 @@ describe("Asset management", function () {
   it("NOT possible to change already set token address", async function () {
     // Given
     await addAsset(ZKX_ASSET);
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
 
     // When
     await expect(
-      L1ZKXContract.setTokenContractAddress(ZKX_ASSET.ticker, DUMMY_ADDRESS)
+      L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, DUMMY_ADDRESS)
     ).to.be.revertedWith("Failed to set token address: Already set");
 
     // Then
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(
       ZKXToken.address
     );
   });
@@ -404,63 +336,35 @@ describe("Asset management", function () {
     await prepareStarknetToAdd(ASSET_2);
     await prepareStarknetToAdd(ASSET_3);
 
-    // Add 5 assets
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_1.ticker,
-      ASSET_1.collateralID
-    );
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_2.ticker,
-      ASSET_2.collateralID
-    );
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_3.ticker,
-      ASSET_3.collateralID
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_1.ticker,
-      ASSET_1.tokenAddress
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_2.ticker,
-      ASSET_2.tokenAddress
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_3.ticker,
-      ASSET_3.tokenAddress
-    );
+    // Add 3 assets
+    await L1ZKXContract.updateAssetListInL1(ASSET_1.assetId);
+    await L1ZKXContract.updateAssetListInL1(ASSET_2.assetId);
+    await L1ZKXContract.updateAssetListInL1(ASSET_3.assetId);
+
+    // Set token contract addresses
+    await L1ZKXContract.setTokenContractAddress(ASSET_1.assetId, ASSET_1.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_2.assetId, ASSET_2.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_3.assetId, ASSET_3.tokenAddress);
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
     await prepareStarknetToRemove(ASSET_1);
-    await L1ZKXContract.removeAssetFromList(
-      ASSET_1.ticker,
-      ASSET_1.collateralID
-    );
+    await L1ZKXContract.removeAssetFromList(ASSET_1.assetId);
 
     // Check that 3rd is 1st now, 2nd didn't move, 1st is gone
     const assetList = await L1ZKXContract.getAssetList();
     expect(assetList.length).to.be.eq(2);
-    expect(assetList[0]).to.be.eq(ASSET_3.ticker);
-    expect(assetList[1]).to.be.eq(ASSET_2.ticker);
-
-    // Check asset IDs
-    expect(await L1ZKXContract.assetID(ASSET_1.ticker)).to.be.eq(0);
-    expect(await L1ZKXContract.assetID(ASSET_2.ticker)).to.be.eq(
-      ASSET_2.collateralID
-    );
-    expect(await L1ZKXContract.assetID(ASSET_3.ticker)).to.be.eq(
-      ASSET_3.collateralID
-    );
+    expect(assetList[0]).to.be.eq(ASSET_3.assetId);
+    expect(assetList[1]).to.be.eq(ASSET_2.assetId);
 
     // Check token addresses
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.assetId)).to.be.eq(
       ZERO_ADDRESS
     );
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.assetId)).to.be.eq(
       ASSET_2.tokenAddress
     );
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.assetId)).to.be.eq(
       ASSET_3.tokenAddress
     );
   });
@@ -471,63 +375,35 @@ describe("Asset management", function () {
     await prepareStarknetToAdd(ASSET_2);
     await prepareStarknetToAdd(ASSET_3);
 
-    // Add 5 assets
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_1.ticker,
-      ASSET_1.collateralID
-    );
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_2.ticker,
-      ASSET_2.collateralID
-    );
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_3.ticker,
-      ASSET_3.collateralID
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_1.ticker,
-      ASSET_1.tokenAddress
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_2.ticker,
-      ASSET_2.tokenAddress
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_3.ticker,
-      ASSET_3.tokenAddress
-    );
+    // Add 3 assets
+    await L1ZKXContract.updateAssetListInL1(ASSET_1.assetId);
+    await L1ZKXContract.updateAssetListInL1(ASSET_2.assetId);
+    await L1ZKXContract.updateAssetListInL1(ASSET_3.assetId);
+
+    // Set token contract addresses
+    await L1ZKXContract.setTokenContractAddress(ASSET_1.assetId, ASSET_1.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_2.assetId, ASSET_2.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_3.assetId, ASSET_3.tokenAddress);
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
     await prepareStarknetToRemove(ASSET_2);
-    await L1ZKXContract.removeAssetFromList(
-      ASSET_2.ticker,
-      ASSET_2.collateralID
-    );
+    await L1ZKXContract.removeAssetFromList(ASSET_2.assetId);
 
     // Check that 3rd is 2nd now, 1st didn't move, 2nd is gone
     const assetList = await L1ZKXContract.getAssetList();
     expect(assetList.length).to.be.eq(2);
-    expect(assetList[0]).to.be.eq(ASSET_1.ticker);
-    expect(assetList[1]).to.be.eq(ASSET_3.ticker);
-
-    // Check asset IDs
-    expect(await L1ZKXContract.assetID(ASSET_1.ticker)).to.be.eq(
-      ASSET_1.collateralID
-    );
-    expect(await L1ZKXContract.assetID(ASSET_2.ticker)).to.be.eq(0);
-    expect(await L1ZKXContract.assetID(ASSET_3.ticker)).to.be.eq(
-      ASSET_3.collateralID
-    );
+    expect(assetList[0]).to.be.eq(ASSET_1.assetId);
+    expect(assetList[1]).to.be.eq(ASSET_3.assetId);
 
     // Check token addresses
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.assetId)).to.be.eq(
       ASSET_1.tokenAddress
     );
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.assetId)).to.be.eq(
       ZERO_ADDRESS
     );
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.assetId)).to.be.eq(
       ASSET_3.tokenAddress
     );
   });
@@ -538,63 +414,35 @@ describe("Asset management", function () {
     await prepareStarknetToAdd(ASSET_2);
     await prepareStarknetToAdd(ASSET_3);
 
-    // Add 5 assets
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_1.ticker,
-      ASSET_1.collateralID
-    );
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_2.ticker,
-      ASSET_2.collateralID
-    );
-    await L1ZKXContract.updateAssetListInL1(
-      ASSET_3.ticker,
-      ASSET_3.collateralID
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_1.ticker,
-      ASSET_1.tokenAddress
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_2.ticker,
-      ASSET_2.tokenAddress
-    );
-    await L1ZKXContract.setTokenContractAddress(
-      ASSET_3.ticker,
-      ASSET_3.tokenAddress
-    );
+    // Add 3 assets
+    await L1ZKXContract.updateAssetListInL1(ASSET_1.assetId);
+    await L1ZKXContract.updateAssetListInL1(ASSET_2.assetId);
+    await L1ZKXContract.updateAssetListInL1(ASSET_3.assetId);
+
+    // Set token contract addresses
+    await L1ZKXContract.setTokenContractAddress(ASSET_1.assetId, ASSET_1.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_2.assetId, ASSET_2.tokenAddress);
+    await L1ZKXContract.setTokenContractAddress(ASSET_3.assetId, ASSET_3.tokenAddress);
     expect((await L1ZKXContract.getAssetList()).length).to.be.eq(3);
 
     // Remove first asset
     await prepareStarknetToRemove(ASSET_3);
-    await L1ZKXContract.removeAssetFromList(
-      ASSET_3.ticker,
-      ASSET_3.collateralID
-    );
+    await L1ZKXContract.removeAssetFromList(ASSET_3.assetId);
 
     // Check that 3rd is gone, other didn't move
     const assetList = await L1ZKXContract.getAssetList();
     expect(assetList.length).to.be.eq(2);
-    expect(assetList[0]).to.be.eq(ASSET_1.ticker);
-    expect(assetList[1]).to.be.eq(ASSET_2.ticker);
-
-    // Check asset IDs
-    expect(await L1ZKXContract.assetID(ASSET_1.ticker)).to.be.eq(
-      ASSET_1.collateralID
-    );
-    expect(await L1ZKXContract.assetID(ASSET_2.ticker)).to.be.eq(
-      ASSET_2.collateralID
-    );
-    expect(await L1ZKXContract.assetID(ASSET_3.ticker)).to.be.eq(0);
+    expect(assetList[0]).to.be.eq(ASSET_1.assetId);
+    expect(assetList[1]).to.be.eq(ASSET_2.assetId);
 
     // Check token addresses
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_1.assetId)).to.be.eq(
       ASSET_1.tokenAddress
     );
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_2.assetId)).to.be.eq(
       ASSET_2.tokenAddress
     );
-    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.ticker)).to.be.eq(
+    expect(await L1ZKXContract.tokenContractAddress(ASSET_3.assetId)).to.be.eq(
       ZERO_ADDRESS
     );
   });
@@ -839,7 +687,7 @@ describe("Deposits", function () {
     await expect(
       aliceContract.depositToL1(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         100 * TOKEN_UNIT
       )
     ).to.be.revertedWith("Deposit failed: non-registered asset");
@@ -851,7 +699,7 @@ describe("Deposits", function () {
     await expect(
       aliceContract.depositToL1(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         100 * TOKEN_UNIT
       )
     ).to.be.revertedWith("Deposit failed: token address not set");
@@ -860,7 +708,7 @@ describe("Deposits", function () {
   it("Not possible to deposit more Tokens than user has", async function () {
     await addAsset(ZKX_ASSET);
     await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       ZKXToken.address
     );
     await ZKXToken.mint(alice.address, 100 * TOKEN_UNIT);
@@ -868,7 +716,7 @@ describe("Deposits", function () {
     await expect(
       aliceContract.depositToL1(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         101 * TOKEN_UNIT
       )
     ).to.be.reverted;
@@ -877,7 +725,7 @@ describe("Deposits", function () {
   it("Successful Token deposit", async function () {
     await addAsset(ZKX_ASSET);
     await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       ZKXToken.address
     );
     await ZKXToken.mint(alice.address, 100 * TOKEN_UNIT);
@@ -890,7 +738,7 @@ describe("Deposits", function () {
     await expect(
       aliceContract.depositToL1(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         100 * TOKEN_UNIT
       )
     ).to.emit(L1ZKXContract, "LogDeposit");
@@ -906,7 +754,7 @@ describe("Deposits", function () {
   it("Deposit and then withdraw tokens", async function () {
     await addAsset(ZKX_ASSET);
     await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       ZKXToken.address
     );
     const amount = 100 * TOKEN_UNIT;
@@ -914,7 +762,7 @@ describe("Deposits", function () {
     await ZKXToken.connect(alice).approve(L1ZKXContract.address, amount);
     await starknetCoreMock.resetCounters();
 
-    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.ticker, amount);
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.assetId, amount);
 
     // Deposit should not consume messages from L2
     expect(await starknetCoreMock.invokedConsumeMessageFromL2Count()).to.be.eq(
@@ -930,17 +778,17 @@ describe("Deposits", function () {
 
     // Rogue can't withdraw Alice's funds
     await expect(
-      rogueContract.withdraw(rogue.address, ZKX_ASSET.ticker, amount, requestID)
+      rogueContract.withdraw(rogue.address, ZKX_ASSET.assetId, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
 
     await expect(
-      rogueContract.withdraw(rogue.address, ZKX_ASSET.ticker, amount, requestID)
+      rogueContract.withdraw(rogue.address, ZKX_ASSET.assetId, amount, requestID)
     ).to.be.revertedWith("INVALID_MESSAGE_TO_CONSUME");
 
     // Alice successfully withdraws funds
     await aliceContract.withdraw(
       alice.address,
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       amount,
       requestID
     );
@@ -955,7 +803,7 @@ describe("Deposits", function () {
   it("Multiple token deposits", async function () {
     await addAsset(ZKX_ASSET);
     await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       ZKXToken.address
     );
     await ZKXToken.mint(alice.address, 300 * TOKEN_UNIT);
@@ -969,7 +817,7 @@ describe("Deposits", function () {
     await expect(
       aliceContract.depositToL1(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         301 * TOKEN_UNIT
       )
     ).to.be.reverted;
@@ -977,21 +825,21 @@ describe("Deposits", function () {
     // This deposit succeeds, after tx Alice has 200 tokens left
     await aliceContract.depositToL1(
       ALICE_L2_ADDRESS,
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       100 * TOKEN_UNIT
     );
 
     // Second deposit succeeds, after tx Alice has 100 tokens left
     await aliceContract.depositToL1(
       ALICE_L2_ADDRESS,
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       100 * TOKEN_UNIT
     );
 
     // Third deposti also succeeds, after tx Alice has no tokens left
     await aliceContract.depositToL1(
       ALICE_L2_ADDRESS,
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       100 * TOKEN_UNIT
     );
 
@@ -1006,7 +854,7 @@ describe("Deposits", function () {
     await expect(
       aliceContract.depositToL1(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         1 * TOKEN_UNIT
       )
     ).to.be.reverted;
@@ -1049,16 +897,13 @@ describe("Deposit Cancellation", function () {
 
   it("deposit by one user, cancellation by another user", async function () {
     await addAsset(ZKX_ASSET);
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
     const amount = 100 * TOKEN_UNIT;
     await ZKXToken.mint(alice.address, amount);
     await ZKXToken.connect(alice).approve(L1ZKXContract.address, amount);
     await starknetCoreMock.resetCounters();
 
-    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.ticker, amount);
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.assetId, amount);
 
     // Deposit should send a message to L2
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1);
@@ -1068,7 +913,7 @@ describe("Deposit Cancellation", function () {
     await expect(
       rogueContract.depositCancelRequest(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         amount,
         nonce
       )
@@ -1077,16 +922,13 @@ describe("Deposit Cancellation", function () {
 
   it("Trying to finalize cancel without initiating", async function () {
     await addAsset(ZKX_ASSET);
-    await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
-      ZKXToken.address
-    );
+    await L1ZKXContract.setTokenContractAddress(ZKX_ASSET.assetId, ZKXToken.address);
     const amount = 100 * TOKEN_UNIT;
     await ZKXToken.mint(alice.address, amount);
     await ZKXToken.connect(alice).approve(L1ZKXContract.address, amount);
     await starknetCoreMock.resetCounters();
 
-    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.ticker, amount);
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.assetId, amount);
 
     // Deposit should send a message to L2
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1);
@@ -1096,7 +938,7 @@ describe("Deposit Cancellation", function () {
     await expect(
       aliceContract.depositReclaim(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         amount,
         nonce
       )
@@ -1106,7 +948,7 @@ describe("Deposit Cancellation", function () {
   it("Initiating cancel before Message Cancellation delay is complete", async function () {
     await addAsset(ZKX_ASSET);
     await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       ZKXToken.address
     );
     const amount = 100 * TOKEN_UNIT;
@@ -1114,7 +956,7 @@ describe("Deposit Cancellation", function () {
     await ZKXToken.connect(alice).approve(L1ZKXContract.address, amount);
     await starknetCoreMock.resetCounters();
 
-    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.ticker, amount);
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.assetId, amount);
 
     // Deposit should send a message to L2
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1);
@@ -1124,7 +966,7 @@ describe("Deposit Cancellation", function () {
     await expect(
       aliceContract.depositCancelRequest(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         amount,
         nonce
       )
@@ -1135,7 +977,7 @@ describe("Deposit Cancellation", function () {
     await expect(
       aliceContract.depositReclaim(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         amount,
         nonce
       )
@@ -1145,7 +987,7 @@ describe("Deposit Cancellation", function () {
   it("Successful Cancellation of deposit", async function () {
     await addAsset(ZKX_ASSET);
     await L1ZKXContract.setTokenContractAddress(
-      ZKX_ASSET.ticker,
+      ZKX_ASSET.assetId,
       ZKXToken.address
     );
     const amount = 100 * TOKEN_UNIT;
@@ -1153,7 +995,7 @@ describe("Deposit Cancellation", function () {
     await ZKXToken.connect(alice).approve(L1ZKXContract.address, amount);
     await starknetCoreMock.resetCounters();
 
-    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.ticker, amount);
+    await aliceContract.depositToL1(ALICE_L2_ADDRESS, ZKX_ASSET.assetId, amount);
 
     // Deposit should send a message to L2
     expect(await starknetCoreMock.invokedSendMessageToL2Count()).to.be.eq(1);
@@ -1163,7 +1005,7 @@ describe("Deposit Cancellation", function () {
     await expect(
       aliceContract.depositCancelRequest(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         amount,
         nonce
       )
@@ -1175,7 +1017,7 @@ describe("Deposit Cancellation", function () {
     await expect(
       aliceContract.depositReclaim(
         ALICE_L2_ADDRESS,
-        ZKX_ASSET.ticker,
+        ZKX_ASSET.assetId,
         amount,
         nonce
       )
