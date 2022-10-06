@@ -17,41 +17,26 @@ from web3 import Web3
 
 counter = 0
 eth_test_utils = EthTestUtils()
-# Generates unique asset params (id, ticker and name) to avoid conflicts
+# Generates unique asset params (id and name) to avoid conflicts
 
 DUMMY_WITHDRAWAL_REQUEST_ADDRESS=12345
 
 def generate_asset_info():
     global counter
     counter += 1
-    id = f"32f0406jz7qj8_${counter}"
-    ticker = f"ETH_${counter}"
+    id = f"ETH_${counter}"
     name = f"Ethereum_${counter}"
-    return str_to_felt(id), str_to_felt(ticker), str_to_felt(name)
+    return str_to_felt(id), str_to_felt(name)
 
 
-def build_default_asset_properties(id, ticker, name):
+def build_default_asset_properties(id, name):
     return [
         id,  # id
         0,  # asset_version
-        ticker,  # ticker
         name,  # short_name
         0,  # tradable
         0,  # collateral
         18,  # token_decimal
-        0,  # metadata_id
-        1,  # tick_size
-        1,  # step_size
-        10,  # minimum_order_size
-        1,  # minimum_leverage
-        5,  # maximum_leverage
-        3,  # currently_allowed_leverage
-        1,  # maintenance_margin_fraction
-        1,  # initial_margin_fraction
-        1,  # incremental_initial_margin_fraction
-        100,  # incremental_position_size
-        1000,  # baseline_position_size
-        10000  # maximum_position_size
     ]
 
 
@@ -114,9 +99,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
 
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
+    asset_id, asset_name = generate_asset_info()
+    asset_properties = build_default_asset_properties(asset_id, asset_name)
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
         add_asset_tx,
@@ -124,15 +108,12 @@ async def adminAuth_factory(starknet_service: StarknetService):
         name="asset_added",
         data=[
             asset_id,
-            asset_ticker,
             admin1.contract_address
         ]
     )
     await postman.flush()
-    l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, asset_id)
-
-    l1_zkx_contract.setTokenContractAddress.transact(
-        asset_ticker, token_contract.address)
+    l1_zkx_contract.updateAssetListInL1.transact(asset_id)
+    l1_zkx_contract.setTokenContractAddress.transact(asset_id, token_contract.address)
     
     tx_exec_info = await signer1.send_transaction(admin1,
                                                   account_deployer.contract_address,
@@ -145,13 +126,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
     deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, int(eth_test_utils.accounts[0].address,16)).call()
     deployed_address=deployed_address.result.address
     return (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract,
-            token_contract, account_deployer, account_registry, asset_ticker, asset_id, deployed_address)
+            token_contract, account_deployer, account_registry, asset_id, deployed_address)
 
 
 @pytest.mark.asyncio
 async def test_deposit_positive_flow(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address) = adminAuth_factory
+    account_deployer, account_registry, asset_id, deployed_address) = adminAuth_factory
     
 
     
@@ -167,7 +148,7 @@ async def test_deposit_positive_flow(adminAuth_factory):
 
     token_contract.approve.transact(l1_zkx_contract.address, 2*(10**18))
     l1_zkx_contract.depositToL1.transact(
-        deployed_address, asset_ticker, 2*(10**18))
+        deployed_address, asset_id, 2*(10**18))
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
     assert token_balance==98*(10**18)
 
@@ -201,7 +182,7 @@ async def test_deposit_positive_flow(adminAuth_factory):
     with eth_reverts("NO_MESSAGE_TO_CANCEL"):
         l1_zkx_contract.depositCancelRequest(
             deployed_address,
-            asset_ticker,
+            asset_id,
             2*(10**18),
             nonce
         )
@@ -211,7 +192,7 @@ async def test_deposit_positive_flow(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_deposit_incorrect_L2_address(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address) = adminAuth_factory
+    account_deployer, account_registry, asset_id, deployed_address) = adminAuth_factory
 
     incorrect_L2_address=12345
 
@@ -219,8 +200,7 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
     assert token_balance==98*(10**18)
 
     token_contract.approve.transact(l1_zkx_contract.address, 2*(10**18))
-    l1_zkx_contract.depositToL1.transact(
-        incorrect_L2_address, asset_ticker, 2*(10**18))
+    l1_zkx_contract.depositToL1.transact(incorrect_L2_address, asset_id, 2*(10**18))
     
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
     assert token_balance==96*(10**18)
@@ -255,7 +235,7 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
     # check that message cancellation should go through since message was not consumed on L2
     l1_zkx_contract.depositCancelRequest.transact(
             incorrect_L2_address,
-            asset_ticker,
+            asset_id,
             2*(10**18),
             nonce
         )
@@ -277,7 +257,7 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address) = adminAuth_factory
+    account_deployer, account_registry, asset_id, deployed_address) = adminAuth_factory
 
     incorrect_L2_address=12345
 
@@ -295,8 +275,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
     # except that it is through a contract which has been removed as the registered L1_ZKX_contract in L2 authorised
     # registry - this can effectively be any contract impersonating as L1_ZKX_contract on L1
     # to be sure no token transfer needs to take place for an impersonating contract to send message to L2 to increase balance
-    l1_zkx_contract.depositToL1.transact(
-        deployed_address, asset_ticker, 1*(10**18))
+    l1_zkx_contract.depositToL1.transact(deployed_address, 1*(10**18))
     
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
     assert token_balance==95*(10**18)
@@ -350,7 +329,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_deposit_incorrect_L1_address(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address) = adminAuth_factory
+    account_deployer, account_registry, asset_id, deployed_address) = adminAuth_factory
 
     # restore correct L1_ZKX_Contract address in authorised registry on L2
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
@@ -362,7 +341,7 @@ async def test_deposit_incorrect_L1_address(adminAuth_factory):
 
     token_contract.approve.transact(l1_zkx_contract.address, 2*(10**18),transact_args={"from":eth_test_utils.accounts[1]})
     l1_zkx_contract.depositToL1.transact(
-        deployed_address, asset_ticker, 2*(10**18),transact_args={"from":eth_test_utils.accounts[1]})
+        deployed_address, asset_id, 2*(10**18),transact_args={"from":eth_test_utils.accounts[1]})
     
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[1].address)
     assert token_balance==98*(10**18)
@@ -394,7 +373,7 @@ async def test_deposit_incorrect_L1_address(adminAuth_factory):
     # check that message cancellation should go through since message was not consumed on L2
     l1_zkx_contract.depositCancelRequest.transact(
             deployed_address,
-            asset_ticker,
+            asset_id,
             2*(10**18),
             nonce
         ,transact_args={"from":eth_test_utils.accounts[1]})
