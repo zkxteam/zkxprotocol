@@ -409,4 +409,71 @@ describe("Multisig", function () {
     expect(await L1ZKXContract.assetContractAddress()).to.be.eq(L2_DUMMY_ADDRESS);
     expect(await L1ZKXContract.withdrawalRequestContractAddress()).to.be.eq(L2_DUMMY_ADDRESS);
   });
+
+  it("Withdraw ETH to Multisig", async function () {
+    // Add ETH as asset to L1ZKXContract
+    await prepareStarknetToAdd(ETH_ASSET);
+    const ADD_ETH_TX_ID = 1;
+    const addEthCall = [
+      L1ZKXContract.address,
+      "updateAssetListInL1(uint256,uint256)",
+      encode(["uint256", "uint256"], [ETH_ASSET.ticker, ETH_ASSET.collateralID]),
+      0
+    ];
+    await MultisigAdmin.proposeTx(ADD_ETH_TX_ID, [addEthCall], ONE_HOUR);
+    await (MultisigAdmin.connect(admin1).approve(ADD_ETH_TX_ID));
+    await (MultisigAdmin.connect(admin2).approve(ADD_ETH_TX_ID));
+    await (MultisigAdmin.connect(admin4).approve(ADD_ETH_TX_ID));
+    await increaseTime(ONE_HOUR);
+    await MultisigAdmin.executeTx(ADD_ETH_TX_ID);
+
+    // Deposit 1 ETH to L1ZKXContract
+    await L1ZKXContract.connect(bob).depositEthToL1(BOB_L2_ADDRESS, { value: ONE_ETH });
+
+    const withdrawfromZKXCall = [
+      L1ZKXContract.address,
+      "transferEth(address,uint256)",
+      encode(["address", "uint256"], [MultisigAdmin.address, ONE_ETH]),
+      0
+    ];
+    const WITHDRAW_ZKX_TX_ID = 2;
+    await MultisigAdmin.proposeTx(WITHDRAW_ZKX_TX_ID, [withdrawfromZKXCall], ONE_DAY);
+    await increaseTime(ONE_DAY);
+
+    // Approve by admins
+    await (MultisigAdmin.connect(admin1).approve(WITHDRAW_ZKX_TX_ID));
+    await (MultisigAdmin.connect(admin2).approve(WITHDRAW_ZKX_TX_ID));
+    await (MultisigAdmin.connect(admin3).approve(WITHDRAW_ZKX_TX_ID));
+
+    await increaseTime(ONE_DAY);
+    await MultisigAdmin.executeTx(WITHDRAW_ZKX_TX_ID);
+    expect(await ethers.provider.getBalance(MultisigAdmin.address)).to.be.eq(ONE_ETH);
+
+    // Withdraw funds from Multisig to some other address
+    const withdrawFromMultisigCall = [
+      MultisigAdmin.address,
+      "withdraw(address,uint256)",
+      encode(["address", "uint256"], [admin4.address, ONE_ETH]),
+      0
+    ];
+    const WITHDRAW_MULTISIG_TX_ID = 3;
+    await MultisigAdmin.proposeTx(WITHDRAW_MULTISIG_TX_ID, [withdrawFromMultisigCall], ONE_DAY);
+    await increaseTime(ONE_DAY);
+
+    // Approve by admins
+    await (MultisigAdmin.connect(admin1).approve(WITHDRAW_MULTISIG_TX_ID));
+    await (MultisigAdmin.connect(admin2).approve(WITHDRAW_MULTISIG_TX_ID));
+    await (MultisigAdmin.connect(admin3).approve(WITHDRAW_MULTISIG_TX_ID));
+    
+    await increaseTime(ONE_DAY);
+    const adminBalanceBefore = await ethers.provider.getBalance(admin4.address);
+    await MultisigAdmin.executeTx(WITHDRAW_MULTISIG_TX_ID);
+
+    // Check results
+    expect(await ethers.provider.getBalance(MultisigAdmin.address)).to.be.eq(0);
+    const adminBalanceAfter = await ethers.provider.getBalance(admin4.address);
+    expect(adminBalanceAfter).to.be.eq(
+      adminBalanceBefore.add(ONE_ETH)
+    );
+  });
 });
