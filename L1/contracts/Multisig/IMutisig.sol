@@ -66,7 +66,7 @@ interface IMultisig {
 
     ///////////
     // Write //
-    ///////////s
+    ///////////
 
 	/// @notice Funds contract with ether
     receive() external payable;
