@@ -103,9 +103,13 @@ contract MultisigAdmin is IMultisig {
     // Write //
     ///////////
 
-	function fund() external payable {
+	receive() external payable {
 		/* Does nothing, just receives ether */
 	}
+
+	function withdraw(address recipient, uint256 amount) external payable {
+        payable(recipient).transfer(amount);
+    }
 
     function proposeTx(uint256 id, Call[] calldata calls, uint256 delay)
         external
