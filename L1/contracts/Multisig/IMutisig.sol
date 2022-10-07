@@ -69,7 +69,12 @@ interface IMultisig {
     ///////////s
 
 	/// @notice Funds contract with ether
-	function fund() external payable;
+    receive() external payable;
+
+    /// @notice Withdraws ether from contract
+    /// @param recipient - address of recipient
+	/// @param amount - amount of ether to withdraw
+	function withdraw(address recipient, uint256 amount) external payable;
 
 	/// @notice Propose tx for confirmation and execution
 	/// @param id - id of proposed tx, must be unique
