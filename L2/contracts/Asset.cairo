@@ -332,7 +332,6 @@ func modify_core_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     );
 
     // Validate and save updated asset
-    validate_asset_properties(updated_asset);
     asset_by_id.write(id_, updated_asset);
 
     // Emit event
