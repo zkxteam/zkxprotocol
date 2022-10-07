@@ -18,12 +18,10 @@ const L2_DUMMY_ADDRESS =
   "0x075c53354a129c84512a2419241a884b0b0cf28ac04c84b3a8152ad1257accab";
 
 const ETH_ASSET = {
-  ticker: 4543560,
-  collateralID: 2012314141,
+  assetId: 4543560
 };
 const ZKX_ASSET = {
-  ticker: 1431520323,
-  collateralID: 90986567876,
+  assetId: 90986567876,
   contractAddress: "0x3333333333333333333333333333333333333333"
 };
 const ONE_HOUR = 60 * 60;
@@ -94,7 +92,7 @@ async function prepareStarknetToAdd(
   starknetMock = starknetCoreMock,
   assetAddress = L2_ASSET_ADDRESS
 ) {
-  const payload = [INDEX.ADD_ASSET, asset.ticker, asset.collateralID];
+  const payload = [INDEX.ADD_ASSET, asset.assetId];
   await starknetMock.addL2ToL1Message(
     assetAddress,
     zkxContract.address,
@@ -108,22 +106,12 @@ async function prepareStarknetToRemove(
   starknetMock = starknetCoreMock,
   assetAddress = L2_ASSET_ADDRESS
 ) {
-  const payload = [INDEX.REMOVE_ASSET, asset.ticker, asset.collateralID];
+  const payload = [INDEX.REMOVE_ASSET, asset.assetId];
   await starknetMock.addL2ToL1Message(
     assetAddress,
     zkxContract.address,
     payload
   );
-}
-
-async function addAsset(
-  asset,
-  zkxContract = L1ZKXContract,
-  starknetMock = starknetCoreMock,
-  assetAddress = L2_ASSET_ADDRESS
-) {
-  await prepareStarknetToAdd(asset, zkxContract, starknetMock, assetAddress);
-  await zkxContract.updateAssetListInL1(asset.ticker, asset.collateralID);
 }
 
 async function increaseTime(time) {
@@ -139,7 +127,7 @@ async function verifyAssetList(expectedAssets) {
   const assetsInContract = await L1ZKXContract.getAssetList();
   expect(assetsInContract.length).to.be.eq(expectedAssets.length);
   for (let i = 0; i < expectedAssets.length; i++) {
-    expect(assetsInContract[i]).to.be.eq(expectedAssets[i].ticker);
+    expect(assetsInContract[i]).to.be.eq(expectedAssets[i].assetId);
   }
 }
 
@@ -213,10 +201,11 @@ describe("Multisig", function () {
     const ADD_ZKX_TX_ID = 42;
     const addTokenCall = [
       L1ZKXContract.address,
-      "updateAssetListInL1(uint256,uint256)",
-      encode(["uint256", "uint256"], [ZKX_ASSET.ticker, ZKX_ASSET.collateralID]),
+      "updateAssetListInL1(uint256)",
+      encode(["uint256"], [ZKX_ASSET.assetId]),
       0
     ];
+    
     await MultisigAdmin.proposeTx(ADD_ZKX_TX_ID, [addTokenCall], ONE_HOUR);
     await (MultisigAdmin.connect(admin3).approve(ADD_ZKX_TX_ID));
     await (MultisigAdmin.connect(admin4).approve(ADD_ZKX_TX_ID));
@@ -229,14 +218,13 @@ describe("Multisig", function () {
     await MultisigAdmin.executeTx(ADD_ZKX_TX_ID);
 
     await verifyAssetList([ZKX_ASSET]);
-    expect(await L1ZKXContract.assetID(ZKX_ASSET.ticker)).to.be.eq(ZKX_ASSET.collateralID);
 
     // Set ZKX token contract address
     const SET_ZKX_TX_ID = 44;
     const setZkxContractCall = [
       L1ZKXContract.address,
       "setTokenContractAddress(uint256,address)",
-      encode(["uint256", "address"], [ZKX_ASSET.ticker, ZKX_ASSET.contractAddress]),
+      encode(["uint256", "address"], [ZKX_ASSET.assetId, ZKX_ASSET.contractAddress]),
       0
     ];
     await MultisigAdmin.proposeTx(SET_ZKX_TX_ID, [setZkxContractCall], ONE_HOUR);
@@ -248,17 +236,17 @@ describe("Multisig", function () {
     await increaseTime(ONE_HOUR);
     expect(await MultisigAdmin.canBeExecuted(SET_ZKX_TX_ID, 0)).to.be.eq(true);
 
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(ZERO_ADDRESS);
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(ZERO_ADDRESS);
     await MultisigAdmin.executeTx(SET_ZKX_TX_ID);
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(ZKX_ASSET.contractAddress);
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(ZKX_ASSET.contractAddress);
 
     // Add ETH as asset
     await prepareStarknetToAdd(ETH_ASSET);
     const ADD_ETH_TX_ID = 55;
     const addEthCall = [
       L1ZKXContract.address,
-      "updateAssetListInL1(uint256,uint256)",
-      encode(["uint256", "uint256"], [ETH_ASSET.ticker, ETH_ASSET.collateralID]),
+      "updateAssetListInL1(uint256)",
+      encode(["uint256"], [ETH_ASSET.assetId]),
       0
     ];
     await MultisigAdmin.proposeTx(ADD_ETH_TX_ID, [addEthCall], ONE_HOUR);
@@ -274,15 +262,14 @@ describe("Multisig", function () {
     await MultisigAdmin.executeTx(ADD_ETH_TX_ID);
 
     await verifyAssetList([ZKX_ASSET, ETH_ASSET]);
-    expect(await L1ZKXContract.assetID(ETH_ASSET.ticker)).to.be.eq(ETH_ASSET.collateralID);
 
     // Remove ZKX token asset
     await prepareStarknetToRemove(ZKX_ASSET);
     const REMOVE_ZKX_TX_ID = 88;
     const removeTokenCall = [
       L1ZKXContract.address,
-      "removeAssetFromList(uint256,uint256)",
-      encode(["uint256", "uint256"], [ZKX_ASSET.ticker, ZKX_ASSET.collateralID]),
+      "removeAssetFromList(uint256)",
+      encode(["uint256"], [ZKX_ASSET.assetId]),
       0
     ];
     await MultisigAdmin.proposeTx(REMOVE_ZKX_TX_ID, [removeTokenCall], ONE_DAY);
@@ -300,8 +287,6 @@ describe("Multisig", function () {
     await MultisigAdmin.executeTx(REMOVE_ZKX_TX_ID);
 
     await verifyAssetList([ETH_ASSET]);
-    expect(await L1ZKXContract.assetID(ZKX_ASSET.ticker)).to.be.eq(0);
-    expect(await L1ZKXContract.assetID(ETH_ASSET.ticker)).to.be.eq(ETH_ASSET.collateralID);
   });
 
   it("Atomicly add ZKX token and set its contract address", async function () {
@@ -309,14 +294,14 @@ describe("Multisig", function () {
     const ADD_ZKX_TX_ID = 42;
     const addTokenCall = [
       L1ZKXContract.address,
-      "updateAssetListInL1(uint256,uint256)",
-      encode(["uint256", "uint256"], [ZKX_ASSET.ticker, ZKX_ASSET.collateralID]),
+      "updateAssetListInL1(uint256)",
+      encode(["uint256"], [ZKX_ASSET.assetId]),
       0
     ];
     const setZkxContractCall = [
       L1ZKXContract.address,
       "setTokenContractAddress(uint256,address)",
-      encode(["uint256", "address"], [ZKX_ASSET.ticker, ZKX_ASSET.contractAddress]),
+      encode(["uint256", "address"], [ZKX_ASSET.assetId, ZKX_ASSET.contractAddress]),
       0
     ];
     await MultisigAdmin.proposeTx(ADD_ZKX_TX_ID, [addTokenCall, setZkxContractCall], ONE_HOUR);
@@ -332,8 +317,7 @@ describe("Multisig", function () {
     await MultisigAdmin.executeTx(ADD_ZKX_TX_ID);
 
     await verifyAssetList([ZKX_ASSET]);
-    expect(await L1ZKXContract.assetID(ZKX_ASSET.ticker)).to.be.eq(ZKX_ASSET.collateralID);
-    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.ticker)).to.be.eq(ZKX_ASSET.contractAddress);
+    expect(await L1ZKXContract.tokenContractAddress(ZKX_ASSET.assetId)).to.be.eq(ZKX_ASSET.contractAddress);
   });
 
   it("Change asset contract address", async function () {
