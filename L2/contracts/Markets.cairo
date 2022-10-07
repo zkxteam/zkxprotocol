@@ -13,7 +13,7 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_ONE
+from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61, Math64x61_ONE
 
 ///////////////
 // Constants //
@@ -41,14 +41,19 @@ func market_removed(market_id: felt) {
 func market_leverage_modified(market_id: felt, leverage: felt) {
 }
 
-// Event emitted whenever a market's tradable parameter is modified
+// Event emitted whenever a market's is_tradable parameter is modified
 @event
-func market_tradable_modified(market_id: felt, tradable: felt) {
+func market_tradable_modified(market_id: felt, is_tradable: felt) {
 }
 
 // Event emitted whenever a market's archived parameter is modified
 @event
-func market_archived_state_modified(market_id: felt, archived: felt) {
+func market_archived_state_modified(market_id: felt, is_archived: felt) {
+}
+
+// Event emitted whenever a market's trade settings are modified
+@event
+func market_trade_settings_updated(market_id: felt, market: Market) {
 }
 
 /////////////
@@ -102,7 +107,7 @@ func market_mapping(asset_id: felt, collateral_id: felt) -> (res: felt) {
 
 // Bool indicating if ticker-pair already exists
 @storage_var
-func market_pair_exists(asset: felt, assetCollateral: felt) -> (res: felt) {
+func market_pair_exists(asset: felt, asset_collateral: felt) -> (res: felt) {
 }
 
 /////////////////
@@ -151,17 +156,6 @@ func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     return (currMarket,);
 }
 
-// @notice Gets a maintenance margin for a market
-// @param market_id_ - Market ID
-// @return maintenance_margin - Returns a maintenance margin of the market
-@view
-func get_maintenance_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt
-) -> (maintenance_margin: felt) {
-    let (currMarket) = market_by_id.read(market_id_);
-    return (currMarket.maintenance_margin_fraction,);
-}
-
 // @notice Gets market ID for associated Asset and Collateral IDs
 // @param asset_id_ - Asset ID
 // @param collateral_id_ - Collateral ID
@@ -184,6 +178,17 @@ func get_asset_collateral_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuil
 ) -> (asset_id: felt, collateral_id: felt) {
     let (currMarket) = market_by_id.read(market_id_);
     return (currMarket.asset, currMarket.asset_collateral);
+}
+
+// @notice Gets a maintenance margin for a market
+// @param market_id_ - Market ID
+// @return maintenance_margin - Returns a maintenance margin of the market
+@view
+func get_maintenance_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (maintenance_margin: felt) {
+    let (currMarket) = market_by_id.read(market_id_);
+    return (currMarket.maintenance_margin_fraction,);
 }
 
 // @notice Gets a ttl value of the market
@@ -279,14 +284,13 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     market_by_id.write(
         market_id=new_market_.id,
         value=Market(
-            market_id=new_market_.id,
-            value=Market(id=new_market_.id,
+            id=new_market_.id,
             asset=new_market_.asset, 
             asset_collateral=new_market_.asset_collateral, 
             leverage=new_market_.leverage, 
             is_tradable=new_tradable, 
             is_archived=new_market_.is_archived, 
-            ttl=new_market_.ttl, 
+            ttl=new_market_.ttl,
             tick_size=new_market_.tick_size,
             step_size=new_market_.step_size,
             minimum_order_size=new_market_.minimum_order_size,
@@ -309,13 +313,13 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     markets_array_len.write(curr_len + 1);
     market_mapping.write(
         asset_id=new_market_.asset, 
-        collateral_id=new_market_.assetCollateral, 
+        collateral_id=new_market_.asset_collateral, 
         value=new_market_.id
     );
 
     // Update id & market pair existence
     market_id_exists.write(new_market_.id, TRUE);
-    market_pair_exists.write(new_market_.asset, new_market_.assetCollateral, TRUE);
+    market_pair_exists.write(new_market_.asset, new_market_.asset_collateral, TRUE);
 
     // Emit event
     market_added.emit(market_id=new_market_.id, market=new_market_);
@@ -356,9 +360,9 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
     // Mark id & ticker as non-existing
     market_id_exists.write(market_id_, FALSE);
-    market_pair_exists.write(market_to_remove.asset, market_to_remove.assetCollateral, FALSE);
+    market_pair_exists.write(market_to_remove.asset, market_to_remove.asset_collateral, FALSE);
     market_mapping.write(
-        asset_id=market_to_remove.asset, collateral_id=market_to_remove.assetCollateral, value=0
+        asset_id=market_to_remove.asset, collateral_id=market_to_remove.asset_collateral, value=0
     );
 
     // Delete market struct
@@ -408,7 +412,8 @@ func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     market_by_id.write(
         market_id=market_id_,
-        value=Market(id=market.id,
+        value=Market(
+            id=market.id,
             asset=market.asset, 
             asset_collateral=market.asset_collateral, 
             leverage=leverage_, 
@@ -460,28 +465,30 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     if (is_tradable_ == 2) {
         market_by_id.write(
             market_id=market_id_,
-            value=Market(id=market.id,
-            asset=market.asset, 
-            asset_collateral=market.asset_collateral, 
-            leverage=market.leverage, 
-            is_tradable=asset1.tradable, 
-            is_archived=market.is_archived, 
-            ttl=market.ttl,
-            tick_size=market.tick_size,
-            step_size=market.step_size,
-            minimum_order_size=market.minimum_order_size,
-            minimum_leverage=market.minimum_leverage,
-            maximum_leverage=market.maximum_leverage,
-            currently_allowed_leverage=market.currently_allowed_leverage,
-            maintenance_margin_fraction=market.maintenance_margin_fraction,
-            initial_margin_fraction=market.initial_margin_fraction,
-            incremental_initial_margin_fraction=market.incremental_initial_margin_fraction,
-            incremental_position_size=market.incremental_position_size,
-            baseline_position_size=market.baseline_position_size,
-            maximum_position_size=market.maximum_position_size),
+            value=Market(
+                id=market.id,
+                asset=market.asset, 
+                asset_collateral=market.asset_collateral, 
+                leverage=market.leverage, 
+                is_tradable=asset1.is_tradable, 
+                is_archived=market.is_archived, 
+                ttl=market.ttl,
+                tick_size=market.tick_size,
+                step_size=market.step_size,
+                minimum_order_size=market.minimum_order_size,
+                minimum_leverage=market.minimum_leverage,
+                maximum_leverage=market.maximum_leverage,
+                currently_allowed_leverage=market.currently_allowed_leverage,
+                maintenance_margin_fraction=market.maintenance_margin_fraction,
+                initial_margin_fraction=market.initial_margin_fraction,
+                incremental_initial_margin_fraction=market.incremental_initial_margin_fraction,
+                incremental_position_size=market.incremental_position_size,
+                baseline_position_size=market.baseline_position_size,
+                maximum_position_size=market.maximum_position_size
+            ),
         );
 
-        market_tradable_modified.emit(market_id=market_id_, is_tradable=asset1.tradable);
+        market_tradable_modified.emit(market_id=market_id_, is_tradable=asset1.is_tradable);
         return ();
     } else {
         if (is_tradable_ == 1) {
@@ -590,7 +597,7 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     incremental_initial_margin_fraction_: felt,
     incremental_position_size_: felt,
     baseline_position_size_: felt,
-    maximum_position_size_: felt,
+    maximum_position_size_: felt
 ) {
     alloc_locals;
 
@@ -598,75 +605,6 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     verify_market_id_exists(market_id_, should_exist_=TRUE);
 
     let (market: Market) = market_by_id.read(market_id_);
-    local updated_market: Market = Market(
-        id=market.id,
-        asset=market.asset, 
-        asset_collateral=market.asset_collateral, 
-        leverage=market.leverage, 
-        is_tradable=market.is_tradable, 
-        is_archived=market.is_archived, 
-        ttl=market.ttl,
-        tick_size=tick_size_,
-        step_size=step_size_,
-        minimum_order_size=minimum_order_size_,
-        minimum_leverage=minimum_leverage_,
-        maximum_leverage=maximum_leverage_,
-        currently_allowed_leverage=currently_allowed_leverage_,
-        maintenance_margin_fraction=maintenance_margin_fraction_,
-        initial_margin_fraction=initial_margin_fraction_,
-        incremental_initial_margin_fraction=incremental_initial_margin_fraction_,
-        incremental_position_size=incremental_position_size_,
-        baseline_position_size=baseline_position_size_,
-        maximum_position_size=maximum_position_size_
-    );
-
-    // Validate and save updated market
-    validate_market_trading_settings(updated_market);
-    market_by_id.write(market_id_, updated_market);
-
-    // Emit event
-    market_trade_settings_updated.emit(market_id=market_id_, market=market);
-
-    return ();
-}
-
-// @notice Modify trade settings of market 
-// @param market_id_ - 
-// @param tick_size_ - new tradable flag value for the market
-// @param step_size_ - new collateral flag value for the market
-// @param minimum_order_size_ - new minimum_order_size value for the market
-// @param minimum_leverage_ - new minimum_leverage value for the market
-// @param maximum_leverage_ - new maximum_leverage value for the market
-// @param currently_allowed_leverage_ - new currently_allowed_leverage value for the market
-// @param maintenance_margin_fraction_ - new maintenance_margin_fraction value for the market
-// @param initial_margin_fraction_ - new initial_margin_fraction value for the market
-// @param incremental_initial_margin_fraction_ - new incremental_initial_margin_fraction value for the market
-// @param incremental_position_size_ - new incremental_position_size value for the market
-// @param baseline_position_size_ - new baseline_position_size value for the market
-// @param maximum_position_size_ - new maximum_position_size value for the market
-@external
-func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt,
-    tick_size_: felt,
-    step_size_: felt,
-    minimum_order_size_: felt,
-    minimum_leverage_: felt,
-    maximum_leverage_: felt,
-    currently_allowed_leverage_: felt,
-    maintenance_margin_fraction_: felt,
-    initial_margin_fraction_: felt,
-    incremental_initial_margin_fraction_: felt,
-    incremental_position_size_: felt,
-    baseline_position_size_: felt,
-    maximum_position_size_: felt,
-) {
-    alloc_locals;
-
-    verify_market_manager_authority();
-    verify_market_id_exists(market_id_, should_exist_=TRUE);
-
-    let (market: Market) = market_by_id.read(market_id=market_id_);
-
     local updated_market: Market = Market(
         id=market.id,
         asset=market.asset, 
@@ -933,7 +871,7 @@ func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     );
     let (asset2: Asset) = IAsset.get_asset(
         contract_address=asset_address, 
-        id=market.assetCollateral
+        id=market.asset_collateral
     );
 
     // Verify assets exist and validate collateral's status

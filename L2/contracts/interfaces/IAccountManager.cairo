@@ -1,11 +1,13 @@
 %lang starknet
 
 from contracts.DataTypes import (
-    OrderRequest,
-    OrderDetails,
-    Signature,
-    OrderDetailsWithIDs,
     CollateralBalance,
+    LiquidatablePosition,
+    NetPositions,
+    OrderRequest,
+    PositionDetails,
+    PositionDetailsWithMarket,
+    Signature,
 )
 
 @contract_interface
@@ -17,6 +19,7 @@ namespace IAccountManager {
         execution_price: felt,
         margin_amount: felt,
         borrowed_amount: felt,
+        market_id: felt,
     ) -> (res: felt) {
     }
 
@@ -26,7 +29,7 @@ namespace IAccountManager {
     func transfer_from(assetID_: felt, amount: felt) -> () {
     }
 
-    func get_order_data(order_ID: felt) -> (res: OrderDetails) {
+    func get_position_data(market_id_: felt, direction_: felt) -> (res: PositionDetails) {
     }
 
     func transfer(assetID_: felt, amount: felt) -> () {
@@ -35,16 +38,21 @@ namespace IAccountManager {
     func get_balance(assetID_: felt) -> (res: felt) {
     }
 
-    func return_array_positions() -> (array_list_len: felt, array_list: OrderDetailsWithIDs*) {
+    func get_positions() -> (array_list_len: felt, array_list: PositionDetailsWithMarket*) {
     }
 
-    func transfer_from_abr(orderID_: felt, assetID_: felt, marketID_: felt, amount: felt) {
+    func get_net_positions() -> (
+        net_positions_array_len: felt, net_positions_array: NetPositions*
+    ) {
     }
 
-    func transfer_abr(orderID_: felt, assetID_: felt, marketID_: felt, amount: felt) {
+    func transfer_from_abr(collateral_id_: felt, market_id_: felt, amount_: felt) {
     }
 
-    func timestamp_check(orderID_: felt) -> (is_eight_hours: felt) {
+    func transfer_abr(collateral_id_: felt, market_id_: felt, amount_: felt) {
+    }
+
+    func timestamp_check(market_id_: felt) -> (is_eight_hours: felt) {
     }
 
     func get_public_key() -> (res: felt) {
@@ -53,6 +61,9 @@ namespace IAccountManager {
     func return_array_collaterals() -> (array_list_len: felt, array_list: CollateralBalance*) {
     }
 
-    func liquidate_position(id: felt, amount: felt) -> () {
+    func liquidate_position(position_: PositionDetailsWithMarket, amount_to_be_sold_: felt) {
+    }
+
+    func get_deleveragable_or_liquidatable_position() -> (position: LiquidatablePosition) {
     }
 }

@@ -14,14 +14,14 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
-//############
-// Constants #
-//############
+///////////////
+// Constants //
+///////////////
 const MESSAGE_WITHDRAW = 3;
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted whenever add_withdrawal_request() is called
 @event
@@ -35,18 +35,18 @@ func add_withdrawal_request_called(
 func update_withdrawal_request_called(from_address: felt, user_l2_address: felt, request_id: felt) {
 }
 
-//##########
-// Storage #
-//##########
+/////////////
+// Storage //
+/////////////
 
 // Maps request id to withdrawal request
 @storage_var
 func withdrawal_request_mapping(request_id: felt) -> (res: WithdrawalRequest) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -59,9 +59,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+//////////
+// View //
+//////////
 
 // @notice Function to get withdrawal request corresponding to the request ID
 // @param request_id_ ID of the withdrawal Request
@@ -74,9 +74,9 @@ func get_withdrawal_request_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     return (withdrawal_request=res);
 }
 
-//#############
-// L1 Handler #
-//#############
+////////////////
+// L1 Handler //
+////////////////
 
 // @notice Function to handle status updates on withdrawal requests
 // @param from_address - The address from where update withdrawal request function is called from
@@ -123,9 +123,9 @@ func update_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+//////////////
+// External //
+//////////////
 
 // @notice function to add withdrawal request to the withdrawal request array
 // @param request_id_ ID of the withdrawal Request

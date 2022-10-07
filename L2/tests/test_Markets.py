@@ -142,7 +142,7 @@ async def test_add_new_market(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == to64x61(10)
 
     markets = await market.get_all_markets().call()
@@ -150,7 +150,7 @@ async def test_add_new_market(adminAuth_factory):
 
     assert parsed_list.id == str_to_felt("32f0406jz7qk1")
     assert parsed_list.asset == str_to_felt("32f0406jz7qj8")
-    assert parsed_list.assetCollateral == str_to_felt("32f0406jz7qj7")
+    assert parsed_list.asset_collateral == str_to_felt("32f0406jz7qj7")
     assert parsed_list.leverage == to64x61(10)
 
 @pytest.mark.asyncio
@@ -179,7 +179,7 @@ async def test_add_new_market_non_tradable(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj6")
-    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == to64x61(8)
     assert fetched_market.tradable == 1
 
@@ -194,7 +194,7 @@ async def test_add_new_market_default_tradable(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj11")
-    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == to64x61(1)
     assert fetched_market.tradable == 2
 
@@ -209,7 +209,7 @@ async def test_modify_leverage(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == to64x61(5)
 
 
@@ -230,7 +230,7 @@ async def test_modify_tradable(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj7")
+    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == to64x61(5)
     assert fetched_market.tradable == 0
 
@@ -253,7 +253,7 @@ async def test_modify_tradable_0_to_1(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj10")
+    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj10")
     assert fetched_market.leverage == to64x61(6)
     assert fetched_market.tradable == 1
 
@@ -285,7 +285,7 @@ async def test_remove_market(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == 0
-    assert fetched_market.assetCollateral == 0
+    assert fetched_market.asset_collateral == 0
     assert fetched_market.leverage == 0
 
 @pytest.mark.asyncio
@@ -340,7 +340,7 @@ async def test_modify_archived_state(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.assetCollateral == str_to_felt("32f0406jz7qj10")
+    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj10")
     assert fetched_market.leverage == to64x61(6)
     assert fetched_market.tradable == 1
     assert fetched_market.archived == 1
