@@ -30,24 +30,21 @@ namespace IMarkets {
     // View functions //
     ////////////////////
 
-    func get_collateral_from_market(market_id_: felt) -> (collateral_id: felt) {
+    func get_collateral_from_market(market_id: felt) -> (collateral_id: felt) {
     }
 
-    func get_asset_collateral_from_market(market_id_: felt) -> (
+    func get_asset_collateral_from_market(market_id: felt) -> (
         asset_id: felt, collateral_id: felt
     ) {
     }
 
-    func get_ttl_from_market(market_id_: felt) -> (ttl: felt) {
+    func get_ttl_from_market(market_id: felt) -> (ttl: felt) {
     }
 
-    func get_market(market_id_: felt) -> (currMarket: Market) {
+    func get_market(id: felt) -> (currMarket: Market) {
     }
 
-    func get_maintenance_margin(market_id_: felt) -> (maintenance_margin: felt) {
-    }
-
-    func get_market_id_from_assets(asset_id_: felt, collateral_id_: felt) -> (market_id: felt) {
+    func get_market_from_assets(asset_id: felt, collateral_id: felt) -> (market_id: felt) {
     }
 
     func get_all_markets() -> (array_list_len: felt, array_list: Market*) {
