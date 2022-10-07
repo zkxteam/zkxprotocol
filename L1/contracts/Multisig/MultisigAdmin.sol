@@ -108,7 +108,9 @@ contract MultisigAdmin is IMultisig {
 	}
 
 	function withdraw(address recipient, uint256 amount) external payable {
-        payable(recipient).transfer(amount);
+        require(msg.sender == address(this), "Withdraw must be approved, so can be called only from itself");
+        (bool isSuccess,) = recipient.call{value: amount}("");
+        require(isSuccess, "ETH transfer failed");
     }
 
     function proposeTx(uint256 id, Call[] calldata calls, uint256 delay)

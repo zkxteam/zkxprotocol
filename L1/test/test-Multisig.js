@@ -430,14 +430,14 @@ describe("Multisig", function () {
     // Deposit 1 ETH to L1ZKXContract
     await L1ZKXContract.connect(bob).depositEthToL1(BOB_L2_ADDRESS, { value: ONE_ETH });
 
-    const withdrawfromZKXCall = [
+    const withdrawFromZKXCall = [
       L1ZKXContract.address,
       "transferEth(address,uint256)",
       encode(["address", "uint256"], [MultisigAdmin.address, ONE_ETH]),
       0
     ];
     const WITHDRAW_ZKX_TX_ID = 2;
-    await MultisigAdmin.proposeTx(WITHDRAW_ZKX_TX_ID, [withdrawfromZKXCall], ONE_DAY);
+    await MultisigAdmin.proposeTx(WITHDRAW_ZKX_TX_ID, [withdrawFromZKXCall], ONE_DAY);
     await increaseTime(ONE_DAY);
 
     // Approve by admins

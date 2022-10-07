@@ -230,7 +230,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     ) external nonReentrant {
         require(
             assetsByTicker[ETH_TICKER].exists,
-            "Deposit failed: ETH not registered as asset"
+            "Withdraw failed: ETH not registered as asset"
         );
 
         // Consume call will revert if no matching message exists
@@ -254,8 +254,9 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             UPDATE_WITHDRAWAL_REQUEST_SELECTOR,
             updateWithdrawalRequestPayload
         );
-
-        payable(userL1Address_).transfer(amount_);
+        
+        (bool isSuccess,) = userL1Address_.call{value: amount_}("");
+        require(isSuccess, "Withdrawal failed: ETH Transfer failed");
 
         emit LogWithdrawal(
             userL1Address_,
@@ -399,7 +400,8 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         );
 
         if (ticker_ == ETH_TICKER) {
-            payable(msg.sender).transfer(amount_);
+            (bool isSuccess,) = msg.sender.call{value: amount_}("");
+            require(isSuccess, "Deposit reclaim failed: ETH Transfer failed");
         } else {
             IERC20(asset.tokenAddress).safeTransfer(msg.sender, amount_);
         }
@@ -567,7 +569,8 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             "ETH Transfer failed: recipient address is zero"
         );
         require(amount_ >= 0, "ETH Transfer failed: amount is zero");
-        recipient_.transfer(amount_);
+        (bool isSuccess,) = recipient_.call{value: amount_}("");
+        require(isSuccess, "ETH Transfer failed");
 
         emit LogAdminTransferEth(recipient_, amount_);
     }
