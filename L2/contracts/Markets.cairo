@@ -174,17 +174,6 @@ func get_market_id_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return (market_id,);
 }
 
-// @notice Gets collateral asset by market ID
-// @param market_id_ - Market ID
-// @returns collateral_id - Collateral ID of the market
-@view
-func get_collateral_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt
-) -> (collateral_id: felt) {
-    let (currMarket) = market_by_id.read(market_id_);
-    return (currMarket.asset_collateral,);
-}
-
 // @notice Gets asset-collateral pair IDs by market ID
 // @param market_id_ - Market ID
 // @returns asset_id - Asset ID of the market
