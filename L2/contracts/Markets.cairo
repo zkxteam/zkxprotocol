@@ -126,16 +126,16 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // View //
 //////////
 
-// @notice Gets a list of all markets
-// @returns array_list_len - Length of the markets list
-// @returns array_list - Fully populated list of markets
+// @notice View function to return all the markets with ids in an array
+// @returns array_list_len - Length of the array_list
+// @returns array_list - Fully populated list of Markets
 @view
 func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    array_list_len: felt, array_list: MarketWID*
+    array_list_len: felt, array_list: Market*
 ) {
     alloc_locals;
 
-    let (array_list: MarketWID*) = alloc();
+    let (array_list: Market*) = alloc();
     let (array_list_len) = markets_array_len.read();
     return populate_markets(iterator=0, array_list_len=array_list_len, array_list=array_list);
 }
@@ -208,18 +208,18 @@ func get_ttl_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     return (currMarket.ttl,);
 }
 
-// @notice Gets all markets with matching tradable and archived state with IDs in a list
-// @param is_tradable_ - tradable flag
-// @param is_archived_ - archived flag
+// @notice View function to return markets by their state with ids in an array
+// @param tradable_ - tradable flag
+// @param archived_ - archived flag
 // @returns array_list_len - Length of the array_list
-// @returns array_list - Fully populated list of MarketWID
+// @returns array_list - Fully populated list of Market
 @view
 func get_all_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     is_tradable_: felt, is_archived_: felt
 ) -> (array_list_len: felt, array_list: Market*) {
     alloc_locals;
 
-    let (array_list: MarketWID*) = alloc();
+    let (array_list: Market*) = alloc();
     let (array_list_len) = markets_array_len.read();
     return populate_markets_by_state(
         iterator=0,
