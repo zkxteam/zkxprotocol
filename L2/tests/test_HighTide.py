@@ -4,6 +4,8 @@ import time
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
+from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
+from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61, PRIME, assert_event_emitted
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
@@ -22,6 +24,16 @@ async def adminAuth_factory(starknet_service: StarknetService):
     admin1 = await account_factory.deploy_account(signer1.public_key)
     admin2 = await account_factory.deploy_account(signer2.public_key)
     user1 = await account_factory.deploy_account(signer3.public_key)
+
+    timestamp = int(time.time())
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
     
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
@@ -32,18 +44,18 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 8, 1])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
 
-    return adminAuth, hightide, admin1, admin2, user1
+    return adminAuth, hightide, admin1, admin2, user1, timestamp
 
 @pytest.mark.asyncio
 async def test_set_multipliers_unauthorized_user(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'set_multipliers', [
         1, 2, 3, 4]))
 
 @pytest.mark.asyncio
 async def test_set_multipliers_authorized_admin(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     set_multipliers_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'set_multipliers', [
         1, 2, 3, 4])
@@ -67,14 +79,14 @@ async def test_set_multipliers_authorized_admin(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_set_constants_unauthorized_user(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'set_constants', [
         1, 2, 3, 4, 5]))
 
 @pytest.mark.asyncio
 async def test_set_constants_authorized_admin(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     set_constants_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'set_constants', [
         1, 2, 3, 4, 5])
@@ -99,19 +111,17 @@ async def test_set_constants_authorized_admin(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setup_trading_season_unauthorized_user(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    timestamp = int(time.time())
     await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'setup_trade_season', [
-        str_to_felt("100"), timestamp, to64x61(30)]))
+        timestamp, to64x61(30)]))
 
 @pytest.mark.asyncio
 async def test_setup_trading_season_authorized_admin(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    timestamp = int(time.time())
     trade_season_setup_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
-        str_to_felt("100"), timestamp, to64x61(30)])
+        timestamp, to64x61(30)])
     
     assert_event_emitted(
         trade_season_setup_tx,
@@ -124,7 +134,7 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
         ]
     )
 
-    execution_info = await hightide.get_season(str_to_felt("100")).call()
+    execution_info = await hightide.get_season(1).call()
     fetched_trading_season = execution_info.result.trading_season
 
     assert fetched_trading_season.start_timestamp == timestamp
@@ -132,34 +142,34 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_start_trade_season_unauthorized_user(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'start_trade_season', [
-        str_to_felt("100")]))
+        1]))
 
 @pytest.mark.asyncio
 async def test_start_trade_season_authorized_admin(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     start_trade_season_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [
-        str_to_felt("100")])
+        1])
     
     assert_event_emitted(
         start_trade_season_tx,
         from_address=hightide.contract_address,
         name="trading_season_started",
         data=[
-            admin1.contract_address, str_to_felt("100")
+            admin1.contract_address, 1
         ]
     )
     
     execution_info = await hightide.get_current_season_id().call()
     fetched_season_id = execution_info.result.season_id
 
-    assert fetched_season_id == str_to_felt("100")
+    assert fetched_season_id == 1
 
 @pytest.mark.asyncio
 async def test_get_season_with_invalid_season_id(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1 = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    await assert_revert(hightide.get_season(str_to_felt("200")).call())
+    await assert_revert(hightide.get_season(2).call())
