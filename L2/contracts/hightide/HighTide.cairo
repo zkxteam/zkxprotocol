@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.bool import FALSE, TRUE
+from starkware.cairo.common.math import assert_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import ManageHighTide_ACTION, Trading_INDEX
@@ -47,11 +47,6 @@ func current_trading_season() -> (season_id: felt) {
 func trading_season_by_id(season_id: felt) -> (trading_season: TradingSeason) {
 }
 
-// Bool indicating if season id already exists
-@storage_var
-func season_id_exists(season_id: felt) -> (res: felt) {
-}
-
 // Stores multipliers used to calculate total reward to be split between traders
 @storage_var
 func multipliers_to_calculate_reward() -> (multipliers: Multipliers) {
@@ -60,6 +55,16 @@ func multipliers_to_calculate_reward() -> (multipliers: Multipliers) {
 // Stores constants used to calculate individual trader score
 @storage_var
 func constants_to_calculate_trader_score() -> (constants: Constants) {
+}
+
+// Length of seasons array
+@storage_var
+func seasons_array_len() -> (len: felt) {
+}
+
+// Array of season ids
+@storage_var
+func season_id_by_index(index: felt) -> (season_id: felt) {
 }
 
 //##############
@@ -98,7 +103,7 @@ func get_current_season_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 func get_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id: felt
 ) -> (trading_season: TradingSeason) {
-    verify_season_id_exists(season_id, TRUE);
+    verify_season_id_exists(season_id);
     let (trading_season) = trading_season_by_id.read(season_id=season_id);
     return (trading_season,);
 }
@@ -128,12 +133,11 @@ func get_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 //#####################
 
 // @notice - This function is used for setting up trade season
-// @param season_id - id of the season
 // @param start_timestamp - start timestamp of the season
 // @param num_trading_days - number of trading days
 @external
 func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt, start_timestamp: felt, num_trading_days: felt
+    start_timestamp: felt, num_trading_days: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -142,7 +146,11 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     with_attr error_message("Caller is not authorized to setup trade season") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    verify_season_id_exists(season_id, FALSE);
+
+    let (curr_len) = seasons_array_len.read();
+    let season_id = curr_len + 1;
+    season_id_by_index.write(curr_len, season_id);
+    seasons_array_len.write(curr_len + 1);
 
     // Create Trading season struct to store
     let trading_season: TradingSeason = TradingSeason(
@@ -150,7 +158,6 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     );
 
     trading_season_by_id.write(season_id, trading_season);
-    season_id_exists.write(season_id, TRUE);
 
     // Emit event
     let (caller) = get_caller_address();
@@ -171,7 +178,7 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     with_attr error_message("Caller is not authorized to start trade season") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    verify_season_id_exists(season_id, TRUE);
+    verify_season_id_exists(season_id);
 
     current_trading_season.write(season_id);
 
@@ -241,11 +248,11 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 //#####################
 
 func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt, should_exist: felt
+    season_id: felt
 ) {
     with_attr error_message("trading season id existence mismatch") {
-        let (id_exists) = season_id_exists.read(season_id);
-        assert id_exists = should_exist;
+        let (seasons_len) = seasons_array_len.read();
+        assert_le(season_id, seasons_len);
     }
     return ();
 }
