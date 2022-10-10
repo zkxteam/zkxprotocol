@@ -1,13 +1,14 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le
+from starkware.cairo.common.math import assert_le, assert_lt
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import ManageHighTide_ACTION, Trading_INDEX
 from contracts.DataTypes import Constants, Multipliers, TradingSeason
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.Math_64x61 import Math64x61_mul
 
 //#########
 // Events #
@@ -178,7 +179,7 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     with_attr error_message("Caller is not authorized to start trade season") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    verify_season_id_exists(season_id);
+    validate_season_to_start(season_id);
 
     current_trading_season.write(season_id);
 
@@ -253,6 +254,51 @@ func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     with_attr error_message("trading season id existence mismatch") {
         let (seasons_len) = seasons_array_len.read();
         assert_le(season_id, seasons_len);
+    }
+    return ();
+}
+
+func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id: felt
+) {
+    alloc_locals;
+
+    verify_season_id_exists(season_id);
+
+    // get current block timestamp
+    let (current_timestamp) = get_block_timestamp();
+
+    // calculates current trading seasons end timestamp
+    let (local current_season_id) = get_current_season_id();
+    let (current_season: TradingSeason) = get_season(current_season_id);
+    let (current_seasons_num_trading_days_in_secs) = Math64x61_mul(
+        current_season.num_trading_days, 24 * 60 * 60
+    );
+    let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
+
+    // calculates new trading seasons end timestamp
+    let (new_season: TradingSeason) = get_season(season_id);
+    let (new_seasons_num_trading_days_in_secs) = Math64x61_mul(
+        new_season.num_trading_days, 24 * 60 * 60
+    );
+    let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
+
+    if (current_season_id != 0) {
+        with_attr error_message("current trading season is still active") {
+            assert_le(current_seasons_end_timestamp, current_timestamp);
+        }
+    } else {
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    with_attr error_message(
+            "new trading seasons start timestamp should be less than or equal to the current timestamp") {
+        assert_le(new_season.start_timestamp, current_timestamp);
+    }
+
+    with_attr error_message(
+            "current timestamp should be less than new trading seasons end timestamp") {
+        assert_lt(current_timestamp, new_seasons_end_timestamp);
     }
     return ();
 }
