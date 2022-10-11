@@ -5,11 +5,12 @@ from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_a
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import unsigned_div_rem, assert_le, assert_in_range, assert_lt
 from starkware.cairo.common.math_cmp import is_nn, is_le
-from contracts.Constants import Hightide_INDEX, AccountRegistry_INDEX
-from contracts.DataTypes import VolumeMetaData, OrderVolume, TradingSeason
+
+from contracts.Constants import Hightide_INDEX, Trading_INDEX
+from contracts.DataTypes import VolumeMetaData, OrderVolume, TradingSeason, MultipleOrder
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IHighTide import IHighTide
+from contracts.interfaces.IHightide import IHightide
 from contracts.libraries.CommonLibrary import (
     CommonLib,
     get_contract_version,
@@ -43,7 +44,6 @@ func num_orders(volume_type: VolumeMetaData) -> (res: felt) {
 }
 
 // corresponding to a volume_type and index this storage var stores an actual volume data (size, price, timestamp of record)
-
 @storage_var
 func orders(volume_type: VolumeMetaData, index: felt) -> (res: OrderVolume) {
 }
@@ -140,13 +140,26 @@ func get_season_trade_frequency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
         registry_address, Hightide_INDEX, version
     );
-    let current_day = get_current_day(hightide_address, season_id_);
+
+    let (season: TradingSeason) = IHightide.get_season(hightide_address, season_id_);
+
+    // Get current day of the season based on the timestamp
+    let current_day = get_current_day(season.start_timestamp);
+
+    local number_of_days;
+    let within_season = is_le(current_day, season.num_trading_days - 1);
+
+    // If the season is over, return without setting the trading stats
+    if (within_season == 1) {
+        assert number_of_days = current_day + 1;
+    } else {
+        assert number_of_days = season.num_trading_days;
+    }
 
     let frequency_list: felt* = alloc();
-    local frequency_len = current_day + 1;
 
-    get_frequencies(season_id_, pair_id_, frequency_len, 0, frequency_list);
-    return (frequency_len, frequency_list);
+    get_frequencies(season_id_, pair_id_, number_of_days, 0, frequency_list);
+    return (number_of_days, frequency_list);
 }
 
 // @dev - this function returns the number of trades recorded for a particular day upto the timestamp of call
@@ -160,15 +173,14 @@ func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
         registry_address, Hightide_INDEX, version
     );
-    // Get current day of the season based on the timestamp
-    let current_day = get_current_day(hightide_address, season_id_);
+    let (season: TradingSeason) = IHightide.get_season(hightide_address, season_id_);
 
     with_attr error_message(
             "Day number should be less than current day number/total tradable days") {
-        assert_le(day_number_, current_day);
+        assert_lt(day_number_, season.num_trading_days);
     }
 
-    let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, current_day);
+    let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, day_number_);
     return (current_daily_count,);
 }
 
@@ -178,16 +190,30 @@ func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt
 ) -> (res: felt) {
+    alloc_locals;
+
     let (registry_address) = get_registry_address();
     let (version) = get_contract_version();
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
         registry_address, Hightide_INDEX, version
     );
 
+    let (season: TradingSeason) = IHightide.get_season(hightide_address, season_id_);
     // Get current day of the season based on the timestamp
-    let current_day = get_current_day(hightide_address, season_id_);
+    let current_day = get_current_day(season.start_timestamp);
+
+    local number_of_days;
+    let within_season = is_le(current_day, season.num_trading_days - 1);
+
+    // If the season is over, return without setting the trading stats
+    if (within_season == 1) {
+        assert number_of_days = current_day + 1;
+    } else {
+        assert number_of_days = season.num_trading_days;
+    }
+
     // The 4th argument of the following function call keeeps a running total of days traded
-    let count = count_num_days_traded(season_id_, pair_id_, current_day + 1, 0);
+    let count = count_num_days_traded(season_id_, pair_id_, number_of_days, 0);
     return (count,);
 }
 
@@ -195,77 +221,66 @@ func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // External Functions #
 //#####################
 
-// @dev - This function is called by AccountManager when executing a trade to record data related to a trade
+// @dev - Function called by trading contract after trade execution
 @external
-func record_trade_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id_: felt, order_type_: felt, execution_price_: felt, order_size_: felt
+func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    pair_id_: felt,
+    order_size_: felt,
+    execution_price_: felt,
+    request_list_len: felt,
+    request_list: MultipleOrder*,
 ) {
     alloc_locals;
-    let (trader_address) = get_caller_address();
-    let (registry_address) = get_registry_address();
+
+    let (caller) = get_caller_address();
+    let (registry) = get_registry_address();
     let (version) = get_contract_version();
-    // Assert that call has come from our deployed AccountManager contract i.e. registered user
-    // We could also have the call come from Trading contract - but then trader address has to be given as an argument
-    assert_caller_registered(registry_address, version, trader_address);
+
+    let (trading_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Trading_INDEX, version=version
+    );
 
     // Get HightideAdmin address from Authorized Registry
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
-        registry_address, Hightide_INDEX, version
+        contract_address=registry, index=Hightide_INDEX, version=version
     );
 
     // Get current season id from hightide
-    let (season_id_) = IHighTide.get_current_season_id(hightide_address);
-    // Record volume data <size, price>
-    let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=order_type_
-    );
-    let (current_len) = num_orders.read(volume_metadata);
+    let (season_id_) = IHightide.get_current_season_id(hightide_address);
+
     let (current_timestamp) = get_block_timestamp();
 
-    // Create order volume type struct object to store
-    let order_volume: OrderVolume = OrderVolume(
-        size=order_size_, price=execution_price_, timestamp=current_timestamp
-    );
-
-    orders.write(volume_metadata, current_len, order_volume);
-    // increment number of trades storage_var
-    num_orders.write(volume_metadata, current_len + 1);
-
-    // emit event for off-chain consumers
-    trade_recorded.emit(
-        season_id_, pair_id_, trader_address, order_type_, order_size_, execution_price_
-    );
     // Get trading season data
-    let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
+    let (season: TradingSeason) = IHightide.get_season(hightide_address, season_id_);
 
-    local time_since_start = current_timestamp - season.start_timestamp;
+    // Get the current day acc to the season
+    let current_day = get_current_day(season.start_timestamp);
 
-    // Calculate current day = S/number of seconds in a day where S=time since start of season
-    let (current_day, r) = unsigned_div_rem(time_since_start, 24 * 60 * 60);
+    let within_season = is_le(current_day, season.num_trading_days - 1);
 
-    // This error message might not be required since season_id is returned by HightideAdmin
-    // and we calculate current_day based on this season_id
-    with_attr error_message("Current day cannot exceed max tradable days in season") {
-        assert_lt(current_day, season.num_trading_days);
-    }
-    let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, current_day);
-    // Increment number of trades for current_day
-    trade_frequency.write(season_id_, pair_id_, current_day, current_daily_count + 1);
-
-    // Update number of unique active traders for a pair in a season
-
-    let (trader_status) = trader_for_pair.read(season_id_, pair_id_, trader_address);
-    // If trader was not active for pair in this season
-    if (trader_status == 0) {
-        // Mark trader as active
-        trader_for_pair.write(season_id_, pair_id_, trader_address, 1);
-        let (current_num_traders) = num_traders.read(season_id_, pair_id_);
-        // Increment count of unique active traders for pair in season
-        num_traders.write(season_id_, pair_id_, current_num_traders + 1);
-        // Store trader address for pair in this season at current index
-        traders_in_pair.write(season_id_, pair_id_, current_num_traders, trader_address);
+    // If the season is over, return without setting the trading stats
+    if (within_season == 0) {
         return ();
     }
+
+    let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, current_day);
+
+    // Increment number of trades for current_day
+    trade_frequency.write(
+        season_id_, pair_id_, current_day, current_daily_count + request_list_len
+    );
+
+    // Recursively set the trading stats for each order
+    record_trade_batch_stats_recurse(
+        season_id_=season_id_,
+        pair_id_=pair_id_,
+        order_size_=order_size_,
+        execution_price_=execution_price_,
+        timestamp_=current_timestamp,
+        request_list_len_=request_list_len,
+        request_list_=request_list,
+    );
+
     return ();
 }
 
@@ -273,23 +288,96 @@ func record_trade_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // Internal Functions #
 //#####################
 
-// @dev - This function checks that trader address is registered in Account Registry
-
-func assert_caller_registered{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address: felt, version: felt, trader_address: felt
+// @dev - Internal function to be called recursively
+func record_trade_batch_stats_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    season_id_: felt,
+    pair_id_: felt,
+    order_size_: felt,
+    execution_price_: felt,
+    timestamp_: felt,
+    request_list_len_: felt,
+    request_list_: MultipleOrder*,
 ) {
-    let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
-        registry_address, AccountRegistry_INDEX, version
-    );
+    alloc_locals;
 
-    let (is_registered) = IAccountRegistry.is_registered_user(
-        account_registry_address, trader_address
-    );
-    with_attr error_message("Trader is not a registered user") {
-        assert is_registered = 1;
+    if (request_list_len_ == 0) {
+        return ();
     }
 
-    return ();
+    local curr_order_size;
+
+    // Check if size is less than or equal to postionSize
+    let cmp_res = is_le(order_size_, [request_list_].positionSize);
+
+    if (cmp_res == 1) {
+        // If yes, make the order_size to be size
+        assert curr_order_size = order_size_;
+    } else {
+        // If no, make order_size to be the positionSize̦
+        assert curr_order_size = [request_list_].positionSize;
+    }
+
+    // Record volume data <size, price>
+    let volume_metadata: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, pair_id=pair_id_, order_type=[request_list_].closeOrder
+    );
+
+    let (current_len) = num_orders.read(volume_metadata);
+
+    num_orders.write(volume_metadata, current_len + 1);
+
+    // Create order volume type struct object to store
+    let order_volume: OrderVolume = OrderVolume(
+        size=curr_order_size, price=execution_price_, timestamp=timestamp_
+    );
+
+    orders.write(volume_metadata, current_len, order_volume);
+
+    // increment number of trades storage_var
+    num_orders.write(volume_metadata, current_len + 1);
+
+    // Update number of unique active traders for a pair in a season
+    let (trader_status) = trader_for_pair.read(season_id_, pair_id_, [request_list_].pub_key);
+
+    // If trader was not active for pair in this season
+    if (trader_status == 0) {
+        // Mark trader as active
+        trader_for_pair.write(season_id_, pair_id_, [request_list_].pub_key, 1);
+        let (current_num_traders) = num_traders.read(season_id_, pair_id_);
+        // Increment count of unique active traders for pair in season
+        num_traders.write(season_id_, pair_id_, current_num_traders + 1);
+        // Store trader address for pair in this season at current index
+        traders_in_pair.write(season_id_, pair_id_, current_num_traders, [request_list_].pub_key);
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    // emit event for off-chain consumers
+    trade_recorded.emit(
+        season_id_,
+        pair_id_,
+        [request_list_].pub_key,
+        [request_list_].closeOrder,
+        order_size_,
+        execution_price_,
+    );
+
+    return record_trade_batch_stats_recurse(
+        season_id_,
+        pair_id_,
+        order_size_,
+        execution_price_,
+        timestamp_,
+        request_list_len_ - 1,
+        request_list_ + MultipleOrder.SIZE,
+    );
 }
 
 // @dev - this function recursively creates the list of order volume
@@ -333,19 +421,17 @@ func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 // @dev - Returns current day of the season based on current timestamp
 // if season has ended then it returns max number of trading days configured for the season
 func get_current_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hightide_address: felt, season_id_: felt
+    start_timestamp: felt
 ) -> felt {
     alloc_locals;
-    // Get trading season data
-    let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
+
     let (current_timestamp) = get_block_timestamp();
-    local time_since_start = current_timestamp - season.start_timestamp;
+    local time_since_start = current_timestamp - start_timestamp;
 
     // Calculate current day = S/number of seconds in a day where S=time since start of season
     let (current_day, r) = unsigned_div_rem(time_since_start, 24 * 60 * 60);
-    // If current day number is more than max number of trading days, then return max trading days configured
-    let max_current_day = max_of(current_day, season.num_trading_days);
-    return max_current_day;
+
+    return current_day;
 }
 
 // @dev - This function recursively calculates the trade count for each day in the season so far
@@ -361,11 +447,11 @@ func get_frequencies{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     }
 
     let (current_trade_count) = trade_frequency.read(season_id_, pair_id_, current_index_);
-    assert [frequency_list] = current_trade_count;
-    get_frequencies(
-        season_id_, pair_id_, total_frequencies - 1, current_index_ + 1, frequency_list + 1
+    assert frequency_list[current_index_] = current_trade_count;
+
+    return get_frequencies(
+        season_id_, pair_id_, total_frequencies - 1, current_index_ + 1, frequency_list
     );
-    return ();
 }
 
 // @dev - This function recursively calculates the total traded days for a season so far
