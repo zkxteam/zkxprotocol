@@ -10,7 +10,7 @@ from contracts.Constants import Hightide_INDEX, Trading_INDEX
 from contracts.DataTypes import VolumeMetaData, OrderVolume, TradingSeason, MultipleOrder
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IHightide import IHightide
+from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import (
     CommonLib,
     get_contract_version,
@@ -141,7 +141,7 @@ func get_season_trade_frequency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         registry_address, Hightide_INDEX, version
     );
 
-    let (season: TradingSeason) = IHightide.get_season(hightide_address, season_id_);
+    let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
 
     // Get current day of the season based on the timestamp
     let current_day = get_current_day(season.start_timestamp);
@@ -173,7 +173,7 @@ func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
         registry_address, Hightide_INDEX, version
     );
-    let (season: TradingSeason) = IHightide.get_season(hightide_address, season_id_);
+    let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
 
     with_attr error_message(
             "Day number should be less than current day number/total tradable days") {
@@ -198,7 +198,7 @@ func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         registry_address, Hightide_INDEX, version
     );
 
-    let (season: TradingSeason) = IHightide.get_season(hightide_address, season_id_);
+    let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
     // Get current day of the season based on the timestamp
     let current_day = get_current_day(season.start_timestamp);
 
@@ -246,12 +246,12 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     );
 
     // Get current season id from hightide
-    let (season_id_) = IHightide.get_current_season_id(hightide_address);
+    let (season_id_) = IHighTide.get_current_season_id(hightide_address);
 
     let (current_timestamp) = get_block_timestamp();
 
     // Get trading season data
-    let (season: TradingSeason) = IHightide.get_season(hightide_address, season_id_);
+    let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
 
     // Get the current day acc to the season
     let current_day = get_current_day(season.start_timestamp);
