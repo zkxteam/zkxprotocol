@@ -272,6 +272,7 @@ struct VolumeMetaData {
 }
 
 struct TradingSeason {
+    start_block_number : felt,
     start_timestamp: felt,
     num_trading_days: felt,
 }

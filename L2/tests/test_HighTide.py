@@ -129,6 +129,7 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
         name="trading_season_set_up",
         data=[
             admin1.contract_address,
+            0,
             timestamp,
             to64x61(30)
         ]

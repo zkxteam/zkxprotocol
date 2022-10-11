@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt
-from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
+from starkware.starknet.common.syscalls import get_block_number, get_block_timestamp, get_caller_address
 
 from contracts.Constants import ManageHighTide_ACTION, Trading_INDEX
 from contracts.DataTypes import Constants, Multipliers, TradingSeason
@@ -155,7 +155,7 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Create Trading season struct to store
     let trading_season: TradingSeason = TradingSeason(
-        start_timestamp=start_timestamp, num_trading_days=num_trading_days
+        start_block_number = 0, start_timestamp=start_timestamp, num_trading_days=num_trading_days
     );
 
     trading_season_by_id.write(season_id, trading_season);
@@ -181,6 +181,17 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     }
     validate_season_to_start(season_id);
 
+    let (new_season: TradingSeason) = get_season(season_id);
+    
+    // get current block number
+    let (current_block_number) = get_block_number();
+
+    // update start block number in trading season
+    let trading_season: TradingSeason = TradingSeason(
+        start_block_number = current_block_number, start_timestamp=new_season.start_timestamp, num_trading_days=new_season.num_trading_days
+    );
+
+    trading_season_by_id.write(season_id, trading_season);
     current_trading_season.write(season_id);
 
     // Emit event
