@@ -125,7 +125,6 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         prices_len=prices_len,
         prices=prices,
         total_account_value=0,
-        market_address=market_address,
         total_maintenance_requirement=0,
         least_collateral_ratio=Math64x61_ONE,
         least_collateral_ratio_position=PositionDetailsWithMarket(0, 0, 0, 0, 0, 0, 0),
@@ -253,7 +252,6 @@ func find_collateral_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // @param prices - Array with all the price details
 // @param total_account_value - Collateral value - borrowed value + positionSize * price
 // @param total_maintenance_requirement - maintenance ratio of the asset * value of the position when executed
-// @param market_address - Address of the Market Contract
 // @param least_collateral_ratio - The least collateral ratio among the positions
 // @param least_collateral_ratio_position - The position which is having the least collateral ratio
 // @param least_collateral_ratio_position_collateral_price - Collateral price of the collateral in the postion which is having the least collateral ratio
@@ -270,7 +268,6 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     prices_len: felt,
     prices: PriceData*,
     total_account_value: felt,
-    market_address: felt,
     total_maintenance_requirement: felt,
     least_collateral_ratio: felt,
     least_collateral_ratio_position: PositionDetailsWithMarket,
@@ -328,7 +325,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
     // Get the asset ID and collateral ID of the position
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
-        contract_address=market_address, market_id=position_details.market_id
+        contract_address=market_address, market_id_=position_details.market_id
     );
 
     // Create a temporary struct to read data from the array element of prices
@@ -354,8 +351,8 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // Get the maintanence margin from Markets contract
     let (market_id) = IMarkets.get_market_id_from_assets(
         contract_address=market_address,
-        asset_id_=order_details.assetID,
-        collateral_id_=order_details.collateralID
+        asset_id_=price_details.assetID,
+        collateral_id_=price_details.collateralID
     );
     let (req_margin) = IMarkets.get_maintenance_margin(
         contract_address=market_address, 
@@ -422,7 +419,6 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         prices_len=prices_len - 1,
         prices=prices + PriceData.SIZE,
         total_account_value=total_account_value + net_position_value_usd,
-        market_address=market_address,
         total_maintenance_requirement=total_maintenance_requirement + maintenance_requirement_usd,
         least_collateral_ratio=least_collateral_ratio_,
         least_collateral_ratio_position=least_collateral_ratio_position_,
@@ -448,14 +444,10 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 ) -> (amount_to_be_sold: felt) {
     alloc_locals;
 
-    let (_, market_id: felt) = IMarkets.get_asset_collateral_from_market(
-        contract_address=market_address_, market_id=position_.market_id
-    );
-
     // Fetch the maintatanence margin requirement from Markets contract
     let (req_margin) = IMarkets.get_maintenance_margin(
         contract_address=market_address_,
-        market_id_=market_id
+        market_id_=position_.market_id
     );
 
     let margin_amount = position_.margin_amount;
@@ -568,7 +560,6 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         prices_len=prices_len,
         prices=prices,
         total_account_value=account_value,
-        market_address=market_address,
         total_maintenance_requirement=maintenance_requirement,
         least_collateral_ratio=Math64x61_ONE,
         least_collateral_ratio_position=PositionDetailsWithMarket(0, 0, 0, 0, 0, 0, 0),
@@ -613,7 +604,7 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 
     // Get the asset & collateral ID from market contract
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
-        contract_address=market_contract_address, market_id=[positions].market_id
+        contract_address=market_contract_address, market_id_=[positions].market_id
     );
     let (market_price: MarketPrice) = IMarketPrices.get_market_price(
         contract_address=market_price_address, id=[positions].market_id
@@ -621,7 +612,7 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 
     // Get the market ttl from the market contract
     let (market_ttl: felt) = IMarkets.get_ttl_from_market(
-        contract_address=market_contract_address, market_id=[positions].market_id
+        contract_address=market_contract_address, market_id_=[positions].market_id
     );
 
     // Get the collateral price from the CollateralPrice contract

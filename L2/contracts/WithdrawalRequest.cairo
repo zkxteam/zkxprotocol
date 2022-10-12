@@ -134,7 +134,7 @@ func update_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 // @param amount_ Amount to be withdrawn
 @external
 func add_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    request_id_: felt, user_l1_address_: felt, assetIDr_: felt, amount_: felt
+    request_id_: felt, user_l1_address_: felt, assetID_: felt, amount_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();

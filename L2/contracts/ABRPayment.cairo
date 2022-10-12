@@ -178,8 +178,8 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     );
 
     // Get the collateral ID of the market
-    let (collateral_id) = IMarkets.get_collateral_from_market(
-        contract_address=market_contract_, market_id=[net_positions_].market_id
+    let (_, collateral_id) = IMarkets.get_asset_collateral_from_market(
+        contract_address=market_contract_, market_id_=[net_positions_].market_id
     );
 
     if (is_called == 1) {

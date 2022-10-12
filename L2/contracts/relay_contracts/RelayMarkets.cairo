@@ -44,7 +44,8 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('add_market');
     let (inner_address) = get_inner_contract();
-    return IMarkets.add_market(contract_address=inner_address, new_market_);
+    IMarkets.add_market(contract_address=inner_address, new_market_=new_market_);
+    return ();
 }
 
 @external
@@ -52,7 +53,8 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('remove_market');
     let (inner_address) = get_inner_contract();
-    return IMarkets.remove_market(contract_address=inner_address, market_id_);
+    IMarkets.remove_market(inner_address, market_id_);
+    return ();
 }
 
 @external
@@ -62,7 +64,8 @@ func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('modify_leverage');
     let (inner_address) = get_inner_contract();
-    return IMarkets.modify_leverage(contract_address=inner_address, market_id_, leverage_);
+    IMarkets.modify_leverage(inner_address, market_id_, leverage_);
+    return ();
 }
 
 @external
@@ -72,7 +75,8 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('modify_tradable');
     let (inner_address) = get_inner_contract();
-    return IMarkets.modify_tradable(contract_address=inner_address, market_id_, is_tradable_);
+    IMarkets.modify_tradable(inner_address, market_id_, is_tradable_);
+    return ();
 }
 
 @external
@@ -82,7 +86,8 @@ func change_max_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('change_max_leverage');
     let (inner_address) = get_inner_contract();
-    return IMarkets.change_max_leverage(contract_address=inner_address, new_max_leverage_);
+    IMarkets.change_max_leverage(inner_address, new_max_leverage_);
+    return ();
 }
 
 @external
@@ -92,19 +97,23 @@ func change_max_ttl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('change_max_ttl');
     let (inner_address) = get_inner_contract();
-    return IMarkets.change_max_ttl(contract_address=inner_address, new_max_ttl_);
+    IMarkets.change_max_ttl(inner_address, new_max_ttl_);
+    return ();
 }
 
 @external
-func modify_archived_state(market_id_: felt, is_archived_: felt) {
+func modify_archived_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt, is_archived_: felt
+) {
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('modify_archived_state');
     let (inner_address) = get_inner_contract();
-    return IMarkets.modify_archived_state(contract_address=inner_address, market_id_, is_archived_);
+    IMarkets.modify_archived_state(inner_address, market_id_, is_archived_);
+    return ();
 }
 
 @external
-func modify_trade_settings(
+func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt,
     tick_size_: felt,
     step_size_: felt,
@@ -122,8 +131,8 @@ func modify_trade_settings(
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('modify_trade_settings');
     let (inner_address) = get_inner_contract();
-    return IMarkets.modify_trade_settings(
-        contract_address=inner_address,
+    IMarkets.modify_trade_settings(
+        inner_address,
         market_id_,
         tick_size_,
         step_size_,
@@ -138,6 +147,7 @@ func modify_trade_settings(
         baseline_position_size_,
         maximum_position_size_
     );
+    return ();
 }
 
 //////////
@@ -149,7 +159,7 @@ func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     currMarket: Market
 ) {
     let (inner_address) = get_inner_contract();
-    let (currMarket) = IMarkets.get_market(contract_address=inner_address, market_id_);
+    let (currMarket) = IMarkets.get_market(inner_address, market_id_);
     return (currMarket,);
 }
 
@@ -158,9 +168,7 @@ func get_market_id_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     asset_id_: felt, collateral_id_: felt
 ) -> (market_id: felt) {
     let (inner_address) = get_inner_contract();
-    let (market_id) = IMarkets.get_market_id_from_assets(
-        contract_address=inner_address, asset_id_, collateral_id_
-    );
+    let (market_id) = IMarkets.get_market_id_from_assets(inner_address, asset_id_, collateral_id_);
     return (market_id,);
 }
 
@@ -169,8 +177,6 @@ func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     array_list_len: felt, array_list: Market*
 ) {
     let (inner_address) = get_inner_contract();
-    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets(
-        contract_address=inner_address
-    );
+    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets(inner_address);
     return (array_list_len, array_list);
 }
