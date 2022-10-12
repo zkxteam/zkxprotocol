@@ -63,6 +63,16 @@ async def abr_factory(starknet_service: StarknetService):
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
     bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
 
+    timestamp = int(time.time())
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp,
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
     fees = await starknet_service.deploy(
         ContractType.TradingFees, 
         [registry.contract_address, 1]
@@ -131,16 +141,9 @@ async def abr_factory(starknet_service: StarknetService):
         ContractType.Liquidate, 
         [registry.contract_address, 1]
     )
-
-    timestamp = int(time.time())
-
-    starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
-        block_timestamp=timestamp,
-        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
-    )
+    hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
+    trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
+   
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -171,6 +174,8 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -247,7 +252,8 @@ async def abr_factory(starknet_service: StarknetService):
         to64x61(10), # leverage
         1, # tradable
         0, # archived
-        10 # ttl
+        10, # ttl
+        1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000
     ])
 
     # Fund the Holding contract
@@ -393,9 +399,9 @@ async def test_abr_payments(abr_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ])
 
     alice_balance = await alice.get_balance(USDC_ID).call()
@@ -417,12 +423,12 @@ async def test_abr_payments(abr_factory):
     assert_events_emitted_from_all_calls(
         abr_tx,
         [
-            [0, abr_fund.contract_address, 'withdraw_ABR_called', [order_id_1, alice.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
-            [1, alice.contract_address, 'transferred_abr', [order_id_1, USDC_ID, marketID_1, abr_to_pay.result.res, initial_timestamp]],
-            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [order_id_1, alice.contract_address, initial_timestamp]],
-            [3, bob.contract_address, 'transferred_from_abr', [ order_id_2, USDC_ID, marketID_1, abr_to_pay.result.res, initial_timestamp]],
-            [4, abr_fund.contract_address, 'deposit_ABR_called', [order_id_2, bob.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
-            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [order_id_2, bob.contract_address, initial_timestamp]]
+            [0, abr_fund.contract_address, 'withdraw_ABR_called', [alice.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [1, alice.contract_address, 'transferred_abr', [marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, alice.contract_address, initial_timestamp]],
+            [3, bob.contract_address, 'transferred_from_abr', [marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [4, abr_fund.contract_address, 'deposit_ABR_called', [bob.contract_address, marketID_1, abr_to_pay.result.res, initial_timestamp]],
+            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, bob.contract_address, initial_timestamp]]
         ]
     )
     
@@ -478,18 +484,15 @@ async def test_will_charge_abr_after_8_hours(abr_factory):
     
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("343uofdsjnv")
-    order_id_2 = str_to_felt("wer4iljerw")
-
     assert_events_emitted_from_all_calls(
         abr_tx,
         [
-            [0, abr_fund.contract_address, 'withdraw_ABR_called', [order_id_1, alice.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
-            [1, alice.contract_address, 'transferred_abr', [order_id_1, USDC_ID, marketID_1, abr_to_pay.result.res, timestamp]],
-            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [order_id_1, alice.contract_address, timestamp]],
-            [3, bob.contract_address, 'transferred_from_abr', [ order_id_2, USDC_ID, marketID_1, abr_to_pay.result.res, timestamp]],
-            [4, abr_fund.contract_address, 'deposit_ABR_called', [order_id_2, bob.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
-            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [order_id_2, bob.contract_address, timestamp]]
+            [0, abr_fund.contract_address, 'withdraw_ABR_called', [alice.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
+            [1, alice.contract_address, 'transferred_abr', [marketID_1, abr_to_pay.result.res, timestamp]],
+            [2, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, alice.contract_address, timestamp]],
+            [3, bob.contract_address, 'transferred_from_abr', [marketID_1, abr_to_pay.result.res, timestamp]],
+            [4, abr_fund.contract_address, 'deposit_ABR_called', [bob.contract_address, marketID_1, abr_to_pay.result.res, timestamp]],
+            [5, abr_payment.contract_address, 'abr_payment_called_user_position', [marketID_1, bob.contract_address, timestamp]]
         ]
     )
   
