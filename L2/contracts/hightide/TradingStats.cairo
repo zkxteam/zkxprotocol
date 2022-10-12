@@ -7,7 +7,7 @@ from starkware.cairo.common.math import unsigned_div_rem, assert_le, assert_in_r
 from starkware.cairo.common.math_cmp import is_nn, is_le
 
 from contracts.Constants import Hightide_INDEX, Trading_INDEX
-from contracts.DataTypes import VolumeMetaData, OrderVolume, TradingSeason, MultipleOrder
+from contracts.DataTypes import VolumeMetaData, TradingSeason, MultipleOrder
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
@@ -18,8 +18,8 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
+from contracts.Math_64x61 import Math64x61_mul
 
-// CAVEAT - This contract is not tested yet
 // This contract can be used as a source of truth for all consumers of trade stats off-chain/on-chain
 // This does not have functions to calculate any of the hightide formulas
 // This contract just does on-chain trade stats storage and reporting
@@ -33,8 +33,8 @@ func trade_recorded(
     pair_id: felt,
     trader_address: felt,
     order_type: felt,
-    order_size: felt,
-    order_price: felt,
+    order_size_64x61: felt,
+    order_price_64x61: felt,
 ) {
 }
 // this var stores the total number of recorded trades for a volume_type
@@ -45,7 +45,7 @@ func num_orders(volume_type: VolumeMetaData) -> (res: felt) {
 
 // corresponding to a volume_type this storage var stores running total of order volume [sum(size*price)]
 @storage_var
-func order_volume(volume_type: VolumeMetaData) -> (res: felt) {
+func order_volume(volume_type: VolumeMetaData) -> (res_64x61: felt) {
 }
 
 // this stores the number of trades in a day for a pair in a season
@@ -59,6 +59,7 @@ func num_traders(season_id: felt, pair_id: felt) -> (res: felt) {
 }
 
 // stores list of trader addresses for a pair in a season - retrievable by index in the list
+// currently this is unused
 @storage_var
 func traders_in_pair(season_id: felt, pair_id: felt, index: felt) -> (trader_address: felt) {
 }
@@ -93,12 +94,12 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 @view
 func get_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     volume_type_: VolumeMetaData
-) -> (number_of_orders: felt, total_volume: felt) {
+) -> (number_of_orders: felt, total_volume_64x61: felt) {
     alloc_locals;
     let (current_num_orders) = num_orders.read(volume_type_);
-    let (current_total_volume) = order_volume.read(volume_type_);
+    let (current_total_volume_64x61) = order_volume.read(volume_type_);
 
-    return (current_num_orders, current_total_volume);
+    return (current_num_orders, current_total_volume_64x61);
     
 }
 
@@ -185,8 +186,8 @@ func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 @external
 func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     pair_id_: felt,
-    order_size_: felt,
-    execution_price_: felt,
+    order_size_64x61_: felt,
+    execution_price_64x61_: felt,
     request_list_len: felt,
     request_list: MultipleOrder*,
 ) {
@@ -217,7 +218,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     // Get trading season data
     let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
 
-    // Get the current day acc to the season
+    // Get the current day according to the season
     let current_day = get_current_day(season.start_timestamp);
 
     let within_season = is_le(current_day, season.num_trading_days - 1);
@@ -239,8 +240,8 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     record_trade_batch_stats_recurse(
         season_id_=season_id_,
         pair_id_=pair_id_,
-        order_size_=order_size_,
-        execution_price_=execution_price_,
+        order_size_64x61_=order_size_64x61_,
+        execution_price_64x61_=execution_price_64x61_,
         request_list_len_=request_list_len,
         request_list_=request_list,
     );
@@ -258,8 +259,8 @@ func record_trade_batch_stats_recurse{
 }(
     season_id_: felt,
     pair_id_: felt,
-    order_size_: felt,
-    execution_price_: felt,
+    order_size_64x61_: felt,
+    execution_price_64x61_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
 ) {
@@ -269,17 +270,17 @@ func record_trade_batch_stats_recurse{
         return ();
     }
 
-    local curr_order_size;
+    local curr_order_size_64x61;
 
     // Check if size is less than or equal to postionSize
-    let cmp_res = is_le(order_size_, [request_list_].positionSize);
+    let cmp_res = is_le(order_size_64x61_, [request_list_].positionSize);
 
     if (cmp_res == 1) {
         // If yes, make the order_size to be size
-        assert curr_order_size = order_size_;
+        assert curr_order_size_64x61 = order_size_64x61_;
     } else {
         // If no, make order_size to be the positionSize̦
-        assert curr_order_size = [request_list_].positionSize;
+        assert curr_order_size_64x61 = [request_list_].positionSize;
     }
 
     // Update running total of order volume
@@ -289,8 +290,9 @@ func record_trade_batch_stats_recurse{
 
     let (current_len) = num_orders.read(volume_metadata);
 
-    let (current_volume) = order_volume.read(volume_metadata);
-    order_volume.write(volume_metadata, current_volume + (curr_order_size*execution_price_));
+    let (current_volume_64x61) = order_volume.read(volume_metadata);
+    let (present_trade_volume_64x61) = Math64x61_mul(curr_order_size_64x61, execution_price_64x61_);
+    order_volume.write(volume_metadata, current_volume_64x61 + present_trade_volume_64x61);
 
     // increment number of trades storage_var
     num_orders.write(volume_metadata, current_len + 1);
@@ -322,15 +324,15 @@ func record_trade_batch_stats_recurse{
         pair_id_,
         [request_list_].pub_key,
         [request_list_].closeOrder,
-        curr_order_size,
-        execution_price_,
+        curr_order_size_64x61,
+        execution_price_64x61_,
     );
 
     return record_trade_batch_stats_recurse(
         season_id_,
         pair_id_,
-        order_size_,
-        execution_price_,
+        order_size_64x61_,
+        execution_price_64x61_,
         request_list_len_ - 1,
         request_list_ + MultipleOrder.SIZE,
     );
