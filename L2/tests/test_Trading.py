@@ -7,7 +7,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -42,7 +42,6 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
-
     ### Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
         admin1_signer.public_key
@@ -68,6 +67,15 @@ async def adminAuth_factory(starknet_service: StarknetService):
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
     dave = await account_factory.deploy_account(dave_signer.public_key)
 
+    timestamp = int(time.time())
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
     ### Deploy infrastructure (Part 2)
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
     holding = await starknet_service.deploy(ContractType.Holding, [registry.contract_address, 1])
@@ -84,16 +92,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ContractType.CollateralPrices, 
         [registry.contract_address, 1]
     )
-
-    timestamp = int(time.time())
-
-    starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
-        block_timestamp=timestamp, 
-        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
-    )
+    hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
+    trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -133,6 +133,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, collateral_prices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -160,14 +162,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [TSLA_ID, 1, str_to_felt("TESLA"), str_to_felt("TESLA MOTORS"), 1, 0, 1, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 0, 60])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [TSLA_USD_ID, TSLA_ID, USDC_ID, to64x61(10), 2, 0, 60])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [UST_USDC_ID, UST_ID, USDC_ID, to64x61(10), 1, 0, 60])
-
-    # Set market price for UST-USDC market
-    await admin1_signer.send_transaction(admin1, marketPrices.contract_address, 'update_market_price', [UST_USDC_ID, 2328901439305830912])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [TSLA_USD_ID, TSLA_ID, USDC_ID, to64x61(10), 2, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [UST_USDC_ID, UST_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Update collateral prices
     await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, to64x61(1)])
@@ -181,19 +180,15 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
-    # Set the balance of admin1 and admin2
-    # await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
-    # await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [USDC_ID, to64x61(1000000)])
-
-    return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance
+    return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate
 
 
 @pytest.mark.asyncio
 async def test_set_balance_for_testing(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(100000)
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
     await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
 
@@ -203,22 +198,22 @@ async def test_set_balance_for_testing(adminAuth_factory):
     assert alice_curr_balance.result.res == alice_balance
     assert bob_curr_balance.result.res == bob_balance
 
+    alice_collaterals = await alice.return_array_collaterals().call()
+    print_parsed_collaterals(alice_collaterals.result.array_list)
+
+    bob_collaterals = await bob.return_array_collaterals().call()
+    print_parsed_collaterals(bob_collaterals.result.array_list)
+
 
 @pytest.mark.asyncio
 async def test_revert_balance_low(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100)
-    bob_balance = to64x61(100)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("pqlkzc3434")
+    order_id_1 = str_to_felt("fdfa34ghjds")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(10789)
@@ -231,7 +226,7 @@ async def test_revert_balance_low(adminAuth_factory):
     leverage1 = 3
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("p21pdfs12mfd")
+    order_id_2 = str_to_felt("rejhfyjkew")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(10789)
@@ -260,26 +255,20 @@ async def test_revert_balance_low(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 @pytest.mark.asyncio
 async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(1000000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("kzwerl2kfsm")
+    order_id_1 = str_to_felt("df54gdfa")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1000)
@@ -292,7 +281,7 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
     leverage1 = 3
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("asl19uxkzck")
+    order_id_2 = str_to_felt("adsfgiu34hjjhks")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(1000)
@@ -321,27 +310,21 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 
 @pytest.mark.asyncio
 async def test_revert_if_bad_limit_order_long(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(1000000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("ls23ksfl2fd")
+    order_id_1 = str_to_felt("kvhn3m87yhfs")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1000)
@@ -354,7 +337,7 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
     leverage1 = 3
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("sdfk23kdfsl1")
+    order_id_2 = str_to_felt("3hf83hdfska")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(1000)
@@ -383,27 +366,21 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1,  orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1,  orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 
 @pytest.mark.asyncio
 async def test_revert_if_bad_limit_order_short(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(1000000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("kmzm2ms62fds")
+    order_id_1 = str_to_felt("fgkiu3iujsd78")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1000)
@@ -412,11 +389,10 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
     position1 = to64x61(4)
     direction1 = 0
     closeOrder1 = 0
-    parentOrder1 = 0
     leverage1 = 3
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("9sk2nsk2llj")
+    order_id_2 = str_to_felt("65duhhj438187i")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(1000)
@@ -425,7 +401,6 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
     position2 = to64x61(3)
     direction2 = 1
     closeOrder2 = 0
-    parentOrder2 = 0
     leverage2 = 3
     liquidatorAddress2 = 0
 
@@ -445,27 +420,21 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 
 @pytest.mark.asyncio
 async def test_revert_if_order_mismatch(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(1000000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("jciow4k234")
+    order_id_1 = str_to_felt("8721jhfkf93hk1")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1078)
@@ -478,7 +447,7 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
     leverage1 = 3
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("sdfk32lvfl")
+    order_id_2 = str_to_felt("9fd1k31k5h7")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(1078)
@@ -507,27 +476,21 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ]))
 
 
 @pytest.mark.asyncio
 async def test_revert_if_asset_not_tradable(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(1000000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = TSLA_USD_ID
 
-    order_id_1 = str_to_felt("w3godgvx323af")
+    order_id_1 = str_to_felt("k3j43l1l34")
     assetID_1 = TSLA_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1078)
@@ -540,7 +503,7 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
     leverage1 = 3
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("fj45g324dfsg")
+    order_id_2 = str_to_felt("45kj341kj4")
     assetID_2 = TSLA_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(1078)
@@ -569,28 +532,21 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))
 
 
 @pytest.mark.asyncio
 async def test_revert_if_collateral_mismatch(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(1000000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [UST_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("wqelvqwe23")
+    order_id_1 = str_to_felt("iu4n31kh123")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1078)
@@ -603,7 +559,7 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
     leverage1 = 3
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("34ksdfmvcv")
+    order_id_2 = str_to_felt("932jh1mjdfsl")
     assetID_2 = BTC_ID
     collateralID_2 = UST_ID
     price2 = to64x61(1078)
@@ -632,27 +588,21 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ]))
 
 
 @pytest.mark.asyncio
 async def test_revert_if_asset_mismatch(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(1000000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("wqelvqwe23")
+    order_id_1 = str_to_felt("3jh1udkasd")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(1078)
@@ -665,7 +615,7 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
     leverage1 = 3
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("34ksdfmvcv")
+    order_id_2 = str_to_felt("5jkhfdjkew")
     assetID_2 = ETH_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(1078)
@@ -694,27 +644,21 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ]))
 
 
 @pytest.mark.asyncio
 async def test_revert_wrong_signature(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(1000000)
-    bob_balance = to64x61(1000000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("y7hi83kjhr")
+    order_id_1 = str_to_felt("zxcds35yts")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(10789)
@@ -727,7 +671,7 @@ async def test_revert_wrong_signature(adminAuth_factory):
     leverage1 = to64x61(1)
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("329dsfjvcx9u")
+    order_id_2 = str_to_felt("mjuwoxzbcwq4")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(10789)
@@ -756,27 +700,21 @@ async def test_revert_wrong_signature(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message1[0], signed_message1[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress1, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress1, 0,
     ]))
 
 
 @pytest.mark.asyncio
 async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(100000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size = to64x61(1)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("343uofdsjnv")
+    order_id_1 = str_to_felt("32i7ashhj2")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
@@ -789,7 +727,7 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
     leverage1 = 11
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("wer4iljerw")
+    order_id_2 = str_to_felt("mnjds87234")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(5000)
@@ -818,29 +756,20 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ]))
 
 @pytest.mark.asyncio
 async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(100000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
-
-    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     ####### Opening of Orders #######
     size = to64x61(1)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("343uofdsjnv")
+    order_id_1 = str_to_felt("bidjsf732hjsfd")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
@@ -853,7 +782,7 @@ async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory
     leverage1 = to64x61(1)
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("wer4iljerw")
+    order_id_2 = str_to_felt("iu32n3246dfsj")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(5000)
@@ -895,20 +824,14 @@ async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ]))
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(100000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
     bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
@@ -917,7 +840,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     size = to64x61(1)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("343uofdsjnv")
+    order_id_1 = str_to_felt("sdj324hka8kaedf")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
@@ -972,45 +895,28 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
-    print("execution price: ", from64x61(res1[3]))
-    print("margin :", from64x61(res1[9]))
-    print("borrowed :", from64x61(res1[10]))
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
         position1,
-        orderType1,
-        direction1,
-        size,
-        2,
         to64x61(5000),
         to64x61(0),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        size,
-        2,
         to64x61(5000),
         to64x61(0),
         leverage2
@@ -1036,17 +942,16 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
 
-    # Cannot remove an open order from the array`
-    await assert_revert(
-        admin1_signer.send_transaction(admin1, alice.contract_address, 'remove_from_array', [0]),
-        "The order is not fully closed yet"
-    )
-   
+    alice_positions = await alice.get_positions().call()
+    print(list(alice_positions.result.positions_array))
+
+    # print("list size is : ", alice_len.result.res)
+
     #### Closing Of Orders ########
     size2 = to64x61(1)
     marketID_2 = BTC_USD_ID
 
-    order_id_3 = str_to_felt("rlbrj4hd")
+    order_id_3 = str_to_felt("rlbrj32414hd")
     assetID_3 = BTC_ID
     collateralID_3 = USDC_ID
     price3 = to64x61(6000)
@@ -1059,7 +964,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     leverage3 = to64x61(1)
     liquidatorAddress3 = 0
 
-    order_id_4 = str_to_felt("tew2334")
+    order_id_4 = str_to_felt("tew243sdf2334")
     assetID_4 = BTC_ID
     collateralID_4 = USDC_ID
     price4 = to64x61(6000)
@@ -1094,42 +999,28 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 0,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 1,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
     ])
 
-    orderState3 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState3 = await alice.get_position_data(market_id_=marketID_2, direction_=direction1).call()
     res3 = list(orderState3.result.res)
 
     assert res3 == [
-        assetID_3,
-        collateralID_3,
-        price1,
         execution_price1,
         0,
-        orderType1,
-        direction1,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage3
     ]
 
-    orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState4 = await bob.get_position_data(market_id_=marketID_2, direction_=direction2).call()
     res4 = list(orderState4.result.res)
 
     assert res4 == [
-        assetID_4,
-        collateralID_4,
-        price2,
         execution_price1,
         0,
-        orderType2,
-        direction2,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage4
@@ -1151,16 +1042,27 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     assert bob_total_fees_after.result.fee == bob_total_fees.result.fee
     assert feeBalance_after.result.fee == feeBalance_curr.result.fee
 
-    # Should be able to remove a closed order
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'remove_from_array', [0])
+@pytest.mark.asyncio
+async def test_retrieval_of_net_positions_1(adminAuth_factory):
+    starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
+
+    alice_net_positions = await alice.get_net_positions().call()
+    alice_net_positions_parsed = list(alice_net_positions.result.net_positions_array)
+
+    assert len(alice_net_positions_parsed) == 0
+
+    bob_net_positions = await bob.get_net_positions().call()
+    bob_net_positions_parsed = list(bob_net_positions.result.net_positions_array)
+    
+    assert len(bob_net_positions_parsed) == 0
 
 @pytest.mark.asyncio
 async def test_three_orders_in_a_batch(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(100000)
-    charlie_balance = to64x61(100000)
+    alice_balance = to64x61(50000)
+    bob_balance = to64x61(50000)
+    charlie_balance = to64x61(50000)
 
     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
     await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
@@ -1174,7 +1076,7 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     size1 = to64x61(4)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("asdlfkjaf")
+    order_id_1 = str_to_felt("32iga62jsgfds")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(9325.2432042)
@@ -1187,7 +1089,7 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     leverage1 = to64x61(1)
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("fdser34iu45g")
+    order_id_2 = str_to_felt("873h2kkjsffg")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(9325.03424)
@@ -1200,7 +1102,7 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     leverage2 = to64x61(1)
     liquidatorAddress2 = 0
 
-    order_id_3 = str_to_felt("3dfw32423rv")
+    order_id_3 = str_to_felt("dsfwr432")
     assetID_3 = BTC_ID
     collateralID_3 = USDC_ID
     price3 = to64x61(9324.43)
@@ -1250,62 +1152,41 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         marketID_1,
         3,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
         charlie.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 0,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
-        position1,
-        orderType1,
-        direction1,
-        size1,
-        1,
+        to64x61(4),
         to64x61(37300),
         to64x61(0),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
         position2,
-        orderType2,
-        direction2,
-        position2,
-        2,
         to64x61(27975),
         to64x61(0),
         leverage2
     ]
 
-    orderState3 = await charlie.get_order_data(orderID_=order_id_3).call()
+    orderState3 = await charlie.get_position_data(market_id_=marketID_1, direction_=direction3).call()
     res3 = list(orderState3.result.res)
 
     assert res3 == [
-        assetID_3,
-        collateralID_3,
-        price3,
         execution_price1,
         position3,
-        orderType3,
-        direction3,
-        position3,
-        2,
         to64x61(9325),
         to64x61(0),
         leverage3
@@ -1329,12 +1210,6 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     #assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
     #assert from64x61(charlie_total_fees.result.fee) == from64x61(charlie_total_fees_before.result.fee + fees3.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res + fees3.result.res)
-
-    # Cannot remove an open order from the array`
-    await assert_revert(
-        admin1_signer.send_transaction(admin1, alice.contract_address, 'remove_from_array', [0]),
-        "The order is not fully closed yet"
-    )
 
     ##### Closing Of Orders ########
     size2 = to64x61(4)
@@ -1406,59 +1281,38 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         marketID_2,
         3,
         alice.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 1,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
         bob.contract_address, signed_message5[0], signed_message5[
-            1], order_id_5, assetID_5, collateralID_5, price5, stopPrice5, orderType5, position5, direction5, closeOrder5, leverage5, liquidatorAddress5, parentOrder5, 0,
+            1], order_id_5, assetID_5, collateralID_5, price5, stopPrice5, orderType5, position5, direction5, closeOrder5, leverage5, liquidatorAddress5, 0,
         charlie.contract_address, signed_message6[0], signed_message6[
-            1], order_id_6, assetID_6, collateralID_6, price6, stopPrice6, orderType6, position6, direction6, closeOrder6, leverage6, liquidatorAddress6, parentOrder6, 0,
+            1], order_id_6, assetID_6, collateralID_6, price6, stopPrice6, orderType6, position6, direction6, closeOrder6, leverage6, liquidatorAddress6, 0,
     ])
 
-    orderState4 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState4 = await alice.get_position_data(market_id_=marketID_2, direction_=direction1).call()
     res4 = list(orderState4.result.res)
     assert res4 == [
-        assetID_4,
-        collateralID_4,
-        price1,
         execution_price1,
-        to64x61(1),
-        orderType1,
-        direction1,
         0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage4
     ]
 
-    orderState5 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState5 = await bob.get_position_data(market_id_=marketID_2, direction_=direction2).call()
     res5 = list(orderState5.result.res)
     assert res5 == [
-        assetID_5,
-        collateralID_5,
-        price2,
         execution_price1,
         0,
-        orderType2,
-        direction2,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage5
     ]
 
-    orderState6 = await charlie.get_order_data(orderID_=order_id_3).call()
+    orderState6 = await charlie.get_position_data(market_id_=marketID_2, direction_=direction3).call()
     res6 = list(orderState6.result.res)
     assert res6 == [
-        assetID_6,
-        collateralID_6,
-        price3,
         execution_price1,
         0,
-        orderType3,
-        direction3,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage6
@@ -1485,12 +1339,9 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     assert charlie_total_fees_after.result.fee == charlie_total_fees.result.fee
     assert feeBalance_after.result.fee == feeBalance_curr.result.fee
 
-    # Should be able to remove a close order from the array
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'remove_from_array', [0])
-
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
@@ -1505,7 +1356,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("343uofdsjxz")
+    order_id_1 = str_to_felt("iu21iosdf8453")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
@@ -1564,42 +1415,28 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
-        position1,
-        orderType1,
-        direction1,
         to64x61(2),
-        2,
         to64x61(5000),
         to64x61(5000),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
-        position2,
-        orderType2,
-        direction2,
         to64x61(2),
-        2,
         to64x61(5000),
         to64x61(5000),
         leverage2
@@ -1619,16 +1456,11 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     # Commenting due to 64x61 bug
     #assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
-
-    alice_position_array = await alice.return_array_positions().call()
-    alice_parsed = list(alice_position_array.result.array_list)
-    print("Alice Array:", alice_parsed)
-
     #### Closing Of Orders ########
     size2 = to64x61(2)
     marketID_2 = BTC_USD_ID
 
-    order_id_3 = str_to_felt("rlbrj4hd")
+    order_id_3 = str_to_felt("dfs32423gdsga")
     assetID_3 = BTC_ID
     collateralID_3 = USDC_ID
     price3 = to64x61(6000)
@@ -1641,7 +1473,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     leverage3 = to64x61(2)
     liquidatorAddress3 = 0
 
-    order_id_4 = str_to_felt("tew2334")
+    order_id_4 = str_to_felt("tew2hda334")
     assetID_4 = BTC_ID
     collateralID_4 = USDC_ID
     price4 = to64x61(6000)
@@ -1711,42 +1543,28 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 1,
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 0,
     ])
 
-    orderState3 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState3 = await alice.get_position_data(market_id_=marketID_2, direction_=direction1).call()
     res3 = list(orderState3.result.res)
 
     assert res3 == [
-        assetID_3,
-        collateralID_3,
-        price1,
         execution_price1,
         0,
-        orderType1,
-        direction1,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage3
     ]
 
-    orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState4 = await bob.get_position_data(market_id_=marketID_2, direction_=direction2).call()
     res4 = list(orderState4.result.res)
 
     assert res4 == [
-        assetID_4,
-        collateralID_4,
-        price2,
         execution_price1,
         0,
-        orderType2,
-        direction2,
-        0,
-        4,
         to64x61(0),
         to64x61(0),
         leverage4
@@ -1777,10 +1595,131 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     assert bob_total_fees_after.result.fee == bob_total_fees.result.fee
     assert feeBalance_after.result.fee == feeBalance_curr.result.fee
 
+@pytest.mark.asyncio
+async def test_opening_full_stop_orders(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
+
+    alice_balance = to64x61(100000)
+    bob_balance = to64x61(100000)
+
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+
+    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
+    bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+
+    ####### Opening of Orders #######
+    size = to64x61(1)
+    marketID_1 = BTC_USD_ID
+
+    order_id_1 = str_to_felt("ds32kjksdldsf")
+    assetID_1 = BTC_ID
+    collateralID_1 = USDC_ID
+    price1 = to64x61(5000)
+    stopPrice1 = to64x61(6000)
+    orderType1 = 2
+    position1 = to64x61(1)
+    direction1 = 0
+    closeOrder1 = 0
+    parentOrder1 = 0
+    leverage1 = to64x61(1)
+    liquidatorAddress1 = 0
+
+    order_id_2 = str_to_felt("34kj1hkhadsf")
+    assetID_2 = BTC_ID
+    collateralID_2 = USDC_ID
+    price2 = to64x61(5000)
+    stopPrice2 = to64x61(4000)
+    orderType2 = 2
+    position2 = to64x61(1)
+    direction2 = 1
+    closeOrder2 = 0
+    parentOrder2 = 0
+    leverage2 = to64x61(1)
+    liquidatorAddress2 = 0
+
+    execution_price1 = to64x61(5000)
+
+    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
+    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
+
+    signed_message1 = alice_signer.sign(hash_computed1)
+    signed_message2 = bob_signer.sign(hash_computed2)
+
+    amount1 = await fixed_math.Math64x61_mul(execution_price1, size).call()
+    fees1 = await fixed_math.Math64x61_mul(amount1.result.res, maker_trading_fees).call()
+    total_amount1 = amount1.result.res + fees1.result.res
+
+    amount2 = await fixed_math.Math64x61_mul(execution_price1, size).call()
+    fees2 = await fixed_math.Math64x61_mul(amount2.result.res, taker_trading_fees).call()
+    total_amount2 = amount2.result.res + fees2.result.res
+
+    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+
+    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size,
+        execution_price1,
+        marketID_1,
+        2,
+        alice.contract_address, signed_message1[0], signed_message1[
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
+        bob.contract_address, signed_message2[0], signed_message2[
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
+    ])
+
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
+    res1 = list(orderState1.result.res)
+    print("Stop order 1", from64x61(res1[0]), from64x61(res1[1]), from64x61(res1[2]), from64x61(res1[3]), from64x61(res1[4]))
+
+    assert res1 == [
+        execution_price1,
+        to64x61(1),
+        to64x61(5000),
+        to64x61(0),
+        leverage1
+    ]
+
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
+    res2 = list(orderState2.result.res)
+
+    print("Stop order 2", from64x61(res2[0]), from64x61(res2[1]), from64x61(res2[2]), from64x61(res2[3]), from64x61(res2[4]))
+    assert res2 == [
+        execution_price1,
+        to64x61(1),
+        to64x61(5000),
+        to64x61(0),
+        leverage2
+    ]
+
+    alice_curr_balance = await alice.get_balance(USDC_ID).call()
+    bob_curr_balance = await bob.get_balance(USDC_ID).call()
+    holdingBalance = await holding.balance(asset_id_=USDC_ID).call()
+    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
+    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
+    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+
+    print("Fee balance got: ", feeBalance_curr.result.fee)
+    print("Alice fee: ", alice_total_fees.result.fee)
+    print("Bob fee: ", bob_total_fees.result.fee)
+
+    assert from64x61(alice_curr_balance.result.res) == from64x61(alice_curr_balance_before.result.res - total_amount1)
+    assert from64x61(bob_curr_balance.result.res) == from64x61(bob_curr_balance_before.result.res - total_amount2)
+    assert holdingBalance.result.amount == holdingBalance_before.result.amount + \
+        amount1.result.res + amount2.result.res
+    # Commenting the below line because of 64x61 bug
+    #assert from64x61(alice_total_fees.result.fee) == from64x61(alice_total_fees_before.result.fee) + from64x61(fees1.result.res)
+    assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
+    #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
+
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
@@ -1795,7 +1734,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     size1 = to64x61(5)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("678uofdsjxz")
+    order_id_1 = str_to_felt("gf8oiahkjhxcv")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
@@ -1808,7 +1747,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     leverage1 = to64x61(10)
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("ryt4iljemn")
+    order_id_2 = str_to_felt("324kjhkldfs832")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(5000)
@@ -1857,42 +1796,28 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
-        position1,
-        orderType1,
-        direction1,
         to64x61(5),
-        1,
         to64x61(2500),
         to64x61(22500),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
-        position2,
-        orderType2,
-        direction2,
         to64x61(5),
-        2,
         to64x61(25000),
         to64x61(0),
         leverage2
@@ -1925,7 +1850,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     size2 = to64x61(2.5)
     marketID_2 = BTC_USD_ID
 
-    order_id_3 = str_to_felt("rlbrj4hd")
+    order_id_3 = str_to_felt("35hsarfg")
     assetID_3 = BTC_ID
     collateralID_3 = USDC_ID
     price3 = to64x61(6000)
@@ -1938,7 +1863,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     leverage3 = to64x61(10)
     liquidatorAddress3 = 0
 
-    order_id_4 = str_to_felt("tew2334")
+    order_id_4 = str_to_felt("t3242sfhzad334")
     assetID_4 = BTC_ID
     collateralID_4 = USDC_ID
     price4 = to64x61(6000)
@@ -2011,42 +1936,28 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 1, 
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 1, 
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 0,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 0,
     ])
 
-    orderState3 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState3 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res3 = list(orderState3.result.res)
 
     assert res3 == [
-        assetID_3,
-        collateralID_3,
-        price1,
         execution_price1,
-        to64x61(7.5),
-        orderType1,
-        direction1,
         to64x61(2.5),
-        3,
         to64x61(1250),
         to64x61(11250),
         leverage3
     ]
 
-    orderState4 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState4 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res4 = list(orderState4.result.res)
 
     assert res4 == [
-        assetID_4,
-        collateralID_4,
-        price2,
         execution_price1,
         to64x61(2.5),
-        orderType2,
-        direction2,
-        to64x61(2.5),
-        3,
         to64x61(12500),
         to64x61(0),
         leverage4
@@ -2088,7 +1999,7 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     size = to64x61(2.5)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("678uofdsjxz")
+    order_id_1 = str_to_felt("yt56kjhxcv")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
     price1 = to64x61(5000)
@@ -2101,13 +2012,13 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     leverage1 = to64x61(10)
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("ryt4iljeno")
+    order_id_2 = str_to_felt("324kjh65fghdfs832")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
-    position2 = to64x61(2.5)
+    position2 = to64x61(5.7)
     direction2 = 0
     closeOrder2 = 0
     parentOrder2 = 0
@@ -2147,43 +2058,29 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 1, 
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 0, 
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
-
+   
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
+    res2 = list(orderState2.result.res)
+    
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
-        position1,
-        orderType1,
-        direction1,
         to64x61(5),
-        1,
         to64x61(2500),
         to64x61(22500),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
-    res2 = list(orderState2.result.res)
-
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
-        position2,
-        orderType2,
-        direction2,
-        to64x61(2.5),
-        2,
-        to64x61(12500),
+        to64x61(5),
+        to64x61(25000),
         to64x61(0),
         leverage2
     ]
@@ -2203,52 +2100,44 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     #assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
     #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
 
-
-
 @pytest.mark.asyncio
-async def test_opening_full_stop_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
-
-    alice_balance = to64x61(100000)
-    bob_balance = to64x61(100000)
-
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+async def test_opening_multiple_markets(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
     alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
     bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
 
     ####### Opening of Orders #######
-    size = to64x61(1)
-    marketID_1 = BTC_USD_ID
+    size1 = to64x61(2)
+    marketID_1 = ETH_USD_ID
 
-    order_id_1 = str_to_felt("343uofdsjnva")
-    assetID_1 = BTC_ID
+    order_id_1 = str_to_felt("i21dsgsfsdf8453")
+    assetID_1 = ETH_ID
     collateralID_1 = USDC_ID
-    price1 = to64x61(5000)
-    stopPrice1 = to64x61(6000)
-    orderType1 = 2
-    position1 = to64x61(1)
+    price1 = to64x61(1500)
+    stopPrice1 = 0
+    orderType1 = 0
+    position1 = to64x61(2)
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = to64x61(1)
+    leverage1 = to64x61(2)
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("wer4iljerwa")
-    assetID_2 = BTC_ID
+    order_id_2 = str_to_felt("jdsio3kllcx")
+    assetID_2 = ETH_ID
     collateralID_2 = USDC_ID
-    price2 = to64x61(5000)
-    stopPrice2 = to64x61(4000)
-    orderType2 = 2
-    position2 = to64x61(1)
+    price2 = to64x61(1500)
+    stopPrice2 = 0
+    orderType2 = 0
+    position2 = to64x61(2)
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = to64x61(1)
+    leverage2 = to64x61(2)
     liquidatorAddress2 = 0
 
-    execution_price1 = to64x61(5000)
+    execution_price1 = to64x61(1500)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
                                 price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
@@ -2258,12 +2147,16 @@ async def test_opening_full_stop_orders(adminAuth_factory):
     signed_message1 = alice_signer.sign(hash_computed1)
     signed_message2 = bob_signer.sign(hash_computed2)
 
-    amount1 = await fixed_math.Math64x61_mul(execution_price1, size).call()
-    fees1 = await fixed_math.Math64x61_mul(amount1.result.res, maker_trading_fees).call()
+    size_without_leverage1 = await fixed_math.Math64x61_div(size1, leverage1).call()
+    amount1 = await fixed_math.Math64x61_mul(execution_price1, size_without_leverage1.result.res).call()
+    amount_for_fee1 = await fixed_math.Math64x61_mul(execution_price1, size1).call()
+    fees1 = await fixed_math.Math64x61_mul(amount_for_fee1.result.res, taker_trading_fees).call()
     total_amount1 = amount1.result.res + fees1.result.res
 
-    amount2 = await fixed_math.Math64x61_mul(execution_price1, size).call()
-    fees2 = await fixed_math.Math64x61_mul(amount2.result.res, taker_trading_fees).call()
+    size_without_leverage2 = await fixed_math.Math64x61_div(size1, leverage2).call()
+    amount2 = await fixed_math.Math64x61_mul(execution_price1, size_without_leverage2.result.res).call()
+    amount_for_fee2 = await fixed_math.Math64x61_mul(execution_price1, size1).call()
+    fees2 = await fixed_math.Math64x61_mul(amount_for_fee2.result.res, maker_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
     holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
@@ -2272,49 +2165,35 @@ async def test_opening_full_stop_orders(adminAuth_factory):
     bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
 
     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
-        size,
+        size1,
         execution_price1,
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
+    orderState1 = await alice.get_position_data(market_id_=marketID_1, direction_=direction1).call()
     res1 = list(orderState1.result.res)
 
     assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
         execution_price1,
-        position1,
-        orderType1,
-        direction1,
-        size,
-        2,
-        to64x61(5000),
-        to64x61(0),
+        to64x61(2),
+        to64x61(1500),
+        to64x61(1500),
         leverage1
     ]
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
+    orderState2 = await bob.get_position_data(market_id_=marketID_1, direction_=direction2).call()
     res2 = list(orderState2.result.res)
 
     assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
         execution_price1,
-        position2,
-        orderType2,
-        direction2,
-        size,
-        2,
-        to64x61(5000),
-        to64x61(0),
+        to64x61(2),
+        to64x61(1500),
+        to64x61(1500),
         leverage2
     ]
 
@@ -2325,61 +2204,122 @@ async def test_opening_full_stop_orders(adminAuth_factory):
     alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
     bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
 
-    print("Fee balance got: ", feeBalance_curr.result.fee)
-    print("Alice fee: ", alice_total_fees.result.fee)
-    print("Bob fee: ", bob_total_fees.result.fee)
-
     assert from64x61(alice_curr_balance.result.res) == from64x61(alice_curr_balance_before.result.res - total_amount1)
     assert from64x61(bob_curr_balance.result.res) == from64x61(bob_curr_balance_before.result.res - total_amount2)
-    assert holdingBalance.result.amount == holdingBalance_before.result.amount + \
-        amount1.result.res + amount2.result.res
-    # Commenting the below line because of 64x61 bug
-    #assert from64x61(alice_total_fees.result.fee) == from64x61(alice_total_fees_before.result.fee) + from64x61(fees1.result.res)
-    assert from64x61(bob_total_fees.result.fee) == from64x61(bob_total_fees_before.result.fee + fees2.result.res)
-    #assert from64x61(feeBalance_curr.result.fee) == from64x61(feeBalance_before.result.fee + fees1.result.res + fees2.result.res)
+    assert from64x61(holdingBalance.result.amount) == from64x61(holdingBalance_before.result.amount + amount_for_fee1.result.res + amount_for_fee2.result.res)
+    assert from64x61(alice_total_fees.result.fee) == from64x61(alice_total_fees_before.result.fee + fees1.result.res)
 
 
 @pytest.mark.asyncio
-async def test_for_risk_while_opening_order(adminAuth_factory):
-    starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance = adminAuth_factory
+async def test_retrieval_of_net_positions_2(adminAuth_factory):
+    starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, _ = adminAuth_factory
 
-    alice_balance = to64x61(800)
-    bob_balance = to64x61(10000)
+    alice_net_positions = await alice.get_net_positions().call()
+    alice_net_positions_parsed = list(alice_net_positions.result.net_positions_array)
+
+    bob_net_positions = await bob.get_net_positions().call()
+    bob_net_positions_parsed = list(bob_net_positions.result.net_positions_array)
+
+    print(from64x61(alice_net_positions_parsed[0].position_size))
+    print(from64x61(bob_net_positions_parsed[0].position_size))
+
+    assert len(alice_net_positions_parsed) == 2
+    assert len(bob_net_positions_parsed) == 2
+
+    assert from64x61(alice_net_positions_parsed[0].position_size) == 4.0
+    assert from64x61(bob_net_positions_parsed[0].position_size) == -4.0
+
+    assert from64x61(alice_net_positions_parsed[1].position_size) == -2.0
+    assert from64x61(bob_net_positions_parsed[1].position_size) == 2.0
+
+    alice_positions = await alice.get_positions().call()
+    print_parsed_positions(alice_positions.result.positions_array)
+    # print(list(alice_positions.result.positions_array))
+
+    bob_positions = await bob.get_positions().call()
+    # print(list(bob_positions.result.positions_array))
+    print_parsed_positions(bob_positions.result.positions_array)
+
+    alice_collaterals = await alice.return_array_collaterals().call()
+    print_parsed_collaterals(alice_collaterals.result.array_list)
+
+    bob_collaterals = await bob.return_array_collaterals().call()
+    print_parsed_collaterals(bob_collaterals.result.array_list)
+
+    alice_curr_balance = await alice.get_balance(USDC_ID).call()
+    bob_curr_balance = await bob.get_balance(USDC_ID).call()
+
+    print("Alice new balance", from64x61(alice_curr_balance.result.res))
+    print("Bob new balance", from64x61(bob_curr_balance.result.res))
+
+    BTC_market_price = await marketPrices.get_market_price(BTC_USD_ID).call()
+    print(from64x61(BTC_market_price.result.market_price.price))
+
+    ETH_market_price = await marketPrices.get_market_price(ETH_USD_ID).call()
+    print(from64x61(ETH_market_price.result.market_price.price))
+
+@pytest.mark.asyncio
+async def test_for_risk_while_opening_order(adminAuth_factory):
+    starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate = adminAuth_factory
+
+    alice_balance = to64x61(100)
+    bob_balance = to64x61(800)
 
     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
     await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
 
+    alice_curr_balance = await alice.get_balance(USDC_ID).call()
+    bob_curr_balance = await bob.get_balance(USDC_ID).call()
+
+    print("Alice new balance", from64x61(alice_curr_balance.result.res))
+    print("Bob new balance", from64x61(bob_curr_balance.result.res))
+
+    alice_collaterals = await alice.return_array_collaterals().call()
+    print_parsed_collaterals(alice_collaterals.result.array_list)
+
+    bob_collaterals = await bob.return_array_collaterals().call()
+    print_parsed_collaterals(bob_collaterals.result.array_list)
+
+    timestamp = int(time.time()) + 61
+
+    starknet.state.state.block_info = BlockInfo(
+        block_number=1, block_timestamp=timestamp, gas_price=starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
+
     ####### Opening of Orders #######
-    size = to64x61(10)
+    size = to64x61(1)
     marketID_1 = BTC_USD_ID
 
-    order_id_1 = str_to_felt("343uosawhit")
+    order_id_1 = str_to_felt("343uosawhdft")
     assetID_1 = BTC_ID
     collateralID_1 = USDC_ID
-    price1 = to64x61(500)
+    price1 = to64x61(200)
     stopPrice1 = 0
     orderType1 = 0
-    position1 = to64x61(10)
+    position1 = to64x61(1)
     direction1 = 1
     closeOrder1 = 0
     parentOrder1 = 0
     leverage1 = to64x61(10)
     liquidatorAddress1 = 0
 
-    order_id_2 = str_to_felt("wer4ilabcd")
+    order_id_2 = str_to_felt("dfsdsw34fds")
     assetID_2 = BTC_ID
     collateralID_2 = USDC_ID
-    price2 = to64x61(500)
+    price2 = to64x61(200)
     stopPrice2 = 0
     orderType2 = 0
-    position2 = to64x61(10)
+    position2 = to64x61(1)
     direction2 = 0
     closeOrder2 = 0
     parentOrder2 = 0
     leverage2 = to64x61(1)
     liquidatorAddress2 = 0
 
-    execution_price1 = to64x61(500)
+    execution_price1 = to64x61(200)
 
     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
                                 price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
@@ -2395,74 +2335,38 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
         marketID_1,
         2,
         alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, parentOrder1, 0,
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, parentOrder2, 1,
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
     ])
 
-    orderState1 = await alice.get_order_data(orderID_=order_id_1).call()
-    res1 = list(orderState1.result.res)
+    BTC_market_price = await marketPrices.get_market_price(BTC_USD_ID).call()
+    print("BTC price is ",from64x61(BTC_market_price.result.market_price.price))
 
-    assert res1 == [
-        assetID_1,
-        collateralID_1,
-        price1,
-        execution_price1,
-        position1,
-        orderType1,
-        direction1,
-        size,
-        2,
-        to64x61(500),
-        to64x61(4500),
-        leverage1
-    ]
+    ETH_market_price = await marketPrices.get_market_price(ETH_USD_ID).call()
+    print("ETH price before is ",from64x61(ETH_market_price.result.market_price.price))
 
-    orderState2 = await bob.get_order_data(orderID_=order_id_2).call()
-    res2 = list(orderState2.result.res)
+    print("timestamp for BTC is: ", BTC_market_price.result.market_price.timestamp)
+    print("timestamp for ETH before is: ", ETH_market_price.result.market_price.timestamp)
+    print("current timestamp is:", timestamp)
 
-    assert res2 == [
-        assetID_2,
-        collateralID_2,
-        price2,
-        execution_price1,
-        position2,
-        orderType2,
-        direction2,
-        size,
-        2,
-        to64x61(5000),
-        to64x61(0),
-        leverage2
-    ]
+    await admin1_signer.send_transaction(admin1, marketPrices.contract_address, "update_market_price", [ETH_USD_ID, to64x61(1500)])
 
-    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
-
-    print("Fee balance got: ", feeBalance_curr.result.fee)
-    print("Alice fee: ", alice_total_fees.result.fee)
-    print("Bob fee: ", bob_total_fees.result.fee)
-
-    timestamp = int(time.time()) + 30
-
-    starknet.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp, gas_price=starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
-    )
+    ETH_market_price = await marketPrices.get_market_price(ETH_USD_ID).call()
+    print("ETH price after is ",from64x61(ETH_market_price.result.market_price.price))
+    print("timestamp for ETH after is: ", ETH_market_price.result.market_price.timestamp)
 
     #### Opening Of new Order ########
-    size2 = to64x61(10)
+    size2 = to64x61(1)
     marketID_2 = BTC_USD_ID
 
     order_id_3 = str_to_felt("rlbruidd")
     assetID_3 = BTC_ID
     collateralID_3 = USDC_ID
-    price3 = to64x61(250)
+    price3 = to64x61(100)
     stopPrice3 = 0
     orderType3 = 0
-    position3 = to64x61(10)
+    position3 = to64x61(1)
     direction3 = 1
     closeOrder3 = 0
     parentOrder3 = 0
@@ -2472,17 +2376,17 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     order_id_4 = str_to_felt("tew43d34")
     assetID_4 = BTC_ID
     collateralID_4 = USDC_ID
-    price4 = to64x61(250)
+    price4 = to64x61(100)
     stopPrice4 = 0
     orderType4 = 0
-    position4 = to64x61(10)
+    position4 = to64x61(1)
     direction4 = 0
     closeOrder4 = 0
     parentOrder4 = 0
     leverage4 = to64x61(1)
     liquidatorAddress4 = 0
 
-    execution_price2 = to64x61(250)
+    execution_price2 = to64x61(100)
 
     hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3,
                                 price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3)
@@ -2498,7 +2402,119 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
         marketID_2,
         2,
         alice.contract_address, signed_message3[0], signed_message3[
-            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, parentOrder3, 0,
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
         bob.contract_address, signed_message4[0], signed_message4[
-            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, parentOrder4, 1,
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
+    ]))
+
+@pytest.mark.asyncio
+async def test_check_for_collision(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
+
+    charlie_balance = to64x61(10000)
+    bob_balance = to64x61(5000)
+    await admin1_signer.send_transaction(admin1, charlie.contract_address, 'set_balance', [USDC_ID, charlie_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+
+    ####### Open order partially #######
+    size1 = to64x61(3)
+    marketID_1 = BTC_USD_ID
+
+    order_id_1 = str_to_felt("fdswq23ji3i4u2")
+    assetID_1 = BTC_ID
+    collateralID_1 = USDC_ID
+    price1 = to64x61(250)
+    stopPrice1 = 0
+    orderType1 = 0
+    position1 = to64x61(10)
+    direction1 = 1
+    closeOrder1 = 0
+    parentOrder1 = 0
+    leverage1 = to64x61(2)
+    liquidatorAddress1 = 0
+
+    order_id_2 = str_to_felt("93jfkdslasfvdsz")
+    assetID_2 = BTC_ID
+    collateralID_2 = USDC_ID
+    price2 = to64x61(250)
+    stopPrice2 = 0
+    orderType2 = 0
+    position2 = to64x61(5)
+    direction2 = 0
+    closeOrder2 = 0
+    parentOrder2 = 0
+    leverage2 = to64x61(1)
+    liquidatorAddress2 = 0
+
+    execution_price1 = to64x61(250)
+
+    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
+    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
+
+    signed_message1 = charlie_signer.sign(hash_computed1)
+    signed_message2 = bob_signer.sign(hash_computed2)
+
+    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size1,
+        execution_price1,
+        marketID_1,
+        2,
+        charlie.contract_address, signed_message1[0], signed_message1[
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
+        bob.contract_address, signed_message2[0], signed_message2[
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
+    ])
+
+
+    ####### Open order partially #######
+    size1 = to64x61(1)
+    marketID_1 = BTC_USD_ID
+
+    order_id_1 = str_to_felt("fdswq23ji3i4u2")
+    assetID_1 = BTC_ID
+    collateralID_1 = USDC_ID
+    price1 = to64x61(250)
+    stopPrice1 = 0
+    orderType1 = 0
+    position1 = to64x61(4)
+    direction1 = 1
+    closeOrder1 = 0
+    parentOrder1 = 0
+    leverage1 = to64x61(5)
+    liquidatorAddress1 = 0
+
+    order_id_2 = str_to_felt("93jfkdslasfvdsz")
+    assetID_2 = BTC_ID
+    collateralID_2 = USDC_ID
+    price2 = to64x61(250)
+    stopPrice2 = 0
+    orderType2 = 0
+    position2 = to64x61(5)
+    direction2 = 0
+    closeOrder2 = 0
+    parentOrder2 = 0
+    leverage2 = to64x61(1)
+    liquidatorAddress2 = 0
+
+    execution_price1 = to64x61(250)
+
+    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
+                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
+    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
+                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
+
+    signed_message1 = charlie_signer.sign(hash_computed1)
+    signed_message2 = bob_signer.sign(hash_computed2)
+
+    await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size1,
+        execution_price1,
+        marketID_1,
+        2,
+        charlie.contract_address, signed_message1[0], signed_message1[
+            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
+        bob.contract_address, signed_message2[0], signed_message2[
+            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
     ]))

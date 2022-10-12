@@ -1,7 +1,7 @@
 %lang starknet
 
 @contract_interface
-namespace IAccount {
+namespace IAccountLiquidator {
     func getPublicKey() -> (publicKey: felt) {
     }
 }

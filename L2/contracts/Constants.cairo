@@ -24,6 +24,8 @@ const AccountDeployer_INDEX = 20;
 const MarketPrices_INDEX = 21;
 const PubkeyWhitelister_INDEX = 22;
 const SigRequirementsManager_INDEX = 23;
+const Hightide_INDEX = 24;
+const TradingStats_INDEX = 25;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
@@ -50,15 +52,12 @@ const ManageFeeDetails_ACTION = 4;
 const ManageFunds_ACTION = 5;
 const ManageGovernanceToken_ACTION = 6;
 const ManageCollateralPrices_ACTION = 7;
+const ManageHighTide_ACTION = 8;
 
-const ORDER_INITIATED = 0;
-const ORDER_OPENED_PARTIALLY = 1;
-const ORDER_OPENED = 2;
-const ORDER_CLOSED_PARTIALLY = 3;
-const ORDER_CLOSED = 4;
-const ORDER_TO_BE_DELEVERAGED = 5;
-const ORDER_TO_BE_LIQUIDATED = 6;
-const ORDER_LIQUIDATED = 7;
+const POSITION_OPENED = 1;
+const POSITION_TO_BE_DELEVERAGED = 2;
+const POSITION_TO_BE_LIQUIDATED = 3;
+const POSITION_LIQUIDATED = 4;
 
 const MARKET_ORDER = 0;
 const LIMIT_ORDER = 1;
