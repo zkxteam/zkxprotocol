@@ -271,16 +271,16 @@ def build_default_asset_properties(
     id,
     short_name,
     asset_version = 1,
-    tradable = 0,
-    collateral = 0,
+    is_tradable = 0,
+    is_collateral = 0,
     token_decimal = 18
 ):
     return [
         id, 
         asset_version, 
         short_name, 
-        tradable, 
-        collateral, 
+        is_tradable, 
+        is_collateral, 
         token_decimal
     ]
 
@@ -289,16 +289,16 @@ def build_asset_properties(
     id,
     asset_version,
     short_name,
-    tradable,
-    collateral,
+    is_tradable,
+    is_collateral,
     token_decimal
 ):
     return [
         id, 
         asset_version, 
         short_name, 
-        tradable, 
-        collateral, 
+        is_tradable, 
+        is_collateral, 
         token_decimal
     ]
 

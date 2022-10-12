@@ -39,22 +39,9 @@ def build_default_asset_properties(id, ticker, name):
         0,  # asset_version
         ticker,  # ticker
         name,  # short_name
-        0,  # tradable
-        1,  # collateral
+        0,  # is_tradable
+        1,  # is_collateral
         18,  # token_decimal
-        0,  # metadata_id
-        1,  # tick_size
-        1,  # step_size
-        10,  # minimum_order_size
-        1,  # minimum_leverage
-        5,  # maximum_leverage
-        3,  # currently_allowed_leverage
-        1,  # maintenance_margin_fraction
-        1,  # initial_margin_fraction
-        1,  # incremental_initial_margin_fraction
-        100,  # incremental_position_size
-        1000,  # baseline_position_size
-        10000  # maximum_position_size
     ]
 
 

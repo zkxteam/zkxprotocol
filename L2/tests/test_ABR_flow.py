@@ -200,8 +200,8 @@ async def abr_factory(starknet_service: StarknetService):
         asset_version = 0,
         ticker = str_to_felt("BTC"),
         short_name = str_to_felt("Bitcoin"),
-        tradable = 1,
-        collateral = 0,
+        is_tradable = 1,
+        is_collateral = 0,
         token_decimal = 8
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_settings)
@@ -212,8 +212,8 @@ async def abr_factory(starknet_service: StarknetService):
         asset_version = 0,
         ticker = str_to_felt("USDC"),
         short_name = str_to_felt("USDC"),
-        tradable = 0,
-        collateral = 1,
+        is_tradable = 0,
+        is_collateral = 1,
         token_decimal = 6
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_settings)
@@ -224,8 +224,8 @@ async def abr_factory(starknet_service: StarknetService):
         BTC_ID, # asset id
         USDC_ID, # collateral id
         to64x61(10), # leverage
-        1, # tradable
-        0, # archived
+        1, # is_tradable
+        0, # is_archived
         10, # ttl
         1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000
     ])

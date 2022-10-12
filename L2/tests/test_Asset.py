@@ -23,7 +23,7 @@ def build_default_asset_properties(id, name):
         id, # id
         1, # asset_version
         name, # short_name
-        0, # tradable
+        0, # is_tradable
         0, # collateral
         18 # token_decimal
     ]
@@ -92,8 +92,8 @@ async def test_adding_asset_by_admin(adminAuth_factory):
 
     assert fetched_asset.id == asset_id
     assert fetched_asset.short_name == asset_name
-    assert fetched_asset.tradable == 0
-    assert fetched_asset.collateral == 0
+    assert fetched_asset.is_tradable == 0
+    assert fetched_asset.is_collateral == 0
     assert fetched_asset.token_decimal == 18
 
     assets = await asset.return_all_assets().call()
@@ -102,8 +102,8 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     assert parsed_list.id == asset_id
     assert parsed_list.asset_version == 1
     assert parsed_list.short_name == asset_name
-    assert parsed_list.tradable == 0
-    assert parsed_list.collateral == 0
+    assert parsed_list.is_tradable == 0
+    assert parsed_list.is_collateral == 0
     assert parsed_list.token_decimal == 18
 
 
@@ -151,8 +151,8 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
 
     assert fetched_asset.id == asset_id
     assert fetched_asset.short_name == new_asset_name
-    assert fetched_asset.tradable == new_tradable_status
-    assert fetched_asset.collateral == new_collateral
+    assert fetched_asset.is_tradable == new_tradable_status
+    assert fetched_asset.is_collateral == new_collateral
     assert fetched_asset.asset_version == 1
 
 

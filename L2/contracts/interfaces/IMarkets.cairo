@@ -40,23 +40,6 @@ namespace IMarkets {
     ) {
     }
 
-    func modify_trade_settings(
-        market_id_: felt,
-        tick_size_: felt,
-        step_size_: felt,
-        minimum_order_size_: felt,
-        minimum_leverage_: felt,
-        maximum_leverage_: felt,
-        currently_allowed_leverage_: felt,
-        maintenance_margin_fraction_: felt,
-        initial_margin_fraction_: felt,
-        incremental_initial_margin_fraction_: felt,
-        incremental_position_size_: felt,
-        baseline_position_size_: felt,
-        maximum_position_size_: felt
-    ) {
-    }
-
     func change_max_ttl(new_max_ttl_: felt) {
     }
 
