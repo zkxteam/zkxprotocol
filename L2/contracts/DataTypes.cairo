@@ -259,18 +259,28 @@ struct CoreFunction {
     function_selector: felt,
 }
 
+// Struct to store order volume
+struct OrderVolume {
+    size: felt,
+    price: felt,
+    timestamp: felt,
+}
+
+// Struct to store volume metadata
 struct VolumeMetaData {
     season_id: felt,
     pair_id: felt,
     order_type: felt,  // open/close
 }
 
+// Struct to store trading season data
 struct TradingSeason {
-    start_block_number : felt,
+    start_block_number: felt,
     start_timestamp: felt,
     num_trading_days: felt,
 }
 
+// Struct to store multipliers used to calculate total reward to be split between traders
 struct Multipliers {
     a1: felt,
     a2: felt,
@@ -278,10 +288,17 @@ struct Multipliers {
     a4: felt,
 }
 
+// Struct to store constants used to calculate individual trader score
 struct Constants {
     a: felt,
     b: felt,
     c: felt,
     z: felt,
     e: felt,
+}
+
+// Struct to store hightide metadata
+struct HighTideMetaData {
+    pair_id: felt,  // supported market
+    status: felt,  // either initiated (by token lister) or confirmed (by zkx, if funds or locked in the pool)
 }
