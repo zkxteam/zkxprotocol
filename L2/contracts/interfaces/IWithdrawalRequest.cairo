@@ -6,7 +6,7 @@ from contracts.DataTypes import WithdrawalRequest
 namespace IWithdrawalRequest {
     // external functions
     func add_withdrawal_request(
-        request_id_: felt, user_l1_address_: felt, ticker_: felt, amount_: felt
+        request_id_: felt, user_l1_address_: felt, assetID_: felt, amount_: felt
     ) {
     }
 

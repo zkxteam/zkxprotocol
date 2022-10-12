@@ -765,7 +765,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param assetID_ - Asset ID of the batch to be set by the first order
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
 // @param marketID_ - Market ID of the batch to be set by the first order
-// @param ticker_ - The ticker of each order in the batch
 // @param execution_price_ - Price at which the orders must be executed
 // @param request_list_len_ - No of orders in the batch
 // @param request_list_ - The batch of the orders
@@ -962,7 +961,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             assert_le(temp_order.leverage, market.currently_allowed_leverage);
         }
 
-        // Recursive call with the ticker and price to compare against
+        // Recursive call with the assetID and price to compare against
         return check_and_execute(
             size_,
             temp_order.assetID,

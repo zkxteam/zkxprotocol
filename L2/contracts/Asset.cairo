@@ -423,7 +423,6 @@ func populate_asset_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert asset_array_[current_len_] = Asset(
         id=id,
         asset_version=asset.asset_version,
-        ticker=id,
         short_name=asset.short_name,
         tradable=asset.tradable,
         collateral=asset.collateral,
