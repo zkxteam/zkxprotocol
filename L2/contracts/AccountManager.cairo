@@ -962,8 +962,7 @@ func withdraw{
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     );
-    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
-    tempvar ticker = asset.id;
+    let (local asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
     // Convert amount from Math64x61 format to felt
     let (amount_in_felt) = Math64x61_toDecimalFelt(amount_, decimals=asset.token_decimal);
     // Get the L1 wallet address of the user
@@ -976,7 +975,7 @@ func withdraw{
         contract_address=withdrawal_request_address,
         request_id_=request_id_,
         user_l1_address_=user_l1_address,
-        ticker_=ticker,
+        ticker_=asset.id,
         amount_=amount_in_felt,
     );
     // Create a withdrawal history object
