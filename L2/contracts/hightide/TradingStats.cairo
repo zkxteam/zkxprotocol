@@ -18,7 +18,7 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
-from contracts.Math_64x61 import Math64x61_mul
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_add
 
 // This contract can be used as a source of truth for all consumers of trade stats off-chain/on-chain
 // This does not have functions to calculate any of the hightide formulas
@@ -59,7 +59,7 @@ func num_traders(season_id: felt, pair_id: felt) -> (res: felt) {
 }
 
 // stores list of trader addresses for a pair in a season - retrievable by index in the list
-// currently this is unused
+// currently this is maintained but not used
 @storage_var
 func traders_in_pair(season_id: felt, pair_id: felt, index: felt) -> (trader_address: felt) {
 }
@@ -130,6 +130,7 @@ func get_season_trade_frequency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 }
 
 //@dev - This function returns the max number of trades in a day for season_id, pair_id
+// this might be used for calculating x_2 according to the hightide algorithm
 @view
 func get_max_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt
@@ -142,8 +143,8 @@ func get_max_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return (max_trades, );
 
 }
+
 // @dev - this function returns the number of trades recorded for a particular day upto the timestamp of call
-// this might be used for calculating x_2 according to the hightide algorithm
 @view
 func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, day_number_: felt
@@ -212,6 +213,10 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     // Get current season id from hightide
     let (season_id_) = IHighTide.get_current_season_id(hightide_address);
+
+    with_attr error_message("Invalid season id found") {
+        assert_le(1, season_id_);
+    }
 
     let (current_timestamp) = get_block_timestamp();
 
@@ -292,7 +297,8 @@ func record_trade_batch_stats_recurse{
 
     let (current_volume_64x61) = order_volume.read(volume_metadata);
     let (present_trade_volume_64x61) = Math64x61_mul(curr_order_size_64x61, execution_price_64x61_);
-    order_volume.write(volume_metadata, current_volume_64x61 + present_trade_volume_64x61);
+    let (updated_order_volume_64x61) = Math64x61_add(current_volume_64x61, present_trade_volume_64x61);
+    order_volume.write(volume_metadata,updated_order_volume_64x61);
 
     // increment number of trades storage_var
     num_orders.write(volume_metadata, current_len + 1);
