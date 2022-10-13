@@ -93,6 +93,16 @@ async def adminAuth_factory(starknet_service: StarknetService):
     daniel = await account_factory.deploy_ZKX_account(daniel_signer.public_key)
     eduard = await account_factory.deploy_ZKX_account(eduard_signer.public_key)
 
+    timestamp = int(time.time())
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
     ### Deploy infrastructure (Part 2)
     fixed_math = await starknet_service.deploy(
         ContractType.Math_64x61, 
@@ -138,16 +148,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ContractType.CollateralPrices, 
         [registry.contract_address, 1]
     )
-
-    timestamp = int(time.time())
-
-    starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
-        block_timestamp=timestamp, 
-        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
-    )
+    hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
+    trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -196,6 +198,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, collateral_prices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)

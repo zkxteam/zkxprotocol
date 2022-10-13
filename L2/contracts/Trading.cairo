@@ -27,6 +27,7 @@ from contracts.Constants import (
     SHORT,
     STOP_ORDER,
     TradingFees_INDEX,
+    TradingStats_INDEX,
 )
 from contracts.DataTypes import (
     Asset,
@@ -48,6 +49,7 @@ from contracts.interfaces.ILiquidate import ILiquidate
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
@@ -154,9 +156,10 @@ func execute_batch{
         holding_address: felt,
         trading_fees_address: felt,
         fees_balance_address: felt,
-        liquidate_address: felt,
         liquidity_fund_address: felt,
         insurance_fund_address: felt,
+        liquidate_address: felt,
+        trading_stats_address: felt,
     ) = get_registry_addresses();
 
     // Recursively loop through the orders in the batch
@@ -185,6 +188,15 @@ func execute_batch{
     with_attr error_message("check and execute returned non zero integer.") {
         assert result = 0;
     }
+
+    ITradingStats.record_trade_batch_stats(
+        contract_address=trading_stats_address,
+        pair_id_=marketID_,
+        order_size_=size_,
+        execution_price_=execution_price_,
+        request_list_len=request_list_len,
+        request_list=request_list,
+    );
     return ();
 }
 
@@ -210,6 +222,7 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     liquidity_fund_address: felt,
     insurance_fund_address: felt,
     liquidate_address: felt,
+    trading_stats_address: felt,
 ) {
     // Read the registry and version
     let (registry) = CommonLib.get_registry_address();
@@ -255,15 +268,21 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         contract_address=registry, index=InsuranceFund_INDEX, version=version
     );
 
+    // Get Trading stats address
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
     return (
         account_registry_address,
         asset_address,
         holding_address,
         trading_fees_address,
         fees_balance_address,
-        liquidate_address,
         liquidity_fund_address,
         insurance_fund_address,
+        liquidate_address,
+        trading_stats_address,
     );
 }
 

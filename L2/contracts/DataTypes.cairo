@@ -258,3 +258,36 @@ struct CoreFunction {
     version: felt,
     function_selector: felt,
 }
+
+struct OrderVolume {
+    size: felt,
+    price: felt,
+    timestamp: felt,
+}
+
+struct VolumeMetaData {
+    season_id: felt,
+    pair_id: felt,
+    order_type: felt,  // open/close
+}
+
+struct TradingSeason {
+    start_block_number : felt,
+    start_timestamp: felt,
+    num_trading_days: felt,
+}
+
+struct Multipliers {
+    a1: felt,
+    a2: felt,
+    a3: felt,
+    a4: felt,
+}
+
+struct Constants {
+    a: felt,
+    b: felt,
+    c: felt,
+    z: felt,
+    e: felt,
+}
