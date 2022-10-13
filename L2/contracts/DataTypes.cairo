@@ -297,8 +297,15 @@ struct Constants {
     e: felt,
 }
 
+// Struct to store details of reward tokens
+struct RewardToken {
+    token_id: felt,
+    no_of_tokens: felt,
+}
+
 // Struct to store hightide metadata
 struct HighTideMetaData {
     pair_id: felt,  // supported market
-    status: felt,  // either initiated (by token lister) or confirmed (by zkx, if funds or locked in the pool)
+    status: felt,  // either initialized (by token lister) or active (by zkx, if funds or locked in the pool) or ended (after reward distribution)
+    preferred_season_id: felt,
 }

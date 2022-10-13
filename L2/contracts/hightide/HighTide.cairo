@@ -8,8 +8,8 @@ from starkware.starknet.common.syscalls import (
     get_caller_address,
 )
 
-from contracts.Constants import ManageHighTide_ACTION, Trading_INDEX
-from contracts.DataTypes import Constants, Multipliers, TradingSeason
+from contracts.Constants import HIGHTIDE_INITIATED, ManageHighTide_ACTION, Trading_INDEX
+from contracts.DataTypes import Constants, HighTideMetaData, Multipliers, RewardToken, TradingSeason
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_mul
@@ -70,6 +70,31 @@ func seasons_array_len() -> (len: felt) {
 // Array of season ids
 @storage_var
 func season_id_by_index(index: felt) -> (season_id: felt) {
+}
+
+// Length of hightide array
+@storage_var
+func hightide_array_len() -> (len: felt) {
+}
+
+// Array of hightide ids
+@storage_var
+func hightide_id_by_index(index: felt) -> (hightide_id: felt) {
+}
+
+// Mapping between hightide id and hightide metadata
+@storage_var
+func hightide_by_id(hightide_id: felt) -> (hightide: HighTideMetaData) {
+}
+
+// Mapping between hightide id and reward token data
+@storage_var
+func reward_tokens_by_hightide_id(hightide_id: felt, index: felt) -> (reward_token: RewardToken) {
+}
+
+// Mapping between season id and hightide id
+@storage_var
+func hightide_id_by_season_id(season_id: felt, index: felt) -> (hightide_id: felt) {
 }
 
 //##############
@@ -261,6 +286,42 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return ();
 }
 
+// @notice - This function is used to initialize high tide
+// @param pair_id - supported market pair
+// @param preferred_season_id - preferred season
+// @param reward_tokens_list_len - no.of reward tokens for an hightide
+// @param reward_tokens_list - array of tokens to be given as reward
+@external
+func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    pair_id: felt,
+    preferred_season_id: felt,
+    reward_tokens_list_len: felt,
+    reward_tokens_list: RewardToken*,
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("Caller is not authorized to set constants") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+    verify_season_id_exists(preferred_season_id);
+
+    let (curr_len) = hightide_array_len.read();
+    let hightide_id = curr_len + 1;
+    hightide_id_by_index.write(curr_len, hightide_id);
+    hightide_array_len.write(curr_len + 1);
+
+    // Create hightide metadata structure
+    let hightide: HighTideMetaData = HighTideMetaData(
+        pair_id=pair_id, status=HIGHTIDE_INITIATED, preferred_season_id=preferred_season_id
+    );
+
+    hightide_by_id.write(hightide_id, hightide);
+
+    return ();
+}
+
 //#####################
 // Internal functions #
 //#####################
@@ -301,7 +362,7 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
 
     if (current_season_id != 0) {
-        with_attr error_message("HighTide: Current season still active") {
+        with_attr error_message("HighTide: Current trading season is still active") 
             assert_le(current_seasons_end_timestamp, current_timestamp);
         }
     } else {
