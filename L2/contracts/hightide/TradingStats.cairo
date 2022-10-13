@@ -213,9 +213,13 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     // Get current season id from hightide
     let (season_id_) = IHighTide.get_current_season_id(hightide_address);
-
-    with_attr error_message("Invalid season id found") {
-        assert_le(1, season_id_);
+    let invalid_season_id = is_le(season_id_,0);
+    
+    //Season id <=0 means that Hightide module has not been activated - in other words no season has been started in the system
+    //This scenario is similar to when a season has ended but a new one has not started yet
+    //In such a situation we just return without recording the trade stats
+    if(invalid_season_id == 1) {
+        return();
     }
 
     let (current_timestamp) = get_block_timestamp();
@@ -229,6 +233,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     let within_season = is_le(current_day, season.num_trading_days - 1);
 
     // If the season is over, return without setting the trading stats
+    // we do not check whether season has started, since Hightide returns only a season_id when it has started
     if (within_season == 0) {
         return ();
     }
@@ -436,6 +441,11 @@ func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     season_id_: felt, pair_id_: felt) -> felt {
     
     alloc_locals;
+
+    with_attr error_message("Invalid season id"){
+        assert_le(1,season_id_);
+    }
+
     let (registry_address) = get_registry_address();
     let (version) = get_contract_version();
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
