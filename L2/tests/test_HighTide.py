@@ -50,8 +50,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
 async def test_set_multipliers_unauthorized_user(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'set_multipliers', [
-        1, 2, 3, 4]))
+    await assert_revert( 
+        signer3.send_transaction(user1, hightide.contract_address, 'set_multipliers', [1, 2, 3, 4]),
+        reverted_with="HighTide: Unauthorized call to set multipliers"
+    )
 
 @pytest.mark.asyncio
 async def test_set_multipliers_authorized_admin(adminAuth_factory):
@@ -81,8 +83,10 @@ async def test_set_multipliers_authorized_admin(adminAuth_factory):
 async def test_set_constants_unauthorized_user(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'set_constants', [
-        1, 2, 3, 4, 5]))
+    await assert_revert( 
+        signer3.send_transaction(user1, hightide.contract_address, 'set_constants', [1, 2, 3, 4, 5]),
+        reverted_with="HighTide: Unauthorized call to set constants"
+    )
 
 @pytest.mark.asyncio
 async def test_set_constants_authorized_admin(adminAuth_factory):
@@ -113,8 +117,10 @@ async def test_set_constants_authorized_admin(adminAuth_factory):
 async def test_setup_trading_season_unauthorized_user(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'setup_trade_season', [
-        timestamp, to64x61(30)]))
+    await assert_revert( 
+        signer3.send_transaction(user1, hightide.contract_address, 'setup_trade_season', [timestamp, to64x61(30)]),
+        "HighTide: Unauthorized call to setup trade season"
+    )
 
 @pytest.mark.asyncio
 async def test_setup_trading_season_authorized_admin(adminAuth_factory):
@@ -145,8 +151,10 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
 async def test_start_trade_season_unauthorized_user(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    await assert_revert( signer3.send_transaction(user1, hightide.contract_address, 'start_trade_season', [
-        1]))
+    await assert_revert( 
+        signer3.send_transaction(user1, hightide.contract_address, 'start_trade_season', [1]),
+        reverted_with="HighTide: Unauthorized call to start trade season"  
+    )
 
 @pytest.mark.asyncio
 async def test_start_trade_season_authorized_admin(adminAuth_factory):
@@ -173,4 +181,4 @@ async def test_start_trade_season_authorized_admin(adminAuth_factory):
 async def test_get_season_with_invalid_season_id(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    await assert_revert(hightide.get_season(2).call())
+    await assert_revert(hightide.get_season(2).call(), reverted_with="HighTide: Trading season id existence mismatch")

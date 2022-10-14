@@ -62,7 +62,7 @@ func check_sig() -> (res: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Registry Address or Version cannot be 0") {
+    with_attr error_message("ValidatorRouter: Registry Address or Version cannot be 0") {
         assert_not_zero(registry_address_);
         assert_not_zero(version_);
     }
@@ -153,7 +153,7 @@ func call_core_function{
     // check nonce
     let (current_nonce) = nonce.read();
 
-    with_attr error_message("Nonce mismatch") {
+    with_attr error_message("SigRequirementsManager: Nonce mismatch") {
         assert current_nonce = core_function_call.nonce;
     }
 
@@ -186,7 +186,8 @@ func call_core_function{
     }
 
     // check we have equal number of signatures and public keys
-    with_attr error_message("No. of signatures does not match no. of public keys") {
+    with_attr error_message(
+            "SigRequirementsManager: No. of signatures does not match no. of public keys") {
         assert sig_len = pubkey_len;
     }
 
@@ -205,7 +206,8 @@ func call_core_function{
     );
 
     // check that atleast the required number of signatures have been given
-    with_attr error_message("No. of signatures sent is less than number required") {
+    with_attr error_message(
+            "SigRequirementsManager: No. of signatures sent is less than number required") {
         assert_le(num_req, sig_len);
     }
 
@@ -241,7 +243,7 @@ func call_core_function{
     );
 
     // check that number of valid signatures provided  >= number of signatures required
-    with_attr error_message("Insufficient no. of valid signatures") {
+    with_attr error_message("SigRequirementsManager: Insufficient no. of valid signatures") {
         assert_le(num_req, num_sig_provided);
     }
 

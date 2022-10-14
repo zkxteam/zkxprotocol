@@ -70,8 +70,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
 async def test_add_new_market_not_admin(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert( signer3.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+    await assert_revert( 
+        signer3.send_transaction(user1, market.contract_address, 'add_market', [str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
     )
 
 
@@ -79,40 +79,53 @@ async def test_add_new_market_not_admin(adminAuth_factory):
 async def test_add_new_market_invalid_leverage(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(11), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(11), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+        reverted_with="Markets: Leverage must be <= max leverage"
+    )
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(0), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(0), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+        reverted_with="Markets: Leverage must be >= 1"
+    )
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(-43)%PRIME, 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(-43)%PRIME, 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+        reverted_with="Markets: Leverage must be >= 1"
+    )
 
 @pytest.mark.asyncio
 async def test_add_new_market_invalid_ttl(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+        reverted_with="Markets: ttl must be > 1"  
+    )
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 36001, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 36001, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+        reverted_with="Markets: ttl must be <= max ttl" 
+    )
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, -60%PRIME, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, -60%PRIME, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+        reverted_with="Markets: ttl must be > 1"
+    )
 
 @pytest.mark.asyncio
 async def test_add_new_market_invalid_tradable(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 0, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
-
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 3, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 3, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+        reverted_with="Markets: Tradable must be <= max trabele"
+    )
     
-    await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), -1%PRIME, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), -1%PRIME, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+        reverted_with="Markets: Tradable cannot be less than zero"
+    )
 
 @pytest.mark.asyncio
 async def test_add_new_market_non_existent_asset(adminAuth_factory):
@@ -171,7 +184,9 @@ async def test_override_existing_market(adminAuth_factory):
 
     await assert_revert(
         signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-            str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj11"), str_to_felt("32f0406jz7qj7=10"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+            str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj11"), str_to_felt("32f0406jz7qj7=10"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+            reverted_with="Markets: market ID existence mismatch"  
+        )
 
 
 @pytest.mark.asyncio
@@ -180,7 +195,9 @@ async def test_add_new_market_with_existing_market_pair(adminAuth_factory):
 
     await assert_revert(
         signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-            str_to_felt("32f0406jz7qk9"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]))
+            str_to_felt("32f0406jz7qk9"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
+            reverted_with="Markets: Market pair existence mismatch"
+        )
 
 
 @pytest.mark.asyncio
@@ -299,7 +316,7 @@ async def test_change_leverage_unauthorized(adminAuth_factory):
 async def test_change_ttl_unauthorized(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_ttl_leverage', [to64x61(7200)]))
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_ttl', [to64x61(7200)]))
 
 
 @pytest.mark.asyncio

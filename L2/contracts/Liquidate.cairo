@@ -90,7 +90,7 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (caller) = get_caller_address();
 
     // Check if the list is empty
-    with_attr error_message("Invalid Input") {
+    with_attr error_message("Liquidate: Prices array cannot be empty") {
         assert_not_zero(prices_len);
     }
 
@@ -100,7 +100,7 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     ) = IAccountManager.get_positions(contract_address=account_address);
 
     // Check if the list is empty
-    with_attr error_message("Position array length is 0") {
+    with_attr error_message("Liquidate: User's positions array is empty") {
         assert_not_zero(positions_len);
     }
 
@@ -227,7 +227,7 @@ func find_collateral_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         balance=[collaterals].balance
         );
     // Check if the passed prices list is in proper order and the price is not negative
-    with_attr error_message("assetID and collateralID do not match") {
+    with_attr error_message("Liquidate: AssetID and collateralID mismatch") {
         assert price_details.collateralID = collateral_details.assetID;
         assert_nn(price_details.collateralPrice);
         assert price_details.assetPrice = 0;
@@ -346,13 +346,13 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         );
 
     // Check if there is a mismatch in prices array and positions array
-    with_attr error_message("assetID and collateralID do not match") {
+    with_attr error_message("Liquidate: AssetID and collateralID mismatch") {
         assert asset_id = price_details.assetID;
         assert collateral_id = price_details.collateralID;
     }
 
     // Check if the prices are not negative
-    with_attr error("price is invalid or the array is out of bounds") {
+    with_attr error("Liquidate: Invalid prices for collateral/asset") {
         assert_nn(price_details.collateralPrice);
         assert_nn(price_details.assetPrice);
     }
@@ -574,8 +574,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     );
 
     if (liq_result == TRUE) {
-        with_attr error_message(
-                "Current order will make the total account value to go below maintenance requirement") {
+        with_attr error_message("Liquidate: Position doesn't satisfy maintanence margin") {
             assert liq_result = FALSE;
         }
     }

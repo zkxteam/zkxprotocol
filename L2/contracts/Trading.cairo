@@ -290,7 +290,7 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // @param order_ - Order to check
 // @param execution_price_ - Price at which the order got matched
 func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    user_address_: felt, order_: MultipleOrder, execution_price_: felt
+    order_: MultipleOrder, execution_price_: felt
 ) {
     // Check if the execution_price is correct
     if (order_.orderType == STOP_ORDER) {
@@ -298,26 +298,24 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         if (order_.direction == LONG) {
             // if long stop order
             // check that stop_price <= execution_price <= limit_price
-            with_attr error_message("Trading: Invalid stop-price long order {user_address_}") {
+            with_attr error_message("Trading: Invalid stop-price long order") {
                 assert_le(order_.stopPrice, execution_price_);
             }
             tempvar range_check_ptr = range_check_ptr;
 
-            with_attr error_message(
-                    "Trading: Invalid stop-limit-price long order {user_address_}") {
+            with_attr error_message("Trading: Invalid stop-limit-price long order") {
                 assert_le(execution_price_, order_.price);
             }
             tempvar range_check_ptr = range_check_ptr;
         } else {
             // if short stop order
             // check that limit_price <= execution_price <= stop_price
-            with_attr error_message("Trading: Invalid stop-price short order {user_address_}") {
+            with_attr error_message("Trading: Invalid stop-price short order") {
                 assert_le(order_.price, execution_price_);
             }
             tempvar range_check_ptr = range_check_ptr;
 
-            with_attr error_message(
-                    "Trading: Invalid stop-limit-price short order {user_address_}") {
+            with_attr error_message("Trading: Invalid stop-limit-price short order") {
                 assert_le(execution_price_, order_.stopPrice);
             }
             tempvar range_check_ptr = range_check_ptr;
@@ -331,13 +329,13 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // if it's a limit order
         if (order_.direction == LONG) {
             // if it's a long order
-            with_attr error_message("Trading: Bad long limit order {user_address_}") {
+            with_attr error_message("Trading: Bad long limit order") {
                 assert_le(execution_price_, order_.price);
             }
             tempvar range_check_ptr = range_check_ptr;
         } else {
             // if it's a short order
-            with_attr error_message("Trading: Bad short limit order {user_address_}") {
+            with_attr error_message("Trading: Bad short limit order") {
                 assert_le(order_.price, execution_price_);
             }
             tempvar range_check_ptr = range_check_ptr;
@@ -355,14 +353,14 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             // if it's a long order
             tempvar upperLimit = order_.price + two_percent;
 
-            with_attr error_message("Trading: Market Order 2% above {user_address_}") {
+            with_attr error_message("Trading: Market Order 2% above") {
                 assert_le(execution_price_, upperLimit);
             }
         } else {
             // if it's a short order
             tempvar lowerLimit = order_.price - two_percent;
 
-            with_attr error_message("Trading: Market Order 2% below {user_address_}") {
+            with_attr error_message("Trading: Market Order 2% below") {
                 assert_le(lowerLimit, execution_price_);
             }
         }
@@ -386,7 +384,6 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @returns margin_amount_open - Margin amount for the order
 // @returns borrowed_amount_open - Borrowed amount for the order
 func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    user_address_: felt,
     order_: MultipleOrder,
     execution_price_: felt,
     order_size_: felt,
@@ -451,7 +448,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     tempvar total_amount = total_position_value + fees;
 
     // User must be able to pay the amount
-    with_attr error_message("Trading: Low Balance {user_address_}") {
+    with_attr error_message("Trading: Low Balance") {
         assert_le(total_amount, user_balance);
     }
 
@@ -823,22 +820,17 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         side=[request_list_].side
         );
 
-    local user_address;
-    assert user_address = temp_order.pub_key;
-
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
     let (is_registered) = IAccountRegistry.is_registered_user(
         contract_address=account_registry_address_, address_=temp_order.pub_key
     );
 
-    with_attr error_message("Trading: User account not registered {user_address}") {
+    with_attr error_message("Trading: User account not registered") {
         assert_not_zero(is_registered);
     }
 
     // Check if the price is fair
-    check_order_price(
-        user_address_=user_address, order_=temp_order, execution_price_=execution_price_
-    );
+    check_order_price(order_=temp_order, execution_price_=execution_price_);
 
     // Check if size is less than or equal to postionSize
     let cmp_res = is_le(size_, temp_order.positionSize);
@@ -870,7 +862,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let (
             average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt
         ) = process_open_orders(
-            user_address_=user_address,
             order_=temp_order,
             execution_price_=execution_price_,
             order_size_=order_size,
@@ -957,7 +948,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             assert_not_zero(market.is_tradable);
         }
 
-        with_attr error_message("Trading: Invalid Leverage {user_address}") {
+        with_attr error_message("Trading: Invalid Leverage") {
             assert_le(temp_order.leverage, asset.currently_allowed_leverage);
         }
 
@@ -985,15 +976,15 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Assert that the order has the same ticker and price as the first order
-    with_attr error_message("Trading: Asset Mismatch {user_address}") {
+    with_attr error_message("Trading: Asset Mismatch") {
         assert assetID_ = temp_order.assetID;
     }
 
-    with_attr error_message("Trading: Collateral Mismatch {user_address}") {
+    with_attr error_message("Trading: Collateral Mismatch") {
         assert collateralID_ = temp_order.collateralID;
     }
 
-    with_attr error_message("Trading: Invalid Leverage {user_address}") {
+    with_attr error_message("Trading: Invalid Leverage") {
         assert_le(temp_order.leverage, max_leverage_);
     }
 

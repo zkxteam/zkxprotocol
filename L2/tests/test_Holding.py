@@ -58,6 +58,14 @@ async def test_fund_reject(holding_factory):
 
 
 @pytest.mark.asyncio
+async def test_defund_reject(holding_factory):
+    _, holding, _, _ = holding_factory
+
+    await assert_revert(signer3.send_transaction(
+        pytest.user1, holding.contract_address, 'defund', [str_to_felt("USDC"), 100]))
+
+
+@pytest.mark.asyncio
 async def test_defund_admin(holding_factory):
     _, holding, admin1, _ = holding_factory
 
@@ -66,10 +74,3 @@ async def test_defund_admin(holding_factory):
     execution_info = await holding.balance(str_to_felt("USDC")).call()
     assert execution_info.result.amount == 0
 
-
-@pytest.mark.asyncio
-async def test_defund_reject(holding_factory):
-    _, holding, _, _ = holding_factory
-
-    await assert_revert(signer3.send_transaction(
-        pytest.user1, holding.contract_address, 'defund', [str_to_felt("USDC"), 100]))
