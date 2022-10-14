@@ -62,6 +62,9 @@ func verify_caller_authority{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     let (access) = IAdminAuth.get_admin_mapping(
         contract_address=auth_address, address=caller, action=action
     );
-    assert access = 1;
+
+    with_attr error_message("Caller Check: Unauthorized caller") {
+        assert access = 1;
+    }
     return ();
 }

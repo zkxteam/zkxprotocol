@@ -159,7 +159,8 @@ async def test_adding_asset_by_unauthorized_user(adminAuth_factory):
     asset_properties = build_default_asset_properties(asset_id, asset_ticker, asset_name)
 
     await assert_revert(
-        signer3.send_transaction(user1, asset.contract_address, 'add_asset', asset_properties)
+        signer3.send_transaction(user1, asset.contract_address, 'add_asset', asset_properties),
+        reverted_with="Asset: Unauthorized caller for mananging assets"
     )
 
 
@@ -221,7 +222,8 @@ async def test_modifying_asset_by_unauthorized_user(adminAuth_factory):
             0, 
             1, 
             1
-        ])
+        ]),
+        reverted_with="Asset: Unauthorized caller for mananging assets"
     )
 
 
@@ -326,7 +328,8 @@ async def test_modifying_trade_settings_by_unauthorized_user(adminAuth_factory):
             to64x61(200), # incremental_position_size
             to64x61(2000), # baseline_position_size
             to64x61(20000) # maximum_position_size
-        ])
+        ]),
+        reverted_with="Asset: Unauthorized caller for mananging assets"
     )
 
 
@@ -351,7 +354,8 @@ async def test_removing_asset_by_admin(adminAuth_factory):
     )
 
     await assert_revert(
-        asset.get_asset(asset_id).call()
+        asset.get_asset(asset_id).call(),
+        reverted_with="Asset: Asset_id existence mismatch"
     )
 
 
@@ -364,7 +368,8 @@ async def test_removing_asset_by_unauthorized_user(adminAuth_factory):
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
     assert_revert(lambda: 
-        signer3.send_transaction(user1, asset.contract_address, 'remove_asset', [asset_id])
+        signer3.send_transaction(user1, asset.contract_address, 'remove_asset', [asset_id]),
+        reverted_with="Asset: Unauthorized caller for mananging assets"
     )
 
 
@@ -506,7 +511,8 @@ async def test_not_possible_to_add_same_id(adminAuth_factory):
     asset_properties_2 = build_default_asset_properties(asset_id_1, asset_ticker_2, asset_name_2)
     # Should fail because asset ID is already present
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
+        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2),
+        reverted_with="Asset: Asset_id existence mismatch"
     )
 
 @pytest.mark.asyncio
@@ -523,7 +529,8 @@ async def test_not_possible_to_add_same_ticker(adminAuth_factory):
     asset_properties_2 = build_default_asset_properties(asset_id_2, asset_ticker_1, asset_name_2)
     # Should fail because asset ID is already present
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2)
+        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2),
+        reverted_with="Asset: Ticker existence mismatch"
     )
 
 @pytest.mark.asyncio
@@ -534,7 +541,8 @@ async def test_not_possible_to_add_zero_asset_id(adminAuth_factory):
 
     # Should fail because asset_id is 0
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1)
+        signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_1),
+        reverted_with="Asset: Asset id cannot be 0"
     )
 
 @pytest.mark.asyncio
@@ -543,7 +551,8 @@ async def test_not_possible_to_remove_zero_asset_id(adminAuth_factory):
 
     # Should fail because zero asset_id can't be present
     await assert_revert(
-        signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [0])
+        signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [0]),
+        reverted_with="Asset: Asset_id existence mismatch"
     )
 
 @pytest.mark.asyncio
@@ -576,7 +585,8 @@ async def test_add_3_then_remove_FIRST_asset(fresh_asset_contract):
 
     # Check removed asset is not present
     await assert_revert(
-        asset.get_asset(ID_TO_DELETE).call()
+        asset.get_asset(ID_TO_DELETE).call(),
+        reverted_with="Asset: Asset_id existence mismatch"
     )
 
     # Check count is 2
@@ -639,7 +649,8 @@ async def test_add_3_then_remove_SECOND_asset(fresh_asset_contract):
 
     # Check removed asset is not present
     await assert_revert(
-        asset.get_asset(ID_TO_DELETE).call()
+        asset.get_asset(ID_TO_DELETE).call(),
+        reverted_with="Asset: Asset_id existence mismatch"
     )
 
     # Check count is 2
@@ -701,7 +712,8 @@ async def test_add_3_then_remove_THIRD_asset(fresh_asset_contract):
 
     # Check removed asset is not present
     await assert_revert(
-        asset.get_asset(ID_TO_DELETE).call()
+        asset.get_asset(ID_TO_DELETE).call(),
+        reverted_with="Asset: Asset_id existence mismatch"
     )
 
     # Check count is 2
