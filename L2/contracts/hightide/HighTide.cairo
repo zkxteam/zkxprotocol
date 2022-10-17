@@ -15,7 +15,6 @@ from contracts.Constants import HIGHTIDE_INITIATED, ManageHighTide_ACTION, Tradi
 from contracts.DataTypes import Constants, HighTideMetaData, Multipliers, RewardToken, TradingSeason
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
-from contracts.Math_64x61 import Math64x61_mul
 
 // //////////
 // Events //
@@ -115,13 +114,13 @@ func hightide_by_season_id(season_id: felt, index: felt) -> (hightide_id: felt) 
 // ///////////////
 
 // @notice Constructor of the smart-contract
-// @param registry_address_ Address of the AuthorizedRegistry contract
-// @param version_ Version of this contract
+// @param registry_address Address of the AuthorizedRegistry contract
+// @param version Version of this contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address_: felt, version_: felt
+    registry_address: felt, version: felt
 ) {
-    CommonLib.initialize(registry_address_, version_);
+    CommonLib.initialize(registry_address, version);
     return ();
 }
 
@@ -194,9 +193,7 @@ func get_hightide_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     alloc_locals;
     let (reward_tokens: RewardToken*) = alloc();
     let (reward_tokens_len) = reward_tokens_len_by_hightide.read(hightide_id);
-    populate_reward_tokens(
-        hightide_id, 0, reward_tokens_len, reward_tokens
-    );
+    populate_reward_tokens(hightide_id, 0, reward_tokens_len, reward_tokens);
     return (reward_tokens_len, reward_tokens);
 }
 
@@ -433,16 +430,13 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     // calculates current trading seasons end timestamp
     let (local current_season_id) = get_current_season_id();
     let (current_season: TradingSeason) = get_season(current_season_id);
-    let (current_seasons_num_trading_days_in_secs) = Math64x61_mul(
-        current_season.num_trading_days, 24 * 60 * 60
-    );
+    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
+
     let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
 
     // calculates new trading seasons end timestamp
     let (new_season: TradingSeason) = get_season(season_id);
-    let (new_seasons_num_trading_days_in_secs) = Math64x61_mul(
-        new_season.num_trading_days, 24 * 60 * 60
-    );
+    let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * 24 * 60 * 60;
     let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
 
     if (current_season_id != 0) {
@@ -517,16 +511,14 @@ func deploy_liquidity_pool_contract{
 
 func populate_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     hightide_id: felt, index: felt, reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
-){
+) {
     if (index == reward_tokens_list_len) {
         return ();
     }
 
-    let reward_token : RewardToken = hightide_rewards_by_id.read(hightide_id, index);
+    let reward_token: RewardToken = hightide_rewards_by_id.read(hightide_id, index);
     assert reward_tokens_list[index] = reward_token;
 
-    populate_reward_tokens(
-        hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list
-    );
+    populate_reward_tokens(hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list);
     return ();
 }
