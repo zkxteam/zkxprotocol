@@ -45,12 +45,12 @@ def convertTo64x61(nums):
     return result
 
 def str_to_felt(text):
-    b_text = bytes(text, 'UTF-8')
+    b_text = text.encode('utf8', 'strict') 
     return int.from_bytes(b_text, "big")
 
 def felt_to_str(felt):
     b_felt = felt.to_bytes(31, "big")
-    return b_felt.decode()
+    return b_felt.decode('utf8', 'strict')
 
 def uint(a):
     return(a, 0)

@@ -13,7 +13,6 @@ namespace IAsset {
     }
 
     func add_asset(
-        id: felt, 
         new_asset: Asset, 
         icon_link_len: felt,
         icon_link: felt*,

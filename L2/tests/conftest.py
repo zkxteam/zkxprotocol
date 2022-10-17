@@ -9,9 +9,7 @@ def compilation_cache() -> LRUCache:
 
 @pytest.fixture(scope='session')
 def contracts_holder() -> ContractsHolder:
-    holder = ContractsHolder()
-    holder.prepare()
-    return holder
+    return ContractsHolder()
 
 @pytest.fixture(scope='module')
 async def starknet_service(contracts_holder, compilation_cache) -> StarknetService:

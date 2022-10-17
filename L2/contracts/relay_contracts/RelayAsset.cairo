@@ -39,7 +39,6 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt, 
     new_asset: Asset, 
     icon_link_len: felt,
     icon_link: felt*,
@@ -52,7 +51,6 @@ func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let (local inner_address) = get_inner_contract();
     IAsset.add_asset(
         inner_address, 
-        id, 
         new_asset, 
         icon_link_len, 
         icon_link, 

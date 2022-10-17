@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted, to64x61
+from utils import str_to_felt, felt_to_str, MAX_UINT256, assert_revert, assert_event_emitted, to64x61
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -18,15 +18,43 @@ def generate_asset_info():
     name = f"Ethereum_${counter}"
     return str_to_felt(id), str_to_felt(name)
 
-def build_default_asset_properties(id, name):
+DEFAULT_LINK = "https://ipfs.io/ipfs/Qme7ss3ARVgxv6rXqVPiikMJ8u2NLgmgszg13pYrDKEoiu"
+
+def decode_starknet_string(encoded_chars):
+    decoded_chars = []
+    print("Decoding string:", encoded_chars)
+    for c in encoded_chars:
+        print("Decoding", c, "to", felt_to_str(c))
+        decoded_chars.append(felt_to_str(c))
+    print("Decoding result:", ''.join(decoded_chars))
+    return ''.join(decoded_chars)
+
+def prepare_starknet_string(string):
+    return [len(string)] + encode_characters(string)
+
+def encode_characters(string):
+    result = []
+    for c in string:
+        result.append(str_to_felt(c))
+    return result
+
+def build_default_asset_properties(
+    id, 
+    name,
+    is_tradable = 0,
+    is_collateral = 0,
+    decimals = 18,
+    icon_link = DEFAULT_LINK,
+    metadata_link = DEFAULT_LINK
+):
     return [
-        id, # id
+        id,
         1, # asset_version
-        name, # short_name
-        0, # is_tradable
-        0, # collateral
-        18 # token_decimal
-    ]
+        name,
+        is_tradable,
+        is_collateral,
+        decimals # token_decimal
+    ] + prepare_starknet_string(icon_link) + prepare_starknet_string(metadata_link)
 
 
 @pytest.fixture(scope='module')
@@ -106,6 +134,13 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     assert parsed_list.is_collateral == 0
     assert parsed_list.token_decimal == 18
 
+    icon_call = await asset.get_icon_link(asset_id).call()
+    icon_link = list(icon_call.result.link)
+    # decoded_icon_link = decode_starknet_string(icon_link)
+    print("From contract:", icon_link)
+    print("Default link:", encode_characters(DEFAULT_LINK))
+    assert icon_link == encode_characters(DEFAULT_LINK)
+
 
 @pytest.mark.asyncio
 async def test_adding_asset_by_unauthorized_user(adminAuth_factory):
@@ -153,7 +188,7 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
     assert fetched_asset.short_name == new_asset_name
     assert fetched_asset.is_tradable == new_tradable_status
     assert fetched_asset.is_collateral == new_collateral
-    assert fetched_asset.asset_version == 1
+    assert fetched_asset.asset_version == 2
 
 
 @pytest.mark.asyncio
@@ -421,7 +456,7 @@ async def test_add_3_then_remove_SECOND_asset(fresh_asset_contract):
 
     # Check re-added asset fetching by id
     re_added_asset = (await asset.get_asset(ID_TO_DELETE).call()).result.currAsset
-    assert re_added_asset.id == asset_id_1
+    assert re_added_asset.id == asset_id_2
     assert re_added_asset.short_name == asset_name_2
 
 @pytest.mark.asyncio
