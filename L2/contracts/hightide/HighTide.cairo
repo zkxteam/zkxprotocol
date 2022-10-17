@@ -50,6 +50,11 @@ func liquidity_pool_contract_class_hash_changed(class_hash: felt) {
 func liquidity_pool_contract_deployed(hightide_id: felt, contract_address: felt) {
 }
 
+// this event is emitted when an hightide is initialized
+@event
+func hightide_initialized(caller: felt, hightide_id: felt) {
+}
+
 // ///////////
 // Storage //
 // ///////////
@@ -340,6 +345,8 @@ func set_liquidity_pool_contract_class_hash{
     }
 
     liquidity_pool_contract_class_hash.write(class_hash);
+
+    // Emit event
     liquidity_pool_contract_class_hash_changed.emit(class_hash=class_hash);
 
     return ();
@@ -359,6 +366,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     reward_tokens_list_len: felt,
     reward_tokens_list: RewardToken*,
 ) {
+    alloc_locals;
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
@@ -369,7 +377,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     verify_season_id_exists(season_id);
 
     let (curr_len) = hightides_array_len.read();
-    let hightide_id = curr_len + 1;
+    local hightide_id = curr_len + 1;
     hightides_array_len.write(curr_len + 1);
 
     let (liquidity_pool_address) = deploy_liquidity_pool_contract(hightide_id);
@@ -383,12 +391,14 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         liquidity_pool_address=liquidity_pool_address,
     );
 
-    let (curr_len) = hightides_array_len.read();
-    let hightide_id = curr_len + 1;
     hightide_by_id.write(hightide_id, hightide);
 
     reward_tokens_len_by_hightide.write(hightide_id, reward_tokens_list_len);
     set_hightide_reward_tokens(hightide_id, 0, reward_tokens_list_len, reward_tokens_list);
+
+    // Emit event
+    let (caller) = get_caller_address();
+    hightide_initialized.emit(caller=caller, hightide_id=hightide_id);
 
     return ();
 }
