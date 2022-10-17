@@ -1,8 +1,11 @@
 %lang starknet
 
+from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt
+from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
 from starkware.starknet.common.syscalls import (
+    deploy,
     get_block_number,
     get_block_timestamp,
     get_caller_address,
@@ -38,6 +41,16 @@ func trading_season_set_up(caller: felt, trading_season: TradingSeason) {
 func trading_season_started(caller: felt, season_id: felt) {
 }
 
+// this event is emitted whenever the liquidity pool contract class hash is changed
+@event
+func liquidity_pool_contract_class_hash_changed(class_hash: felt) {
+}
+
+// this event is emitted whenever a new liquidity pool contract is deployed
+@event
+func liquidity_pool_contract_deployed(hightide_id: felt, contract_address: felt) {
+}
+
 // ///////////
 // Storage //
 // ///////////
@@ -62,6 +75,11 @@ func multipliers_to_calculate_reward() -> (multipliers: Multipliers) {
 func constants_to_calculate_trader_score() -> (constants: Constants) {
 }
 
+// stores class hash of liquidity pool contract
+@storage_var
+func liquidity_pool_contract_class_hash() -> (class_hash: felt) {
+}
+
 // Length of seasons array
 @storage_var
 func seasons_array_len() -> (len: felt) {
@@ -74,7 +92,7 @@ func season_id_by_index(index: felt) -> (season_id: felt) {
 
 // Length of hightide array
 @storage_var
-func hightide_array_len() -> (len: felt) {
+func hightides_array_len() -> (len: felt) {
 }
 
 // Array of hightide ids
@@ -112,9 +130,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ////////
+// View //
+// ////////
 
 // @notice View function to get current season id
 // @returns season_id - Id of the season
@@ -138,6 +156,18 @@ func get_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     return (trading_season,);
 }
 
+// @notice View function to get hightide metadata for the supplied hightide id
+// @param hightide_id - id of hightide
+// @returns hightide_metadata - structure of hightide metadata
+@view
+func get_hightide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id: felt
+) -> (hightide_metadata: HighTideMetaData) {
+    verify_hightide_id_exists(hightide_id);
+    let (hightide_metadata) = hightide_by_id.read(hightide_id=hightide_id);
+    return (hightide_metadata,);
+}
+
 // @notice View function to get multipliers used to calculate total reward
 // @returns multipliers - structure of Multipliers
 @view
@@ -158,9 +188,9 @@ func get_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return (constants,);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ////////////
+// External //
+// ////////////
 
 // @notice - This function is used for setting up trade season
 // @param start_timestamp - start timestamp of the season
@@ -286,6 +316,27 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return ();
 }
 
+// @notice external function to set class hash of liquidity pool contract
+// @param class_hash -  class hash of the liquidity pool contract
+@external
+func set_liquidity_pool_contract_class_hash{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(class_hash: felt) {
+    let (current_registry_address) = CommonLib.get_registry_address();
+    let (current_version) = CommonLib.get_contract_version();
+
+    verify_caller_authority(current_registry_address, current_version, ManageHighTide_ACTION);
+
+    with_attr error_message("HighTide: Class hash cannot be 0") {
+        assert_not_zero(class_hash);
+    }
+
+    liquidity_pool_contract_class_hash.write(class_hash);
+    liquidity_pool_contract_class_hash_changed.emit(class_hash=class_hash);
+
+    return ();
+}
+
 // @notice - This function is used to initialize high tide
 // @param pair_id - supported market pair
 // @param season_id - preferred season
@@ -304,15 +355,17 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not authorized to set constants") {
+    with_attr error_message("HighTide: Caller is not authorized to set constants") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
     verify_season_id_exists(season_id);
 
-    let (curr_len) = hightide_array_len.read();
+    let (curr_len) = hightides_array_len.read();
     let hightide_id = curr_len + 1;
     hightide_id_by_index.write(curr_len, hightide_id);
-    hightide_array_len.write(curr_len + 1);
+    hightides_array_len.write(curr_len + 1);
+
+    let (liquidity_pool_address) = deploy_liquidity_pool_contract(hightide_id);
 
     // Create hightide metadata structure
     let hightide: HighTideMetaData = HighTideMetaData(
@@ -320,9 +373,11 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         status=HIGHTIDE_INITIATED,
         season_id=season_id,
         is_burnable=is_burnable,
-        liquidity_pool_address=0,
+        liquidity_pool_address=liquidity_pool_address,
     );
 
+    let (curr_len) = hightides_array_len.read();
+    let hightide_id = curr_len + 1;
     hightide_by_id.write(hightide_id, hightide);
 
     set_hightide_reward_tokens(hightide_id, 0, reward_tokens_list_len, reward_tokens_list);
@@ -340,6 +395,16 @@ func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     with_attr error_message("HighTide: Trading season id existence mismatch") {
         let (seasons_len) = seasons_array_len.read();
         assert_le(season_id, seasons_len);
+    }
+    return ();
+}
+
+func verify_hightide_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id: felt
+) {
+    with_attr error_message("HighTide: Hightide id existence mismatch") {
+        let (hightide_len) = hightides_array_len.read();
+        assert_le(hightide_id, hightide_len);
     }
     return ();
 }
@@ -404,4 +469,37 @@ func set_hightide_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list + RewardToken.SIZE
     );
     return ();
+}
+
+func deploy_liquidity_pool_contract{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(hightide_id: felt) -> (deployed_address: felt) {
+    let (hightide_metadata) = get_hightide(hightide_id);
+    let (hash) = liquidity_pool_contract_class_hash.read();
+    let (current_registry_address) = CommonLib.get_registry_address();
+    let (current_version) = CommonLib.get_contract_version();
+
+    with_attr error_message("HighTide: Class hash cannot be 0") {
+        assert_not_zero(hash);
+    }
+
+    with_attr error_message(
+            "HighTide: Liquidity pool contract already exists for the provided hightide") {
+        assert hightide_metadata.liquidity_pool_address = FALSE;
+    }
+
+    // prepare constructor calldata for deploy call
+    let calldata: felt* = alloc();
+
+    assert calldata[0] = hightide_id;
+    assert calldata[1] = current_registry_address;
+    assert calldata[2] = current_version;
+
+    let (deployed_address) = deploy(hash, 0, 3, calldata, 1);
+
+    liquidity_pool_contract_deployed.emit(
+        hightide_id=hightide_id, contract_address=deployed_address
+    );
+
+    return (deployed_address=deployed_address);
 }
