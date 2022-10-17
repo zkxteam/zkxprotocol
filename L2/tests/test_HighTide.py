@@ -6,7 +6,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61, PRIME, assert_event_emitted
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, PRIME, assert_event_emitted
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -127,7 +127,7 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     trade_season_setup_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
-        timestamp, to64x61(30)])
+        timestamp, 30])
     
     assert_event_emitted(
         trade_season_setup_tx,
@@ -137,7 +137,7 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
             admin1.contract_address,
             0,
             timestamp,
-            to64x61(30)
+            30
         ]
     )
 
@@ -145,7 +145,7 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
     fetched_trading_season = execution_info.result.trading_season
 
     assert fetched_trading_season.start_timestamp == timestamp
-    assert fetched_trading_season.num_trading_days == to64x61(30)
+    assert fetched_trading_season.num_trading_days == 30
 
 @pytest.mark.asyncio
 async def test_start_trade_season_unauthorized_user(adminAuth_factory):
