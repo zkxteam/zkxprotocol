@@ -306,6 +306,8 @@ struct RewardToken {
 // Struct to store hightide metadata
 struct HighTideMetaData {
     pair_id: felt,  // supported market
-    status: felt,  // either initialized (by token lister) or active (by zkx, if funds or locked in the pool) or ended (after reward distribution)
-    preferred_season_id: felt,
+    status: felt,  // either initialized (by token lister) or active (by zkx, if funds or locked in the pool)
+    season_id: felt,  // season in which hightide to be activated
+    is_burnable: felt,  // 0 - return to token lister, 1 - burn tokens
+    liquidity_pool_address: felt,  // contract address of liquidity pool associated with hightide
 }

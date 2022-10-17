@@ -14,9 +14,9 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_mul
 
-//#########
-// Events #
-//#########
+// //////////
+// Events //
+// //////////
 
 // Event emitted whenever mutipliers are set
 @event
@@ -38,9 +38,9 @@ func trading_season_set_up(caller: felt, trading_season: TradingSeason) {
 func trading_season_started(caller: felt, season_id: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// ///////////
+// Storage //
+// ///////////
 
 // Stores the current trading season id
 @storage_var
@@ -89,17 +89,17 @@ func hightide_by_id(hightide_id: felt) -> (hightide: HighTideMetaData) {
 
 // Mapping between hightide id and reward token data
 @storage_var
-func reward_tokens_by_hightide_id(hightide_id: felt, index: felt) -> (reward_token: RewardToken) {
+func hightide_rewards_by_id(hightide_id: felt, index: felt) -> (reward_token: RewardToken) {
 }
 
 // Mapping between season id and hightide id
 @storage_var
-func hightide_id_by_season_id(season_id: felt, index: felt) -> (hightide_id: felt) {
+func hightide_by_season_id(season_id: felt, index: felt) -> (hightide_id: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// ///////////////
+// Constructor //
+// ///////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -288,13 +288,15 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
 // @notice - This function is used to initialize high tide
 // @param pair_id - supported market pair
-// @param preferred_season_id - preferred season
+// @param season_id - preferred season
+// @param is_burnable - if 0 - return to token lister, 1 - burn tokens
 // @param reward_tokens_list_len - no.of reward tokens for an hightide
 // @param reward_tokens_list - array of tokens to be given as reward
 @external
 func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     pair_id: felt,
-    preferred_season_id: felt,
+    season_id: felt,
+    is_burnable: felt,
     reward_tokens_list_len: felt,
     reward_tokens_list: RewardToken*,
 ) {
@@ -305,7 +307,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     with_attr error_message("Caller is not authorized to set constants") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    verify_season_id_exists(preferred_season_id);
+    verify_season_id_exists(season_id);
 
     let (curr_len) = hightide_array_len.read();
     let hightide_id = curr_len + 1;
@@ -314,17 +316,23 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Create hightide metadata structure
     let hightide: HighTideMetaData = HighTideMetaData(
-        pair_id=pair_id, status=HIGHTIDE_INITIATED, preferred_season_id=preferred_season_id
+        pair_id=pair_id,
+        status=HIGHTIDE_INITIATED,
+        season_id=season_id,
+        is_burnable=is_burnable,
+        liquidity_pool_address=0,
     );
 
     hightide_by_id.write(hightide_id, hightide);
 
+    set_hightide_reward_tokens(hightide_id, 0, reward_tokens_list_len, reward_tokens_list);
+
     return ();
 }
 
-//#####################
-// Internal functions #
-//#####################
+// ////////////
+// Internal //
+// ////////////
 
 func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id: felt
@@ -376,5 +384,24 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     with_attr error_message("HighTide: Invalid Timestamp") {
         assert_lt(current_timestamp, new_seasons_end_timestamp);
     }
+    return ();
+}
+
+func set_hightide_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id: felt, index: felt, reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
+) {
+    if (index == reward_tokens_list_len) {
+        return ();
+    }
+
+    // Create reward token structure
+    let reward_token: RewardToken = RewardToken(
+        token_id=[reward_tokens_list].token_id, no_of_tokens=[reward_tokens_list].no_of_tokens
+    );
+
+    hightide_rewards_by_id.write(hightide_id, index, reward_token);
+    set_hightide_reward_tokens(
+        hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list + RewardToken.SIZE
+    );
     return ();
 }
