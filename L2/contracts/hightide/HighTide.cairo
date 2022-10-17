@@ -85,19 +85,9 @@ func liquidity_pool_contract_class_hash() -> (class_hash: felt) {
 func seasons_array_len() -> (len: felt) {
 }
 
-// Array of season ids
-@storage_var
-func season_id_by_index(index: felt) -> (season_id: felt) {
-}
-
 // Length of hightide array
 @storage_var
 func hightides_array_len() -> (len: felt) {
-}
-
-// Array of hightide ids
-@storage_var
-func hightide_id_by_index(index: felt) -> (hightide_id: felt) {
 }
 
 // Mapping between hightide id and hightide metadata
@@ -108,6 +98,11 @@ func hightide_by_id(hightide_id: felt) -> (hightide: HighTideMetaData) {
 // Mapping between hightide id and reward token data
 @storage_var
 func hightide_rewards_by_id(hightide_id: felt, index: felt) -> (reward_token: RewardToken) {
+}
+
+// Mapping between hightide id and reward tokens list length
+@storage_var
+func reward_tokens_len_by_hightide(hightide_id: felt) -> (len: felt) {
 }
 
 // Mapping between season id and hightide id
@@ -135,7 +130,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ////////
 
 // @notice View function to get current season id
-// @returns season_id - Id of the season
+// @return season_id - Id of the season
 @view
 func get_current_season_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     season_id: felt
@@ -146,7 +141,7 @@ func get_current_season_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
 // @notice View function to get the trading season for the supplied season id
 // @param season_id - id of the season
-// @returns trading_season - structure of trading season
+// @return trading_season - structure of trading season
 @view
 func get_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id: felt
@@ -158,7 +153,7 @@ func get_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 
 // @notice View function to get hightide metadata for the supplied hightide id
 // @param hightide_id - id of hightide
-// @returns hightide_metadata - structure of hightide metadata
+// @return hightide_metadata - structure of hightide metadata
 @view
 func get_hightide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     hightide_id: felt
@@ -169,7 +164,7 @@ func get_hightide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 }
 
 // @notice View function to get multipliers used to calculate total reward
-// @returns multipliers - structure of Multipliers
+// @return multipliers - structure of Multipliers
 @view
 func get_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     multipliers: Multipliers
@@ -179,13 +174,30 @@ func get_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 }
 
 // @notice View function to get constants to calculate individual trader score
-// @returns constants - structure of Constants
+// @return constants - structure of Constants
 @view
 func get_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     constants: Constants
 ) {
     let (constants) = constants_to_calculate_trader_score.read();
     return (constants,);
+}
+
+// @notice View function to get list of reward tokens
+// @param hightide_id - id of hightide
+// @return reward_tokens_list_len - length of reward tokens list
+// @return reward_tokens_list - list of reward tokens
+@view
+func get_hightide_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id: felt
+) -> (reward_tokens_list_len: felt, reward_tokens_list: RewardToken*) {
+    alloc_locals;
+    let (reward_tokens: RewardToken*) = alloc();
+    let (reward_tokens_len) = reward_tokens_len_by_hightide.read(hightide_id);
+    populate_reward_tokens(
+        hightide_id, 0, reward_tokens_len, reward_tokens
+    );
+    return (reward_tokens_len, reward_tokens);
 }
 
 // ////////////
@@ -209,7 +221,6 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     let (curr_len) = seasons_array_len.read();
     let season_id = curr_len + 1;
-    season_id_by_index.write(curr_len, season_id);
     seasons_array_len.write(curr_len + 1);
 
     // Create Trading season struct to store
@@ -362,7 +373,6 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     let (curr_len) = hightides_array_len.read();
     let hightide_id = curr_len + 1;
-    hightide_id_by_index.write(curr_len, hightide_id);
     hightides_array_len.write(curr_len + 1);
 
     let (liquidity_pool_address) = deploy_liquidity_pool_contract(hightide_id);
@@ -380,6 +390,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let hightide_id = curr_len + 1;
     hightide_by_id.write(hightide_id, hightide);
 
+    reward_tokens_len_by_hightide.write(hightide_id, reward_tokens_list_len);
     set_hightide_reward_tokens(hightide_id, 0, reward_tokens_list_len, reward_tokens_list);
 
     return ();
@@ -502,4 +513,20 @@ func deploy_liquidity_pool_contract{
     );
 
     return (deployed_address=deployed_address);
+}
+
+func populate_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id: felt, index: felt, reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
+){
+    if (index == reward_tokens_list_len) {
+        return ();
+    }
+
+    let reward_token : RewardToken = hightide_rewards_by_id.read(hightide_id, index);
+    assert reward_tokens_list[index] = reward_token;
+
+    populate_reward_tokens(
+        hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list
+    );
+    return ();
 }
