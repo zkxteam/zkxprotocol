@@ -11,6 +11,11 @@ from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
 
+BTC_ID = str_to_felt("32f0406jz7qj8")
+USDC_ID = str_to_felt("fghj3am52qpzsib")
+USDT_ID = str_to_felt("yjk45lvmasopq")
+BTC_USDC_ID = str_to_felt("gecn2j0cm45sz")
+BTC_USDT_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -182,3 +187,41 @@ async def test_get_season_with_invalid_season_id(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     await assert_revert(hightide.get_season(2).call(), reverted_with="HighTide: Trading season id existence mismatch")
+
+@pytest.mark.asyncio
+async def test_inialize_hightide_with_zero_class_hash(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
+
+    await assert_revert(signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
+        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, USDT_ID, 500]))
+
+@pytest.mark.asyncio
+async def test_inialize_hightide(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
+    
+    class_hash = 123
+    tx_exec_info=await signer1.send_transaction(admin1, 
+                                   hightide.contract_address,
+                                   'set_liquidity_pool_contract_class_hash',
+                                   [class_hash])
+   
+    assert_event_emitted(
+        tx_exec_info,
+        from_address = hightide.contract_address,
+        name = 'liquidity_pool_contract_class_hash_changed',
+        data = [
+            class_hash
+        ]
+    )
+
+    tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
+        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, USDT_ID, 500])
+
+    assert_event_emitted(
+        tx_exec_info,
+        from_address = hightide.contract_address,
+        name = 'hightide_initialized',
+        data =[
+            admin1.contract_address, 1
+        ]
+    )
