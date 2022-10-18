@@ -259,12 +259,6 @@ struct CoreFunction {
     function_selector: felt,
 }
 
-struct OrderVolume {
-    size: felt,
-    price: felt,
-    timestamp: felt,
-}
-
 struct VolumeMetaData {
     season_id: felt,
     pair_id: felt,
