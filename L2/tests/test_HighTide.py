@@ -9,16 +9,16 @@ from starkware.starknet.testing.contract import DeclaredClass
 from starkware.starknet.core.os.class_hash import compute_class_hash
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, PRIME, assert_event_emitted, assert_events_emitted
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61, PRIME, assert_event_emitted, assert_events_emitted
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
 
 BTC_ID = str_to_felt("32f0406jz7qj8")
 USDC_ID = str_to_felt("fghj3am52qpzsib")
-USDT_ID = str_to_felt("yjk45lvmasopq")
+UST_ID = str_to_felt("yjk45lvmasopq")
 BTC_USDC_ID = str_to_felt("gecn2j0cm45sz")
-BTC_USDT_ID = str_to_felt("gecn2j0c12rtzxcmsz")
+BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 class_hash=0
 
 @pytest.fixture(scope='module')
@@ -54,11 +54,26 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+    asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
+    market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
 
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 8, 1])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
+
+    # Add assets
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [BTC_ID, 1, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 1, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [UST_ID, 1, str_to_felt("UST"), str_to_felt("UST"), 1, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+
+    # Add markets
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USDC_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     return adminAuth, hightide, admin1, admin2, user1, timestamp
 
@@ -204,7 +219,7 @@ async def test_inialize_hightide_with_zero_class_hash(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     await assert_revert(signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
-        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, USDT_ID, 500]))
+        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, UST_ID, 500]))
 
 @pytest.mark.asyncio
 async def test_inialize_hightide(adminAuth_factory):
@@ -225,7 +240,7 @@ async def test_inialize_hightide(adminAuth_factory):
     )
 
     tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
-        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, USDT_ID, 500])
+        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, UST_ID, 500])
 
     execution_info = await hightide.get_hightide(1).call()
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
@@ -241,5 +256,5 @@ async def test_inialize_hightide(adminAuth_factory):
     fetched_rewards = await hightide.get_hightide_reward_tokens(1).call()
     assert fetched_rewards.result.reward_tokens_list[0].token_id == USDC_ID
     assert fetched_rewards.result.reward_tokens_list[0].no_of_tokens == 1000
-    assert fetched_rewards.result.reward_tokens_list[1].token_id == USDT_ID
+    assert fetched_rewards.result.reward_tokens_list[1].token_id == UST_ID
     assert fetched_rewards.result.reward_tokens_list[1].no_of_tokens == 500
