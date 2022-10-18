@@ -38,7 +38,7 @@ class ContractType(Enum):
     PubkeyWhitelister = "contracts/signature_infra/PubkeyWhitelister.cairo"
     HighTide = "contracts/hightide/HighTide.cairo"
     TradingStats = "contracts/hightide/TradingStats.cairo"
-
+    
     # Relay contracts
     RelayABR = "contracts/relay_contracts/RelayABR.cairo"
     RelayABRPayment = "contracts/relay_contracts/RelayABRPayment.cairo"
@@ -53,6 +53,8 @@ class ContractType(Enum):
     RelayMarkets = "contracts/relay_contracts/RelayMarkets.cairo"
     RelayFeeDiscount = "contracts/relay_contracts/RelayFeeDiscount.cairo"
     WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
+    ZKXDeployer = "contracts/ZKXDeployer.cairo"
+    
     # Test-helping contracts
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
