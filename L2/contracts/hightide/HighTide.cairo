@@ -11,10 +11,20 @@ from starkware.starknet.common.syscalls import (
     get_caller_address,
 )
 
-from contracts.Constants import HIGHTIDE_INITIATED, ManageHighTide_ACTION, Trading_INDEX
-from contracts.DataTypes import Constants, HighTideMetaData, Multipliers, RewardToken, TradingSeason
+from contracts.Constants import HIGHTIDE_INITIATED, ManageHighTide_ACTION, Market_INDEX
+from contracts.DataTypes import (
+    Constants,
+    HighTideMetaData,
+    Market,
+    Multipliers,
+    RewardToken,
+    TradingSeason,
+)
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.libraries.Validation import assert_bool
 
 // //////////
 // Events //
@@ -196,6 +206,7 @@ func get_hightide_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     hightide_id: felt
 ) -> (reward_tokens_list_len: felt, reward_tokens_list: RewardToken*) {
     alloc_locals;
+    verify_hightide_id_exists(hightide_id);
     let (reward_tokens: RewardToken*) = alloc();
     let (reward_tokens_len) = reward_tokens_len_by_hightide.read(hightide_id);
     populate_reward_tokens(hightide_id, 0, reward_tokens_len, reward_tokens);
@@ -376,6 +387,24 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
     verify_season_id_exists(season_id);
 
+    // Get market contract address
+    let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    // Get Market from the corresponding market id
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_contract_address, id=pair_id
+    );
+
+    with_attr error_message("HighTide: Listed market pair does not exist") {
+        assert_not_zero(market.asset);
+    }
+
+    with_attr error_message("HighTide: is_burnable value should be boolean") {
+        assert_bool(is_burnable);
+    }
+
     let (curr_len) = hightides_array_len.read();
     local hightide_id = curr_len + 1;
     hightides_array_len.write(curr_len + 1);
@@ -512,6 +541,7 @@ func deploy_liquidity_pool_contract{
 
     let (deployed_address) = deploy(hash, 0, 3, calldata, 1);
 
+    // Emit event
     liquidity_pool_contract_deployed.emit(
         hightide_id=hightide_id, contract_address=deployed_address
     );
