@@ -4,9 +4,12 @@ import time
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
+from starkware.starknet.testing.contract_utils import get_contract_class
+from starkware.starknet.testing.contract import DeclaredClass
+from starkware.starknet.core.os.class_hash import compute_class_hash
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, PRIME, assert_event_emitted
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, PRIME, assert_event_emitted, assert_events_emitted
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -16,6 +19,7 @@ USDC_ID = str_to_felt("fghj3am52qpzsib")
 USDT_ID = str_to_felt("yjk45lvmasopq")
 BTC_USDC_ID = str_to_felt("gecn2j0cm45sz")
 BTC_USDT_ID = str_to_felt("gecn2j0c12rtzxcmsz")
+class_hash=0
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -29,6 +33,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
     admin1 = await account_factory.deploy_account(signer1.public_key)
     admin2 = await account_factory.deploy_account(signer2.public_key)
     user1 = await account_factory.deploy_account(signer3.public_key)
+
+    contract_class = starknet_service.contracts_holder.get_contract_class(ContractType.LiquidityPool)
+    global class_hash
+    class_hash, _ = await starknet_service.starknet.state.declare(contract_class)
+    direct_class_hash = compute_class_hash(contract_class)
+    class_hash = int.from_bytes(class_hash,'big')
+    assert direct_class_hash == class_hash
 
     timestamp = int(time.time())
 
@@ -199,7 +210,6 @@ async def test_inialize_hightide_with_zero_class_hash(adminAuth_factory):
 async def test_inialize_hightide(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
     
-    class_hash = 123
     tx_exec_info=await signer1.send_transaction(admin1, 
                                    hightide.contract_address,
                                    'set_liquidity_pool_contract_class_hash',
@@ -217,11 +227,19 @@ async def test_inialize_hightide(adminAuth_factory):
     tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
         [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, USDT_ID, 500])
 
-    assert_event_emitted(
+    execution_info = await hightide.get_hightide(1).call()
+    liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
+
+    assert_events_emitted(
         tx_exec_info,
-        from_address = hightide.contract_address,
-        name = 'hightide_initialized',
-        data =[
-            admin1.contract_address, 1
+        [
+            [0, hightide.contract_address, 'liquidity_pool_contract_deployed', [1, liquidity_pool_address]],
+            [1, hightide.contract_address, 'hightide_initialized', [admin1.contract_address, 1]],
         ]
     )
+    
+    fetched_rewards = await hightide.get_hightide_reward_tokens(1).call()
+    assert fetched_rewards.result.reward_tokens_list[0].token_id == USDC_ID
+    assert fetched_rewards.result.reward_tokens_list[0].no_of_tokens == 1000
+    assert fetched_rewards.result.reward_tokens_list[1].token_id == USDT_ID
+    assert fetched_rewards.result.reward_tokens_list[1].no_of_tokens == 500
