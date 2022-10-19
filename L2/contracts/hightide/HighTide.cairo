@@ -480,7 +480,7 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         );
 
         hightide_by_id.write(hightide_id, hightide);
-        // assign_hightide_to_season();
+        assign_hightide_to_season(hightide_id, hightide_metadata.season_id);
     } else {
         return ();
     }
@@ -613,8 +613,8 @@ func populate_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     let reward_token: RewardToken = hightide_rewards_by_id.read(hightide_id, index);
     assert reward_tokens_list[index] = reward_token;
-
     populate_reward_tokens(hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list);
+
     return ();
 }
 
@@ -651,6 +651,7 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         reward_tokens_list_len,
         reward_tokens_list + RewardToken.SIZE,
     );
+
     return (FALSE,);
 }
 
@@ -668,6 +669,7 @@ func verify_token_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let current_balance_Uint256: Uint256 = IERC20.balanceOf(
         [contract_address_list], liquidity_pool_address
     );
+
     let (new_balance_Uint256, carry) = uint256_add(balance_Uint256, current_balance_Uint256);
     verify_token_balance(
         liquidity_pool_address,
@@ -676,5 +678,29 @@ func verify_token_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         contract_address_list_len,
         contract_address_list + 1,
     );
+
     return (balance_Uint256,);
+}
+
+func assign_hightide_to_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id: felt, season_id: felt
+) {
+    // get current block timestamp
+    let (current_timestamp) = get_block_timestamp();
+
+    let (trading_season) = trading_season_by_id.read(season_id=season_id);
+    let seasons_num_trading_days_in_secs = trading_season.num_trading_days * 24 * 60 * 60;
+    let seasons_end_timestamp = trading_season.start_timestamp + seasons_num_trading_days_in_secs;
+
+    with_attr error_message("HighTide: Trading season already ended") {
+        assert_lt(seasons_end_timestamp, current_timestamp);
+    }
+
+    let (index) = hightide_by_season_id.read(season_id, 0);
+    hightide_by_season_id.write(season_id, index + 1, hightide_id);
+
+    // 0th index always stores the no.of hightides corresponding to the season
+    hightide_by_season_id.write(season_id, 0, index + 1);
+
+    return ();
 }
