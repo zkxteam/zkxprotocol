@@ -4,14 +4,13 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
-from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import (
     deploy,
     get_block_number,
     get_block_timestamp,
     get_caller_address,
 )
-from starkware.cairo.common.uint256 import Uint256, uint256_add
+from starkware.cairo.common.uint256 import Uint256, uint256_add, uint256_lt
 
 from contracts.Constants import (
     HIGHTIDE_ACTIVE,
@@ -635,17 +634,16 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     ) = IStarkway.get_token_contract_addresses(
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
-    
-    //let (token_balance_Uint256) = verify_token_balance(
-    //    liquidity_pool_address, 0, 0, contract_address_list_len, contract_address_list
-    //);
-    //let result = is_le(token_balance_Uint256, [reward_tokens_list].no_of_tokens);
-    //if (result == TRUE) {
-    //    if (token_balance_Uint256 != [reward_tokens_list].no_of_tokens) {
-    //       return (FALSE,);
-    //    }
-    //}
-    tempvar syscall_ptr = syscall_ptr;
+
+    let balance_Uint256: Uint256 = Uint256(0, 0);
+    let (token_balance_Uint256) = verify_token_balance(
+        liquidity_pool_address, balance_Uint256, 0, contract_address_list_len, contract_address_list
+    );
+    let (result) = uint256_lt(token_balance_Uint256, [reward_tokens_list].no_of_tokens);
+    if (result == 1) {
+        return (FALSE,);
+    }
+
     check_activation(
         liquidity_pool_address,
         starkway_contract_address,
@@ -667,7 +665,9 @@ func verify_token_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         return (balance_Uint256,);
     }
 
-    let current_balance_Uint256:Uint256 = IERC20.balanceOf([contract_address_list], liquidity_pool_address);
+    let current_balance_Uint256: Uint256 = IERC20.balanceOf(
+        [contract_address_list], liquidity_pool_address
+    );
     let (new_balance_Uint256, carry) = uint256_add(balance_Uint256, current_balance_Uint256);
     verify_token_balance(
         liquidity_pool_address,

@@ -1,5 +1,7 @@
 %lang starknet
 
+from starkware.cairo.common.uint256 import Uint256
+
 // @notice struct to store details of markets
 struct Market {
     id: felt,
@@ -299,8 +301,8 @@ struct Constants {
 
 // Struct to store details of reward tokens
 struct RewardToken {
-    token_id: felt, // L1 ERC20 contract address
-    no_of_tokens: felt,
+    token_id: felt,  // L1 ERC20 contract address
+    no_of_tokens: Uint256,
 }
 
 // Struct to store hightide metadata
