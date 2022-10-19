@@ -1,17 +1,25 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.bool import FALSE
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
+from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import (
     deploy,
     get_block_number,
     get_block_timestamp,
     get_caller_address,
 )
+from starkware.cairo.common.uint256 import Uint256, uint256_add
 
-from contracts.Constants import HIGHTIDE_INITIATED, ManageHighTide_ACTION, Market_INDEX
+from contracts.Constants import (
+    HIGHTIDE_ACTIVE,
+    HIGHTIDE_INITIATED,
+    ManageHighTide_ACTION,
+    Market_INDEX,
+    Starkway_INDEX,
+)
 from contracts.DataTypes import (
     Constants,
     HighTideMetaData,
@@ -21,14 +29,16 @@ from contracts.DataTypes import (
     TradingSeason,
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IERC20 import IERC20
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.IStarkway import IStarkway
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
 
-// //////////
+// /////////
 // Events //
-// //////////
+// /////////
 
 // Event emitted whenever mutipliers are set
 @event
@@ -65,9 +75,9 @@ func liquidity_pool_contract_deployed(hightide_id: felt, contract_address: felt)
 func hightide_initialized(caller: felt, hightide_id: felt) {
 }
 
-// ///////////
+// //////////
 // Storage //
-// ///////////
+// //////////
 
 // Stores the current trading season id
 @storage_var
@@ -124,9 +134,9 @@ func reward_tokens_len_by_hightide(hightide_id: felt) -> (len: felt) {
 func hightide_by_season_id(season_id: felt, index: felt) -> (hightide_id: felt) {
 }
 
-// ///////////////
+// //////////////
 // Constructor //
-// ///////////////
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address Address of the AuthorizedRegistry contract
@@ -139,9 +149,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// ////////
+// ///////
 // View //
-// ////////
+// ///////
 
 // @notice View function to get current season id
 // @return season_id - Id of the season
@@ -213,9 +223,9 @@ func get_hightide_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     return (reward_tokens_len, reward_tokens);
 }
 
-// ////////////
+// ///////////
 // External //
-// ////////////
+// ///////////
 
 // @notice - This function is used for setting up trade season
 // @param start_timestamp - start timestamp of the season
@@ -432,9 +442,55 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return ();
 }
 
-// ////////////
+// @notice - This function is used to activate high tide
+// @param hightide_id - id of hightide
+@external
+func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id: felt
+) {
+    alloc_locals;
+    verify_hightide_id_exists(hightide_id);
+
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+    // Get Starkway contract address
+    let (local starkway_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Starkway_INDEX, version=version
+    );
+
+    let (
+        reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
+    ) = get_hightide_reward_tokens(hightide_id);
+
+    let (hightide_metadata: HighTideMetaData) = get_hightide(hightide_id);
+    let (status) = check_activation(
+        hightide_metadata.liquidity_pool_address,
+        starkway_contract_address,
+        0,
+        reward_tokens_list_len,
+        reward_tokens_list,
+    );
+    if (status == TRUE) {
+        // Update hightide status to active
+        let hightide: HighTideMetaData = HighTideMetaData(
+            pair_id=hightide_metadata.pair_id,
+            status=HIGHTIDE_ACTIVE,
+            season_id=hightide_metadata.season_id,
+            is_burnable=hightide_metadata.is_burnable,
+            liquidity_pool_address=hightide_metadata.liquidity_pool_address,
+        );
+
+        hightide_by_id.write(hightide_id, hightide);
+        // assign_hightide_to_season();
+    } else {
+        return ();
+    }
+    return ();
+}
+
+// ///////////
 // Internal //
-// ////////////
+// ///////////
 
 func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id: felt
@@ -561,4 +617,64 @@ func populate_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     populate_reward_tokens(hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list);
     return ();
+}
+
+func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    liquidity_pool_address: felt,
+    starkway_contract_address: felt,
+    iterator: felt,
+    reward_tokens_list_len: felt,
+    reward_tokens_list: RewardToken*,
+) -> (status: felt) {
+    if (iterator == reward_tokens_list_len) {
+        return (TRUE,);
+    }
+
+    let (
+        contract_address_list_len: felt, contract_address_list: felt*
+    ) = IStarkway.get_token_contract_addresses(
+        contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
+    );
+    
+    //let (token_balance_Uint256) = verify_token_balance(
+    //    liquidity_pool_address, 0, 0, contract_address_list_len, contract_address_list
+    //);
+    //let result = is_le(token_balance_Uint256, [reward_tokens_list].no_of_tokens);
+    //if (result == TRUE) {
+    //    if (token_balance_Uint256 != [reward_tokens_list].no_of_tokens) {
+    //       return (FALSE,);
+    //    }
+    //}
+    tempvar syscall_ptr = syscall_ptr;
+    check_activation(
+        liquidity_pool_address,
+        starkway_contract_address,
+        iterator + 1,
+        reward_tokens_list_len,
+        reward_tokens_list + RewardToken.SIZE,
+    );
+    return (FALSE,);
+}
+
+func verify_token_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    liquidity_pool_address: felt,
+    balance_Uint256: Uint256,
+    iterator: felt,
+    contract_address_list_len: felt,
+    contract_address_list: felt*,
+) -> (token_balance_Uint256: Uint256) {
+    if (iterator == contract_address_list_len) {
+        return (balance_Uint256,);
+    }
+
+    let current_balance_Uint256:Uint256 = IERC20.balanceOf([contract_address_list], liquidity_pool_address);
+    let (new_balance_Uint256, carry) = uint256_add(balance_Uint256, current_balance_Uint256);
+    verify_token_balance(
+        liquidity_pool_address,
+        new_balance_Uint256,
+        iterator + 1,
+        contract_address_list_len,
+        contract_address_list + 1,
+    );
+    return (balance_Uint256,);
 }

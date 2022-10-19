@@ -299,7 +299,7 @@ struct Constants {
 
 // Struct to store details of reward tokens
 struct RewardToken {
-    token_id: felt,
+    token_id: felt, // L1 ERC20 contract address
     no_of_tokens: felt,
 }
 

@@ -26,6 +26,7 @@ const PubkeyWhitelister_INDEX = 22;
 const SigRequirementsManager_INDEX = 23;
 const Hightide_INDEX = 24;
 const TradingStats_INDEX = 25;
+const Starkway_INDEX = 26;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
