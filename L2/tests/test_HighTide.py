@@ -219,7 +219,7 @@ async def test_inialize_hightide_with_zero_class_hash(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
     await assert_revert(signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
-        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, UST_ID, 500]))
+        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, 0, UST_ID, 500, 0]))
 
 @pytest.mark.asyncio
 async def test_inialize_hightide(adminAuth_factory):
@@ -240,7 +240,7 @@ async def test_inialize_hightide(adminAuth_factory):
     )
 
     tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
-        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, UST_ID, 500])
+        [BTC_USDC_ID, 1, 1, 2, USDC_ID, 1000, 0, UST_ID, 500, 0])
 
     execution_info = await hightide.get_hightide(1).call()
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
@@ -255,6 +255,6 @@ async def test_inialize_hightide(adminAuth_factory):
     
     fetched_rewards = await hightide.get_hightide_reward_tokens(1).call()
     assert fetched_rewards.result.reward_tokens_list[0].token_id == USDC_ID
-    assert fetched_rewards.result.reward_tokens_list[0].no_of_tokens == 1000
+    assert fetched_rewards.result.reward_tokens_list[0].no_of_tokens == (1000, 0)
     assert fetched_rewards.result.reward_tokens_list[1].token_id == UST_ID
-    assert fetched_rewards.result.reward_tokens_list[1].no_of_tokens == 500
+    assert fetched_rewards.result.reward_tokens_list[1].no_of_tokens == (500, 0)
