@@ -74,6 +74,16 @@ func liquidity_pool_contract_deployed(hightide_id: felt, contract_address: felt)
 func hightide_initialized(caller: felt, hightide_id: felt) {
 }
 
+// this event is emitted when an hightide is activated
+@event
+func hightide_activated(caller: felt, hightide_id: felt) {
+}
+
+// this event is emitted when an hightide is assigned to a season
+@event
+func assigned_hightide_to_season(hightide_id: felt, season_id: felt) {
+}
+
 // //////////
 // Storage //
 // //////////
@@ -480,7 +490,13 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         );
 
         hightide_by_id.write(hightide_id, hightide);
+
+        // Emit event
+        let (caller) = get_caller_address();
+        hightide_activated.emit(caller=caller, hightide_id=hightide_id);
+
         assign_hightide_to_season(hightide_id, hightide_metadata.season_id);
+
     } else {
         return ();
     }
@@ -701,6 +717,9 @@ func assign_hightide_to_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
     // 0th index always stores the no.of hightides corresponding to the season
     hightide_by_season_id.write(season_id, 0, index + 1);
+    
+    // Emit event
+    assigned_hightide_to_season.emit(hightide_id=hightide_id, season_id=season_id);
 
     return ();
 }
