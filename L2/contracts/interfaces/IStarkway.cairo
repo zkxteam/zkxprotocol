@@ -2,6 +2,6 @@
 
 @contract_interface
 namespace IStarkway {
-    func get_token_contract_addresses(token_id: felt) -> (contract_address_list_len: felt, contract_address_list: felt*) {
+    func get_whitelisted_token_addresses(token_id: felt) -> (addresses_list_len: felt, addresses_list: felt*) {
     }
 }

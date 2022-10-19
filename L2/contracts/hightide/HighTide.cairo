@@ -631,7 +631,7 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     let (
         contract_address_list_len: felt, contract_address_list: felt*
-    ) = IStarkway.get_token_contract_addresses(
+    ) = IStarkway.get_whitelisted_token_addresses(
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
 
