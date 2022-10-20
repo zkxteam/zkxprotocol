@@ -648,6 +648,7 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     reward_tokens_list_len: felt,
     reward_tokens_list: RewardToken*,
 ) -> (status: felt) {
+    alloc_locals;
     if (iterator == reward_tokens_list_len) {
         return (TRUE,);
     }
@@ -658,7 +659,25 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
 
-    let balance_Uint256: Uint256 = Uint256(0, 0);
+    local balance_Uint256: Uint256 = Uint256(0, 0);
+    let (native_token_l2_address: felt) = IStarkway.get_native_token_l2_address(
+        contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
+    );
+
+    if (native_token_l2_address != 0) {
+        let current_balance_Uint256: Uint256 = IERC20.balanceOf(
+            native_token_l2_address, liquidity_pool_address
+        );
+        assert balance_Uint256 = current_balance_Uint256;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+    
     let (token_balance_Uint256) = verify_token_balance(
         liquidity_pool_address, balance_Uint256, 0, contract_address_list_len, contract_address_list
     );
