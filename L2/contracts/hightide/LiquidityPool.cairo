@@ -3,6 +3,7 @@
 from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
+from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.uint256 import Uint256, uint256_le
 
 from contracts.Constants import Hightide_INDEX, Starkway_INDEX
@@ -66,6 +67,12 @@ func perform_return_or_burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let (local hightide_contract_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Hightide_INDEX, version=version
     );
+
+    // Make sure this function is called from hightide contract
+    let (caller) = get_caller_address();
+    with_attr error_message("LiquidityPool: caller is not hightide contract") {
+        assert caller = hightide_contract_address;
+    }
 
     let (
         reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
@@ -156,10 +163,10 @@ func transfer_or_burn_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         if (is_burnable == FALSE) {
             IERC20.transfer([contract_address_list], token_lister_address, current_balance_Uint256);
         } else {
-            IERC20.transfer([contract_address_list], 0, current_balance_Uint256);
+            IERC20.transfer([contract_address_list], 0x0000DEAD, current_balance_Uint256);
         }
         tempvar syscall_ptr = syscall_ptr;
-    } else{
+    } else {
         tempvar syscall_ptr = syscall_ptr;
     }
 
