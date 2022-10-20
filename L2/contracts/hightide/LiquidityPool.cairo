@@ -111,6 +111,42 @@ func reward_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         return ();
     }
 
+    let (native_token_l2_address: felt) = IStarkway.get_native_token_l2_address(
+        contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
+    );
+
+    if (native_token_l2_address != 0) {
+        let current_balance_Uint256: Uint256 = IERC20.balanceOf(
+            native_token_l2_address, liquidity_pool_address
+        );
+
+        let zero_Uint256: Uint256 = Uint256(0, 0);
+        let (result) = uint256_le(current_balance_Uint256, zero_Uint256);
+        if (result == FALSE) {
+            if (is_burnable == FALSE) {
+                IERC20.transfer(
+                    native_token_l2_address, token_lister_address, current_balance_Uint256
+                );
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                IERC20.burn(native_token_l2_address, current_balance_Uint256);
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            }
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
     let (
         contract_address_list_len: felt, contract_address_list: felt*
     ) = IStarkway.get_whitelisted_token_addresses(
