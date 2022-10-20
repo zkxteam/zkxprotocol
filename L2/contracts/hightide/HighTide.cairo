@@ -385,6 +385,7 @@ func set_liquidity_pool_contract_class_hash{
 // @notice - This function is used to initialize high tide
 // @param pair_id - supported market pair
 // @param season_id - preferred season
+// @param token_lister_address - L2 address of token lister
 // @param is_burnable - if 0 - return to token lister, 1 - burn tokens
 // @param reward_tokens_list_len - no.of reward tokens for an hightide
 // @param reward_tokens_list - array of tokens to be given as reward
@@ -392,6 +393,7 @@ func set_liquidity_pool_contract_class_hash{
 func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     pair_id: felt,
     season_id: felt,
+    token_lister_address: felt,
     is_burnable: felt,
     reward_tokens_list_len: felt,
     reward_tokens_list: RewardToken*,
@@ -405,6 +407,10 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
     verify_season_id_exists(season_id);
+
+    with_attr error_message("HighTide: Token lister address cannot be 0") {
+        assert_not_zero(token_lister_address);
+    }
 
     // Get market contract address
     let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
@@ -435,6 +441,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         pair_id=pair_id,
         status=HIGHTIDE_INITIATED,
         season_id=season_id,
+        token_lister_address=token_lister_address,
         is_burnable=is_burnable,
         liquidity_pool_address=liquidity_pool_address,
     );
@@ -485,6 +492,7 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             pair_id=hightide_metadata.pair_id,
             status=HIGHTIDE_ACTIVE,
             season_id=hightide_metadata.season_id,
+            token_lister_address=hightide_metadata.token_lister_address,
             is_burnable=hightide_metadata.is_burnable,
             liquidity_pool_address=hightide_metadata.liquidity_pool_address,
         );
