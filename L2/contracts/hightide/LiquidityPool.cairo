@@ -49,14 +49,12 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ///////////
 
 // @notice - This function is used for either returning or burning the tokens
-// @param hightide_id - id of hightide
 @external
-func perform_return_or_burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hightide_id: felt
-) {
+func perform_return_or_burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
     alloc_locals;
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
+    let (id) = hightide_id.read();
 
     // Get Starkway contract address
     let (local starkway_contract_address) = IAuthorizedRegistry.get_contract_address(
@@ -77,11 +75,11 @@ func perform_return_or_burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let (
         reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
     ) = IHighTide.get_hightide_reward_tokens(
-        contract_address=hightide_contract_address, hightide_id=hightide_id
+        contract_address=hightide_contract_address, hightide_id=id
     );
 
     let (hightide_metadata: HighTideMetaData) = IHighTide.get_hightide(
-        contract_address=hightide_contract_address, hightide_id=hightide_id
+        contract_address=hightide_contract_address, hightide_id=id
     );
 
     reward_tokens_recurse(
