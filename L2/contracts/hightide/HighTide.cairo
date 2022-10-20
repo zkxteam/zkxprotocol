@@ -59,27 +59,27 @@ func trading_season_set_up(caller: felt, trading_season: TradingSeason) {
 func trading_season_started(caller: felt, season_id: felt) {
 }
 
-// this event is emitted whenever the liquidity pool contract class hash is changed
+// Event is emitted whenever the liquidity pool contract class hash is changed
 @event
 func liquidity_pool_contract_class_hash_changed(class_hash: felt) {
 }
 
-// this event is emitted whenever a new liquidity pool contract is deployed
+// Event is emitted whenever a new liquidity pool contract is deployed
 @event
 func liquidity_pool_contract_deployed(hightide_id: felt, contract_address: felt) {
 }
 
-// this event is emitted when an hightide is initialized
+// Event is emitted when an hightide is initialized
 @event
 func hightide_initialized(caller: felt, hightide_id: felt) {
 }
 
-// this event is emitted when an hightide is activated
+// Event is emitted when an hightide is activated
 @event
 func hightide_activated(caller: felt, hightide_id: felt) {
 }
 
-// this event is emitted when an hightide is assigned to a season
+// Event is emitted when an hightide is assigned to a season
 @event
 func assigned_hightide_to_season(hightide_id: felt, season_id: felt) {
 }
@@ -664,7 +664,7 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         liquidity_pool_address, balance_Uint256, 0, contract_address_list_len, contract_address_list
     );
     let (result) = uint256_lt(token_balance_Uint256, [reward_tokens_list].no_of_tokens);
-    if (result == 1) {
+    if (result == TRUE) {
         return (FALSE,);
     }
 
