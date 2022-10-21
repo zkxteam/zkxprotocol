@@ -179,7 +179,7 @@ func process_admin_action{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         // if present approver is 0 then caller is first approver
         // save caller address as approver & return
         let (current_approver) = approver.read(address);
-        with_attr error_message("AdminAuth: Approver cannot be same as caller") {
+        with_attr error_message("AdminAuth: Both approvers cannot be the same") {
             assert_not_equal(current_approver, caller);
         }
         if (current_approver == 0) {

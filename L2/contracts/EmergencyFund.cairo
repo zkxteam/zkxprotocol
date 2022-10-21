@@ -193,7 +193,7 @@ func fund_insurance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
-    with_attr error_message("Unauthorized call to fund insurance") {
+    with_attr error_message("EmergencyFund: Unauthorized call to fund insurance") {
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
@@ -231,7 +231,7 @@ func defund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
-    with_attr error_message("Unauthorized call to defund holding") {
+    with_attr error_message("EmergencyFund: Unauthorized call to defund holding") {
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 

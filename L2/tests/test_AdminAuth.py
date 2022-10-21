@@ -105,7 +105,7 @@ async def test_update_admin_mapping_same_approval(adminAuth_factory):
     assert execution_info1.result.allowed == 0
 
     # if same admin gives another approval then transaction will revert
-    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [user2.contract_address, 0, 1]), reverted_with="AdminAuth: Approver cannot be same as caller")
+    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [user2.contract_address, 0, 1]), reverted_with="AdminAuth: Both approvers cannot be the same")
 
     execution_info1 = await adminAuth.get_admin_mapping(user2.contract_address, 0).call()
     assert execution_info1.result.allowed == 0

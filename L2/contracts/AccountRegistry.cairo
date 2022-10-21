@@ -152,7 +152,7 @@ func remove_from_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    with_attr error_message("AccountManager: 0 passed as ID for removal") {
+    with_attr error_message("AccountRegistry: 0 passed as ID for removal") {
         assert_nn(id_);
     }
 
@@ -166,7 +166,7 @@ func remove_from_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     }
 
     let (account_address) = account_registry.read(index=id_);
-    with_attr error_message("AccountManager: Account address doesn't exist at the index") {
+    with_attr error_message("AccountRegistry: Account address doesn't exist at the index") {
         assert_not_zero(account_address);
     }
 
