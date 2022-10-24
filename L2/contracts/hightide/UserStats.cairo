@@ -9,6 +9,7 @@ from contracts.DataTypes import TradingSeason
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import CommonLib
+from contracts.Math_64x61 import Math64x61_add
 
 // /////////
 // Events //
@@ -86,18 +87,39 @@ func get_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func record_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     pair_id: felt, trader_address: felt, fee_64x61: felt
 ) {
-    // This function checks whether season has ended 
+    // This function checks whether season has ended
     let (season_id) = verify_season_existance();
     if (season_id == 0) {
         return ();
     }
 
     let (current_trader_fee_64x61) = trader_fee_by_market.read(season_id, pair_id, trader_address);
+    let (updated_trader_fee_64x61) = Math64x61_add(current_trader_fee_64x61, fee_64x61);
 
     // Increment trader fee
-    trader_fee_by_market.write(
-        season_id, pair_id, trader_address, current_trader_fee_64x61 + fee_64x61
-    );
+    trader_fee_by_market.write(season_id, pair_id, trader_address, updated_trader_fee_64x61);
+
+    return ();
+}
+
+// @notice This function is used to record total fee collected by the platform for a pair in a season
+// @param pair_id - id of the pair
+// @param fee_64x61 - total fee charged for the traded pair
+@external
+func record_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    pair_id: felt, fee_64x61: felt
+) {
+    // This function checks whether season has ended
+    let (season_id) = verify_season_existance();
+    if (season_id == 0) {
+        return ();
+    }
+
+    let (current_fee_64x61) = total_fee_by_market.read(season_id, pair_id);
+    let (updated_fee_64x61) = Math64x61_add(current_fee_64x61, fee_64x61);
+
+    // Increment total fee
+    total_fee_by_market.write(season_id, pair_id, updated_fee_64x61);
 
     return ();
 }
