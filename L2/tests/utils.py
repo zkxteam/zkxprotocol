@@ -55,14 +55,14 @@ def felt_to_str(felt):
 def uint(a):
     return(a, 0)
 
-async def assert_revert(fun):
+async def assert_revert(fun, reverted_with=None):
     try:
         await fun
         assert False
     except StarkException as err:
         _, error = err.args
-        assert error['code'] == StarknetErrorCode.TRANSACTION_FAILED
-
+        if reverted_with is not None:
+            assert reverted_with in error['message']
 
 class Signer():
     """

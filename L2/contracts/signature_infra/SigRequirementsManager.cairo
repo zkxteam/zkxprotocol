@@ -54,7 +54,7 @@ func func_to_num_sig_mapping(core_function: CoreFunction) -> (num: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Registry Address or Version cannot be 0") {
+    with_attr error_message("SigRequirementsManager: Registry Address or Version cannot be 0") {
         assert_not_zero(registry_address_);
         assert_not_zero(version_);
     }
@@ -75,7 +75,7 @@ func assert_func_handled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 ) {
     let (is_registered) = func_to_registration_mapping.read(core_function);
 
-    with_attr error_message("Function not registered for handling by signature infra") {
+    with_attr error_message("SigRequirementsManager: Function not registered") {
         assert_not_zero(is_registered);
     }
 
@@ -124,7 +124,7 @@ func set_sig_requirement{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION);
 
-    with_attr error_message("Number of signatures required cannot be negative") {
+    with_attr error_message("SigRequirementsManager: Number of signatures cannot be negative") {
         assert_nn(num_req);
     }
 

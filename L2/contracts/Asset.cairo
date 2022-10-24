@@ -184,7 +184,9 @@ func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     alloc_locals;
 
     // Verify authority, state and input
-    assert_not_zero(id_);
+    with_attr error_message("Asset: Asset id cannot be 0") {
+        assert_not_zero(id_);
+    }
     verify_caller_authority_asset();
     verify_asset_id_exists(id_, should_exist_=FALSE);
     verify_ticker_exists(new_asset_.ticker, should_exist_=FALSE);
@@ -487,7 +489,7 @@ func populate_asset_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
 func verify_caller_authority_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     ) {
-    with_attr error_message("Caller not authorized to manage assets") {
+    with_attr error_message("Asset: Unauthorized caller for mananging assets") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, ManageAssets_ACTION);
@@ -498,7 +500,7 @@ func verify_caller_authority_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 func verify_asset_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, should_exist_: felt
 ) {
-    with_attr error_message("asset_id existence mismatch") {
+    with_attr error_message("Asset: Asset_id existence mismatch") {
         let (id_exists) = asset_id_exists.read(asset_id_);
         assert id_exists = should_exist_;
     }
@@ -508,7 +510,7 @@ func verify_asset_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 func verify_ticker_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     ticker_: felt, should_exist_: felt
 ) {
-    with_attr error_message("Ticker existence mismatch") {
+    with_attr error_message("Asset: Ticker existence mismatch") {
         let (ticker_exists) = asset_ticker_exists.read(ticker_);
         assert ticker_exists = should_exist_;
     }

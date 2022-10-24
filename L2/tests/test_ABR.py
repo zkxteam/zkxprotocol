@@ -62,8 +62,7 @@ async def test_should_revert_if_wrong_number_of_arguments_passed_for_BTC(abr_fac
 
     arguments = [1282193, 479] + btc_spot + [480]+btc_perp
 
-    await assert_revert(
-        admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments))
+    await assert_revert(admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments))
 
 
 @pytest.mark.asyncio
@@ -72,7 +71,7 @@ async def test_should_revert_if_non_admin_changed_bollinger_width(abr_factory):
 
     new_boll_width = to64x61(1.5)
 
-    await assert_revert(admin2_signer.send_transaction(admin2, abr.contract_address, 'modify_bollinger_width', [new_boll_width]))
+    await assert_revert(admin2_signer.send_transaction(admin2, abr.contract_address, 'modify_bollinger_width', [new_boll_width]), reverted_with="ABR: Unauthorized")
 
 
 @ pytest.mark.asyncio
@@ -81,7 +80,7 @@ async def test_should_revert_if_non_admin_changed_base_abr(abr_factory):
 
     new_base_abr = to64x61(0.000025)
     await assert_revert(
-        admin2_signer.send_transaction(admin2, abr.contract_address, 'modify_base_abr', [new_base_abr]))
+        admin2_signer.send_transaction(admin2, abr.contract_address, 'modify_base_abr', [new_base_abr]), reverted_with="ABR: Unauthorized")
 
 
 @ pytest.mark.asyncio
@@ -115,7 +114,7 @@ async def test_should_revert_if_called_before_8_hours(abr_factory):
     arguments = [1282193, 480] + btc_spot + [480]+btc_perp
 
     await assert_revert(
-        admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments))
+        admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments), reverted_with="ABR: 8 hours not passed")
 
 
 @ pytest.mark.asyncio

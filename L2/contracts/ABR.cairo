@@ -96,7 +96,7 @@ func get_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func modify_base_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_base_abr_: felt
 ) {
-    with_attr error_message("Caller does not have permission to update base abr value") {
+    with_attr error_message("ABR: Unauthorized") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
@@ -111,7 +111,7 @@ func modify_base_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_bollinger_width_: felt
 ) {
-    with_attr error_message("Caller does not have permission to update bollinger width") {
+    with_attr error_message("ABR: Unauthorized") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
@@ -145,12 +145,14 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
     // If 8 hours have not passed yet
     if (is_eight_hours == 1) {
-        assert 1 = 0;
+        with_attr error_message("ABR: 8 hours not passed") {
+            assert 1 = 0;
+        }
     }
 
     if (perp_mark_len == perp_index_len) {
     } else {
-        with_attr error_message("Pass same number of data points for mark and index") {
+        with_attr error_message("ABR: arguments mismatch") {
             assert 1 = 0;
         }
     }

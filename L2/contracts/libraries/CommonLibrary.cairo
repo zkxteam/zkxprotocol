@@ -43,7 +43,7 @@ namespace CommonLib {
         registry_address_: felt, contract_version_: felt
     ) {
         // Validate arguments
-        with_attr error_message("Registry address and version cannot be 0") {
+        with_attr error_message("CommonLibrary: Registry address and version cannot be 0") {
             assert_not_zero(registry_address_);
             assert_not_zero(contract_version_);
         }
@@ -94,7 +94,7 @@ namespace CommonLib {
             current_registry_address, current_contract_version, MasterAdmin_ACTION
         );
 
-        with_attr error_message("contract version cannot be 0") {
+        with_attr error_message("CommonLibrary: Contract version cannot be 0") {
             assert_not_zero(new_version_);
         }
 
@@ -119,7 +119,7 @@ namespace CommonLib {
             current_registry_address, current_contract_version, MasterAdmin_ACTION
         );
 
-        with_attr error_message("Registry address cannot be 0") {
+        with_attr error_message("CommonLibrary: Registry address cannot be 0") {
             assert_not_zero(registry_address_);
         }
 
@@ -137,17 +137,18 @@ namespace CommonLib {
 // @notice view function to get current contract version
 // @return contract_version - version of the contract
 @view
-func get_contract_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    ) -> (contract_version: felt) {
+func get_contract_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    contract_version: felt
+) {
     return CommonLib.get_contract_version();
 }
 
 // @notice view function to get the address of Authorized registry contract
 // @return registry_address - Address of Authorized registry contract
 @view
-func get_registry_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    ) -> (registry_address: felt) {
-    
+func get_registry_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    registry_address: felt
+) {
     return CommonLib.get_registry_address();
 }
 
@@ -162,7 +163,7 @@ func set_contract_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     new_version_: felt
 ) {
     CommonLib.set_contract_version(new_version_);
-    return();
+    return ();
 }
 
 // @notice external function to set authorized registry contract address

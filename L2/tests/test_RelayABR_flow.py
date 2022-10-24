@@ -187,7 +187,8 @@ async def test_fund_called_by_non_authorized_address(abr_factory):
 
     amount = to64x61(1000000)
     await assert_revert(
-        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "fund", [BTC_USD_ID, amount])
+        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "fund", [BTC_USD_ID, amount]),
+        reverted_with="FundLib: Unauthorized call to manage funds"
     )
 
 @pytest.mark.asyncio
@@ -218,7 +219,8 @@ async def test_defund_called_by_non_authorized_address(abr_factory):
     amount = to64x61(500000)
     abr_fund_balance_before = await abr_fund.balance(BTC_USD_ID).call()
     await assert_revert(
-        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "defund", [BTC_USD_ID, amount])
+        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "defund", [BTC_USD_ID, amount]),
+        reverted_with="FundLib: Unauthorized call to manage funds"
     )
 
     abr_fund_balance = await abr_fund.balance(BTC_USD_ID).call()

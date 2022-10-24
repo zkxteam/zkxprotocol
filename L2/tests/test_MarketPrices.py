@@ -78,4 +78,4 @@ async def test_update_market_price(adminAuth_factory):
 async def test_unauthorized_add_market_price_to_market_prices(adminAuth_factory):
     adminAuth, market_prices, admin1, admin2 = adminAuth_factory
 
-    await assert_revert(admin2_signer.send_transaction(admin2, market_prices.contract_address, 'update_market_price', [BTC_USD_ID, 500]))
+    await assert_revert(admin2_signer.send_transaction(admin2, market_prices.contract_address, 'update_market_price', [BTC_USD_ID, 500]),reverted_with="MarketPrices: Unauthorized caller for updating market price")

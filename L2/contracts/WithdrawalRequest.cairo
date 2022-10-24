@@ -94,7 +94,7 @@ func update_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     );
 
     // Make sure the message was sent by the intended L1 contract.
-    with_attr error_message("From address is not matching") {
+    with_attr error_message("WithdrawalRequest: L1 contract mismatch") {
         assert from_address = l1_zkx_address;
     }
 
@@ -149,7 +149,7 @@ func add_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         contract_address=account_registry_address, address_=caller
     );
 
-    with_attr error_message("Called account contract is not registered") {
+    with_attr error_message("WithdrawalRequest: User address not registered") {
         assert_not_zero(present);
     }
 

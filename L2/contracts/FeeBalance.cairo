@@ -106,18 +106,18 @@ func update_fee_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         contract_address=registry, index=Trading_INDEX, version=version
     );
 
-    with_attr error_message("Access is denied since caller is not trading contract") {
+    with_attr error_message("FeeBalance: Unauthorized call to update fee mapping") {
         assert caller = trading_address;
     }
 
-    with_attr error_message("Fee to be added should be non negative") {
+    with_attr error_message("FeeBalance: Fee must be non negative") {
         assert_nn(fee_to_add_);
     }
 
     let current_fee: felt = fee_mapping.read(address=address, assetID=assetID_);
     let new_fee: felt = current_fee + fee_to_add_;
 
-    with_attr error_message("New fee must be in 64x61 range") {
+    with_attr error_message("FeeBalance: Fee must be in 64x61 representation") {
         Math64x61_assert64x61(new_fee);
     }
 
@@ -126,7 +126,7 @@ func update_fee_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let current_total_fee_per_asset: felt = total_fee_per_asset.read(assetID=assetID_);
     let new_total_fee_per_asset: felt = current_total_fee_per_asset + fee_to_add_;
 
-    with_attr error_message("Total fee must be in 64x61 range") {
+    with_attr error_message("FeeBalance: Total fee must be in 64x61 representation") {
         Math64x61_assert64x61(new_total_fee_per_asset);
     }
 
@@ -155,21 +155,21 @@ func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not Master Admin") {
+    with_attr error_message("FeeBalance: Unauthorized call to withdraw") {
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    with_attr error_message("Amount to be withdrawn should be greater than 0") {
+    with_attr error_message("FeeBalance: Amount must be > 0") {
         assert_lt(0, amount_to_withdraw_);
     }
 
-    with_attr error_message("Amount should be in 64x61 representation") {
+    with_attr error_message("FeeBalance: Amount must be in 64x61 representation") {
         Math64x61_assert64x61(amount_to_withdraw_);
     }
 
     let current_total_fee_per_asset: felt = total_fee_per_asset.read(assetID=assetID_);
 
-    with_attr error_message("Amount to withdraw is more than balance available") {
+    with_attr error_message("FeeBalance: Insufficient Balance") {
         assert_le(amount_to_withdraw_, current_total_fee_per_asset);
     }
 

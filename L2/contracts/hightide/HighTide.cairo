@@ -2,7 +2,11 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt
-from starkware.starknet.common.syscalls import get_block_number, get_block_timestamp, get_caller_address
+from starkware.starknet.common.syscalls import (
+    get_block_number,
+    get_block_timestamp,
+    get_caller_address,
+)
 
 from contracts.Constants import ManageHighTide_ACTION, Trading_INDEX
 from contracts.DataTypes import Constants, Multipliers, TradingSeason
@@ -144,7 +148,7 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not authorized to setup trade season") {
+    with_attr error_message("HighTide: Unauthorized call to setup trade season") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
 
@@ -155,7 +159,7 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Create Trading season struct to store
     let trading_season: TradingSeason = TradingSeason(
-        start_block_number = 0, start_timestamp=start_timestamp, num_trading_days=num_trading_days
+        start_block_number=0, start_timestamp=start_timestamp, num_trading_days=num_trading_days
     );
 
     trading_season_by_id.write(season_id, trading_season);
@@ -176,19 +180,21 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not authorized to start trade season") {
+    with_attr error_message("HighTide: Unauthorized call to start trade season") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
     validate_season_to_start(season_id);
 
     let (new_season: TradingSeason) = get_season(season_id);
-    
+
     // get current block number
     let (current_block_number) = get_block_number();
 
     // update start block number in trading season
     let trading_season: TradingSeason = TradingSeason(
-        start_block_number = current_block_number, start_timestamp=new_season.start_timestamp, num_trading_days=new_season.num_trading_days
+        start_block_number=current_block_number,
+        start_timestamp=new_season.start_timestamp,
+        num_trading_days=new_season.num_trading_days,
     );
 
     trading_season_by_id.write(season_id, trading_season);
@@ -213,7 +219,7 @@ func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not authorized to set multipliers") {
+    with_attr error_message("HighTide: Unauthorized call to set multipliers") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
 
@@ -241,7 +247,7 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not authorized to set constants") {
+    with_attr error_message("HighTide: Unauthorized call to set constants") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
 
@@ -262,7 +268,7 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id: felt
 ) {
-    with_attr error_message("trading season id existence mismatch") {
+    with_attr error_message("HighTide: Trading season id existence mismatch") {
         let (seasons_len) = seasons_array_len.read();
         assert_le(season_id, seasons_len);
     }
@@ -295,20 +301,18 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
 
     if (current_season_id != 0) {
-        with_attr error_message("current trading season is still active") {
+        with_attr error_message("HighTide: Current season still active") {
             assert_le(current_seasons_end_timestamp, current_timestamp);
         }
     } else {
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    with_attr error_message(
-            "new trading seasons start timestamp should be less than or equal to the current timestamp") {
+    with_attr error_message("HighTide: Invalid Timestamp") {
         assert_le(new_season.start_timestamp, current_timestamp);
     }
 
-    with_attr error_message(
-            "current timestamp should be less than new trading seasons end timestamp") {
+    with_attr error_message("HighTide: Invalid Timestamp") {
         assert_lt(current_timestamp, new_seasons_end_timestamp);
     }
     return ();

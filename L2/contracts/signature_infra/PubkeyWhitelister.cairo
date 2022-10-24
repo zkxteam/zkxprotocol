@@ -46,7 +46,7 @@ func version() -> (res: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Registry Address or Version cannot be 0") {
+    with_attr error_message("PubkeyWhitelister: Registry Address or Version cannot be 0") {
         assert_not_zero(registry_address_);
         assert_not_zero(version_);
     }
