@@ -113,7 +113,7 @@ func record_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Emit event
     let (caller) = get_caller_address();
-    traders_fee_recorded.emit(caller, season_id, pair_id, trader_address, fee_64x61);
+    traders_fee_recorded.emit(caller, season_id, pair_id, trader_address, updated_trader_fee_64x61);
 
     return ();
 }
@@ -139,7 +139,7 @@ func record_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     // Emit event
     let (caller) = get_caller_address();
-    total_fee_recorded.emit(caller, season_id, pair_id, fee_64x61);
+    total_fee_recorded.emit(caller, season_id, pair_id, updated_fee_64x61);
 
     return ();
 }
