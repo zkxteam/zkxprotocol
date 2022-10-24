@@ -111,18 +111,18 @@ func get_message{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 // @notice Internal function to recursively find the index of the withdrawal request to be updated
 // @param user_l1_address_ - User's L1 wallet address
-// @param ticker_ - collateral on which user submitted withdrawal request
+// @param assetID_ - collateral on which user submitted withdrawal request
 // @param amount_ - Amount of funds that user has withdrawn
 // @param timestamp_ - Time at which user submitted withdrawal request
 // @param status_ - Status of the withdrawal request
 // @param arr_len_ - current index which is being checked to be updated
 func add_message_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     user_l1_address_: felt,
-    ticker_: felt,
+    assetID_: felt,
     amount_: felt,
     timestamp_: felt,
     L1_fee_amount_: felt,
-    L1_fee_ticker_: felt,
+    L1_fee_assetID_: felt,
     arr_len_: felt,
 ) -> (res: felt) {
     alloc_locals;
@@ -136,11 +136,11 @@ func add_message_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     if (message.timestamp == 0) {
         let new_message = QuoteL1Message(
             user_l1_address=user_l1_address_,
-            ticker=ticker_,
+            assetID=assetID_,
             amount=amount_,
             timestamp=timestamp_,
             L1_fee_amount=L1_fee_amount_,
-            L1_fee_ticker=L1_fee_ticker_,
+            L1_fee_assetID=L1_fee_assetID_,
         );
         L1_message_array.write(index=arr_len_, value=new_message);
         return (1,);
@@ -151,36 +151,36 @@ func add_message_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     if (is_less == 0) {
         let new_message = QuoteL1Message(
             user_l1_address=user_l1_address_,
-            ticker=ticker_,
+            assetID=assetID_,
             amount=amount_,
             timestamp=timestamp_,
             L1_fee_amount=L1_fee_amount_,
-            L1_fee_ticker=L1_fee_ticker_,
+            L1_fee_assetID=L1_fee_assetID_,
         );
         L1_message_array.write(index=arr_len_, value=new_message);
         return (1,);
     }
 
     return add_message_recurse(
-        user_l1_address_, ticker_, amount_, timestamp_, L1_fee_amount_, L1_fee_ticker_, arr_len_ + 1
+        user_l1_address_, assetID_, amount_, timestamp_, L1_fee_amount_, L1_fee_assetID_, arr_len_ + 1
     );
 }
 
 // @notice function to check conditions and add message to the array
 // @param user_l1_address_ User's L1 wallet address
-// @param ticker_ collateral for the requested withdrawal
+// @param assetID_ collateral for the requested withdrawal
 // @param amount_ Amount to be withdrawn
 // @param timestamp_ - Time at which user submitted withdrawal request
 // @param L1_fee_amount_ - Gas fee in L1
-// @param L1_fee_ticker_ - Collateral used to pay L1 gas fee
+// @param L1_fee_assetID_ - Collateral used to pay L1 gas fee
 @external
 func check_and_add_message{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     user_l1_address_: felt,
-    ticker_: felt,
+    assetID_: felt,
     amount_: felt,
     timestamp_: felt,
     L1_fee_amount_: felt,
-    L1_fee_ticker_: felt,
+    L1_fee_assetID_: felt,
 ) -> (result: felt) {
     alloc_locals;
     let (registry) = registry_address.read();
@@ -201,7 +201,7 @@ func check_and_add_message{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     }
 
     let (result) = add_message_recurse(
-        user_l1_address_, ticker_, amount_, timestamp_, L1_fee_amount_, L1_fee_ticker_, 0
+        user_l1_address_, assetID_, amount_, timestamp_, L1_fee_amount_, L1_fee_assetID_, 0
     );
 
     return (result=result);

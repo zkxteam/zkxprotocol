@@ -26,7 +26,7 @@ const MESSAGE_WITHDRAW = 3;
 // Event emitted whenever add_withdrawal_request() is called
 @event
 func add_withdrawal_request_called(
-    request_id: felt, user_l1_address: felt, ticker: felt, amount: felt, user_l2_address: felt
+    request_id: felt, user_l1_address: felt, assetID: felt, amount: felt, user_l2_address: felt
 ) {
 }
 
@@ -106,7 +106,7 @@ func update_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     assert_not_zero(user_l2_address);
     // Create a struct with the withdrawal Request
     let updated_request = WithdrawalRequest(
-        user_l1_address=0, user_l2_address=0, ticker=0, amount=0
+        user_l1_address=0, user_l2_address=0, assetID=0, amount=0
     );
     withdrawal_request_mapping.write(request_id=request_id_, value=updated_request);
 
@@ -130,11 +130,11 @@ func update_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 // @notice function to add withdrawal request to the withdrawal request array
 // @param request_id_ ID of the withdrawal Request
 // @param user_l1_address_ User's L1 wallet address
-// @param ticker_ collateral for the requested withdrawal
+// @param assetID_ collateral for the requested withdrawal
 // @param amount_ Amount to be withdrawn
 @external
 func add_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    request_id_: felt, user_l1_address_: felt, ticker_: felt, amount_: felt
+    request_id_: felt, user_l1_address_: felt, assetID_: felt, amount_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -155,7 +155,7 @@ func add_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     // Create a struct with the withdrawal Request
     let new_request = WithdrawalRequest(
-        user_l1_address=user_l1_address_, user_l2_address=caller, ticker=ticker_, amount=amount_
+        user_l1_address=user_l1_address_, user_l2_address=caller, assetID=assetID_, amount=amount_
     );
 
     withdrawal_request_mapping.write(request_id=request_id_, value=new_request);
@@ -168,7 +168,7 @@ func add_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let (message_payload: felt*) = alloc();
     assert message_payload[0] = MESSAGE_WITHDRAW;
     assert message_payload[1] = user_l1_address_;
-    assert message_payload[2] = ticker_;
+    assert message_payload[2] = assetID_;
     assert message_payload[3] = amount_;
     assert message_payload[4] = request_id_;
 
@@ -179,7 +179,7 @@ func add_withdrawal_request{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     add_withdrawal_request_called.emit(
         request_id=request_id_,
         user_l1_address=user_l1_address_,
-        ticker=ticker_,
+        assetID=assetID_,
         amount=amount_,
         user_l2_address=caller,
     );

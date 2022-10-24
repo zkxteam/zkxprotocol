@@ -7,11 +7,11 @@ namespace IQuoteL1Fee {
     // external functions
     func check_and_add_message(
         user_l1_address_: felt,
-        ticker_: felt,
+        assetID_: felt,
         amount_: felt,
         timestamp_: felt,
         L1_fee_amount_: felt,
-        L1_fee_ticker_: felt,
+        L1_fee_assetID_: felt,
     ) -> (result: felt) {
     }
 

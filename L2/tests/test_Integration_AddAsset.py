@@ -3,15 +3,13 @@ import asyncio
 import json
 import os
 from starkware.starknet.testing.starknet import Starknet
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted
+from utils import str_to_felt, MAX_UINT256, assert_event_emitted
 from helpers import StarknetService, ContractType, AccountFactory
 from starkware.eth.eth_test_utils import EthTestUtils, eth_reverts
 from starkware.starknet.testing.contracts import MockStarknetMessaging
 from starkware.starknet.testing.postman import Postman
-from starkware.starknet.testing.contract_utils import get_contract_class
-from starkware.starknet.testing.contract import StarknetContract
 from dummy_addresses import L1_dummy_address
-from dummy_signers import signer1, signer2, signer3
+from dummy_signers import signer1, signer2
 
 
 counter = 0
@@ -23,34 +21,19 @@ DUMMY_WITHDRAWAL_REQUEST_ADDRESS=12345
 def generate_asset_info():
     global counter
     counter += 1
-    id = f"32f0406jz7qj8_${counter}"
-    ticker = f"ETH_${counter}"
+    id = f"ETH_${counter}"
     name = f"Ethereum_${counter}"
-    return str_to_felt(id), str_to_felt(ticker), str_to_felt(name)
+    return str_to_felt(id), str_to_felt(name)
 
 
 def build_default_asset_properties(id, ticker, name):
     return [
         id,  # id
         0,  # asset_version
-        ticker,  # ticker
         name,  # short_name
-        0,  # tradable
-        0,  # collateral
+        0,  # is_tradable
+        0,  # is_collateral
         18,  # token_decimal
-        0,  # metadata_id
-        1,  # tick_size
-        1,  # step_size
-        10,  # minimum_order_size
-        1,  # minimum_leverage
-        5,  # maximum_leverage
-        3,  # currently_allowed_leverage
-        1,  # maintenance_margin_fraction
-        1,  # initial_margin_fraction
-        1,  # incremental_initial_margin_fraction
-        100,  # incremental_position_size
-        1000,  # baseline_position_size
-        10000  # maximum_position_size
     ]
 
 
@@ -120,9 +103,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
 @pytest.mark.asyncio
 async def test_add_asset_positive_flow(adminAuth_factory):
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
+    asset_id, asset_name = generate_asset_info()
+    asset_properties = build_default_asset_properties(asset_id, asset_name)
 
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
@@ -131,7 +113,6 @@ async def test_add_asset_positive_flow(adminAuth_factory):
         name="asset_added",
         data=[
             asset_id,
-            asset_ticker,
             admin1.contract_address
         ]
     )
@@ -147,31 +128,29 @@ async def test_add_asset_positive_flow(adminAuth_factory):
 
     # asset list should be empty
     asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==0
+    assert len(asset_list) == 0
 
     # no asset_id should exist for this ticker at this point
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==0
+    stored_asset_id = l1_zkx_contract.assetID.call(asset_id)
+    assert stored_asset_id == 0
 
     # this call only goes through if the message from L2 has reached the message queue
-    l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, asset_id)
+    l1_zkx_contract.updateAssetListInL1.transact(asset_id)
 
     asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==1
-    assert asset_list[0]==asset_ticker
+    assert len(asset_list) == 1
+    assert asset_list[0] == asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==asset_id
+    stored_asset_id = l1_zkx_contract.assetID.call(asset_id)
+    assert stored_asset_id == asset_id
 
 
 @pytest.mark.asyncio
 async def test_add_asset_incorrect_payload(adminAuth_factory):
 
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
-
+    asset_id, asset_name = generate_asset_info()
+    asset_properties = build_default_asset_properties(asset_id, asset_name)
     
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
@@ -180,44 +159,34 @@ async def test_add_asset_incorrect_payload(adminAuth_factory):
         name="asset_added",
         data=[
             asset_id,
-            asset_ticker,
             admin1.contract_address
         ]
     )
 
     await postman.flush()
 
-    incorrect_ticker=12345
-    incorrect_asset_id=12345
+    incorrect_ticker = 12345
+    incorrect_asset_id = 12345
     stored_asset_id = l1_zkx_contract.assetID.call(incorrect_ticker)
-    assert stored_asset_id==0
+    assert stored_asset_id == 0
 
     asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==1
-
-    with eth_reverts("INVALID_MESSAGE_TO_CONSUME"):
-        l1_zkx_contract.updateAssetListInL1.transact(incorrect_ticker, asset_id)
-    
-    
-    asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==1
+    assert len(asset_list) == 1
 
     with eth_reverts("INVALID_MESSAGE_TO_CONSUME"):
-        l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, incorrect_asset_id)
+        l1_zkx_contract.updateAssetListInL1.transact(incorrect_asset_id)
     
     asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==1
+    assert len(asset_list) == 1
 
 
 @pytest.mark.asyncio
 async def test_add_asset_impersonator_ZKX_L1(adminAuth_factory):
 
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
+    asset_id, asset_name = generate_asset_info()
+    asset_properties = build_default_asset_properties(asset_id, asset_name)
 
-    
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
         add_asset_tx,
@@ -225,7 +194,6 @@ async def test_add_asset_impersonator_ZKX_L1(adminAuth_factory):
         name="asset_added",
         data=[
             asset_id,
-            asset_ticker,
             admin1.contract_address
         ]
     )
@@ -242,26 +210,22 @@ async def test_add_asset_impersonator_ZKX_L1(adminAuth_factory):
                                                         DUMMY_WITHDRAWAL_REQUEST_ADDRESS)
     
     asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==1
+    assert len(asset_list) == 1
 
     with eth_reverts("INVALID_MESSAGE_TO_CONSUME"):
-        l1_zkx_contract_impersonator.updateAssetListInL1.transact(asset_ticker, asset_id)
-    
+        l1_zkx_contract_impersonator.updateAssetListInL1.transact(asset_id)
 
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==1
-
 
     # however a genuine call should go through, proving that message is still there waiting to be consumed despite
     # attempts by malicious contract to consume it
 
-    l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, asset_id)
+    l1_zkx_contract.updateAssetListInL1.transact(asset_id)
 
     asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==2
-    assert asset_list[1]==asset_ticker
+    assert len(asset_list) == 2
+    assert asset_list[1] == asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==asset_id
-
-
+    stored_asset_id = l1_zkx_contract.assetID.call(asset_id)
+    assert stored_asset_id == asset_id

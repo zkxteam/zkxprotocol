@@ -200,22 +200,9 @@ async def abr_factory(starknet_service: StarknetService):
         asset_version = 0,
         ticker = str_to_felt("BTC"),
         short_name = str_to_felt("Bitcoin"),
-        tradable = 1,
-        collateral = 0,
-        token_decimal = 8,
-        metadata_id = 0,
-        tick_size = to64x61(0.000000001),
-        step_size = to64x61(0.000001),
-        minimum_order_size = to64x61(0.001),
-        minimum_leverage = to64x61(1),
-        maximum_leverage = to64x61(10),
-        currently_allowed_leverage = to64x61(10),
-        maintenance_margin_fraction = to64x61(1),
-        initial_margin_fraction = to64x61(1),
-        incremental_initial_margin_fraction = to64x61(1),
-        incremental_position_size = to64x61(100),
-        baseline_position_size = to64x61(1000),
-        maximum_position_size = to64x61(10000)
+        is_tradable = 1,
+        is_collateral = 0,
+        token_decimal = 8
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_settings)
 
@@ -225,22 +212,9 @@ async def abr_factory(starknet_service: StarknetService):
         asset_version = 0,
         ticker = str_to_felt("USDC"),
         short_name = str_to_felt("USDC"),
-        tradable = 0,
-        collateral = 1,
-        token_decimal = 6,
-        metadata_id = 0,
-        tick_size = to64x61(0.01),
-        step_size = to64x61(0.1),
-        minimum_order_size = to64x61(1),
-        minimum_leverage = to64x61(1),
-        maximum_leverage = to64x61(5),
-        currently_allowed_leverage = to64x61(3),
-        maintenance_margin_fraction = to64x61(1),
-        initial_margin_fraction = to64x61(1),
-        incremental_initial_margin_fraction = to64x61(1),
-        incremental_position_size = to64x61(100),
-        baseline_position_size = to64x61(1000),
-        maximum_position_size = to64x61(10000)
+        is_tradable = 0,
+        is_collateral = 1,
+        token_decimal = 6
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_settings)
 
@@ -250,8 +224,8 @@ async def abr_factory(starknet_service: StarknetService):
         BTC_ID, # asset id
         USDC_ID, # collateral id
         to64x61(10), # leverage
-        1, # tradable
-        0, # archived
+        1, # is_tradable
+        0, # is_archived
         10, # ttl
         1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000
     ])
