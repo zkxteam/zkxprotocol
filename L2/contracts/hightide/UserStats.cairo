@@ -15,6 +15,18 @@ from contracts.Math_64x61 import Math64x61_add
 // Events //
 // /////////
 
+// Event emitted when trader's fee collected for a pair in a season is recorded
+@event
+func traders_fee_recorded(
+    caller: felt, season_id: felt, pair_id: felt, trader_address: felt, fee_64x61: felt
+) {
+}
+
+// Event emitted when total fee collected by the platform for a pair in a season is recorded
+@event
+func total_fee_recorded(caller: felt, season_id: felt, pair_id: felt, total_fee_64x61: felt) {
+}
+
 // //////////
 // Storage //
 // //////////
@@ -99,6 +111,10 @@ func record_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Increment trader fee
     trader_fee_by_market.write(season_id, pair_id, trader_address, updated_trader_fee_64x61);
 
+    // Emit event
+    let (caller) = get_caller_address();
+    traders_fee_recorded.emit(caller, season_id, pair_id, trader_address, fee_64x61);
+
     return ();
 }
 
@@ -120,6 +136,10 @@ func record_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     // Increment total fee
     total_fee_by_market.write(season_id, pair_id, updated_fee_64x61);
+
+    // Emit event
+    let (caller) = get_caller_address();
+    total_fee_recorded.emit(caller, season_id, pair_id, fee_64x61);
 
     return ();
 }
