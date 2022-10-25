@@ -54,7 +54,7 @@ from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.interfaces.IUserStats import IUserStats
 from contracts.libraries.CommonLibrary import CommonLib
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+from contracts.Math_64x61 import Math64x61_add, Math64x61_mul, Math64x61_div
 
 //############
 // Constants #
@@ -166,7 +166,7 @@ func execute_batch{
     ) = get_registry_addresses();
 
     // Recursively loop through the orders in the batch
-    let (result) = check_and_execute(
+    let (result, total_fee_64x61) = check_and_execute(
         size_,
         0,
         0,
@@ -186,6 +186,7 @@ func execute_batch{
         insurance_fund_address,
         user_stats_address,
         0,
+        0,
     );
 
     // Check if every order has a counter order
@@ -201,6 +202,11 @@ func execute_batch{
         request_list_len=request_list_len,
         request_list=request_list,
     );
+
+    IUserStats.record_total_fee(
+        contract_address=user_stats_address, pair_id=marketID_, fee_64x61=total_fee_64x61
+    );
+
     return ();
 }
 
@@ -393,9 +399,11 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param fees_balance_address_ - Address of the Fee Balance contract
 // @param holding_address_ - Address of the Holding contract
 // @param user_stats_address_ - Address of the User stats contract
+// @param fee_64x61_ - toatl fee charged by the platform so far for all the trades in the batch
 // @returns average_execution_price_open - Average Execution Price for the order
 // @returns margin_amount_open - Margin amount for the order
 // @returns borrowed_amount_open - Borrowed amount for the order
+// @returns total_fee_64x61 - fee charged on the current order in addition to the previous orders fee
 func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder,
     execution_price_: felt,
@@ -407,7 +415,13 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     fees_balance_address_: felt,
     holding_address_: felt,
     user_stats_address_: felt,
-) -> (average_execution_price_open: felt, margin_amount_open: felt, borrowed_amount_open: felt) {
+    fee_64x61_: felt,
+) -> (
+    average_execution_price_open: felt,
+    margin_amount_open: felt,
+    borrowed_amount_open: felt,
+    total_fee_64x61: felt,
+) {
     alloc_locals;
 
     local margin_amount_open;
@@ -457,6 +471,9 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // Calculate the fees for the order
     let (fees) = Math64x61_mul(fees_rate, leveraged_position_value);
+
+    // calculate total fee charged by the platform
+    let (total_fee_64x61) = Math64x61_add(fees, fee_64x61_);
 
     // Calculate the total amount by adding fees
     tempvar total_amount = total_position_value + fees;
@@ -522,7 +539,9 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         amount=leveraged_position_value,
     );
 
-    return (average_execution_price_open, margin_amount_open, borrowed_amount_open);
+    return (
+        average_execution_price_open, margin_amount_open, borrowed_amount_open, total_fee_64x61
+    );
 }
 
 // @notice Intenal function that processes close orders including Liquidation & Deleveraging
@@ -797,6 +816,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param insurance_fund_address_ - Address of the Insurance Fund contract
 // @param user_stats_address_ - Address of the User stats contract
 // @param max_leverage_ - Maximum Leverage for the market set by the first order
+// @param total_fee_64x61_ - total fee charged by the platform for all orders in the batch
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     size_: felt,
     assetID_: felt,
@@ -817,12 +837,13 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     insurance_fund_address_: felt,
     user_stats_address_: felt,
     max_leverage_: felt,
-) -> (res: felt) {
+    total_fee_64x61_: felt,
+) -> (res: felt, total_fee_64x61_: felt) {
     alloc_locals;
 
     // Check if the list is empty, if yes return 1
     if (request_list_len_ == 0) {
-        return (sum,);
+        return (sum, total_fee_64x61_);
     }
 
     // Create a struct object for the order
@@ -880,11 +901,15 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local margin_amount;
     local borrowed_amount;
     local average_execution_price;
+    local fee_64x61;
 
     // If the order is to be opened
     if (temp_order.closeOrder == FALSE) {
         let (
-            average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt
+            average_execution_price_temp: felt,
+            margin_amount_temp: felt,
+            borrowed_amount_temp: felt,
+            total_fee_64x61: felt,
         ) = process_open_orders(
             order_=temp_order,
             execution_price_=execution_price_,
@@ -896,10 +921,15 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             fees_balance_address_=fees_balance_address_,
             holding_address_=holding_address_,
             user_stats_address_=user_stats_address_,
+            fee_64x61_=total_fee_64x61_,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
+        assert fee_64x61 = total_fee_64x61;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
         let (
             average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt
@@ -915,6 +945,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Create a temporary order object
@@ -998,6 +1031,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             insurance_fund_address_,
             user_stats_address_,
             asset.currently_allowed_leverage,
+            fee_64x61,
         );
     }
 
@@ -1035,5 +1069,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         insurance_fund_address_,
         user_stats_address_,
         max_leverage_,
+        fee_64x61,
     );
 }
