@@ -28,6 +28,7 @@ from contracts.Constants import (
     STOP_ORDER,
     TradingFees_INDEX,
     TradingStats_INDEX,
+    UserStats_INDEX,
 )
 from contracts.DataTypes import (
     Asset,
@@ -51,6 +52,7 @@ from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.ITradingFees import ITradingFees
+from contracts.interfaces.IUserStats import IUserStats
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
@@ -160,6 +162,7 @@ func execute_batch{
         insurance_fund_address: felt,
         liquidate_address: felt,
         trading_stats_address: felt,
+        user_stats_address: felt,
     ) = get_registry_addresses();
 
     // Recursively loop through the orders in the batch
@@ -181,6 +184,7 @@ func execute_batch{
         liquidate_address,
         liquidity_fund_address,
         insurance_fund_address,
+        user_stats_address,
         0,
     );
 
@@ -213,6 +217,7 @@ func execute_batch{
 // @returns liquidate_address - Address of the Liquidate contract
 // @returns liquidity_fund_address - Address of the Liquidity Fund contract
 // @returns insurance_fund_address - Address of the Insurance Fund contract
+// @returns user_stats_address - Address of the User stats contract
 func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     account_registry_address: felt,
     asset_address: felt,
@@ -223,6 +228,7 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     insurance_fund_address: felt,
     liquidate_address: felt,
     trading_stats_address: felt,
+    user_stats_address: felt,
 ) {
     // Read the registry and version
     let (registry) = CommonLib.get_registry_address();
@@ -273,6 +279,11 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         contract_address=registry, index=TradingStats_INDEX, version=version
     );
 
+    // Get User stats address
+    let (user_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=UserStats_INDEX, version=version
+    );
+
     return (
         account_registry_address,
         asset_address,
@@ -283,6 +294,7 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         insurance_fund_address,
         liquidate_address,
         trading_stats_address,
+        user_stats_address,
     );
 }
 
@@ -380,6 +392,7 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param liquidate_address_ - Address of the Liquidate contract
 // @param fees_balance_address_ - Address of the Fee Balance contract
 // @param holding_address_ - Address of the Holding contract
+// @param user_stats_address_ - Address of the User stats contract
 // @returns average_execution_price_open - Average Execution Price for the order
 // @returns margin_amount_open - Margin amount for the order
 // @returns borrowed_amount_open - Borrowed amount for the order
@@ -393,6 +406,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     liquidate_address_: felt,
     fees_balance_address_: felt,
     holding_address_: felt,
+    user_stats_address_: felt,
 ) -> (average_execution_price_open: felt, margin_amount_open: felt, borrowed_amount_open: felt) {
     alloc_locals;
 
@@ -471,6 +485,14 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         address=order_.pub_key,
         assetID_=order_.collateralID,
         fee_to_add=fees,
+    );
+
+    // Update the fees to be paid by user for the current season in UserStats contract
+    IUserStats.record_trader_fee(
+        contract_address=user_stats_address_,
+        pair_id=market_id_,
+        trader_address=order_.pub_key,
+        fee_64x61=fees,
     );
 
     // Deduct the amount from liquidity funds if order is leveraged
@@ -773,6 +795,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param liquidate_address_ - Address of the Liquidate contract
 // @param liquidity_fund_address_ - Address of the Liquidity Fund contract
 // @param insurance_fund_address_ - Address of the Insurance Fund contract
+// @param user_stats_address_ - Address of the User stats contract
 // @param max_leverage_ - Maximum Leverage for the market set by the first order
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     size_: felt,
@@ -792,6 +815,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     liquidate_address_: felt,
     liquidity_fund_address_: felt,
     insurance_fund_address_: felt,
+    user_stats_address_: felt,
     max_leverage_: felt,
 ) -> (res: felt) {
     alloc_locals;
@@ -871,6 +895,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidate_address_=liquidate_address_,
             fees_balance_address_=fees_balance_address_,
             holding_address_=holding_address_,
+            user_stats_address_=user_stats_address_,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
@@ -971,6 +996,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidate_address_,
             liquidity_fund_address_,
             insurance_fund_address_,
+            user_stats_address_,
             asset.currently_allowed_leverage,
         );
     }
@@ -1007,6 +1033,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         liquidate_address_,
         liquidity_fund_address_,
         insurance_fund_address_,
+        user_stats_address_,
         max_leverage_,
     );
 }
