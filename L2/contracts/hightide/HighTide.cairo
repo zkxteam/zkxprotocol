@@ -557,7 +557,7 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
 
     if (current_season_id != 0) {
-        with_attr error_message("HighTide: Current trading season is still active") 
+        with_attr error_message("HighTide: Current trading season is still active") {
             assert_le(current_seasons_end_timestamp, current_timestamp);
         }
     } else {
