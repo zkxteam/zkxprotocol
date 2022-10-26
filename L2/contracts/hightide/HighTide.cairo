@@ -686,15 +686,13 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         return (FALSE,);
     }
 
-    check_activation(
+    return check_activation(
         liquidity_pool_address,
         starkway_contract_address,
         iterator + 1,
         reward_tokens_list_len,
         reward_tokens_list + RewardToken.SIZE,
     );
-
-    return (FALSE,);
 }
 
 func verify_token_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -713,15 +711,13 @@ func verify_token_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     );
 
     let (new_balance_Uint256, carry) = uint256_add(balance_Uint256, current_balance_Uint256);
-    verify_token_balance(
+    return verify_token_balance(
         liquidity_pool_address,
         new_balance_Uint256,
         iterator + 1,
         contract_address_list_len,
         contract_address_list + 1,
     );
-
-    return (balance_Uint256,);
 }
 
 func assign_hightide_to_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
