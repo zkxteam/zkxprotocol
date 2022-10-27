@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import (
     deploy,
     get_block_number,
@@ -518,6 +518,7 @@ func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     season_id: felt
 ) {
     with_attr error_message("HighTide: Trading season id existence mismatch") {
+        assert_nn(season_id);
         let (seasons_len) = seasons_array_len.read();
         assert_le(season_id, seasons_len);
     }
@@ -528,6 +529,7 @@ func verify_hightide_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     hightide_id: felt
 ) {
     with_attr error_message("HighTide: Hightide id existence mismatch") {
+        assert_nn(hightide_id);
         let (hightide_len) = hightides_array_len.read();
         assert_le(hightide_id, hightide_len);
     }

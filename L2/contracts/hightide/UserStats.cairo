@@ -5,7 +5,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import Hightide_INDEX, Trading_INDEX
-from contracts.DataTypes import TradingSeason
+from contracts.DataTypes import TraderFee, TradingSeason
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import CommonLib
@@ -122,26 +122,18 @@ func record_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param pair_id - id of the pair
 // @param fee_64x61 - total fee charged for the traded pair
 @external
-func record_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id: felt, fee_64x61: felt
+func record_fee_details{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    pair_id: felt, trader_fee_list_len: felt, trader_fee_list: TraderFee*
 ) {
+    alloc_locals;
+
     // This function checks whether season has ended
-    let (season_id) = verify_season_existance();
+    let (local season_id) = verify_season_existance();
     if (season_id == 0) {
         return ();
     }
 
-    let (current_fee_64x61) = total_fee_by_market.read(season_id, pair_id);
-    let (updated_fee_64x61) = Math64x61_add(current_fee_64x61, fee_64x61);
-
-    // Increment total fee
-    total_fee_by_market.write(season_id, pair_id, updated_fee_64x61);
-
-    // Emit event
-    let (caller) = get_caller_address();
-    total_fee_recorded.emit(caller, season_id, pair_id, updated_fee_64x61);
-
-    return ();
+    return update_trader_fee(season_id, pair_id, 0, 0, trader_fee_list_len, trader_fee_list);
 }
 
 // ///////////
@@ -190,4 +182,31 @@ func verify_season_existance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         return (0,);
     }
     return (season_id,);
+}
+
+func update_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id: felt, pair_id: felt, iterator: felt, current_total_fee_64x61: felt, trader_fee_list_len: felt, trader_fee_list: TraderFee*
+){
+    let (caller) = get_caller_address();
+    if (iterator == trader_fee_list_len) {
+        total_fee_by_market.write(season_id, pair_id, current_total_fee_64x61);
+
+        // Emit event
+        total_fee_recorded.emit(caller, season_id, pair_id, current_total_fee_64x61);
+
+        return ();
+    }
+    let trader_address = [trader_fee_list].trader_address;
+    let fee_64x61 = [trader_fee_list].fee_64x61;
+    let (current_trader_fee_64x61) = trader_fee_by_market.read(season_id, pair_id, trader_address);
+    let (updated_trader_fee_64x61) = Math64x61_add(current_trader_fee_64x61, fee_64x61);
+    let (updated_total_fee_64x61) = Math64x61_add(current_total_fee_64x61, fee_64x61);
+
+    // Increment trader fee
+    trader_fee_by_market.write(season_id, pair_id, trader_address, updated_trader_fee_64x61);
+
+    // Emit event
+    traders_fee_recorded.emit(caller, season_id, pair_id, trader_address, updated_trader_fee_64x61);
+
+    return update_trader_fee(season_id, pair_id, iterator + 1, updated_total_fee_64x61, trader_fee_list_len, trader_fee_list+TraderFee.SIZE);
 }
