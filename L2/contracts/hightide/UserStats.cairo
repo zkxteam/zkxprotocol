@@ -91,36 +91,8 @@ func get_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // External //
 // ///////////
 
-// @notice This function is called to record trader's fee
-// @param pair_id - id of the pair
-// @param trader_address - L2 address of the user
-// @param fee_64x61 - fee charged on trader for the traded pair
-@external
-func record_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id: felt, trader_address: felt, fee_64x61: felt
-) {
-    // This function checks whether season has ended
-    let (season_id) = verify_season_existance();
-    if (season_id == 0) {
-        return ();
-    }
-
-    let (current_trader_fee_64x61) = trader_fee_by_market.read(season_id, pair_id, trader_address);
-    let (updated_trader_fee_64x61) = Math64x61_add(current_trader_fee_64x61, fee_64x61);
-
-    // Increment trader fee
-    trader_fee_by_market.write(season_id, pair_id, trader_address, updated_trader_fee_64x61);
-
-    // Emit event
-    let (caller) = get_caller_address();
-    traders_fee_recorded.emit(caller, season_id, pair_id, trader_address, updated_trader_fee_64x61);
-
-    return ();
-}
-
 // @notice This function is used to record total fee collected by the platform for a pair in a season
 // @param pair_id - id of the pair
-// @param fee_64x61 - total fee charged for the traded pair
 @external
 func record_fee_details{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     pair_id: felt, trader_fee_list_len: felt, trader_fee_list: TraderFee*
