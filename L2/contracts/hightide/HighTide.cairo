@@ -403,7 +403,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("HighTide: Caller is not authorized to set constants") {
+    with_attr error_message("HighTide: Unauthorized call to initialize hightide") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
     verify_season_id_exists(season_id);

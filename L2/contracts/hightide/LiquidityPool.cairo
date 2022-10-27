@@ -162,7 +162,7 @@ func reward_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         contract_address_list,
     );
 
-    reward_tokens_recurse(
+    return reward_tokens_recurse(
         token_lister_address,
         is_burnable,
         liquidity_pool_address,
@@ -171,8 +171,6 @@ func reward_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         reward_tokens_list_len,
         reward_tokens_list + RewardToken.SIZE,
     );
-
-    return ();
 }
 
 func transfer_or_burn_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -197,14 +195,15 @@ func transfer_or_burn_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         if (is_burnable == FALSE) {
             IERC20.transfer([contract_address_list], token_lister_address, current_balance_Uint256);
         } else {
-            IERC20.transfer([contract_address_list], 0x0000DEAD, current_balance_Uint256);
+            // burn tokens by sending it to dead address
+            IERC20.transfer([contract_address_list], 0x0000DEAD, current_balance_Uint256); 
         }
         tempvar syscall_ptr = syscall_ptr;
     } else {
         tempvar syscall_ptr = syscall_ptr;
     }
 
-    transfer_or_burn_tokens(
+    return transfer_or_burn_tokens(
         token_lister_address,
         is_burnable,
         liquidity_pool_address,
@@ -212,6 +211,4 @@ func transfer_or_burn_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         contract_address_list_len,
         contract_address_list + 1,
     );
-
-    return ();
 }
