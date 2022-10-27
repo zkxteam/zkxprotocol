@@ -679,7 +679,7 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-    
+
     let (token_balance_Uint256) = verify_token_balance(
         liquidity_pool_address, balance_Uint256, 0, contract_address_list_len, contract_address_list
     );

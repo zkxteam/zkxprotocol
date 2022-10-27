@@ -39,7 +39,7 @@ from contracts.DataTypes import (
     OrderRequest,
     PositionDetails,
     Signature,
-    TraderFee
+    TraderFee,
 )
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
@@ -190,7 +190,7 @@ func execute_batch{
         insurance_fund_address,
         0,
         0,
-        trader_fee_list
+        trader_fee_list,
     );
 
     // Check if every order has a counter order
@@ -208,7 +208,10 @@ func execute_batch{
     );
 
     IUserStats.record_fee_details(
-        contract_address=user_stats_address, pair_id=marketID_, trader_fee_list_len=trader_fee_list_len, trader_fee_list=trader_fee_list
+        contract_address=user_stats_address,
+        pair_id=marketID_,
+        trader_fee_list_len=trader_fee_list_len,
+        trader_fee_list=trader_fee_list,
     );
 
     return ();
@@ -420,13 +423,13 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     fees_balance_address_: felt,
     holding_address_: felt,
     trader_fee_list_len_: felt,
-    trader_fee_list_: TraderFee*
+    trader_fee_list_: TraderFee*,
 ) -> (
     average_execution_price_open: felt,
     margin_amount_open: felt,
     borrowed_amount_open: felt,
     trader_fee_list_len: felt,
-    trader_fee_list: TraderFee*
+    trader_fee_list: TraderFee*,
 ) {
     alloc_locals;
 
@@ -538,7 +541,11 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     );
 
     return (
-        average_execution_price_open, margin_amount_open, borrowed_amount_open, trader_fee_list_len_ + 1, trader_fee_list_ + TraderFee.SIZE
+        average_execution_price_open,
+        margin_amount_open,
+        borrowed_amount_open,
+        trader_fee_list_len_ + 1,
+        trader_fee_list_ + TraderFee.SIZE,
     );
 }
 
@@ -837,7 +844,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     insurance_fund_address_: felt,
     max_leverage_: felt,
     trader_fee_list_len_: felt,
-    trader_fee_list_: TraderFee*
+    trader_fee_list_: TraderFee*,
 ) -> (res: felt, trader_fee_list_len: felt) {
     alloc_locals;
 
@@ -902,7 +909,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local borrowed_amount;
     local average_execution_price;
     local trader_fee_list_len;
-    local trader_fee_list:TraderFee*;
+    local trader_fee_list: TraderFee*;
 
     // If the order is to be opened
     if (temp_order.closeOrder == FALSE) {
@@ -923,7 +930,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             fees_balance_address_=fees_balance_address_,
             holding_address_=holding_address_,
             trader_fee_list_len_=trader_fee_list_len_,
-            trader_fee_list_=trader_fee_list_
+            trader_fee_list_=trader_fee_list_,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
@@ -1036,7 +1043,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             insurance_fund_address_,
             asset.currently_allowed_leverage,
             trader_fee_list_len,
-            trader_fee_list
+            trader_fee_list,
         );
     }
 
@@ -1074,6 +1081,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         insurance_fund_address_,
         max_leverage_,
         trader_fee_list_len,
-        trader_fee_list
+        trader_fee_list,
     );
 }

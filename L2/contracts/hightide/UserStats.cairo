@@ -157,8 +157,13 @@ func verify_season_existance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 }
 
 func update_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt, pair_id: felt, iterator: felt, current_total_fee_64x61: felt, trader_fee_list_len: felt, trader_fee_list: TraderFee*
-){
+    season_id: felt,
+    pair_id: felt,
+    iterator: felt,
+    current_total_fee_64x61: felt,
+    trader_fee_list_len: felt,
+    trader_fee_list: TraderFee*,
+) {
     let (caller) = get_caller_address();
     if (iterator == trader_fee_list_len) {
         total_fee_by_market.write(season_id, pair_id, current_total_fee_64x61);
@@ -180,5 +185,12 @@ func update_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Emit event
     traders_fee_recorded.emit(caller, season_id, pair_id, trader_address, updated_trader_fee_64x61);
 
-    return update_trader_fee(season_id, pair_id, iterator + 1, updated_total_fee_64x61, trader_fee_list_len, trader_fee_list+TraderFee.SIZE);
+    return update_trader_fee(
+        season_id,
+        pair_id,
+        iterator + 1,
+        updated_total_fee_64x61,
+        trader_fee_list_len,
+        trader_fee_list + TraderFee.SIZE,
+    );
 }

@@ -196,7 +196,7 @@ func transfer_or_burn_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             IERC20.transfer([contract_address_list], token_lister_address, current_balance_Uint256);
         } else {
             // burn tokens by sending it to dead address
-            IERC20.transfer([contract_address_list], 0x0000DEAD, current_balance_Uint256); 
+            IERC20.transfer([contract_address_list], 0x0000DEAD, current_balance_Uint256);
         }
         tempvar syscall_ptr = syscall_ptr;
     } else {
