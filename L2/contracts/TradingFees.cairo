@@ -184,13 +184,13 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 ) {
     alloc_locals;
     // Auth check
-    with_attr error_message("Caller is not authorized to manage fee details") {
+    with_attr error_message("TradingFees: Unauthorized caller to set base fees") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, ManageFeeDetails_ACTION);
     }
 
-    with_attr error_message("Tier and fee details values cannot be negative") {
+    with_attr error_message("TradingFees: Tier and fee details must be > 0") {
         assert_nn(tier_);
         assert_not_zero(tier_);
         assert_nn(fee_details.numberOfTokens);
@@ -198,15 +198,15 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         assert_nn(fee_details.takerFee);
     }
 
-    with_attr error_message("Maker fee and taker fee values should be in 64x61 representation") {
+    with_attr error_message(
+            "TradingFees: Maker fee and taker fee values must be in 64x61 representation") {
         Math64x61_assert64x61(fee_details.makerFee);
         Math64x61_assert64x61(fee_details.takerFee);
     }
 
     let (current_max_base_fee_tier) = max_base_fee_tier.read();
 
-    with_attr error_message(
-            "Tier should be less than or equal to (current max base fee tier + 1)") {
+    with_attr error_message("TradingFees: Invalid tier") {
         assert_le(tier_, current_max_base_fee_tier + 1);
     }
 
@@ -214,7 +214,7 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     // with respect to the lower tier, if lower tier exists
     let (lower_tier_fee) = base_fee_tiers.read(tier=tier_ - 1);
     if (tier_ - 1 != 0) {
-        with_attr error_message("New fee details are not valid with respect to lower tier") {
+        with_attr error_message("TradingFees: Invalid fees for the tier to exisiting lower tiers") {
             assert_lt(lower_tier_fee.numberOfTokens, fee_details.numberOfTokens);
             assert_lt(fee_details.makerFee, lower_tier_fee.makerFee);
             assert_lt(fee_details.takerFee, lower_tier_fee.takerFee);
@@ -233,7 +233,7 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let (upper_tier_fee) = base_fee_tiers.read(tier=tier_ + 1);
     let is_max_base_fee_tier = is_le(current_max_base_fee_tier, tier_);
     if (is_max_base_fee_tier != 1) {
-        with_attr error_message("New fee details are not valid with respect to upper tier") {
+        with_attr error_message("TradingFees: Invalid fees for the tier to exisiting upper tiers") {
             assert_lt(fee_details.numberOfTokens, upper_tier_fee.numberOfTokens);
             assert_lt(upper_tier_fee.makerFee, fee_details.makerFee);
             assert_lt(upper_tier_fee.takerFee, fee_details.takerFee);
@@ -259,27 +259,26 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 ) {
     alloc_locals;
     // Auth check
-    with_attr error_message("Caller is not authorized to manage fee details") {
+    with_attr error_message("TradingFees: Unauthorized caller for updating discount") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, ManageFeeDetails_ACTION);
     }
 
-    with_attr error_message("Tier and discount details values cannot be negative") {
+    with_attr error_message("TradingFees: Tier and discount must be > 0") {
         assert_nn(tier_);
         assert_not_zero(tier_);
         assert_nn(discount_details.numberOfTokens);
         assert_nn(discount_details.discount);
     }
 
-    with_attr error_message("Discount should be in 64x61 representation") {
+    with_attr error_message("TradingFees: Discount must be in 64x61 representation") {
         Math64x61_assert64x61(discount_details.discount);
     }
 
     let (current_max_discount_tier) = max_discount_tier.read();
 
-    with_attr error_message(
-            "Tier should be less than or equal to (current max base fee tier + 1)") {
+    with_attr error_message("TradingFees: Invalid tier") {
         assert_le(tier_, current_max_discount_tier + 1);
     }
 
@@ -287,7 +286,7 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     // with respect to the lower tier, if lower tier exists
     let (lower_tier_discount) = discount_tiers.read(tier=tier_ - 1);
     if (tier_ - 1 != 0) {
-        with_attr error_message("New discount details are not valid with respect to lower tier") {
+        with_attr error_message("TradingFees: Invalid fees for the tier to exisiting lower tiers") {
             assert_lt(lower_tier_discount.numberOfTokens, discount_details.numberOfTokens);
             assert_lt(lower_tier_discount.discount, discount_details.discount);
         }
@@ -305,7 +304,7 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (upper_tier_discount) = discount_tiers.read(tier=tier_ + 1);
     let is_max_discount_tier = is_le(current_max_discount_tier, tier_);
     if (is_max_discount_tier != 1) {
-        with_attr error_message("New discount details are not valid with respect to upper tier") {
+        with_attr error_message("TradingFees: Invalid fees for the tier to exisiting upper tiers") {
             assert_lt(discount_details.numberOfTokens, upper_tier_discount.numberOfTokens);
             assert_lt(discount_details.discount, upper_tier_discount.discount);
         }

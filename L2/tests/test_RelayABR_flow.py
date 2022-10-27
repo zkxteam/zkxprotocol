@@ -98,7 +98,7 @@ async def abr_factory(starknet_service: StarknetService):
         ContractType.Liquidate, 
         [registry.contract_address, 1]
     )
-    hightide_mock = await starknet_service.deploy(ContractType.HighTideMock, [registry.contract_address, 1])
+    hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
     trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
 
 
@@ -131,7 +131,7 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide_mock.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
 
     # Add base fee and discount in Trading Fee contract
@@ -187,7 +187,8 @@ async def test_fund_called_by_non_authorized_address(abr_factory):
 
     amount = to64x61(1000000)
     await assert_revert(
-        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "fund", [BTC_USD_ID, amount])
+        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "fund", [BTC_USD_ID, amount]),
+        reverted_with="FundLib: Unauthorized call to manage funds"
     )
 
 @pytest.mark.asyncio
@@ -218,7 +219,8 @@ async def test_defund_called_by_non_authorized_address(abr_factory):
     amount = to64x61(500000)
     abr_fund_balance_before = await abr_fund.balance(BTC_USD_ID).call()
     await assert_revert(
-        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "defund", [BTC_USD_ID, amount])
+        admin2_signer.send_transaction(admin2, abr_fund.contract_address, "defund", [BTC_USD_ID, amount]),
+        reverted_with="FundLib: Unauthorized call to manage funds"
     )
 
     abr_fund_balance = await abr_fund.balance(BTC_USD_ID).call()

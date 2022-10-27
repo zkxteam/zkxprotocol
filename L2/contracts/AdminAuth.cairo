@@ -115,7 +115,7 @@ func update_admin_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (caller) = get_caller_address();
     let (is_admin) = admin_mapping.read(address=caller, action=MasterAdmin_ACTION);
 
-    with_attr error_message("Unauthorized call - only admin can call this function") {
+    with_attr error_message("AdminAuth: Unauthorized call for admin mapping updation") {
         assert is_admin = TRUE;
     }
 
@@ -126,7 +126,7 @@ func update_admin_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     // arg value should either be 0 or 1
-    with_attr error_message("Permission can only be 0 or 1") {
+    with_attr error_message("AdminAuth: Permission should be either 0 or 1") {
         let val_check = value * (1 - value);
         assert val_check = FALSE;
     }
@@ -152,11 +152,11 @@ func set_min_num_admins{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let (caller) = get_caller_address();
     let (is_admin) = admin_mapping.read(address=caller, action=MasterAdmin_ACTION);
 
-    with_attr error_message("Unauthorized call - only admin can call this function") {
+    with_attr error_message("AdminAuth: Unauthorized call for set_min_num_admins") {
         assert is_admin = TRUE;
     }
 
-    with_attr error_message("Incorrect value for minimum number of admins - should be >=2") {
+    with_attr error_message("AdminAuth: Number of min admin should be >=2") {
         assert_nn(num);
         assert_le(2, num);  // we enforce that there have to be atleast 2 admins in the system
     }
@@ -179,7 +179,7 @@ func process_admin_action{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         // if present approver is 0 then caller is first approver
         // save caller address as approver & return
         let (current_approver) = approver.read(address);
-        with_attr error_message("Both approvers cannot be the same") {
+        with_attr error_message("AdminAuth: Both approvers cannot be the same") {
             assert_not_equal(current_approver, caller);
         }
         if (current_approver == 0) {
@@ -200,13 +200,13 @@ func process_admin_action{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         let (minimum_admins_required) = min_num_admins.read();
         let (current_num_admins) = current_total_admins.read();
 
-        with_attr error_message("Cannot have less than minimum number of admins") {
+        with_attr error_message("AdminAuth: Minimum number of admins not satisfied") {
             assert_lt(minimum_admins_required, current_num_admins);
         }
 
         // check that remover is not the same as caller
         let (current_remover) = remover.read(address);
-        with_attr error_message("Both removers cannot be the same") {
+        with_attr error_message("AdminAuth: Admin cannot approve twice") {
             assert_not_equal(current_remover, caller);
         }
         if (current_remover == 0) {

@@ -119,14 +119,14 @@ async def adminAuth_factory(starknet_service: StarknetService):
 async def test_update_collateral_price_unauthorized_user(adminAuth_factory):
     adminAuth, collateral_prices, admin1, admin2 = adminAuth_factory
 
-    await assert_revert(signer2.send_transaction(admin2, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, 500]))
+    await assert_revert(signer2.send_transaction(admin2, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, 500]), reverted_with="CollateralPrices: Unauthorized call to update collateral prices")
 
 
 @pytest.mark.asyncio
 async def test_update_negative_collateral_price(adminAuth_factory):
     adminAuth, collateral_prices, admin1, admin2 = adminAuth_factory
 
-    await assert_revert(signer1.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, -500%PRIME]))
+    await assert_revert(signer1.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, -500%PRIME]), reverted_with="CollateralPrices: Price cannot be negative")
 
 @pytest.mark.asyncio
 async def test_update_collateral_price(adminAuth_factory):

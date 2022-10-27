@@ -72,4 +72,5 @@ async def test_defund_reject(holding_factory):
     _, liquidity, _, _ = holding_factory
 
     await assert_revert(signer3.send_transaction(
-        pytest.user1, liquidity.contract_address, 'defund', [str_to_felt("USDC"), 100]))
+        pytest.user1, liquidity.contract_address, 'defund', [str_to_felt("USDC"), 100])
+    )

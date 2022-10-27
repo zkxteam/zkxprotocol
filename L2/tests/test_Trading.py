@@ -67,6 +67,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
     dave = await account_factory.deploy_account(dave_signer.public_key)
 
+    print("alice address: ", alice.contract_address)
+    print("bob address: ", bob.contract_address)
+
     timestamp = int(time.time())
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
@@ -92,7 +95,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ContractType.CollateralPrices, 
         [registry.contract_address, 1]
     )
-    hightide_mock = await starknet_service.deploy(ContractType.HighTideMock, [registry.contract_address, 1])
+    hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
     trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
@@ -133,7 +136,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, collateral_prices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide_mock.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
 
     # Add base fee and discount in Trading Fee contract
@@ -159,13 +162,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 1, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [UST_ID, 1, str_to_felt("UST"), str_to_felt("UST"), 1, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [DOGE_ID, 1, str_to_felt("DOGE"), str_to_felt("DOGECOIN"), 0, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [TSLA_ID, 1, str_to_felt("TESLA"), str_to_felt("TESLA MOTORS"), 1, 0, 1, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [TSLA_ID, 1, str_to_felt("TESLA"), str_to_felt("TESLA MOTORS"), 1, 0, 8, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Add markets
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [TSLA_USD_ID, TSLA_ID, USDC_ID, to64x61(10), 2, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [TSLA_USD_ID, TSLA_ID, USDC_ID, to64x61(10), 0, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [UST_USDC_ID, UST_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
     # Update collateral prices
@@ -181,29 +184,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
     return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate
-
-
-@pytest.mark.asyncio
-async def test_set_balance_for_testing(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
-
-    alice_balance = to64x61(10000)
-    bob_balance = to64x61(10000)
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
-
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
-
-    assert alice_curr_balance.result.res == alice_balance
-    assert bob_curr_balance.result.res == bob_balance
-
-    alice_collaterals = await alice.return_array_collaterals().call()
-    print_parsed_collaterals(alice_collaterals.result.array_list)
-
-    bob_collaterals = await bob.return_array_collaterals().call()
-    print_parsed_collaterals(bob_collaterals.result.array_list)
-
 
 @pytest.mark.asyncio
 async def test_revert_balance_low(adminAuth_factory):
@@ -223,7 +203,7 @@ async def test_revert_balance_low(adminAuth_factory):
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = 3
+    leverage1 = to64x61(3)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("rejhfyjkew")
@@ -236,7 +216,7 @@ async def test_revert_balance_low(adminAuth_factory):
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(10789)
@@ -258,7 +238,31 @@ async def test_revert_balance_low(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
-    ]))
+    ]), reverted_with="Trading: Low Balance")
+
+
+@pytest.mark.asyncio
+async def test_set_balance_for_testing(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
+
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [UST_ID, bob_balance])
+
+    alice_curr_balance = await alice.get_balance(USDC_ID).call()
+    bob_curr_balance = await bob.get_balance(USDC_ID).call()
+
+    assert alice_curr_balance.result.res == alice_balance
+    assert bob_curr_balance.result.res == bob_balance
+
+    alice_collaterals = await alice.return_array_collaterals().call()
+    print_parsed_collaterals(alice_collaterals.result.array_list)
+
+    bob_collaterals = await bob.return_array_collaterals().call()
+    print_parsed_collaterals(bob_collaterals.result.array_list)
+
 
 @pytest.mark.asyncio
 async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
@@ -278,7 +282,7 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = 3
+    leverage1 = to64x61(3)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("adsfgiu34hjjhks")
@@ -291,7 +295,7 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(1021)
@@ -313,7 +317,7 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
-    ]))
+    ]), reverted_with="Trading: Market Order 2% above")
 
 
 @pytest.mark.asyncio
@@ -334,7 +338,7 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = 3
+    leverage1 = to64x61(3)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("3hf83hdfska")
@@ -347,7 +351,7 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(1001)
@@ -369,7 +373,7 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1,  orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
-    ]))
+    ]), reverted_with="Trading: Bad long limit order")
 
 
 @pytest.mark.asyncio
@@ -389,7 +393,7 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
     position1 = to64x61(4)
     direction1 = 0
     closeOrder1 = 0
-    leverage1 = 3
+    leverage1 = to64x61(3)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("65duhhj438187i")
@@ -401,7 +405,7 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
     position2 = to64x61(3)
     direction2 = 1
     closeOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(999)
@@ -423,7 +427,7 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
-    ]))
+    ]), reverted_with="Trading: Bad short limit order")
 
 
 @pytest.mark.asyncio
@@ -444,7 +448,7 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = 3
+    leverage1 = to64x61(3)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("9fd1k31k5h7")
@@ -457,7 +461,7 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
     direction2 = 0
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(1078)
@@ -479,7 +483,7 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
-    ]))
+    ]), reverted_with="Trading: Net size is non-zero")
 
 
 @pytest.mark.asyncio
@@ -500,7 +504,7 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = 3
+    leverage1 = to64x61(3)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("45kj341kj4")
@@ -513,7 +517,7 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(1078)
@@ -535,7 +539,7 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
-    ]))
+    ]), reverted_with=f"Trading: Market not tradable")
 
 
 @pytest.mark.asyncio
@@ -556,7 +560,7 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = 3
+    leverage1 = to64x61(3)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("932jh1mjdfsl")
@@ -569,7 +573,7 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(1078)
@@ -591,7 +595,7 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
-    ]))
+    ]), reverted_with="Trading: Collateral Mismatch")
 
 
 @pytest.mark.asyncio
@@ -612,7 +616,7 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = 3
+    leverage1 = to64x61(3)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("5jkhfdjkew")
@@ -625,7 +629,7 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(1078)
@@ -647,7 +651,7 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
-    ]))
+    ]), reverted_with=f"Trading: Asset Mismatch")
 
 
 @pytest.mark.asyncio
@@ -724,7 +728,7 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
     direction1 = 0
     closeOrder1 = 0
     parentOrder1 = 0
-    leverage1 = 11
+    leverage1 = to64x61(11)
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("mnjds87234")
@@ -737,7 +741,7 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
     direction2 = 1
     closeOrder2 = 0
     parentOrder2 = 0
-    leverage2 = 3
+    leverage2 = to64x61(3)
     liquidatorAddress2 = 0
 
     execution_price1 = to64x61(5000)
@@ -759,7 +763,7 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0, 
-    ]))
+    ]), reverted_with="Trading: Invalid Leverage")
 
 @pytest.mark.asyncio
 async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory):
@@ -827,7 +831,7 @@ async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
-    ]))
+    ]), reverted_with="Trading: Invalid stop-limit-price short order")
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders(adminAuth_factory):
@@ -2405,7 +2409,7 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
             1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
         bob.contract_address, signed_message4[0], signed_message4[
             1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
-    ]))
+    ]), reverted_with="Liquidate: Position doesn't satisfy maintanence margin")
 
 @pytest.mark.asyncio
 async def test_check_for_collision(adminAuth_factory):
@@ -2517,4 +2521,4 @@ async def test_check_for_collision(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1, 
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
-    ]))
+    ]), reverted_with="AccountManager: Hash mismatch")

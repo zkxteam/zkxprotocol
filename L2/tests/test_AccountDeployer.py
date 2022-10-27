@@ -69,7 +69,7 @@ async def test_deploy_account_contract_with_zero_hash(adminAuth_factory):
     pubkey = signer3.public_key
 
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
-    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))
+    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]), reverted_with="AccountDeploayer: Class hash cannot be 0")
 
 @pytest.mark.asyncio
 async def test_deploy_account_contract(adminAuth_factory):
@@ -77,7 +77,7 @@ async def test_deploy_account_contract(adminAuth_factory):
     pubkey = signer3.public_key
 
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
-    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))
+    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]), reverted_with="AccountDeploayer: Class hash cannot be 0")
 
     #print(pubkey)
     tx_exec_info=await signer1.send_transaction(admin1, 
@@ -147,10 +147,10 @@ async def test_unauthorized_changes_to_config(adminAuth_factory):
     adminAuth, auth_registry, account_registry, admin1, admin2, user4, account_deployer = adminAuth_factory
 
     await assert_revert(signer4.send_transaction(
-        user4, account_deployer.contract_address, 'set_account_class_hash', [12345]))
+        user4, account_deployer.contract_address, 'set_account_class_hash', [12345]), reverted_with="Caller Check: Unauthorized caller")
 
     await assert_revert(signer4.send_transaction(
-        user4, account_deployer.contract_address, 'set_contract_version', [123456]))
+        user4, account_deployer.contract_address, 'set_contract_version', [123456]), reverted_with="Caller Check: Unauthorized caller")
     
     result = await account_deployer.get_account_class_hash().call()
     assert result.result.class_hash == class_hash
@@ -185,4 +185,4 @@ async def test_redeploy_existing_account(adminAuth_factory):
     pubkey = signer3.public_key
 
     # this pubkey, L1 address combination is already deployed and hence should revert
-    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]))
+    await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456]), reverted_with="AccountDeployer: Account exists")

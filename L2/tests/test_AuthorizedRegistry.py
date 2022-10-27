@@ -64,7 +64,7 @@ async def test_modify_registry_by_unauthorized(adminAuth_factory):
     adminAuth, registry, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert(signer3.send_transaction(
-        user1, registry.contract_address, 'update_contract_registry', [2, 1, 123]))
+        user1, registry.contract_address, 'update_contract_registry', [2, 1, 123]), reverted_with="AuthRegistry: Unauthorized call for contract registry updation")
 
 @pytest.mark.asyncio
 async def test_modify_registry_by_admin_already_updated(adminAuth_factory):

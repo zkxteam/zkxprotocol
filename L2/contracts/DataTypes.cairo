@@ -1,5 +1,7 @@
 %lang starknet
 
+from starkware.cairo.common.uint256 import Uint256
+
 // @notice struct to store details of markets
 struct Market {
     id: felt,
@@ -244,24 +246,6 @@ struct CollateralPrice {
     price_in_usd: felt,
 }
 
-struct OrderVolume {
-    size: felt,
-    price: felt,
-    timestamp: felt,
-}
-
-struct VolumeMetaData {
-    season_id: felt,
-    pair_id: felt,
-    order_type: felt,  // open/close
-}
-
-struct TradingSeason {
-    start_timestamp: felt,
-    end_timestamp: felt,
-    num_trading_days: felt,
-}
-
 struct CoreFunctionCall {
     index: felt,
     version: felt,
@@ -275,4 +259,51 @@ struct CoreFunction {
     index: felt,
     version: felt,
     function_selector: felt,
+}
+
+// Struct to store volume metadata
+struct VolumeMetaData {
+    season_id: felt,
+    pair_id: felt,
+    order_type: felt,  // open/close
+}
+
+// Struct to store trading season data
+struct TradingSeason {
+    start_block_number: felt,
+    start_timestamp: felt,
+    num_trading_days: felt,
+}
+
+// Struct to store multipliers used to calculate total reward to be split between traders
+struct Multipliers {
+    a1: felt,
+    a2: felt,
+    a3: felt,
+    a4: felt,
+}
+
+// Struct to store constants used to calculate individual trader score
+struct Constants {
+    a: felt,
+    b: felt,
+    c: felt,
+    z: felt,
+    e: felt,
+}
+
+// Struct to store details of reward tokens
+struct RewardToken {
+    token_id: felt,  // L1 ERC20 contract address
+    no_of_tokens: Uint256,
+}
+
+// Struct to store hightide metadata
+struct HighTideMetaData {
+    pair_id: felt,  // supported market
+    status: felt,  // either initialized (by token lister) or active (by zkx, if funds or locked in the pool)
+    season_id: felt,  // season in which hightide to be activated
+    token_lister_address: felt, //L2 address of token lister
+    is_burnable: felt,  // 0 - return to token lister, 1 - burn tokens
+    liquidity_pool_address: felt,  // contract address of liquidity pool associated with hightide
 }

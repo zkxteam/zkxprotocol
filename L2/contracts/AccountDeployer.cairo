@@ -107,14 +107,14 @@ func deploy_account{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (current_registry_address) = CommonLib.get_registry_address();
     let (current_version) = CommonLib.get_contract_version();
 
-    with_attr error_message("Class hash cannot be 0") {
+    with_attr error_message("AccountDeploayer: Class hash cannot be 0") {
         assert_not_zero(hash);
     }
 
     let (stored_deployed_address) = pubkey_L1_to_address.read(public_key, L1_address);
 
     // check we havent already deployed this combination of public key and L1 address
-    with_attr error_message("Account already exists with given pubkey and L1 address") {
+    with_attr error_message("AccountDeployer: Account exists") {
         assert stored_deployed_address = FALSE;
     }
 
@@ -162,7 +162,7 @@ func set_account_class_hash{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION);
 
-    with_attr error_message("Class hash cannot be 0") {
+    with_attr error_message("AccountDeploayer: Class hash cannot be 0") {
         assert_not_zero(class_hash);
     }
 

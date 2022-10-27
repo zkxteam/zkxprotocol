@@ -41,7 +41,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
 async def test_remove_address_from_account_registry_empty(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
-    await assert_revert(signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [0]))
+    await assert_revert(signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [0]), 
+        reverted_with="AccountRegistry: id greater than account registry len"
+    )
 
 @pytest.mark.asyncio
 async def test_add_address_to_account_registry(adminAuth_factory):
@@ -67,13 +69,15 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
     await assert_revert(
-        signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [200])
+        signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [200]),
+        reverted_with="AccountRegistry: id greater than account registry len"
     )
 
     array_length_before = await account_registry.get_registry_len().call()
 
     await assert_revert(
-        signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [array_length_before.result.len + 1])
+        signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [array_length_before.result.len + 1]),
+        reverted_with="AccountRegistry: id greater than account registry len"
     )
 
     await signer1.send_transaction(admin1, account_registry.contract_address, 'remove_from_account_registry', [0])
@@ -93,7 +97,9 @@ async def test__unauthorized_add_address_to_account_registry(adminAuth_factory):
     adminAuth, account_registry, admin1, admin2 = adminAuth_factory
 
     await assert_revert(signer2.send_transaction(
-        admin2, account_registry.contract_address, 'add_to_account_registry', [0x12345]))
+        admin2, account_registry.contract_address, 'add_to_account_registry', [0x12345]),
+        reverted_with="AccountRegistry: Unauthorized caller for add_to_account_registry"
+    )
 
 
 @pytest.mark.asyncio
@@ -122,15 +128,18 @@ async def test_get_account_registry(adminAuth_factory):
     assert array_length.result.len == 6
 
     await assert_revert(
-        account_registry.get_account_registry(-1, 1).call()
+        account_registry.get_account_registry(-1, 1).call(),
+        reverted_with="AccountRegistry: Starting index cannot be negative"
     )
 
     await assert_revert(
-        account_registry.get_account_registry(0, 0).call()
+        account_registry.get_account_registry(0, 0).call(),
+        reverted_with="AccountRegistry: Number of accounts cannot be negative or zero"
     )
 
     await assert_revert(
-        account_registry.get_account_registry(0, -1).call()
+        account_registry.get_account_registry(0, -1).call(),
+        reverted_with="AccountRegistry: Number of accounts cannot be negative or zero"
     )
 
     fetched_account_registry_1 = await account_registry.get_account_registry(0, 1).call()

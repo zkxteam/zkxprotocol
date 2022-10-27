@@ -126,7 +126,8 @@ async def test_unauthorised_whitelist(adminAuth_factory):
             pubkey_whitelister.contract_address,
             "whitelist_pubkey",
             [signer1.public_key],
-        )
+        ),
+        reverted_with="Caller Check: Unauthorized caller"
     )
 
 
@@ -151,7 +152,8 @@ async def test_unauthorised_set_sig_req(adminAuth_factory):
             sig_req_manager.contract_address,
             "set_sig_requirement",
             [1, 1, get_selector_from_name("set_asset_value"), 2],
-        )
+        ),
+        reverted_with="Caller Check: Unauthorized caller"
     )
 
 
@@ -176,7 +178,8 @@ async def test_unauthorised_deregister(adminAuth_factory):
             sig_req_manager.contract_address,
             "deregister_func",
             [1, 1, get_selector_from_name("set_asset_value")],
-        )
+        ),
+        reverted_with="Caller Check: Unauthorized caller"
     )
 
 
@@ -202,7 +205,8 @@ async def test_unauthorised_delist(adminAuth_factory):
             "delist_pubkey",
             [signer3.public_key],
         )
-    )
+    ),
+    reverted_with="Caller Check: Unauthorized caller"
 
 
 @pytest.mark.asyncio
@@ -367,7 +371,8 @@ async def test_call_with_incorrect_nonce(adminAuth_factory):
                 1,
                 signer3.public_key,
             ],
-        )
+        ),
+        reverted_with="SigRequirementsManager: Nonce mismatch"
     )
 
 
@@ -509,7 +514,8 @@ async def test_call_with_insufficient_sig(adminAuth_factory):
                 1,
                 signer3.public_key,
             ],
-        )
+        ),
+        reverted_with="SigRequirementsManager: No. of signatures sent is less than number required"
     )
 
 
@@ -905,7 +911,8 @@ async def test_call_with_delisted_pubkey(adminAuth_factory):
                 signer3.public_key,
                 signer1.public_key,
             ],
-        )
+        ),
+        reverted_with="SigRequirementsManager: Insufficient no. of valid signatures"
     )
 
 
@@ -989,5 +996,6 @@ async def test_with_deregistered_func(adminAuth_factory):
                 signer3.public_key,
                 signer4.public_key,
             ],
-        )
+        ),
+        reverted_with="SigRequirementsManager: Function not registered"
     )
