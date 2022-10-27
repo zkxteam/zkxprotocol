@@ -26,6 +26,7 @@ const PubkeyWhitelister_INDEX = 22;
 const SigRequirementsManager_INDEX = 23;
 const Hightide_INDEX = 24;
 const TradingStats_INDEX = 25;
+const Starkway_INDEX = 27;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
@@ -70,3 +71,6 @@ const SHORT = 0;
 
 const WITHDRAWAL_INITIATED = 0;
 const WITHDRAWAL_SUCCEEDED = 1;
+
+const HIGHTIDE_INITIATED = 0;
+const HIGHTIDE_ACTIVE = 1;
