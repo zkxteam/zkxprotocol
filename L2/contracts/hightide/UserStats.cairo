@@ -166,10 +166,12 @@ func update_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) {
     let (caller) = get_caller_address();
     if (iterator == trader_fee_list_len) {
-        total_fee_by_market.write(season_id, pair_id, current_total_fee_64x61);
+        let (current_fee_64x61) = total_fee_by_market.read(season_id, pair_id);
+        let (updated_fee_64x61) = Math64x61_add(current_total_fee_64x61, current_fee_64x61);
+        total_fee_by_market.write(season_id, pair_id, updated_fee_64x61);
 
         // Emit event
-        total_fee_recorded.emit(caller, season_id, pair_id, current_total_fee_64x61);
+        total_fee_recorded.emit(caller, season_id, pair_id, updated_fee_64x61);
 
         return ();
     }

@@ -56,7 +56,7 @@ from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.interfaces.IUserStats import IUserStats
 from contracts.libraries.CommonLibrary import CommonLib
-from contracts.Math_64x61 import Math64x61_add, Math64x61_mul, Math64x61_div
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 
 //############
 // Constants #

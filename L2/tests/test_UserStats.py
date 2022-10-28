@@ -217,7 +217,7 @@ async def test_record_fee_details_with_two_open_orders(adminAuth_factory):
     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
     await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
 
-    # start season to test recording of trade stats
+    # start season to test recording of user stats
     season_id=1
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [
         season_id])
@@ -277,14 +277,152 @@ async def test_record_fee_details_with_two_open_orders(adminAuth_factory):
     pair_id = marketID_1
 
     trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
-    print(trader1_fee)
     assert from64x61(trader1_fee.result.fee_64x61) == 0.9699999999999964
 
     trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
-    print(trader2_fee)
     assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
 
     total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
-    print(total_fee)
     assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
 
+@pytest.mark.asyncio
+async def test_record_fee_details_with_two_close_orders(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
+
+    #### Closing Of Orders ########
+    size2 = to64x61(0.5)
+    marketID_2 = BTC_USD_ID
+    order_id_1 = str_to_felt("sdj324hka8kaedf")
+    order_id_2 = str_to_felt("wer4iljerw")
+
+    order_id_3 = str_to_felt("rlbrj32414hd")
+    assetID_3 = BTC_ID
+    collateralID_3 = USDC_ID
+    price3 = to64x61(6000)
+    stopPrice3 = 0
+    orderType3 = 0
+    position3 = to64x61(1)
+    direction3 = 1
+    closeOrder3 = 1
+    parentOrder3 = order_id_1
+    leverage3 = to64x61(1)
+    liquidatorAddress3 = 0
+
+    order_id_4 = str_to_felt("tew243sdf2334")
+    assetID_4 = BTC_ID
+    collateralID_4 = USDC_ID
+    price4 = to64x61(6000)
+    stopPrice4 = 0
+    orderType4 = 0
+    position4 = to64x61(1)
+    direction4 = 0
+    closeOrder4 = 1
+    parentOrder4 = order_id_2
+    leverage4 = to64x61(1)
+    liquidatorAddress4 = 0
+
+    execution_price2 = to64x61(6000)
+
+    hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3,
+                                price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3)
+    hash_computed4 = hash_order(order_id_4, assetID_4, collateralID_4,
+                                price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4)
+
+    signed_message3 = alice_signer.sign(hash_computed3)
+    signed_message4 = bob_signer.sign(hash_computed4)
+
+    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size2,
+        execution_price2,
+        marketID_2,
+        2,
+        alice.contract_address, signed_message3[0], signed_message3[
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 0,
+        bob.contract_address, signed_message4[0], signed_message4[
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 1,
+    ])
+
+    season_id = 1
+    pair_id = marketID_2
+
+    # Recorded fee is not changed as we placed close orders
+    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    assert from64x61(trader1_fee.result.fee_64x61) == 0.9699999999999964 
+
+    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
+
+    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
+
+
+@pytest.mark.asyncio
+async def test_record_fee_details_with_one_open_order_and_one_close_order(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
+
+    size2 = to64x61(0.5)
+    marketID_2 = BTC_USD_ID
+    order_id_2 = str_to_felt("wer4iljerw")
+
+    #### Open order ########
+    order_id_3 = str_to_felt("35hsarfg")
+    assetID_3 = BTC_ID
+    collateralID_3 = USDC_ID
+    price3 = to64x61(6000)
+    stopPrice3 = 0
+    orderType3 = 0
+    position3 = to64x61(1)
+    direction3 = 1
+    closeOrder3 = 0
+    parentOrder3 = 0
+    leverage3 = to64x61(1)
+    liquidatorAddress3 = 0
+
+    #### Close order ########
+    order_id_4 = str_to_felt("t3242sfhzad334")
+    assetID_4 = BTC_ID
+    collateralID_4 = USDC_ID
+    price4 = to64x61(6000)
+    stopPrice4 = 0
+    orderType4 = 0
+    position4 = to64x61(1)
+    direction4 = 0
+    closeOrder4 = 1
+    parentOrder4 = order_id_2
+    leverage4 = to64x61(1)
+    liquidatorAddress4 = 0
+
+    execution_price2 = to64x61(6000)
+
+    hash_computed3 = hash_order(order_id_3, assetID_3, collateralID_3, price3, stopPrice3,
+                                orderType3, position3, direction3, closeOrder3, leverage3)
+    hash_computed4 = hash_order(order_id_4, assetID_4, collateralID_4, price4, stopPrice4,
+                                orderType4, position4, direction4, closeOrder4, leverage4)
+
+    signed_message3 = alice_signer.sign(hash_computed3)
+    signed_message4 = bob_signer.sign(hash_computed4)
+
+    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
+        size2,
+        execution_price2,
+        marketID_2,
+        2,
+        alice.contract_address, signed_message3[0], signed_message3[
+            1], order_id_3, assetID_3, collateralID_3, price3, stopPrice3, orderType3, position3, direction3, closeOrder3, leverage3, liquidatorAddress3, 1, 
+        bob.contract_address, signed_message4[0], signed_message4[
+            1], order_id_4, assetID_4, collateralID_4, price4, stopPrice4, orderType4, position4, direction4, closeOrder4, leverage4, liquidatorAddress4, 0,
+    ])
+
+    season_id = 1
+    pair_id = marketID_2
+
+    # Recorded fee is changed for Alice as it is a open order
+    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    assert from64x61(trader1_fee.result.fee_64x61) == 2.424999999999996
+
+    # Recorded fee is not changed for bob as it is a close order
+    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
+
+    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    assert from64x61(total_fee.result.total_fee_64x61) == 4.849999999999994
