@@ -191,8 +191,7 @@ async def test_start_trade_season_unauthorized_user(adminAuth_factory):
 async def test_start_trade_season_authorized_admin(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp = adminAuth_factory
 
-    start_trade_season_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [
-        1])
+    start_trade_season_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [1])
     
     assert_event_emitted(
         start_trade_season_tx,
