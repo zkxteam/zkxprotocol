@@ -208,7 +208,7 @@ async def test_unauthorized_call(adminAuth_factory):
         fee]), "UserStats: Trading fee can be recorded only by Trading contract")
 
 @pytest.mark.asyncio
-async def test_trader_fee_recorded(adminAuth_factory):
+async def test_record_fee_details_with_two_open_orders(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
 
     alice_balance = to64x61(50000)

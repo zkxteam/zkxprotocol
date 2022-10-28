@@ -411,7 +411,6 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @returns margin_amount_open - Margin amount for the order
 // @returns borrowed_amount_open - Borrowed amount for the order
 // @returns trader_fee_list_len - length of the trader fee list
-// @returns trader_fee_list - traders fee list
 func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder,
     execution_price_: felt,
@@ -429,7 +428,6 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     margin_amount_open: felt,
     borrowed_amount_open: felt,
     trader_fee_list_len: felt,
-    trader_fee_list: TraderFee*,
 ) {
     alloc_locals;
 
@@ -545,7 +543,6 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         margin_amount_open,
         borrowed_amount_open,
         trader_fee_list_len_ + 1,
-        trader_fee_list_ + TraderFee.SIZE,
     );
 }
 
@@ -918,7 +915,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             margin_amount_temp: felt,
             borrowed_amount_temp: felt,
             trader_fee_list_len_temp: felt,
-            trader_fee_list_temp: TraderFee*,
         ) = process_open_orders(
             order_=temp_order,
             execution_price_=execution_price_,
@@ -936,7 +932,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
         assert trader_fee_list_len = trader_fee_list_len_temp;
-        assert trader_fee_list = trader_fee_list_temp;
+        assert trader_fee_list = trader_fee_list_ + TraderFee.SIZE;
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
