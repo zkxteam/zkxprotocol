@@ -303,7 +303,15 @@ struct HighTideMetaData {
     pair_id: felt,  // supported market
     status: felt,  // either initialized (by token lister) or active (by zkx, if funds or locked in the pool)
     season_id: felt,  // season in which hightide to be activated
-    token_lister_address: felt, //L2 address of token lister
+    token_lister_address: felt,  // L2 address of token lister
     is_burnable: felt,  // 0 - return to token lister, 1 - burn tokens
     liquidity_pool_address: felt,  // contract address of liquidity pool associated with hightide
+}
+
+// Struct to store high-tide factors
+struct HighTideFactors {
+    x_1: felt,
+    x_2: felt,
+    x_3: felt,
+    x_4: felt,
 }
