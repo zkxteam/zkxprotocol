@@ -43,12 +43,32 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
+//#################
+// View Functions #
+//#################
+
+// @notice view function to get the hightide factors of a pair
+// @return res - A struct of type HighTideFactors
+@view
+func get_hightide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt
+) -> (res: HighTideFactors) {
+    let (factors) = high_tide_factors.read(season_id=season_id_, pair_id=pair_id_);
+    return (res=factors);
+}
+
 //#####################
-// Internal Functions #
+// External Functions #
 //#####################
 
+// @notice external function to calculate the factors
+// @param pair_id_list_len - Length of the pair_id array
+// @param pair_id_list - Array of pair_ids
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param top_pair_id_ - Top pair for the given season
+@external
 func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id_list_len: felt, pair_id_list: felt, season_id_: felt, top_pair_id_: felt
+    pair_id_list_len: felt, pair_id_list: felt*, season_id_: felt, top_pair_id_: felt
 ) {
     alloc_locals;
     let (registry) = CommonLib.get_registry_address();
@@ -98,6 +118,7 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         top_pair_number_of_traders
     );
 
+    // Recursively calculate the factors for each pair_id
     return calculate_high_tide_factors_recurse(
         pair_id_list_len=pair_id_list_len,
         pair_id_list=pair_id_list,
@@ -110,11 +131,24 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     );
 }
 
+//#####################
+// Internal Functions #
+//#####################
+
+// @notice internal function to recursively calculate the factors
+// @param pair_id_list_len - Length of the pair_id array
+// @param pair_id_list - Array of pair_ids
+// @param trading_stats_address_ - Address of the Trading stats contract
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param average_volume_top_pair_64x61_ - Average volume of the top pair in the season
+// @param max_trades_top_pair_64x61_ - Max number of trades by the top pair in the season
+// @param top_pair_number_of_traders_64x61_ - Number of unique traders for the top pair in the season
+// @param total_days_ - Number of days the season is active
 func calculate_high_tide_factors_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
     pair_id_list_len: felt,
-    pair_id_list: felt,
+    pair_id_list: felt*,
     trading_stats_address_: felt,
     season_id_: felt,
     average_volume_top_pair_64x61_: felt,
@@ -170,6 +204,12 @@ func calculate_high_tide_factors_recurse{
     );
 }
 
+// @notice internal function to calculate x_1 for a pair
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param pair_id_- Pair Id for which to calculate x_1
+// @param trading_stats_address_ - Address of the Trading stats contract
+// @param average_volume_top_pair_64x61_ - Average volume of the top pair in the season
+// @returns x_1 - x_1 value for the pair
 func calculate_x_1{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
     pair_id_: felt,
@@ -184,6 +224,12 @@ func calculate_x_1{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return (x_1,);
 }
 
+// @notice internal function to calculate x_2 for a pair
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param pair_id_- Pair Id for which to calculate x_2
+// @param trading_stats_address_ - Address of the Trading stats contract
+// @param max_trades_top_pair_64x61_ - Max number of trades by the top pair in the season
+// @returns x_2 - x_2 value for the pair
 func calculate_x_2{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trading_stats_address_: felt, max_trades_top_pair_64x61_: felt
 ) -> (res: felt) {
@@ -198,6 +244,12 @@ func calculate_x_2{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return (x_2,);
 }
 
+// @notice internal function to calculate x_3 for a pair
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param pair_id_- Pair Id for which to calculate x_2
+// @param total_days_ - Number of days the season is active
+// @param trading_stats_address_ - Address of the Trading stats contract
+// @returns x_3 - x_3 value for the pair
 func calculate_x_3{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, total_days_: felt, trading_stats_address_: felt
 ) -> (res: felt) {
@@ -213,6 +265,12 @@ func calculate_x_3{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return (x3,);
 }
 
+// @notice internal function to calculate x_4 for a pair
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param pair_id_- Pair Id for which to calculate x_4
+// @param trading_stats_address_ - Address of the Trading stats contract
+// @param top_pair_number_of_traders_64x61_ - Number of unique traders for the top pair in the season
+// @returns x_4 - x_4 value for the pair
 func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
     pair_id_: felt,

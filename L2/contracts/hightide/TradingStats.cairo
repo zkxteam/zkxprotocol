@@ -18,7 +18,7 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_add
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_add, Math64x61_div, Math64x61_fromIntFelt
 
 // This contract can be used as a source of truth for all consumers of trade stats off-chain/on-chain
 // This does not have functions to calculate any of the hightide formulas
@@ -122,13 +122,15 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     let (current_total_volume_open_64x61) = order_volume.read(volume_metadata_pair_open);
     let (current_total_volume_close_64x61) = order_volume.read(volume_metadata_pair_close);
 
-    let (total_volume_64x61) = Math64x61_add(volume_metadata_pair_open, volume_metadata_pair_close);
-    let (total_orders) = current_num_orders_open + current_num_orders_close;
+    let (total_volume_64x61) = Math64x61_add(
+        current_total_volume_open_64x61, current_total_volume_close_64x61
+    );
+    let total_orders = current_num_orders_open + current_num_orders_close;
     let (total_orders_64x61) = Math64x61_fromIntFelt(total_orders);
 
     let (average_volume) = Math64x61_div(total_volume_64x61, total_orders_64x61);
 
-    return (average_volume);
+    return (average_volume,);
 }
 
 // @dev - Returns current active trader count for given <season_id, pair_id>
