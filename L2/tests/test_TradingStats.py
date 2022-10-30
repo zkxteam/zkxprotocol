@@ -206,6 +206,7 @@ async def test_unauthorized_call(adminAuth_factory):
 
     size1 = to64x61(1)
     marketID_1 = BTC_USD_ID
+    season_id = 1
 
     order_id_1 = str_to_felt("sdj324hka8kaedf")
     assetID_1 = BTC_ID
@@ -244,6 +245,7 @@ async def test_unauthorized_call(adminAuth_factory):
     signed_message2 = bob_signer.sign(hash_computed2)
 
     await assert_revert(dave_signer.send_transaction(dave, trading_stats.contract_address, "record_trade_batch_stats", [
+        season_id,
         marketID_1,
         size1,
         execution_price1,

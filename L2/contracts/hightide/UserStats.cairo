@@ -93,10 +93,13 @@ func get_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // ///////////
 
 // @notice This function is used to record total fee collected by the platform for a pair in a season
+// @param season_id - id of the season
 // @param pair_id - id of the pair
+// @param trader_fee_list_len - length of the trader fee list
+// @param trader_fee_list - List which stores traders fee
 @external
 func record_fee_details{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id: felt, trader_fee_list_len: felt, trader_fee_list: TraderFee*
+    season_id: felt, pair_id: felt, trader_fee_list_len: felt, trader_fee_list: TraderFee*
 ) {
     let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
@@ -109,21 +112,6 @@ func record_fee_details{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     // Check that this call originated from Trading contract
     with_attr error_message("UserStats: Fee can be recorded only by Trading contract") {
         assert caller = trading_address;
-    }
-
-    // Get HightideAdmin address from Authorized Registry
-    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Hightide_INDEX, version=version
-    );
-
-    let (season_id) = IHighTide.get_current_season_id(hightide_address);
-    if (season_id == 0) {
-        return ();
-    }
-
-    let (is_expired) = IHighTide.get_season_expiry_state(hightide_address, season_id);
-    if (is_expired == TRUE) {
-        return ();
     }
 
     return update_trader_fee(season_id, pair_id, 0, 0, trader_fee_list_len, trader_fee_list);

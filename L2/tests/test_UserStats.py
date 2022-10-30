@@ -200,8 +200,10 @@ async def test_unauthorized_call(adminAuth_factory):
 
     marketID = BTC_USD_ID
     fee = to64x61(0.5)
+    season_id = 1
 
     await assert_revert(dave_signer.send_transaction(dave, user_stats.contract_address, "record_fee_details", [
+        season_id,
         marketID,
         1,
         alice.contract_address,

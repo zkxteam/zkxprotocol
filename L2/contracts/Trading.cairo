@@ -15,6 +15,7 @@ from contracts.Constants import (
     Asset_INDEX,
     DELEVERAGING_ORDER,
     FeeBalance_INDEX,
+    Hightide_INDEX,
     Holding_INDEX,
     InsuranceFund_INDEX,
     LIMIT_ORDER,
@@ -46,6 +47,7 @@ from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IFeeBalance import IFeeBalance
+from contracts.interfaces.IHighTide import IHighTide
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from contracts.interfaces.ILiquidate import ILiquidate
@@ -165,6 +167,7 @@ func execute_batch{
         liquidate_address: felt,
         trading_stats_address: felt,
         user_stats_address: felt,
+        hightide_address: felt,
     ) = get_registry_addresses();
 
     let (trader_fee_list: TraderFee*) = alloc();
@@ -198,8 +201,19 @@ func execute_batch{
         assert result = 0;
     }
 
+    let (season_id) = IHighTide.get_current_season_id(hightide_address);
+    if (season_id == 0) {
+        return ();
+    }
+
+    let (is_expired) = IHighTide.get_season_expiry_state(hightide_address, season_id);
+    if (is_expired == TRUE) {
+        return ();
+    }
+
     ITradingStats.record_trade_batch_stats(
         contract_address=trading_stats_address,
+        season_id_=season_id,
         pair_id_=marketID_,
         order_size_64x61_=size_,
         execution_price_64x61_=execution_price_,
@@ -209,6 +223,7 @@ func execute_batch{
 
     IUserStats.record_fee_details(
         contract_address=user_stats_address,
+        season_id=season_id,
         pair_id=marketID_,
         trader_fee_list_len=trader_fee_list_len,
         trader_fee_list=trader_fee_list,
@@ -227,10 +242,12 @@ func execute_batch{
 // @returns holding_address - Address of the Holding contract
 // @returns trading_fees_address - Address of the Trading contract
 // @returns fees_balance_address - Address of the Fee Balance contract
-// @returns liquidate_address - Address of the Liquidate contract
 // @returns liquidity_fund_address - Address of the Liquidity Fund contract
 // @returns insurance_fund_address - Address of the Insurance Fund contract
+// @returns liquidate_address - Address of the Liquidate contract
+// @returns trading_stats_address - Address of the Trading stats contract
 // @returns user_stats_address - Address of the User stats contract
+// @returns hightide_address - Address of the Hightide contract
 func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     account_registry_address: felt,
     asset_address: felt,
@@ -242,6 +259,7 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     liquidate_address: felt,
     trading_stats_address: felt,
     user_stats_address: felt,
+    hightide_address: felt,
 ) {
     // Read the registry and version
     let (registry) = CommonLib.get_registry_address();
@@ -297,6 +315,11 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         contract_address=registry, index=UserStats_INDEX, version=version
     );
 
+    // Get Hightide address
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
     return (
         account_registry_address,
         asset_address,
@@ -308,6 +331,7 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         liquidate_address,
         trading_stats_address,
         user_stats_address,
+        hightide_address,
     );
 }
 

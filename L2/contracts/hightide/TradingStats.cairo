@@ -181,6 +181,7 @@ func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @dev - Function called by trading contract after trade execution
 @external
 func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt,
     pair_id_: felt,
     order_size_64x61_: felt,
     execution_price_64x61_: felt,
@@ -201,37 +202,17 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     with_attr error_message("Trade can be recorded only by Trading contract") {
         assert caller = trading_address;
     }
-    // Get HightideAdmin address from Authorized Registry
+
+    // Get Hightide address from Authorized Registry
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Hightide_INDEX, version=version
     );
-
-    // Get current season id from hightide
-    let (season_id_) = IHighTide.get_current_season_id(hightide_address);
-    let invalid_season_id = is_le(season_id_, 0);
-
-    // Season id <=0 means that Hightide module has not been activated - in other words no season has been started in the system
-    // This scenario is similar to when a season has ended but a new one has not started yet
-    // In such a situation we just return without recording the trade stats
-    if (invalid_season_id == 1) {
-        return ();
-    }
-
-    let (current_timestamp) = get_block_timestamp();
 
     // Get trading season data
     let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
 
     // Get the current day according to the season
     let current_day = get_current_day(season.start_timestamp);
-
-    let within_season = is_le(current_day, season.num_trading_days - 1);
-
-    // If the season is over, return without setting the trading stats
-    // we do not check whether season has started, since Hightide returns only a season_id when it has started
-    if (within_season == 0) {
-        return ();
-    }
 
     let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, current_day);
 
