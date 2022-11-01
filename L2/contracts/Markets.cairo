@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_le_felt, assert_nn, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_le_felt, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 
 from contracts.Constants import Asset_INDEX, ManageMarkets_ACTION
@@ -11,6 +11,7 @@ from contracts.DataTypes import Asset, Market
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.CommonLibrary import CommonLib
+from contracts.libraries.StringLib import StringLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
 from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61, Math64x61_ONE
@@ -21,6 +22,7 @@ from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive
 
 const MAX_TRADABLE = 2;
 const MIN_LEVERAGE = Math64x61_ONE;
+const METADATA_LINK_TYPE = 'MARKET_METADATA_LINK';
 
 ////////////
 // Events //
@@ -54,6 +56,11 @@ func market_archived_state_modified(market_id: felt, is_archived: felt) {
 // Event emitted whenever a market's trade settings are modified
 @event
 func market_trade_settings_updated(market_id: felt, market: Market) {
+}
+
+// Event emitted when market metadata link is updated
+@event
+func market_metadata_link_update(market_id: felt) {
 }
 
 /////////////
@@ -225,6 +232,18 @@ func get_all_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     );
 }
 
+// @notice View function to read market metadata link
+// @param market_id_ - ID of the market
+// @return link_len - Length of link string
+// @return link - Link characters
+@view
+func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (link_len: felt, link: felt*) {
+    let (link_len, link) = StringLib.read_string(type=METADATA_LINK_TYPE, id=market_id_);
+    return (link_len, link);
+}
+
 //////////////
 // External //
 //////////////
@@ -262,7 +281,9 @@ func change_max_ttl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 // if tradable value of new_market_ = 2, it means take value from Asset contract
 @external
 func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_market_: Market
+    new_market_: Market,
+    metadata_link_len: felt,
+    metadata_link: felt*
 ) {
     alloc_locals;
 
@@ -320,6 +341,14 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     // Update id & market pair existence
     market_id_exists.write(new_market_.id, TRUE);
     market_pair_exists.write(new_market_.asset, new_market_.asset_collateral, TRUE);
+
+    // Save metadata link
+    StringLib.save_string(
+        type=METADATA_LINK_TYPE, 
+        id=new_market_.id, 
+        string_len=metadata_link_len,
+        string=metadata_link
+    );
 
     // Emit event
     market_added.emit(market_id=new_market_.id, market=new_market_);
@@ -391,6 +420,9 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         )
     );
 
+    // Delete metadata link
+    StringLib.remove_existing_string(type=METADATA_LINK_TYPE, id=market_id_);
+
     // Emit event
     market_removed.emit(market_id_);
 
@@ -450,8 +482,9 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
-    with_attr error_message("Markets: is_tradable_ value must be bool") {
-        assert_bool(is_tradable_);
+    with_attr error_message("Markets: is_tradable_ value must be 0, 1 or 2") {
+        assert_le(0, is_tradable_);
+        assert_le(is_tradable_, 2);
     }
 
     let (market: Market) = market_by_id.read(market_id_);
@@ -636,6 +669,33 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
     // Emit event
     market_trade_settings_updated.emit(market_id=market_id_, market=market);
+
+    return ();
+}
+
+// @notice Update market metadata link
+// @param market_id_ - ID of Asset to be updated
+// @param link_len_ - Length of a link
+// @param link_ - Link characters
+@external
+func update_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt, link_len: felt, link: felt*
+) {
+    // Verification
+    verify_market_manager_authority();
+    verify_market_id_exists(market_id_, should_exist_=TRUE);
+    
+    // Save new metadata link
+    StringLib.remove_existing_string(type=METADATA_LINK_TYPE, id=market_id_);
+    StringLib.save_string(
+        type=METADATA_LINK_TYPE, 
+        id=market_id_, 
+        string_len=link_len,
+        string=link
+    );
+
+    // Emit event
+    market_metadata_link_update.emit(market_id_);
 
     return ();
 }
@@ -855,8 +915,9 @@ func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         assert_le(1, market.ttl);
         assert_le(market.ttl, maximum_ttl);
     }
-    with_attr error_message("Markets: is_tradable must be bool") {
-        assert_bool(market.is_tradable);
+    with_attr error_message("Markets: is_tradable must 0, 1 or 2") {
+        assert_le(0, market.is_tradable);
+        assert_le(market.is_tradable, 2);
     }
     with_attr error_message("Markets: is_archived must be bool") {
         assert_bool(market.is_archived);
