@@ -39,6 +39,7 @@ from contracts.AccountManager import (
     balance,
     collateral_array_len,
     deleveragable_or_liquidatable_position,
+    get_portion_executed,
 )
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 

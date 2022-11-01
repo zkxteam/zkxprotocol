@@ -532,22 +532,22 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         fee_to_add=fees,
     );
 
-    local open_order_value_64x61;
     local open_orders_count;
 
     let (portion_executed) = IAccountManager.get_portion_executed(
         contract_address=order_.pub_key, order_id=order_.orderID
     );
+
+    let (current_order_value_64x61) = Math64x61_mul(order_size_, execution_price_);
+
     if (portion_executed == 0) {
-        let (current_order_value_64x61) = Math64x61_mul(order_size_, execution_price_);
-        assert open_order_value_64x61 = current_order_value_64x61;
         assert open_orders_count = 1;
     } else {
-        assert open_order_value_64x61 = 0;
         assert open_orders_count = 0;
     }
+
     let element: TraderStats = TraderStats(
-        order_.pub_key, fees, open_order_value_64x61, open_orders_count
+        order_.pub_key, fees, current_order_value_64x61, open_orders_count
     );
     assert [trader_stats_list_] = element;
 

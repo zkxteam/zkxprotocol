@@ -202,15 +202,15 @@ async def test_unauthorized_call(adminAuth_factory):
     fee = to64x61(0.5)
     season_id = 1
 
-    await assert_revert(dave_signer.send_transaction(dave, user_stats.contract_address, "record_fee_details", [
+    await assert_revert(dave_signer.send_transaction(dave, user_stats.contract_address, "record_trader_stats", [
         season_id,
         marketID,
         1,
         alice.contract_address,
-        fee]), "UserStats: Fee can be recorded only by Trading contract")
+        fee, 10000, 2]), "UserStats: Stats can be recorded only by Trading contract")
 
 @pytest.mark.asyncio
-async def test_record_fee_details_with_two_open_orders(adminAuth_factory):
+async def test_record_trader_stats_with_two_open_orders(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
 
     alice_balance = to64x61(50000)
@@ -288,7 +288,7 @@ async def test_record_fee_details_with_two_open_orders(adminAuth_factory):
     assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
 
 @pytest.mark.asyncio
-async def test_record_fee_details_with_two_close_orders(adminAuth_factory):
+async def test_record_trader_stats_with_two_close_orders(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
 
     #### Closing Of Orders ########
@@ -359,7 +359,7 @@ async def test_record_fee_details_with_two_close_orders(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_record_fee_details_with_one_open_order_and_one_close_order(adminAuth_factory):
+async def test_record_trader_stats_with_one_open_order_and_one_close_order(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
 
     size2 = to64x61(0.5)
