@@ -3,7 +3,8 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
+from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import (
     deploy,
     get_block_number,
@@ -57,6 +58,11 @@ func trading_season_set_up(caller: felt, trading_season: TradingSeason) {
 // Event emitted whenever trading season is started
 @event
 func trading_season_started(caller: felt, season_id: felt) {
+}
+
+// Event emitted whenever trading season is ended
+@event
+func trading_season_ended(caller: felt, season_id: felt) {
 }
 
 // Event is emitted whenever the liquidity pool contract class hash is changed
@@ -232,6 +238,31 @@ func get_hightide_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     return (reward_tokens_len, reward_tokens);
 }
 
+// @notice View function to get season's expiry state
+// @param season_id - id of the season
+// @return is_expired - returns FALSE if it is not expired else TRUE
+@view
+func get_season_expiry_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id: felt
+) -> (is_expired: felt) {
+    alloc_locals;
+
+    verify_season_id_exists(season_id);
+    // get current block timestamp
+    let (local current_timestamp) = get_block_timestamp();
+
+    // calculates current trading seasons end timestamp
+    let (current_season: TradingSeason) = get_season(season_id);
+    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
+    let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
+
+    let within_season = is_le(current_timestamp, current_seasons_end_timestamp);
+    if (within_season == TRUE) {
+        return (FALSE,);
+    }
+    return (TRUE,);
+}
+
 // ///////////
 // External //
 // ///////////
@@ -301,6 +332,33 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     // Emit event
     let (caller) = get_caller_address();
     trading_season_started.emit(caller, season_id);
+    return ();
+}
+
+// @notice - This function is used for ending trade season
+// @param season_id - id of the season
+@external
+func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("HighTide: Unauthorized call to end trade season") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    let (is_expired) = get_season_expiry_state(season_id);
+    with_attr error_message("HighTide: Trading season is still active") {
+        assert is_expired = TRUE;
+    }
+
+    current_trading_season.write(0);
+
+    // Emit event
+    let (caller) = get_caller_address();
+    trading_season_ended.emit(caller, season_id);
     return ();
 }
 
@@ -518,6 +576,8 @@ func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     season_id: felt
 ) {
     with_attr error_message("HighTide: Trading season id existence mismatch") {
+        assert_nn(season_id);
+        assert_not_zero(season_id);
         let (seasons_len) = seasons_array_len.read();
         assert_le(season_id, seasons_len);
     }
@@ -528,6 +588,8 @@ func verify_hightide_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     hightide_id: felt
 ) {
     with_attr error_message("HighTide: Hightide id existence mismatch") {
+        assert_nn(hightide_id);
+        assert_not_zero(hightide_id);
         let (hightide_len) = hightides_array_len.read();
         assert_le(hightide_id, hightide_len);
     }
@@ -539,30 +601,25 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 ) {
     alloc_locals;
 
-    verify_season_id_exists(season_id);
-
     // get current block timestamp
     let (current_timestamp) = get_block_timestamp();
 
-    // calculates current trading seasons end timestamp
-    let (local current_season_id) = get_current_season_id();
-    let (current_season: TradingSeason) = get_season(current_season_id);
-    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
+    // get current season id
+    let (current_season_id) = current_trading_season.read();
+    if (current_season_id == 0) {
+        return ();
+    }
 
-    let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
+    let (is_expired) = get_season_expiry_state(current_season_id);
+    with_attr error_message("HighTide: Current trading season is still active") {
+        assert is_expired = TRUE;
+    }
 
+    verify_season_id_exists(season_id);
     // calculates new trading seasons end timestamp
     let (new_season: TradingSeason) = get_season(season_id);
     let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * 24 * 60 * 60;
     let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
-
-    if (current_season_id != 0) {
-        with_attr error_message("HighTide: Current trading season is still active") {
-            assert_le(current_seasons_end_timestamp, current_timestamp);
-        }
-    } else {
-        tempvar range_check_ptr = range_check_ptr;
-    }
 
     with_attr error_message("HighTide: Invalid Timestamp") {
         assert_le(new_season.start_timestamp, current_timestamp);
@@ -659,7 +716,7 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
 
-    local balance_Uint256: Uint256 = Uint256(0, 0);
+    local balance_Uint256: Uint256 = cast((low=0, high=0), Uint256);
     let (native_token_l2_address: felt) = IStarkway.get_native_token_l2_address(
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
@@ -677,7 +734,7 @@ func check_activation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-    
+
     let (token_balance_Uint256) = verify_token_balance(
         liquidity_pool_address, balance_Uint256, 0, contract_address_list_len, contract_address_list
     );
@@ -723,15 +780,10 @@ func verify_token_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 func assign_hightide_to_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     hightide_id: felt, season_id: felt
 ) {
-    // get current block timestamp
-    let (current_timestamp) = get_block_timestamp();
-
-    let (trading_season) = trading_season_by_id.read(season_id=season_id);
-    let seasons_num_trading_days_in_secs = trading_season.num_trading_days * 24 * 60 * 60;
-    let seasons_end_timestamp = trading_season.start_timestamp + seasons_num_trading_days_in_secs;
+    let (is_expired) = get_season_expiry_state(season_id);
 
     with_attr error_message("HighTide: Trading season already ended") {
-        assert_lt(seasons_end_timestamp, current_timestamp);
+        assert is_expired = FALSE;
     }
 
     let (index) = hightide_by_season_id.read(season_id, 0);

@@ -108,6 +108,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
     trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
+    user_stats = await starknet_service.deploy(ContractType.UserStats, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -159,6 +160,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [26, 1, user_stats.contract_address])
     
     # Deploy relay contracts with appropriate indexes
     relay_trading = await starknet_service.deploy(ContractType.RelayTrading, [

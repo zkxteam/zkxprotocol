@@ -6,6 +6,7 @@ from contracts.DataTypes import MultipleOrder
 namespace ITradingStats {
     // external functions
     func record_trade_batch_stats(
+        season_id_: felt,
         pair_id_: felt,
         order_size_64x61_: felt,
         execution_price_64x61_: felt,

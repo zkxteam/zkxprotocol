@@ -100,7 +100,6 @@ func get_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let (current_total_volume_64x61) = order_volume.read(volume_type_);
 
     return (current_num_orders, current_total_volume_64x61);
-    
 }
 
 // @dev - Returns current active trader count for given <season_id, pair_id>
@@ -119,9 +118,8 @@ func get_num_active_traders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 func get_season_trade_frequency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt
 ) -> (frequency_len: felt, frequency: felt*) {
-    
     alloc_locals;
-    let number_of_days= get_current_days_in_season(season_id_, pair_id_);
+    let number_of_days = get_current_days_in_season(season_id_, pair_id_);
     local ref_number_of_days = number_of_days;
     let frequency_list: felt* = alloc();
 
@@ -129,19 +127,17 @@ func get_season_trade_frequency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     return (ref_number_of_days, frequency_list);
 }
 
-//@dev - This function returns the max number of trades in a day for season_id, pair_id
+// @dev - This function returns the max number of trades in a day for season_id, pair_id
 // this might be used for calculating x_2 according to the hightide algorithm
 @view
 func get_max_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt
 ) -> (res: felt) {
-
     let number_of_days = get_current_days_in_season(season_id_, pair_id_);
 
     let frequency_list: felt* = alloc();
     let max_trades = get_frequencies(season_id_, pair_id_, number_of_days, 0, frequency_list, 0);
-    return (max_trades, );
-
+    return (max_trades,);
 }
 
 // @dev - this function returns the number of trades recorded for a particular day upto the timestamp of call
@@ -171,7 +167,6 @@ func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt
 ) -> (res: felt) {
-   
     let number_of_days = get_current_days_in_season(season_id_, pair_id_);
 
     // The 4th argument of the following function call keeeps a running total of days traded
@@ -186,6 +181,7 @@ func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @dev - Function called by trading contract after trade execution
 @external
 func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt,
     pair_id_: felt,
     order_size_64x61_: felt,
     execution_price_64x61_: felt,
@@ -206,23 +202,11 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     with_attr error_message("Trade can be recorded only by Trading contract") {
         assert caller = trading_address;
     }
-    // Get HightideAdmin address from Authorized Registry
+
+    // Get Hightide address from Authorized Registry
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Hightide_INDEX, version=version
     );
-
-    // Get current season id from hightide
-    let (season_id_) = IHighTide.get_current_season_id(hightide_address);
-    let invalid_season_id = is_le(season_id_,0);
-    
-    //Season id <=0 means that Hightide module has not been activated - in other words no season has been started in the system
-    //This scenario is similar to when a season has ended but a new one has not started yet
-    //In such a situation we just return without recording the trade stats
-    if(invalid_season_id == 1) {
-        return();
-    }
-
-    let (current_timestamp) = get_block_timestamp();
 
     // Get trading season data
     let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
@@ -230,15 +214,6 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     // Get the current day according to the season
     let current_day = get_current_day(season.start_timestamp);
 
-    let within_season = is_le(current_day, season.num_trading_days - 1);
-
-    // If the season is over, return without setting the trading stats
-    // we do not check whether season has started, since Hightide returns only a season_id when it has started
-    if (within_season == 0) {
-        return ();
-    }
-
-    
     let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, current_day);
 
     // Increment number of trades for current_day
@@ -302,8 +277,10 @@ func record_trade_batch_stats_recurse{
 
     let (current_volume_64x61) = order_volume.read(volume_metadata);
     let (present_trade_volume_64x61) = Math64x61_mul(curr_order_size_64x61, execution_price_64x61_);
-    let (updated_order_volume_64x61) = Math64x61_add(current_volume_64x61, present_trade_volume_64x61);
-    order_volume.write(volume_metadata,updated_order_volume_64x61);
+    let (updated_order_volume_64x61) = Math64x61_add(
+        current_volume_64x61, present_trade_volume_64x61
+    );
+    order_volume.write(volume_metadata, updated_order_volume_64x61);
 
     // increment number of trades storage_var
     num_orders.write(volume_metadata, current_len + 1);
@@ -393,7 +370,7 @@ func get_frequencies{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     total_frequencies: felt,
     current_index_: felt,
     frequency_list: felt*,
-    max_num_trades: felt
+    max_num_trades: felt,
 ) -> felt {
     if (total_frequencies == 0) {
         return max_num_trades;
@@ -403,16 +380,24 @@ func get_frequencies{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     assert frequency_list[current_index_] = current_trade_count;
 
     let cmp_res = is_le(max_num_trades, current_trade_count);
-    if (cmp_res==1) {
-        
+    if (cmp_res == 1) {
         return get_frequencies(
-        season_id_, pair_id_, total_frequencies - 1, current_index_ + 1, frequency_list, current_trade_count
-    );
-
+            season_id_,
+            pair_id_,
+            total_frequencies - 1,
+            current_index_ + 1,
+            frequency_list,
+            current_trade_count,
+        );
     }
 
     return get_frequencies(
-        season_id_, pair_id_, total_frequencies - 1, current_index_ + 1, frequency_list, max_num_trades
+        season_id_,
+        pair_id_,
+        total_frequencies - 1,
+        current_index_ + 1,
+        frequency_list,
+        max_num_trades,
     );
 }
 
@@ -435,15 +420,14 @@ func count_num_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return count_num_days_traded(season_id_, pair_id_, num_days_ - 1, days_traded + 1);
 }
 
-
-//@dev - This function calculates number of days that have elapsed in the season so far
+// @dev - This function calculates number of days that have elapsed in the season so far
 func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt) -> felt {
-    
+    season_id_: felt, pair_id_: felt
+) -> felt {
     alloc_locals;
 
-    with_attr error_message("Invalid season id"){
-        assert_le(1,season_id_);
+    with_attr error_message("Invalid season id") {
+        assert_le(1, season_id_);
     }
 
     let (registry_address) = get_registry_address();
@@ -467,5 +451,4 @@ func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         assert number_of_days = season.num_trading_days;
     }
     return number_of_days;
-
 }

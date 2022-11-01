@@ -120,7 +120,7 @@ func reward_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
             native_token_l2_address, liquidity_pool_address
         );
 
-        let zero_Uint256: Uint256 = Uint256(0, 0);
+        let zero_Uint256: Uint256 = cast((low=0, high=0), Uint256);
         let (result) = uint256_le(current_balance_Uint256, zero_Uint256);
         if (result == FALSE) {
             if (is_burnable == FALSE) {
@@ -189,14 +189,14 @@ func transfer_or_burn_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         [contract_address_list], liquidity_pool_address
     );
 
-    let zero_Uint256: Uint256 = Uint256(0, 0);
+    let zero_Uint256: Uint256 = cast((low=0, high=0), Uint256);
     let (result) = uint256_le(current_balance_Uint256, zero_Uint256);
     if (result == FALSE) {
         if (is_burnable == FALSE) {
             IERC20.transfer([contract_address_list], token_lister_address, current_balance_Uint256);
         } else {
             // burn tokens by sending it to dead address
-            IERC20.transfer([contract_address_list], 0x0000DEAD, current_balance_Uint256); 
+            IERC20.transfer([contract_address_list], 0x0000DEAD, current_balance_Uint256);
         }
         tempvar syscall_ptr = syscall_ptr;
     } else {

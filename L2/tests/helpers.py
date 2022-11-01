@@ -39,6 +39,7 @@ class ContractType(Enum):
     HighTide = "contracts/hightide/HighTide.cairo"
     TradingStats = "contracts/hightide/TradingStats.cairo"
     LiquidityPool = "contracts/hightide/LiquidityPool.cairo"
+    UserStats = "contracts/hightide/UserStats.cairo"
 
     # Relay contracts
     RelayABR = "contracts/relay_contracts/RelayABR.cairo"

@@ -98,6 +98,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
     trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
+    user_stats = await starknet_service.deploy(ContractType.UserStats, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -140,6 +141,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [26, 1, user_stats.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -204,6 +206,7 @@ async def test_unauthorized_call(adminAuth_factory):
 
     size1 = to64x61(1)
     marketID_1 = BTC_USD_ID
+    season_id = 1
 
     order_id_1 = str_to_felt("sdj324hka8kaedf")
     assetID_1 = BTC_ID
@@ -242,6 +245,7 @@ async def test_unauthorized_call(adminAuth_factory):
     signed_message2 = bob_signer.sign(hash_computed2)
 
     await assert_revert(dave_signer.send_transaction(dave, trading_stats.contract_address, "record_trade_batch_stats", [
+        season_id,
         marketID_1,
         size1,
         execution_price1,

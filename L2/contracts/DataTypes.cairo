@@ -307,3 +307,9 @@ struct HighTideMetaData {
     is_burnable: felt,  // 0 - return to token lister, 1 - burn tokens
     liquidity_pool_address: felt,  // contract address of liquidity pool associated with hightide
 }
+
+// Struct to store Trader's fee details 
+struct TraderFee {
+    trader_address: felt,  
+    fee_64x61: felt,
+}
