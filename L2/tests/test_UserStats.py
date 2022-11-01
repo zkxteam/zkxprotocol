@@ -207,7 +207,7 @@ async def test_unauthorized_call(adminAuth_factory):
         marketID,
         1,
         alice.contract_address,
-        fee, 10000, 2]), "UserStats: Stats can be recorded only by Trading contract")
+        fee, 10000, 2]), "UserStats: Stats can be recorded only by TradingStats contract")
 
 @pytest.mark.asyncio
 async def test_record_trader_stats_with_two_open_orders(adminAuth_factory):

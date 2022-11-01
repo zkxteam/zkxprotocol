@@ -5,7 +5,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
-from contracts.Constants import Hightide_INDEX, Trading_INDEX
+from contracts.Constants import Hightide_INDEX, TradingStats_INDEX
 from contracts.DataTypes import TraderStats, TradingSeason
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
@@ -133,13 +133,13 @@ func record_trader_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
     );
 
-    // Check that this call originated from Trading contract
-    with_attr error_message("UserStats: Stats can be recorded only by Trading contract") {
-        assert caller = trading_address;
+    // Check that this call originated from Trading stats contract
+    with_attr error_message("UserStats: Stats can be recorded only by TradingStats contract") {
+        assert caller = trading_stats_address;
     }
 
     return update_trader_stats_recurse(
