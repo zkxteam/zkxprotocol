@@ -57,6 +57,43 @@ func get_hightide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return (res=factors);
 }
 
+@view
+func find_top_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) -> (
+    max_trades_top_pair_64x61: felt,
+    top_pair_number_of_traders: felt,
+    average_volume_top_pair_64x61: felt,
+) {
+    alloc_locals;
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get HightideAdmin address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Get trading stats contract from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
+    let (hightide_list_len: felt, hightide_list: felt*) = IHighTide.get_hightides_by_season_id(
+        contract_address=hightide_address, season_id=season_id_
+    );
+
+    return find_top_stats_recurse(
+        hightide_address_=hightide_address,
+        trading_stats_address_=trading_stats_address,
+        hightide_list_len_=hightide_list_len,
+        hightide_list_=hightide_list,
+        max_trades_top_pair_64x61_=0,
+        top_pair_number_of_traders_=0,
+        average_volume_top_pair_64x61=0,
+    );
+}
+
 //#####################
 // External Functions #
 //#####################
@@ -92,34 +129,20 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     let within_season = is_le(current_day, season.num_trading_days - 1);
 
-    // If the season is over, calculate high tide factores
+    // If the season is over, calculate high tide factors
     if (within_season == 1) {
         return ();
     }
 
-    // For x_1
-    let (average_volume_top_pair_64x61: felt) = ITradingStats.get_average_order_volume(
-        contract_address=trading_stats_address, season_id_=season_id_, pair_id_=top_pair_id_
-    );
-
-    // For x_2
-    let (max_trades_top_pair: felt) = ITradingStats.get_max_trades_in_day(
-        contract_address=trading_stats_address, season_id_=season_id_, pair_id_=top_pair_id_
-    );
-
-    let (max_trades_top_pair_64x61: felt) = Math64x61_fromIntFelt(max_trades_top_pair);
-
-    // For x_4
-    let (top_pair_number_of_traders: felt) = ITradingStats.get_num_active_traders(
-        contract_address=trading_stats_address, season_id_=season_id_, pair_id_=top_pair_id_
-    );
-
-    let (top_pair_number_of_traders_64x61: felt) = Math64x61_fromIntFelt(
-        top_pair_number_of_traders
-    );
+    let (
+        top_pair_number_of_traders_64x61: felt,
+        max_trades_top_pair_64x61: felt,
+        average_volume_top_pair_64x61: felt,
+    ) = find_top_stats(season_id_=season_id_);
 
     // Recursively calculate the factors for each pair_id
     return calculate_high_tide_factors_recurse(
+        season_id_=season_id_,
         pair_id_list_len=pair_id_list_len,
         pair_id_list=pair_id_list,
         trading_stats_address_=trading_stats_address,
@@ -288,6 +311,91 @@ func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     );
 
     return (x_4,);
+}
+
+func find_top_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt,
+    hightide_address_: felt,
+    trading_stats_address_: felt,
+    hightide_list_len_: felt,
+    hightide_list_: felt,
+    max_trades_top_pair_64x61_: felt,
+    top_pair_number_of_traders_: felt,
+    average_volume_top_pair_64x61_: felt,
+) -> (
+    max_trades_top_pair_64x61: felt,
+    top_pair_number_of_traders: felt,
+    average_volume_top_pair_64x61: felt,
+) {
+    alloc_locals;
+    local current_max_trades_pair: felt;
+    local current_top_number_of_traders: felt;
+    local current_top_average_volume: felt;
+
+    if (hightide_list_len_ == 0) {
+        return (
+            max_trades_top_pair_64x61_, top_pair_number_of_traders_, average_volume_top_pair_64x61_
+        );
+    }
+
+    let hightide_details: HighTideMetaData = IHighTide.get_hightide(
+        contract_address=hightide_address_, hightide_id_=[hightide_list_]
+    );
+
+    let (max_trades_pair: felt) = ITradingStats.get_max_trades_in_day(
+        contract_address=trading_stats_address_,
+        season_id_=season_id_,
+        pair_id_=hightide_details.pair_id,
+    );
+
+    let (max_trades_64x61: felt) = Math64x61_fromIntFelt(max_trades);
+
+    let (average_volume_pair_64x61: felt) = ITradingStats.get_average_order_volume(
+        contract_address=trading_stats_address_,
+        season_id_=season_id_,
+        pair_id_=hightide_details.pair_id,
+    );
+
+    let (pair_number_of_traders: felt) = ITradingStats.get_num_active_traders(
+        contract_address=trading_stats_address_,
+        season_id_=season_id_,
+        pair_id_=hightide_details.pair_id,
+    );
+
+    let (pair_number_of_traders_64x61: felt) = Math64x61_fromIntFelt(pair_number_of_traders);
+
+    let is_larger_volume = is_le(average_volume_top_pair_64x61_, average_volume_pair_64x61);
+    let is_larger_trades = is_le(max_trades_top_pair_64x61_, max_trades_64x61);
+    let is_larger_traders = is_le(top_pair_number_of_traders_, pair_number_of_traders);
+
+    if (is_larger_volume == 1) {
+        assert current_top_average_volume = average_volume_pair_64x61;
+    } else {
+        assert current_top_average_volume = average_volume_top_pair_64x61_;
+    }
+
+    if (is_larger_trades == 1) {
+        assert current_max_trades_pair = max_trades_64x61;
+    } else {
+        assert current_max_trades_pair = max_trades_top_pair_64x61_;
+    }
+
+    if (is_larger_traders == 1) {
+        assert current_top_number_of_traders = pair_number_of_traders;
+    } else {
+        assert current_top_number_of_traders = top_pair_number_of_traders_;
+    }
+
+    return find_top_stats_recurse(
+        season_id_=season_id_,
+        hightide_address_=hightide_address_,
+        trading_stats_address_=trading_stats_address_,
+        hightide_list_len_=hightide_list_len_ - 1,
+        hightide_list_=hightide_list_ + 1,
+        max_trades_top_pair_64x61_=current_max_trades_pair,
+        top_pair_number_of_traders_=current_top_number_of_traders,
+        average_volume_top_pair_64x61_=current_top_average_volume,
+    );
 }
 
 // @dev - Returns current day of the season based on current timestamp
