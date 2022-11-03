@@ -6,7 +6,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import Hightide_INDEX, TradingStats_INDEX
-from contracts.DataTypes import TraderStats, TradingSeason
+from contracts.DataTypes import PnL, TraderStats, TradingSeason
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import CommonLib
@@ -69,6 +69,13 @@ func trader_open_order_value_by_market(season_id: felt, pair_id: felt, trader_ad
 @storage_var
 func trader_open_orders_count_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
     open_orders_count: felt
+) {
+}
+
+// Stores the pnl of a trader for a pair in a season
+@storage_var
+func trader_pnl_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
+    pnl_64x61: PnL
 ) {
 }
 
@@ -171,6 +178,20 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         return ();
     }
     let trader_address = [trader_stats_list].trader_address;
+
+    if ([trader_stats_list].pnl_64x61 != 0) {
+        let (pnl) = trader_pnl_by_market.read(season_id, pair_id, trader_address);
+        let new_pnl: PnL = PnL(pnl.new_pnl_64x61, [trader_stats_list].pnl_64x61);
+        trader_pnl_by_market.write(season_id, pair_id, trader_address, new_pnl);
+        return update_trader_stats_recurse(
+            season_id,
+            pair_id,
+            iterator + 1,
+            current_total_fee_64x61,
+            trader_stats_list_len,
+            trader_stats_list + TraderStats.SIZE,
+        );
+    }
 
     // 1. Increment trader fee
     let fee_64x61 = [trader_stats_list].fee_64x61;

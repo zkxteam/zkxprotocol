@@ -314,4 +314,11 @@ struct TraderStats {
     fee_64x61: felt,
     open_order_value_64x61: felt,
     open_orders_count: felt,
+    pnl_64x61: felt,
+}
+
+// Struct to store Trader's pnl
+struct PnL {
+    old_pnl_64x61: felt,
+    new_pnl_64x61: felt,
 }

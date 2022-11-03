@@ -501,14 +501,15 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     let (current_order_value_64x61) = Math64x61_mul(order_size_, execution_price_);
 
-    if (portion_executed == 0) {
+    if ((portion_executed + order_size_) == order_.positionSize) {
         assert open_orders_count = 1;
     } else {
         assert open_orders_count = 0;
     }
 
+    // Update Trader stats
     let element: TraderStats = TraderStats(
-        order_.pub_key, fees, current_order_value_64x61, open_orders_count
+        order_.pub_key, fees, current_order_value_64x61, open_orders_count, 0
     );
     assert [trader_stats_list_] = element;
 
@@ -567,7 +568,14 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     liquidity_fund_address_: felt,
     insurance_fund_address_: felt,
     holding_address_: felt,
-) -> (margin_amount_close: felt, borrowed_amount_close: felt, average_execution_price_close: felt) {
+    trader_stats_list_len_: felt,
+    trader_stats_list_: TraderStats*,
+) -> (
+    margin_amount_close: felt,
+    borrowed_amount_close: felt,
+    average_execution_price_close: felt,
+    trader_stats_list_len: felt,
+) {
     alloc_locals;
 
     local margin_amount_close;
@@ -614,6 +622,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Calculate pnl and net account value
     let (pnl) = Math64x61_mul(parent_position.position_size, diff);
     net_acc_value = margin_amount + pnl;
+
+    // update trader stats
+    let element: TraderStats = TraderStats(order_.pub_key, 0, 0, 0, pnl);
+    assert [trader_stats_list_] = element;
 
     // Total value of the asset at current price
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
@@ -795,7 +807,12 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    return (average_execution_price_close, margin_amount_close, borrowed_amount_close);
+    return (
+        average_execution_price_close,
+        margin_amount_close,
+        borrowed_amount_close,
+        trader_stats_list_len_ + 1,
+    );
 }
 
 // @notice Internal function called by execute_batch
@@ -939,7 +956,10 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
     } else {
         let (
-            average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt
+            average_execution_price_temp: felt,
+            margin_amount_temp: felt,
+            borrowed_amount_temp: felt,
+            trader_stats_list_len_temp: felt,
         ) = process_close_orders(
             order_=temp_order,
             execution_price_=execution_price_,
@@ -948,12 +968,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidity_fund_address_=liquidity_fund_address_,
             insurance_fund_address_=insurance_fund_address_,
             holding_address_=holding_address_,
+            trader_stats_list_len_=trader_stats_list_len_,
+            trader_stats_list_=trader_stats_list_,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
-        assert trader_stats_list_len = trader_stats_list_len_;
-        assert trader_stats_list = trader_stats_list_;
+        assert trader_stats_list_len = trader_stats_list_len_temp;
+        assert trader_stats_list = trader_stats_list_ + TraderStats.SIZE;
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
