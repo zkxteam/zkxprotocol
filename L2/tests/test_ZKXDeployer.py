@@ -52,6 +52,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     class_hash_liquidate =  int.from_bytes(class_hash_liquidate_,'big')
     class_hash_abr =  int.from_bytes(class_hash_abr_,'big')
 
+    print(class_hash_trading, class_hash_liquidate, class_hash_abr)
+
     return admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_abr
 
 
@@ -60,14 +62,15 @@ async def test_deploy_non_admin(adminAuth_factory):
     admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_abr = adminAuth_factory
 
     await assert_revert(
-        signer3.send_transaction(user1, zkxDeployer.contract_address, 'deploy_contracts', [2, class_hash_trading, class_hash_trading])
+        signer3.send_transaction(user1, zkxDeployer.contract_address, 'deploy_contracts', [2, class_hash_trading, class_hash_liquidate])
     )
 
 
 @pytest.mark.asyncio
 async def test_deploy_admin(adminAuth_factory):
     admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_abr = adminAuth_factory
-    await signer1.send_transaction(admin1, zkxDeployer.contract_address, 'deploy_contracts', [2, class_hash_trading, class_hash_trading])
+    print(class_hash_trading, class_hash_liquidate)
+    await signer1.send_transaction(admin1, zkxDeployer.contract_address, 'deploy_contracts', [2, class_hash_trading, class_hash_liquidate])
 
     res_deployed = await zkxDeployer.populate_deployed_addresses().call()
     assert len(res_deployed.result.array) == 2
@@ -79,7 +82,7 @@ async def test_salt(adminAuth_factory):
 
     res_deployed_before = await zkxDeployer.populate_deployed_addresses().call()
 
-    await signer1.send_transaction(admin1, zkxDeployer.contract_address, 'deploy_contracts', [3, class_hash_trading, class_hash_trading, class_hash_abr])
+    await signer1.send_transaction(admin1, zkxDeployer.contract_address, 'deploy_contracts', [3, class_hash_trading, class_hash_liquidate, class_hash_abr])
 
     res_deployed_after = await zkxDeployer.populate_deployed_addresses().call()
     assert len(res_deployed_after.result.array) == 3

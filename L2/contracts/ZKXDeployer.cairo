@@ -1,36 +1,35 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.syscalls import deploy
 
 from contracts.Constants import MasterAdmin_ACTION
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
 from contracts.libraries.Utils import verify_caller_authority
 
 //##########
 // Storage #
-// ##########x
+// ##########
 
-// Stores the deployed address
+// Stores the deployed addreses array
 @storage_var
 func deployed_addresses(index: felt) -> (contract_address: felt) {
 }
 
+// Stores the length of deployed addresses array
 @storage_var
 func deployed_addresses_len() -> (res: felt) {
 }
 
+// Stores the current nonce
 @storage_var
-func curr_salt() -> (res: felt) {
+func curr_nonce() -> (res: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// ////////////////
+// Constructor ///
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -43,9 +42,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// //////////////////
+// View Functions //
+// ////////////////
 
 // @notice View function to return all the deployed contract addresses
 // @returns array_len - Length of the last deployed array
@@ -58,9 +57,9 @@ func populate_deployed_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     return populate_deployed_addresses_recurse(0, array, array_len);
 }
 
-//#####################
-// External Functions #
-//#####################
+// //////////////////////
+// External Functions //
+// ////////////////////
 
 // @notice External function to deploy_contracts
 // @dev The hashes must be declared beforehand, the sequence of hashes must be handled by the deploy script
@@ -80,33 +79,38 @@ func deploy_contracts{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     assert calldata[0] = current_registry_address;
     assert calldata[1] = current_version;
 
-    deploy_account_recurse(hashes_len, hashes, calldata, 0);
+    let (nonce) = curr_nonce.read();
+    let (new_nonce) = deploy_contracts_recurse(hashes_len, hashes, calldata, 0, nonce);
     deployed_addresses_len.write(hashes_len);
+    curr_nonce.write(new_nonce);
 
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// //////////////////////
+// Internal Functions //
+// ////////////////////
+
 // @notice Internal function to recursively deploy contracts
-// @param hashes_len - Current length of the hashes array
-// @param hashes - Array of hashes
-// @param iterator - Iterator to index the array
-// @param calldata - Calldata consisting of registry and version
-func deploy_account_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hashes_len: felt, hashes: felt*, calldata: felt*, iterator: felt
-) {
-    if (hashes_len == 0) {
-        return ();
+// @param hashes_len_ - Current length of the hashes array
+// @param hashes_ - Array of hashes
+// @param iterator_ - Iterator to index the array
+// @param calldata_ - Calldata consisting of registry and version
+// @param nonce_ - Current nonce
+// @returns nonce_ - Final nonce
+func deploy_contracts_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hashes_len_: felt, hashes_: felt*, calldata_: felt*, iterator_: felt, nonce_: felt
+) -> (nonce: felt) {
+    if (hashes_len_ == 0) {
+        return (nonce_,);
     }
 
-    let (salt) = curr_salt.read();
-    let (deployed_address) = deploy([hashes], salt, 2, calldata, 1);
-    deployed_addresses.write(index=iterator, value=deployed_address);
-    curr_salt.write(value=salt + 1);
+    let (deployed_address) = deploy([hashes_], nonce_, 2, calldata_, 1);
+    deployed_addresses.write(index=iterator_, value=deployed_address);
 
-    return deploy_account_recurse(hashes_len - 1, hashes + 1, calldata, iterator + 1);
+    return deploy_contracts_recurse(
+        hashes_len_ - 1, hashes_ + 1, calldata_, iterator_ + 1, nonce_ + 1
+    );
 }
 
 // @notice Internal function to populate the array with deployed contract addresses
