@@ -445,7 +445,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         let cumulative_order_size = position_details.position_size + order_size_;
         let (price) = Math64x61_div(cumulative_order_value, cumulative_order_size);
 
-        assert average_execution_price_open = execution_price_;
+        assert average_execution_price_open = price;
         tempvar range_check_ptr = range_check_ptr;
     }
 
@@ -620,7 +620,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     // Calculate pnl and net account value
-    let (pnl) = Math64x61_mul(parent_position.position_size, diff);
+    let (pnl) = Math64x61_mul(order_size_, diff);
     net_acc_value = margin_amount + pnl;
 
     // update trader stats
