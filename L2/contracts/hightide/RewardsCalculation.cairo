@@ -55,9 +55,76 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // View //
 // ///////
 
+@view
+func get_block_numbers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) {
+    with_attr error_message("RewardsCalculation: Invalid season_id") {
+        assert_lt(0, season_id_);
+    }
+
+    // Get starting index
+    let (starting_index: felt) = block_number_start.read(season_id=season_id_);
+    with_attr error_message("RewardsCalculation: No blocknumbers set for this season") {
+        assert_not_zero(starting_index);
+    }
+
+    // Initialize an array
+    let (block_numbers: felt*) = alloc();
+
+    // Get the starting index of the next season_id (if it's not set, it returns 0)
+    let (ending_index: felt) = block_number_start.read(season_id=season_id_ + 1);
+
+    // Recursively fill the array and return it
+    return get_block_number_recurse(block_numbers, starting_index, ending_index, 0);
+}
+
+@view
+func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, user_address_: felt
+) {
+    with_attr error_message("RewardsCalculation: Invalid user_address") {
+        assert_not_zero(user_address);
+    }
+
+    with_attr error_message("RewardsCalculation: Invalid season_id") {
+        assert_lt(0, season_id_);
+    }
+
+    let (xp_value_user: felt) = xp_value.read(season_id=season_id_, user_address=user_address_);
+
+    return (xp_value_user);
+}
 // ///////////
 // Internal //
 // ///////////
+
+func get_block_number_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    block_numbers: felt*, current_index: felt, ending_index: felt, iterator: felt
+) {
+    // Return condition 1, return if we reach the starting index of the next season_id
+    if (current_index == ending_index) {
+        return (iterator, block_numbers);
+    }
+
+    let (current_block_number: felt) = block_number_array.read(index=current_index);
+
+    // Return condition 2, return if we reach an index where the blocknumber is not set
+    if (current_block_number == 0) {
+        return (iterator, block_numbers);
+    }
+
+    // Set the blocknumber in our array
+    assert block_numbers[iterator] = current_block_number;
+
+    // Recursively call the next index
+    return get_block_number_recurse(
+        block_numbers=block_numbers,
+        current_index=current_index + 1,
+        ending_index=ending_index,
+        iterator=iterator + 1,
+    );
+}
 
 func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id: felt, xp_values_len: felt, xp_values: XpValues*
@@ -99,7 +166,6 @@ func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     season_id: felt, xp_values_len: felt, xp_values: XpValues*
 ) {
     // Auth Check
-
     set_user_xp_values_recurse(season_id, xp_values_len, xp_values, 0);
     return ();
 }
@@ -109,8 +175,6 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     block_number_: felt
 ) {
     // Auth check
-
-    let (caller) = get_caller_address();
     let (registry) = get_registry_address();
     let (version) = get_contract_version();
 
@@ -132,12 +196,30 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     // If it's a new season, initialize the starting index
     if (season_starting_index == 0) {
-        block_number_start.write(season_id=season_id, value=current_array_len);
+        if (season_id == 1) {
+            block_number_start.write(season_id=season_id, value=1);
+
+            // Write the new block number
+            block_number_array.write(index=1, value=block_number_);
+
+            // Update the length of the array
+            block_number_array_len.write(1);
+        } else {
+            block_number_start.write(season_id=season_id, value=current_array_len);
+
+            // Write the new block number
+            block_number_array.write(index=current_array_len, value=block_number_);
+
+            // Update the length of the array
+            block_number_array_len.write(current_array_len + 1);
+        }
+    } else {
+        // Write the new block number
+        block_number_array.write(index=current_array_len, value=block_number_);
+
+        // Update the length of the array
+        block_number_array_len.write(current_array_len + 1);
     }
 
-    // Write the new block number
-    block_number_array.write(index=current_array_len, value=block_number_);
-
-    // Update the length of the array
-    block_number_array_len.write(current_array_len + 1);
+    return ();
 }
