@@ -313,7 +313,7 @@ struct TraderStats {
     trader_address: felt,
     fee_64x61: felt,
     order_volume_64x61: felt,
-    order_type: felt,
+    order_type: felt, // 0 for open order, 1 for close order
     pnl_64x61: felt,
 }
 
