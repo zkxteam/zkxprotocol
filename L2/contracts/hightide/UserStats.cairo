@@ -6,7 +6,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import Hightide_INDEX, TradingStats_INDEX
-from contracts.DataTypes import PnL, TraderStats, TradingSeason
+from contracts.DataTypes import PnL, TraderStats, TradingSeason, VolumeMetaData
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import CommonLib
@@ -28,17 +28,17 @@ func trader_fee_recorded(
 func total_fee_recorded(caller: felt, season_id: felt, pair_id: felt, total_fee_64x61: felt) {
 }
 
-// Event emitted when trader's open order value for a pair in a season is recorded
+// Event emitted when trader's order volume for a pair in a season is recorded
 @event
-func trader_open_order_value_recorded(
-    caller: felt, season_id: felt, pair_id: felt, trader_address: felt, open_order_value_64x61: felt
+func trader_order_volume_recorded(
+    caller: felt, season_id: felt, pair_id: felt, trader_address: felt, order_volume_64x61: felt
 ) {
 }
 
-// Event emitted when trader's open orders count for a pair in a season is recorded
+// Event emitted when trader's orders count for a pair in a season is recorded
 @event
-func trader_open_orders_count_recorded(
-    caller: felt, season_id: felt, pair_id: felt, trader_address: felt, open_orders_count: felt
+func trader_orders_count_recorded(
+    caller: felt, season_id: felt, pair_id: felt, trader_address: felt, orders_count: felt
 ) {
 }
 
@@ -58,17 +58,17 @@ func trader_fee_by_market(season_id: felt, pair_id: felt, trader_address: felt) 
 func total_fee_by_market(season_id: felt, pair_id: felt) -> (total_fee_64x61: felt) {
 }
 
-// Stores the open order value of a trader for a pair in a season
+// Stores the total order volume recorded for a volume_type in a season for a trader
 @storage_var
-func trader_open_order_value_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
-    open_order_value_64x61: felt
+func trader_order_volume_by_market(trader_address: felt, volume_type: VolumeMetaData) -> (
+    order_volume_64x61: felt
 ) {
 }
 
-// Stores the open orders count of a trader for a pair in a season
+// Stores the total number of recorded trades for a volume_type in a season for a trader
 @storage_var
-func trader_open_orders_count_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
-    open_orders_count: felt
+func trader_orders_count_by_market(trader_address: felt, volume_type: VolumeMetaData) -> (
+    orders_count: felt
 ) {
 }
 
@@ -203,36 +203,36 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     // Emit event
     trader_fee_recorded.emit(caller, season_id, pair_id, trader_address, updated_trader_fee_64x61);
 
-    // 2. Increment trader open order value
-    let open_order_value_64x61 = [trader_stats_list].open_order_value_64x61;
-    let (current_order_value_64x61) = trader_open_order_value_by_market.read(
-        season_id, pair_id, trader_address
+    // 2. Update running total of order volume and order count
+
+    let order_volume_64x61 = [trader_stats_list].order_volume_64x61;
+    let volume_metadata: VolumeMetaData = VolumeMetaData(
+        season_id=season_id, pair_id=pair_id, order_type=[trader_stats_list].order_type
     );
-    let (updated_order_value_64x61) = Math64x61_add(
-        current_order_value_64x61, open_order_value_64x61
+
+    let (current_order_volume_64x61) = trader_order_volume_by_market.read(
+        trader_address, volume_metadata
     );
-    trader_open_order_value_by_market.write(
-        season_id, pair_id, trader_address, updated_order_value_64x61
+    let (updated_order_volume_64x61) = Math64x61_add(
+        current_order_volume_64x61, order_volume_64x61
+    );
+    trader_order_volume_by_market.write(
+        trader_address, volume_metadata, updated_order_volume_64x61
     );
 
     // Emit event
-    trader_open_order_value_recorded.emit(
-        caller, season_id, pair_id, trader_address, updated_order_value_64x61
+    trader_order_volume_recorded.emit(
+        caller, season_id, pair_id, trader_address, updated_order_volume_64x61
     );
 
-    // 3. Increment traders open order count
-    let open_orders_count = [trader_stats_list].open_orders_count;
-    let (current_open_orders_count) = trader_open_orders_count_by_market.read(
-        season_id, pair_id, trader_address
+    let (current_orders_count) = trader_orders_count_by_market.read(
+        trader_address, volume_metadata
     );
-    let (updated_open_orders_count) = Math64x61_add(current_open_orders_count, open_orders_count);
-    trader_open_orders_count_by_market.write(
-        season_id, pair_id, trader_address, updated_open_orders_count
-    );
+    trader_orders_count_by_market.write(trader_address, volume_metadata, current_orders_count + 1);
 
     // Emit event
-    trader_open_orders_count_recorded.emit(
-        caller, season_id, pair_id, trader_address, updated_open_orders_count
+    trader_orders_count_recorded.emit(
+        caller, season_id, pair_id, trader_address, current_orders_count + 1
     );
 
     return update_trader_stats_recurse(

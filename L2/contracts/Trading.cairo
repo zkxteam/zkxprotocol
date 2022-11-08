@@ -493,24 +493,10 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         fee_to_add=fees,
     );
 
-    local open_orders_count;
-
-    let (portion_executed) = IAccountManager.get_portion_executed(
-        contract_address=order_.pub_key, order_id=order_.orderID
-    );
-
-    let (current_order_value_64x61) = Math64x61_mul(order_size_, execution_price_);
-
-    if ((portion_executed + order_size_) == order_.positionSize) {
-        assert open_orders_count = 1;
-    } else {
-        assert open_orders_count = 0;
-    }
+    let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
 
     // Update Trader stats
-    let element: TraderStats = TraderStats(
-        order_.pub_key, fees, current_order_value_64x61, open_orders_count, 0
-    );
+    let element: TraderStats = TraderStats(order_.pub_key, fees, order_volume_64x61, 0, 0);
     assert [trader_stats_list_] = element;
 
     // Deduct the amount from liquidity funds if order is leveraged
@@ -623,8 +609,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (pnl) = Math64x61_mul(order_size_, diff);
     net_acc_value = margin_amount + pnl;
 
+    let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
+
     // update trader stats
-    let element: TraderStats = TraderStats(order_.pub_key, 0, 0, 0, pnl);
+    let element: TraderStats = TraderStats(order_.pub_key, 0, order_volume_64x61, 1, pnl);
     assert [trader_stats_list_] = element;
 
     // Total value of the asset at current price

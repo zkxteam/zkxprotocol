@@ -312,8 +312,8 @@ struct HighTideMetaData {
 struct TraderStats {
     trader_address: felt,
     fee_64x61: felt,
-    open_order_value_64x61: felt,
-    open_orders_count: felt,
+    order_volume_64x61: felt,
+    order_type: felt,
     pnl_64x61: felt,
 }
 
