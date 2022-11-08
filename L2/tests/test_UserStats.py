@@ -201,8 +201,8 @@ async def test_unauthorized_call(adminAuth_factory):
     marketID = BTC_USD_ID
     fee_64x61 = to64x61(0.5)
     season_id = 1
-    open_order_value_64x61 = to64x61(1000)
-    open_order_count = 1
+    order_volume_64x61 = to64x61(1000)
+    order_type = 1
     pnl_64x61 = to64x61(100)
 
     await assert_revert(dave_signer.send_transaction(dave, user_stats.contract_address, "record_trader_stats", [
@@ -210,7 +210,7 @@ async def test_unauthorized_call(adminAuth_factory):
         marketID,
         1,
         alice.contract_address,
-        fee_64x61, open_order_value_64x61, open_order_count, pnl_64x61]), "UserStats: Stats can be recorded only by TradingStats contract")
+        fee_64x61, order_volume_64x61, order_type, pnl_64x61]), "UserStats: Stats can be recorded only by TradingStats contract")
 
 @pytest.mark.asyncio
 async def test_record_trader_stats_with_two_open_orders(adminAuth_factory):
