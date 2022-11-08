@@ -66,7 +66,4 @@ namespace IAccountManager {
 
     func get_deleveragable_or_liquidatable_position() -> (position: LiquidatablePosition) {
     }
-
-    func get_portion_executed(order_id: felt) -> (portion_executed: felt) {
-    }
 }

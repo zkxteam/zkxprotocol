@@ -384,18 +384,6 @@ func timestamp_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return (is_eight_hours,);
 }
 
-// @notice view function to get portion executed of an order
-// @param order_id - ID of an order
-// @return portion_executed - returns size of the order executed
-@view
-func get_portion_executed{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_id: felt
-) -> (portion_executed: felt) {
-    // Get the portion executed details
-    let (order_portion_executed) = portion_executed.read(order_id);
-    return (portion_executed=order_portion_executed);
-}
-
 //#############
 // L1 Handler #
 //#############
