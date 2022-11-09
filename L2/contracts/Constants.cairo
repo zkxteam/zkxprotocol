@@ -28,7 +28,8 @@ const Hightide_INDEX = 24;
 const TradingStats_INDEX = 25;
 const UserStats_INDEX = 26;
 const Starkway_INDEX = 27;
-
+const VALIDATOR_ROUTER_INDEX = 28;
+const REWARDS_CALCULATION = 29;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
