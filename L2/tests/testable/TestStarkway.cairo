@@ -12,14 +12,9 @@ from contracts.interfaces.IERC20 import IERC20
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
-/////////////
+// //////////
 // Storage //
-/////////////
-
-// Mapping to store class hash of ERC-20 contract
-@storage_var
-func ERC20_class_hash() -> (class_hash: felt) {
-}
+// //////////
 
 // Mapping to store number of whitelisted token addresses for a particular token
 @storage_var
@@ -36,9 +31,9 @@ func whitelisted_token_l2_address(l1_address: felt, index: felt) -> (l2_address:
 func native_token_l2_address(l1_address: felt) -> (l2_address: felt) {
 }
 
-/////////////////
+// //////////////
 // Constructor //
-/////////////////
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address Address of the AuthorizedRegistry contract
@@ -51,19 +46,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//////////
+// ///////
 // View //
-//////////
-
-// @notice Function to get ERC-20 class hash
-// @return class_hash - class hash of the ERC-20 contract
-@view
-func get_class_hash{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    class_hash: felt
-) {
-    let (class_hash) = ERC20_class_hash.read();
-    return (class_hash,);
-}
+// ///////
 
 // @notice Function to get ERC-20 L2 address corresponding to ERC-20 L1 address
 // @param l1_address - L1 address of ERC-20 token
@@ -89,33 +74,16 @@ func get_whitelisted_token_addresses{
     return _populate_addresses_list(0, len, addresses_list, l1_address);
 }
 
-//////////////
+// ///////////
 // External //
-//////////////
-
-// @notice Function to set class hash of ERC-20 contract, callable by admin
-// @param class_hash - class hash of ERC-20 contract
-@external
-func set_class_hash{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    class_hash: felt
-) {
-    let (current_registry_address) = CommonLib.get_registry_address();
-    let (current_version) = CommonLib.get_contract_version();
-
-    verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION);
-
-    ERC20_class_hash.write(class_hash);
-    return ();
-}
+// ///////////
 
 // @notice Function to initialize ERC-20 token from L1 Starkway contract
 // @param token_l1_address - L1 ERC-20 token contract address
-// @param name - name of the token
-// @param symbol - symbol for the token
-// @param decimals - number of decimals of the token
+// @param token_l2_address - L2 ERC-20 token contract address
 @external
 func initialize_token{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    token_l1_address: felt, name: felt, symbol: felt, decimals: felt
+    token_l1_address: felt, token_l2_address: felt
 ) {
     let (current_registry_address) = CommonLib.get_registry_address();
     let (current_version) = CommonLib.get_contract_version();
@@ -128,24 +96,26 @@ func initialize_token{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         assert native_l2_address = 0;
     }
 
-    let (hash) = ERC20_class_hash.read();
-    with_attr error_message("Class hash cannot be 0") {
-        assert_not_zero(hash);
-    }
+    native_token_l2_address.write(token_l1_address, token_l2_address);
 
-    with_attr error_message("Value for decimals is not within the range") {
-        assert_in_range(decimals, 1, 19);
-    }
+    return ();
+}
 
-    // prepare constructor calldata for deploy call
-    let calldata: felt* = alloc();
-    assert calldata[0] = name;
-    assert calldata[1] = symbol;
-    assert calldata[2] = decimals;
+// @notice Function to whitelist L2 ERC-20 token addresses
+// @param token_l1_address - L1 ERC-20 token contract address
+// @param white_listed_l2_address - whitelisted L2 ERC-20 token contract address
+@external
+func whitelist_token_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    token_l1_address: felt, white_listed_l2_address: felt
+) {
+    let (current_registry_address) = CommonLib.get_registry_address();
+    let (current_version) = CommonLib.get_contract_version();
 
-    let (deployed_address) = deploy(hash, 0, 3, calldata, 1);
+    verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION);
 
-    native_token_l2_address.write(token_l1_address, deployed_address);
+    let (len) = whitelisted_token_l2_address_length.read(token_l1_address);
+    whitelisted_token_l2_address.write(token_l1_address, len, white_listed_l2_address);
+    whitelisted_token_l2_address_length.write(token_l1_address, len + 1);
 
     return ();
 }
@@ -157,10 +127,7 @@ func initialize_token{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 // @param amount_high - higher bits of Uint256 value of amount
 @external
 func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    token_l1_address: felt,
-    recipient_address: felt,
-    amount_low: felt,
-    amount_high: felt,
+    token_l1_address: felt, recipient_address: felt, amount_low: felt, amount_high: felt
 ) {
     // Make sure that recipient address is not 0 address
     with_attr error_message("Recipient address cannot be 0 address") {
@@ -180,9 +147,9 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return ();
 }
 
-//////////////
+// ///////////
 // Internal //
-//////////////
+// ///////////
 
 // @notice Recursive function to populate the addresses list of whitelisted ERC-20 tokens
 // @param current_len - current length of list being populated
