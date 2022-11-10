@@ -26,10 +26,9 @@ alice_signer = Signer(123456789987654323)
 bob_signer = Signer(123456789987654324)
 
 initial_timestamp = int(time.time())
-timestamp2 = int(time.time()) + (60*60*24) + 60
-timestamp3 = int(time.time()) + (60*60*24)*2 + 60
-timestamp4 = int(time.time()) + (60*60*24)*3 + 60
-timestamp5 = int(time.time()) + (60*60*24)*31 + 60
+timestamp1 = int(time.time()) + (60*60*24)*3 + 60
+timestamp2 = int(time.time()) + (60*60*24)*6 + 60
+timestamp3 = int(time.time()) + (60*60*24)*9 + 60
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -66,9 +65,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
     rewardsCalculation = await starknet_service.deploy(ContractType.RewardsCalculation, [registry.contract_address, 1])
-    validator_router = await starknet_service.deploy(ContractType.ValidatorRouter, [registry.contract_address, 1])
-    sig_req_manager = await starknet_service.deploy(ContractType.SigRequirementsManager,[registry.contract_address, 1])
-    pubkey_whitelister = await starknet_service.deploy(ContractType.PubkeyWhitelister, [registry.contract_address, 1])
 
     account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
@@ -82,9 +78,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
-    await signer1.send_transaction(admin1, registry.contract_address, "update_contract_registry", [22, 1, pubkey_whitelister.contract_address])
-    await signer1.send_transaction(admin1, registry.contract_address, "update_contract_registry", [23, 1, sig_req_manager.contract_address])
-    await signer1.send_transaction(admin1, registry.contract_address, "update_contract_registry", [28, 1, validator_router.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, "update_contract_registry", [29, 1, rewardsCalculation.contract_address])
 
     # Add assets
@@ -96,47 +89,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USDC_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
     await signer1.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
 
-    # Add set_block_number to signature infra
-    await signer1.send_transaction(
-        admin1,
-        sig_req_manager.contract_address,
-        "set_sig_requirement",
-        [29, 1, get_selector_from_name("set_block_number"), 2],
-    )
-
-    # Add set_user_xp_values to signature infra 
-    await signer1.send_transaction(
-        admin1,
-        sig_req_manager.contract_address,
-        "set_sig_requirement",
-        [29, 1, get_selector_from_name("set_user_xp_values"), 2],
-    )
-
-    # Whitelist pubkeys
-    await signer1.send_transaction(
-        admin1,
-        pubkey_whitelister.contract_address,
-        "whitelist_pubkey",
-        [signer3.public_key],
-    )
-
-    await signer1.send_transaction(
-        admin1,
-        pubkey_whitelister.contract_address,
-        "whitelist_pubkey",
-        [signer4.public_key],
-    )
-
-    # turn on signature check master switch in the ValidatorRouter
-    await signer1.send_transaction(
-        admin1, validator_router.contract_address, "toggle_check_sig", []
-    )
-
-    return adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, alice, bob
+    return adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob
 
 @pytest.mark.asyncio
 async def test_setup_trading_season_authorized_admin(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, _, _, _, _, _, _, _ = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, _, _, _, _ = adminAuth_factory
 
     set_multipliers_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'set_multipliers', [
         1, 2, 3, 4])
@@ -179,7 +136,7 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_initialize_hightide(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, _, _, _, _, _, _, _ = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1,_, _, _, _ = adminAuth_factory
     
     tx_exec_info=await signer1.send_transaction(admin1, 
                                    hightide.contract_address,
@@ -199,113 +156,15 @@ async def test_initialize_hightide(adminAuth_factory):
     assert fetched_rewards.result.reward_tokens_list[1].no_of_tokens == (500, 0)
 
 @pytest.mark.asyncio
-async def test_set_block_number_direct_wo_sigs(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, _, _ = adminAuth_factory
-
-    await assert_revert( 
-        signer1.send_transaction(
-            admin1, 
-            rewardsCalculation.contract_address, 
-            'set_block_number', 
-            [7247809324]
-        ),
-        "RewardsCalculation: Unauthorized call"
-    )
-
-@pytest.mark.asyncio
-async def test_set_block_numbers_unauthorized_caller(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, _, _ = adminAuth_factory
-
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
-        [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_block_number"),
-            compute_hash_on_elements([123243343]),
-        ]
-    )
-
-    user1_sig = signer1.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
-
-    await assert_revert(
-        signer1.send_transaction(
-            admin1,
-            validator_router.contract_address,
-            "call_core_function",
-            [
-                29,
-                1,
-                current_nonce,
-                get_selector_from_name("set_block_number"),
-                1,
-                123243343,
-                2,
-                user1_sig[0],
-                user1_sig[1],
-                user4_sig[0],
-                user4_sig[1],
-                2,
-                signer1.public_key,
-                signer4.public_key,
-            ],
-        ),
-        "SigRequirementsManager: Insufficient no. of valid signatures"
-    )
-
-    block_numbers = await rewardsCalculation.get_block_numbers(1).call()
-
-    assert block_numbers.result.block_numbers == []
-
-@pytest.mark.asyncio
 async def test_set_block_numbers_authorized_caller(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, _, _ = adminAuth_factory
-
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
-        [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_block_number"),
-            compute_hash_on_elements([123243343]),
-        ]
-    )
-
-    user3_sig = signer3.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
     await signer1.send_transaction(
         admin1,
-        validator_router.contract_address,
-        "call_core_function",
+        rewardsCalculation.contract_address,
+        "set_block_number",
         [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_block_number"),
-            1,
             123243343,
-            2,
-            user3_sig[0],
-            user3_sig[1],
-            user4_sig[0],
-            user4_sig[1],
-            2,
-            signer3.public_key,
-            signer4.public_key,
         ],
     )
 
@@ -315,46 +174,14 @@ async def test_set_block_numbers_authorized_caller(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_set_block_numbers_authorized_caller_2(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, _, _ = adminAuth_factory
-
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
-        [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_block_number"),
-            compute_hash_on_elements([123243787]),
-        ]
-    )
-
-    user3_sig = signer3.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
     await signer1.send_transaction(
         admin1,
-        validator_router.contract_address,
-        "call_core_function",
+        rewardsCalculation.contract_address,
+        "set_block_number",
         [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_block_number"),
-            1,
             123243787,
-            2,
-            user3_sig[0],
-            user3_sig[1],
-            user4_sig[0],
-            user4_sig[1],
-            2,
-            signer3.public_key,
-            signer4.public_key,
         ],
     )
 
@@ -363,109 +190,21 @@ async def test_set_block_numbers_authorized_caller_2(adminAuth_factory):
     assert block_numbers.result.block_numbers == [123243343 ,123243787]
 
 @pytest.mark.asyncio
-async def test_set_xp_values_unauthorized_caller(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, alice, bob = adminAuth_factory
-
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
-        [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_user_xp_values"),
-            compute_hash_on_elements([1, alice.contract_address, to64x61(100)]),
-        ]
-    )
-
-    user1_sig = signer1.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
-
-    await assert_revert(
-        signer1.send_transaction(
-            admin1,
-            validator_router.contract_address,
-            "call_core_function",
-            [
-                29,
-                1,
-                current_nonce,
-                get_selector_from_name("set_user_xp_values"),
-                3,
-                1,
-                alice.contract_address,
-                to64x61(100),
-                2,
-                user1_sig[0],
-                user1_sig[1],
-                user4_sig[0],
-                user4_sig[1],
-                2,
-                signer1.public_key,
-                signer4.public_key,
-            ],
-        ),
-        "SigRequirementsManager: Insufficient no. of valid signatures"
-    )
-
-@pytest.mark.asyncio
 async def test_set_xp_values_authorized_caller_0_user_address(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, alice, bob = adminAuth_factory
-
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
-        [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_user_xp_values"),
-            compute_hash_on_elements([1, 1, 0x0, to64x61(100)]),
-        ]
-    )
-
-    user3_sig = signer3.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
 
     await assert_revert(
         signer1.send_transaction(
             admin1,
-            validator_router.contract_address,
-            "call_core_function",
+            rewardsCalculation.contract_address,
+            "set_user_xp_values",
             [
-                29,
-                1,
-                current_nonce,
-                get_selector_from_name("set_user_xp_values"),
-                # calldata len
-                4,
-                # calldata
                 1,
                 1,
                 0x0,
-                to64x61(100),
-                # sig len
-                2,
-                # sigs
-                user3_sig[0],
-                user3_sig[1],
-                user4_sig[0],
-                user4_sig[1],
-                # pub key lens
-                2,
-                # pub key
-                signer3.public_key,
-                signer4.public_key,
+                to64x61(100)
             ],
-        ), 
+        ),
         "RewardsCalculation: User Address cannot be 0"
     )
 
@@ -473,60 +212,23 @@ async def test_set_xp_values_authorized_caller_0_user_address(adminAuth_factory)
     assert xp_value_alice.result.xp_value == to64x61(0) 
 
 @pytest.mark.asyncio
-async def test_set_xp_values_authorized_caller(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, alice, bob = adminAuth_factory
-
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
-        [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_user_xp_values"),
-            compute_hash_on_elements([1, 2, alice.contract_address, to64x61(100), bob.contract_address, to64x61(50)]),
-        ]
-    )
-
-    user3_sig = signer3.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
+async def test_set_xp_values(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
 
     await signer1.send_transaction(
         admin1,
-        validator_router.contract_address,
-        "call_core_function",
+        rewardsCalculation.contract_address,
+        "set_user_xp_values",
         [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_user_xp_values"),
-            # calldata len
-            6,
-            # calldata
             1,
             2,
             alice.contract_address,
             to64x61(100),
             bob.contract_address,
-            to64x61(50),
-            # sig len
-            2,
-            # sigs
-            user3_sig[0],
-            user3_sig[1],
-            user4_sig[0],
-            user4_sig[1],
-            # pub key lens
-            2,
-            # pub key
-            signer3.public_key,
-            signer4.public_key,
+            to64x61(50)
         ],
-    )
+    ),
+        
 
     xp_value_alice = await rewardsCalculation.get_user_xp_value(1, alice.contract_address).call()
     assert xp_value_alice.result.xp_value == to64x61(100) 
@@ -535,90 +237,34 @@ async def test_set_xp_values_authorized_caller(adminAuth_factory):
     assert xp_value_bob.result.xp_value == to64x61(50) 
 
 @pytest.mark.asyncio
-async def test_set_xp_values_authorized_caller_reset_xp(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, alice, bob = adminAuth_factory
-
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
-        [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_user_xp_values"),
-            compute_hash_on_elements([1, 1, alice.contract_address, to64x61(100)]),
-        ]
-    )
-
-    user3_sig = signer3.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
+async def test_set_xp_values_reset_xp(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
 
     await assert_revert(
         signer1.send_transaction(
             admin1,
-            validator_router.contract_address,
-            "call_core_function",
+            rewardsCalculation.contract_address,
+            "set_user_xp_values",
             [
-                29,
-                1,
-                current_nonce,
-                get_selector_from_name("set_user_xp_values"),
-                # calldata len
-                4,
-                # calldata
                 1,
                 1,
                 alice.contract_address,
-                to64x61(100),
-                # sig len
-                2,
-                # sigs
-                user3_sig[0],
-                user3_sig[1],
-                user4_sig[0],
-                user4_sig[1],
-                # pub key lens
-                2,
-                # pub key
-                signer3.public_key,
-                signer4.public_key,
+                to64x61(1),
             ],
-        )
-    )
+        ),
+        "RewardsCalculation: Xp value already set"
+    ),
 
     xp_value_alice = await rewardsCalculation.get_user_xp_value(1, alice.contract_address).call()
     assert xp_value_alice.result.xp_value == to64x61(100) 
 
 @pytest.mark.asyncio
-async def test_set_xp_values_authorized_caller_wo_sigs(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, alice, _ = adminAuth_factory
-
-    await assert_revert( 
-        signer1.send_transaction(
-            admin1, 
-            rewardsCalculation.contract_address, 
-            'set_user_xp_values', 
-            [
-                1, 
-                1,
-                alice.contract_address,
-                to64x61(100)
-            ]
-        ),
-        "RewardsCalculation: Unauthorized call"
-    )
-
-@pytest.mark.asyncio
 async def test_set_block_numbers_after_season_end(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, _, _ = adminAuth_factory
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
-        block_timestamp=timestamp5, 
+        block_timestamp=timestamp1, 
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
         starknet_version = STARKNET_VERSION
@@ -626,47 +272,14 @@ async def test_set_block_numbers_after_season_end(adminAuth_factory):
 
     # end trade season
     await signer1.send_transaction(admin1, hightide.contract_address, 'end_trade_season', [1])
-    
-    
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
-        [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_block_number"),
-            compute_hash_on_elements([123243787]),
-        ]
-    )
-
-    user3_sig = signer3.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
 
     await assert_revert(
         signer1.send_transaction(
             admin1,
-            validator_router.contract_address,
-            "call_core_function",
+            rewardsCalculation.contract_address,
+            "set_block_number",
             [
-                29,
-                1,
-                current_nonce,
-                get_selector_from_name("set_block_number"),
-                1,
-                123243787,
-                2,
-                user3_sig[0],
-                user3_sig[1],
-                user4_sig[0],
-                user4_sig[1],
-                2,
-                signer3.public_key,
-                signer4.public_key,
+                123243790,
             ],
         ),
         "RewardsCalculations: No ongoing season"
@@ -676,18 +289,18 @@ async def test_set_block_numbers_after_season_end(adminAuth_factory):
     assert block_numbers.result.block_numbers == [123243343, 123243787]
 
 @pytest.mark.asyncio
-async def test_set_block_numbers_new_season(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, validator_router, sig_req_manager, pubkey_whitelister, _, _ = adminAuth_factory
+async def test_set_block_numbers_season_2(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
     # Setup and start new season
 
     trade_season_setup_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
-        timestamp5, 2])
+        timestamp1, 2])
 
     execution_info = await hightide.get_season(2).call()
     fetched_trading_season = execution_info.result.trading_season
 
-    assert fetched_trading_season.start_timestamp == timestamp5
+    assert fetched_trading_season.start_timestamp == timestamp1
     assert fetched_trading_season.num_trading_days == 2
 
     start_trade_season_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [2])
@@ -702,93 +315,116 @@ async def test_set_block_numbers_new_season(adminAuth_factory):
     assert block_numbers.result.block_numbers == []
 
 
-    # Set block number
-
-    # get current nonce from ValidatorRouter
-    current_nonce = await validator_router.get_nonce().call()
-    current_nonce = current_nonce.result.current_nonce
-
-    # calculate hash of core function call, this will be signed by the users / nodes
-    core_function_call_hash = compute_hash_on_elements(
+    await signer1.send_transaction(
+        admin1,
+        rewardsCalculation.contract_address,
+        "set_block_number",
         [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_block_number"),
-            compute_hash_on_elements([12328000]),
-        ]
+            12328000,
+        ],
     )
-
-    user3_sig = signer3.sign(core_function_call_hash)
-    user4_sig = signer4.sign(core_function_call_hash)
-
 
     await signer1.send_transaction(
         admin1,
-        validator_router.contract_address,
-        "call_core_function",
+        rewardsCalculation.contract_address,
+        "set_block_number",
         [
-            29,
-            1,
-            current_nonce,
-            get_selector_from_name("set_block_number"),
-            1,
-            12328000,
-            2,
-            user3_sig[0],
-            user3_sig[1],
-            user4_sig[0],
-            user4_sig[1],
-            2,
-            signer3.public_key,
-            signer4.public_key,
+            12328025,
+        ],
+    )
+
+    await signer1.send_transaction(
+        admin1,
+        rewardsCalculation.contract_address,
+        "set_block_number",
+        [
+            12328050,
         ],
     )
 
     block_numbers = await rewardsCalculation.get_block_numbers(2).call()
 
-    assert block_numbers.result.block_numbers == [12328000]
+    assert block_numbers.result.block_numbers == [12328000, 12328025, 12328050]
 
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
     assert block_numbers.result.block_numbers == [123243343, 123243787]
 
+@pytest.mark.asyncio
+async def test_set_block_numbers_season_3(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
+
+    # end last season
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp2, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
+    await signer1.send_transaction(admin1, hightide.contract_address, 'end_trade_season', [2])
+
+    # Setup and start new season
+
+    trade_season_setup_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
+        timestamp2, 3])
+
+    execution_info = await hightide.get_season(3).call()
+    fetched_trading_season = execution_info.result.trading_season
+
+    assert fetched_trading_season.start_timestamp == timestamp2
+    assert fetched_trading_season.num_trading_days == 3
+
+    start_trade_season_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [3])
+    
+    execution_info = await hightide.get_current_season_id().call()
+    fetched_season_id = execution_info.result.season_id
+
+    assert fetched_season_id == 3
+
+    block_numbers = await rewardsCalculation.get_block_numbers(3).call()
+
+    assert block_numbers.result.block_numbers == []
 
 
+    await signer1.send_transaction(
+        admin1,
+        rewardsCalculation.contract_address,
+        "set_block_number",
+        [
+            12328090,
+        ],
+    )
 
-    # await signer1.send_transaction(admin1, rewardsCalculation.contract_address, 'set_block_number', [343123432])
+    await signer1.send_transaction(
+        admin1,
+        rewardsCalculation.contract_address,
+        "set_block_number",
+        [
+            12328095,
+        ],
+    )
 
-    # block_numbers = await rewardsCalculation.get_block_numbers(1).call()
+    await signer1.send_transaction(
+        admin1,
+        rewardsCalculation.contract_address,
+        "set_block_number",
+        [
+            12328125,
+        ],
+    )
 
-    # print(block_numbers.result.block_numbers)
+    block_numbers = await rewardsCalculation.get_block_numbers(3).call()
 
-    # await signer1.send_transaction(admin1, rewardsCalculation.contract_address, 'set_block_number', [4768712769])
+    assert block_numbers.result.block_numbers == [12328090, 12328095, 12328125]
 
-    # block_numbers = await rewardsCalculation.get_block_numbers(1).call()
+    block_numbers = await rewardsCalculation.get_block_numbers(2).call()
 
-    # print(block_numbers.result.block_numbers)
+    assert block_numbers.result.block_numbers == [12328000, 12328025, 12328050]
 
-    # await signer1.send_transaction(admin1, rewardsCalculation.contract_address, 'set_block_number', [7247809324])
+    block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
-    # block_numbers = await rewardsCalculation.get_block_numbers(1).call()
-
-    # print(block_numbers.result.block_numbers)
-
-   
-    # await signer1.send_transaction(admin1, hightide.contract_address, 'end_trade_season', [1])
-
-    # await assert_revert(signer1.send_transaction(admin1, rewardsCalculation.contract_address, 'set_block_number', [7247809324]))
-
-
-    # block_numbers = await rewardsCalculation.get_block_numbers(1).call()
-
-    # print(block_numbers.result.block_numbers)
-
-
-
-
-
-
-
-
+    assert block_numbers.result.block_numbers == [123243343, 123243787]
 

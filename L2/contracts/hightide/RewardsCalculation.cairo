@@ -2,14 +2,14 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero, unsigned_div_rem
 
 from contracts.DataTypes import XpValues, TradingSeason
-from starkware.starknet.common.syscalls import get_caller_address
+from starkware.starknet.common.syscalls import get_caller_address, get_block_timestamp
 from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
-from contracts.Constants import Hightide_INDEX, VALIDATOR_ROUTER_INDEX
+from contracts.Constants import Hightide_INDEX
 
 // This stores the block numbers set by the Nodes
 @storage_var
@@ -59,6 +59,8 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func get_block_numbers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) -> (block_numbers_len: felt, block_numbers: felt*) {
+    alloc_locals;
+
     with_attr error_message("RewardsCalculation: Invalid season_id") {
         assert_lt(0, season_id_);
     }
@@ -77,7 +79,11 @@ func get_block_numbers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (ending_index: felt) = block_number_start.read(season_id=season_id_ + 1);
 
     // Recursively fill the array and return it
-    return get_block_number_recurse(block_numbers, starting_index, ending_index, 0);
+    let (block_numbers_len: felt) = get_block_number_recurse(
+        block_numbers, starting_index, ending_index, 0
+    );
+
+    return (block_numbers_len, block_numbers);
 }
 
 // @notice This function is gets the xp value for a user in a season
@@ -111,20 +117,19 @@ func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param iterator_ - Stores the current length of the populated array
 // @param xp_values_ - Array of XpValues struct
 // @returns block_numbers_len - Length of the final block_numbers array
-// @returns block_numbers - Array of the block_numbers
 func get_block_number_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     block_numbers_: felt*, current_index_: felt, ending_index_: felt, iterator_: felt
-) -> (block_numbers_len: felt, block_numbers: felt*) {
+) -> (block_numbers_len: felt) {
     // Return condition 1, return if we reach the starting index of the next season_id
     if (current_index_ == ending_index_) {
-        return (iterator_, block_numbers_);
+        return (iterator_,);
     }
 
     let (current_block_number: felt) = block_number_array.read(index=current_index_);
 
     // Return condition 2, return if we reach an index where the blocknumber is not set
     if (current_block_number == 0) {
-        return (iterator_, block_numbers_);
+        return (iterator_,);
     }
 
     // Set the blocknumber in our array
@@ -157,20 +162,18 @@ func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         assert_le(0, [xp_values_].final_xp_value);
     }
 
-    if ([xp_values_].user_address == 0) {
+    if ([xp_values_].user_address == 0x0) {
         with_attr error_message("RewardsCalculation: User Address cannot be 0") {
             assert 1 = 0;
         }
     }
-
-    // Range check
 
     let (current_xp_value: felt) = xp_value.read(
         season_id=season_id_, user_address=[xp_values_].user_address
     );
 
     // Check if the xp value is already set
-    with_attr error_message("RewardsCalculation: Xp value already ser") {
+    with_attr error_message("RewardsCalculation: Xp value already set") {
         assert current_xp_value = 0;
     }
     // Write the value
@@ -199,21 +202,28 @@ func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, xp_values_len: felt, xp_values: XpValues*
 ) {
-    // Auth Check
+    alloc_locals;
     let (registry) = get_registry_address();
     let (version) = get_contract_version();
 
-    let (caller) = get_caller_address();
-
     // Get Hightide address from Authorized Registry
-    let (validator_router) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=VALIDATOR_ROUTER_INDEX, version=version
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    with_attr error_message("RewardsCalculation: Unauthorized call") {
-        assert caller = validator_router;
+    let (season: TradingSeason) = IHighTide.get_season(
+        contract_address=hightide_address, season_id=season_id_
+    );
+
+    // Get the day count
+    let current_day = get_current_day(season.start_timestamp);
+
+    // Revert if season is still ongoing
+    with_attr error_message("RewardsCalculation: Season still ongoing") {
+        assert_le(current_day, season.num_trading_days - 1);
     }
 
+    // Recursively update the users' xp value
     set_user_xp_values_recurse(season_id_, xp_values_len, xp_values);
     return ();
 }
@@ -227,17 +237,6 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     // Auth check
     let (registry) = get_registry_address();
     let (version) = get_contract_version();
-
-    let (caller) = get_caller_address();
-
-    // Get Hightide address from Authorized Registry
-    let (validator_router) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=VALIDATOR_ROUTER_INDEX, version=version
-    );
-
-    with_attr error_message("RewardsCalculation: Unauthorized call") {
-        assert caller = validator_router;
-    }
 
     // Get Hightide address from Authorized Registry
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
@@ -287,4 +286,20 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     }
 
     return ();
+}
+
+// @dev - Returns current day of the season based on current timestamp
+// if season has ended then it returns max number of trading days configured for the season
+func get_current_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    start_timestamp: felt
+) -> felt {
+    alloc_locals;
+
+    let (current_timestamp) = get_block_timestamp();
+    local time_since_start = current_timestamp - start_timestamp;
+
+    // Calculate current day = S/number of seconds in a day where S=time since start of season
+    let (current_day, r) = unsigned_div_rem(time_since_start, 24 * 60 * 60);
+
+    return current_day;
 }
