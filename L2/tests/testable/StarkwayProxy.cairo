@@ -54,7 +54,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param l1_address - L1 address of ERC-20 token
 // @return address - address of native L2 ERC-20 token
 @view
-func get_native_token_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func get_native_token_l2_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     l1_address: felt
 ) -> (address: felt) {
     let (address) = native_token_l2_address.read(l1_address);
@@ -82,7 +82,7 @@ func get_whitelisted_token_addresses{
 // @param token_l1_address - L1 ERC-20 token contract address
 // @param token_l2_address - L2 ERC-20 token contract address
 @external
-func initialize_token{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func add_native_token_l2_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     token_l1_address: felt, token_l2_address: felt
 ) {
     let (current_registry_address) = CommonLib.get_registry_address();
@@ -90,10 +90,18 @@ func initialize_token{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     verify_caller_authority(current_registry_address, current_version, MasterAdmin_ACTION);
 
+    with_attr error_message("Token l1 address shouldn't be zero") {
+        assert_not_zero(token_l1_address);
+    }
+
     let (native_l2_address) = native_token_l2_address.read(token_l1_address);
     // Case when native l2 ERC-20 contract already initialized for this token
     with_attr error_message("Token already initialized") {
         assert native_l2_address = 0;
+    }
+
+    with_attr error_message("Token l2 address shouldn't be zero") {
+        assert_not_zero(token_l2_address);
     }
 
     native_token_l2_address.write(token_l1_address, token_l2_address);

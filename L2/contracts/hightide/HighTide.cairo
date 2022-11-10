@@ -479,7 +479,12 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     with_attr error_message("HighTide: Unauthorized call to initialize hightide") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    verify_season_id_exists(season_id);
+
+    let (is_expired) = get_season_expiry_state(season_id);
+
+    with_attr error_message("HighTide: Trading season already ended") {
+        assert is_expired = FALSE;
+    }
 
     with_attr error_message("HighTide: Token lister address cannot be 0") {
         assert_not_zero(token_lister_address);
@@ -552,6 +557,10 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     ) = get_hightide_reward_tokens(hightide_id);
 
     let (hightide_metadata: HighTideMetaData) = get_hightide(hightide_id);
+
+    with_attr error_message("HighTide: Hightide is already activated") {
+        assert hightide_metadata.status = HIGHTIDE_INITIATED;
+    }
     let (status) = check_activation_recurse(
         hightide_metadata.liquidity_pool_address,
         starkway_contract_address,
@@ -578,6 +587,9 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
         assign_hightide_to_season(hightide_id, hightide_metadata.season_id);
     } else {
+        with_attr error_message("HighTide: Liquidity pool should be fully funded") {
+            assert status = TRUE;
+        }
         return ();
     }
     return ();
@@ -591,8 +603,7 @@ func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     season_id: felt
 ) {
     with_attr error_message("HighTide: Trading season id existence mismatch") {
-        assert_nn(season_id);
-        assert_not_zero(season_id);
+        assert_lt(0, season_id);
         let (seasons_len) = seasons_array_len.read();
         assert_le(season_id, seasons_len);
     }
@@ -603,8 +614,7 @@ func verify_hightide_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     hightide_id: felt
 ) {
     with_attr error_message("HighTide: Hightide id existence mismatch") {
-        assert_nn(hightide_id);
-        assert_not_zero(hightide_id);
+        assert_lt(0, hightide_id);
         let (hightide_len) = hightides_array_len.read();
         assert_le(hightide_id, hightide_len);
     }
@@ -730,7 +740,7 @@ func check_activation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
 
-    local balance_Uint256: Uint256 = cast((low=0, high=0), Uint256);
+    local balance_Uint256: Uint256;
     let (native_token_l2_address: felt) = IStarkway.get_native_token_l2_address(
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
@@ -744,6 +754,7 @@ func check_activation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
+        assert balance_Uint256 = cast((low=0, high=0), Uint256);
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
