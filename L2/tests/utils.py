@@ -195,7 +195,7 @@ async def assert_revert(fun, reverted_with=None):
             assert reverted_with in error['message']
 
 # following event assertion functions directly from oz test utils
-def assert_event_emitted(tx_exec_info, from_address, name, data, order=0):
+def assert_event_emitted(tx_exec_info, from_address, name, data=[], order=0):
     """Assert one single event is fired with correct data."""
     assert_events_emitted(tx_exec_info, [(order, from_address, name, data)])
 
