@@ -16,7 +16,7 @@ admin3_signer = Signer(123456789987654323)
 alice_signer = Signer(123456789987654324)
 
 MANAGE_SETTINGS_ACTION = 9
-
+SETTINGS_REGISTRY_INDEX = 28
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -27,22 +27,21 @@ def event_loop():
 async def shared_factory(starknet_service: StarknetService):
 
     ### Deploy accounts
-    admin1 = await starknet_service.deploy(ContractType.Account, [
-        admin1_signer.public_key
-    ])
-    admin2 = await starknet_service.deploy(ContractType.Account, [
-        admin2_signer.public_key
-    ])
-    admin3 = await starknet_service.deploy(ContractType.Account, [
-        admin3_signer.public_key
-    ])
-    alice = await starknet_service.deploy(ContractType.Account, [
-        alice_signer.public_key
-    ])
+    admin1 = await starknet_service.deploy(ContractType.Account, [admin1_signer.public_key])
+    admin2 = await starknet_service.deploy(ContractType.Account, [admin2_signer.public_key])
+    admin3 = await starknet_service.deploy(ContractType.Account, [admin3_signer.public_key])
+    alice = await starknet_service.deploy(ContractType.Account, [alice_signer.public_key])
 
     ### Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
+
+    ### Give admin3 rights to add trusted contracts to AuthRegistry
+    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [
+      admin1.contract_address, 
+      3,
+      True
+    ])
 
     ### Give settings manager rights to admin3
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [
@@ -59,8 +58,16 @@ async def settings_factory(starknet_service: StarknetService, shared_factory):
 
     admin1, admin2, admin3, alice, registry = shared_factory
 
-    ### Deploy Settings contract
+    # Deploy Settings contract
     settings = await starknet_service.deploy(ContractType.Settings, [registry.contract_address, 1])
+
+    # Add Settings contract to AuthRegistry
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [
+      SETTINGS_REGISTRY_INDEX, 
+      1,
+      settings.contract_address
+    ])
+
     return settings
 
 
@@ -79,12 +86,16 @@ async def test_update_settings_link_by_master_admin(shared_factory, settings_fac
     admin1, admin2, admin3, alice, registry = shared_factory
     settings = settings_factory
 
-    # 1. Ensure stored link is initially empty
+    # 1. Check settings address from AuthRegistry
+    settings_from_registry_call = await registry.get_contract_address(SETTINGS_REGISTRY_INDEX, 1).call()
+    assert settings_from_registry_call.result.address == settings.contract_address
+
+    # 2. Check stored link is initially empty
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters("")
 
-    # 2. Update link to DEFAULT_LINK_1 by Master Admin
+    # 3. Update link to DEFAULT_LINK_1 by Master Admin
     update_tx = await admin1_signer.send_transaction(
         admin1, 
         settings.contract_address, 
@@ -97,12 +108,12 @@ async def test_update_settings_link_by_master_admin(shared_factory, settings_fac
       name="settings_link_updated"
     )
 
-    # 3. Validate stored link is DEFAULT_LINK_1
+    # 4. Check stored link is DEFAULT_LINK_1
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters(DEFAULT_LINK_1)
 
-    # 4. Update link to DEFAULT_LINK_2 by Master Admin
+    # 5. Update link to DEFAULT_LINK_2 by Master Admin
     update_tx = await admin1_signer.send_transaction(
         admin1, 
         settings.contract_address, 
@@ -115,7 +126,7 @@ async def test_update_settings_link_by_master_admin(shared_factory, settings_fac
       name="settings_link_updated"
     )
 
-    # 5. Validate stored link is DEFAULT_LINK_2
+    # 6. Check stored link is DEFAULT_LINK_2
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters(DEFAULT_LINK_2)
@@ -126,12 +137,16 @@ async def test_update_settings_link_by_settings_admin(shared_factory, settings_f
     admin1, admin2, admin3, alice, registry = shared_factory
     settings = settings_factory
 
-    # 1. Ensure stored link is initially empty
+    # 1. Check settings address from AuthRegistry
+    settings_from_registry_call = await registry.get_contract_address(SETTINGS_REGISTRY_INDEX, 1).call()
+    assert settings_from_registry_call.result.address == settings.contract_address
+
+    # 2. Check stored link is initially empty
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters("")
 
-    # 2. Update link to DEFAULT_LINK_1 by Settings Admin
+    # 3. Update link to DEFAULT_LINK_1 by Settings Admin
     await admin3_signer.send_transaction(
         admin3, 
         settings.contract_address, 
@@ -139,12 +154,12 @@ async def test_update_settings_link_by_settings_admin(shared_factory, settings_f
         prepare_starknet_string(DEFAULT_LINK_1)
     )
 
-    # 3. Validate stored link is DEFAULT_LINK_1
+    # 4. Check stored link is DEFAULT_LINK_1
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters(DEFAULT_LINK_1)
 
-    # 4. Update link to DEFAULT_LINK_2 by Settings Admin
+    # 5. Update link to DEFAULT_LINK_2 by Settings Admin
     await admin3_signer.send_transaction(
         admin3, 
         settings.contract_address, 
@@ -152,7 +167,7 @@ async def test_update_settings_link_by_settings_admin(shared_factory, settings_f
         prepare_starknet_string(DEFAULT_LINK_2)
     )
 
-    # 5. Validate stored link is DEFAULT_LINK_2
+    # 6. Check stored link is DEFAULT_LINK_2
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters(DEFAULT_LINK_2)
@@ -163,12 +178,16 @@ async def test_remove_settings_link_by_settings_admin(shared_factory, settings_f
     admin1, admin2, admin3, alice, registry = shared_factory
     settings = settings_factory
 
-    # 1. Ensure stored link is initially empty
+    # 1. Check settings address from AuthRegistry
+    settings_from_registry_call = await registry.get_contract_address(SETTINGS_REGISTRY_INDEX, 1).call()
+    assert settings_from_registry_call.result.address == settings.contract_address
+
+    # 2. Ensure stored link is initially empty
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters("")
 
-    # 2. Update link to DEFAULT_LINK_1 by Settings Admin
+    # 3. Update link to DEFAULT_LINK_1 by Settings Admin
     update_tx = await admin3_signer.send_transaction(
         admin3, 
         settings.contract_address, 
@@ -181,12 +200,12 @@ async def test_remove_settings_link_by_settings_admin(shared_factory, settings_f
       name="settings_link_updated"
     )
 
-    # 3. Validate stored link is DEFAULT_LINK_1
+    # 4. Validate stored link is DEFAULT_LINK_1
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters(DEFAULT_LINK_1)
 
-    # 4. Remove link by Settings Admin
+    # 5. Remove link by Settings Admin
     remove_tx = await admin3_signer.send_transaction(
         admin3, 
         settings.contract_address, 
@@ -199,7 +218,7 @@ async def test_remove_settings_link_by_settings_admin(shared_factory, settings_f
       name="settings_link_updated"
     )
 
-    # 5. Validate stored link is empty
+    # 6. Validate stored link is empty
     settings_link_call = await settings.get_settings_link().call()
     settings_link = list(settings_link_call.result.link)
     assert settings_link == encode_characters("")
@@ -219,3 +238,11 @@ async def test_update_settings_link_by_unauthorized_user(shared_factory, setting
       ),
       reverted_with="Settings: caller not authorized to manage settings"
     )
+
+@pytest.mark.asyncio
+async def test_settings_contract_is_present_in_auth_registry(shared_factory, settings_factory):
+    admin1, admin2, admin3, alice, registry = shared_factory
+    settings = settings_factory
+
+    settings_from_registry_call = await registry.get_contract_address(SETTINGS_REGISTRY_INDEX, 1).call()
+    assert settings_from_registry_call.result.address == settings.contract_address
