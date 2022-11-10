@@ -56,6 +56,7 @@ const ManageFunds_ACTION = 5;
 const ManageGovernanceToken_ACTION = 6;
 const ManageCollateralPrices_ACTION = 7;
 const ManageHighTide_ACTION = 8;
+const ManageSettings_ACTION = 9;
 
 const POSITION_OPENED = 1;
 const POSITION_TO_BE_DELEVERAGED = 2;
