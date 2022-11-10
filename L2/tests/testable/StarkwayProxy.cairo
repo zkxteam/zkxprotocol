@@ -54,7 +54,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param l1_address - L1 address of ERC-20 token
 // @return address - address of native L2 ERC-20 token
 @view
-func get_native_token_l2_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func get_native_token_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     l1_address: felt
 ) -> (address: felt) {
     let (address) = native_token_l2_address.read(l1_address);

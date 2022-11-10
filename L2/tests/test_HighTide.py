@@ -91,81 +91,81 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     return adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, starknet_service
 
-# @pytest.mark.asyncio
-# async def test_set_multipliers_unauthorized_user(adminAuth_factory):
-#     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
+@pytest.mark.asyncio
+async def test_set_multipliers_unauthorized_user(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
 
-#     await assert_revert( 
-#         signer3.send_transaction(user1, hightide.contract_address, 'set_multipliers', [1, 2, 3, 4]),
-#         reverted_with="HighTide: Unauthorized call to set multipliers"
-#     )
+    await assert_revert( 
+        signer3.send_transaction(user1, hightide.contract_address, 'set_multipliers', [1, 2, 3, 4]),
+        reverted_with="HighTide: Unauthorized call to set multipliers"
+    )
 
-# @pytest.mark.asyncio
-# async def test_set_multipliers_authorized_admin(adminAuth_factory):
-#     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
+@pytest.mark.asyncio
+async def test_set_multipliers_authorized_admin(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
 
-#     set_multipliers_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'set_multipliers', [
-#         1, 2, 3, 4])
+    set_multipliers_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'set_multipliers', [
+        1, 2, 3, 4])
     
-#     assert_event_emitted(
-#         set_multipliers_tx,
-#         from_address=hightide.contract_address,
-#         name="multipliers_for_rewards_added",
-#         data=[
-#             admin1.contract_address,1,2,3,4
-#         ]
-#     )
+    assert_event_emitted(
+        set_multipliers_tx,
+        from_address=hightide.contract_address,
+        name="multipliers_for_rewards_added",
+        data=[
+            admin1.contract_address,1,2,3,4
+        ]
+    )
 
-#     execution_info = await hightide.get_multipliers().call()
-#     fetched_multipliers = execution_info.result.multipliers
+    execution_info = await hightide.get_multipliers().call()
+    fetched_multipliers = execution_info.result.multipliers
 
-#     assert fetched_multipliers.a1 == 1
-#     assert fetched_multipliers.a2 == 2
-#     assert fetched_multipliers.a3 == 3
-#     assert fetched_multipliers.a4 == 4
+    assert fetched_multipliers.a1 == 1
+    assert fetched_multipliers.a2 == 2
+    assert fetched_multipliers.a3 == 3
+    assert fetched_multipliers.a4 == 4
 
-# @pytest.mark.asyncio
-# async def test_set_constants_unauthorized_user(adminAuth_factory):
-#     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
+@pytest.mark.asyncio
+async def test_set_constants_unauthorized_user(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
 
-#     await assert_revert( 
-#         signer3.send_transaction(user1, hightide.contract_address, 'set_constants', [1, 2, 3, 4, 5]),
-#         reverted_with="HighTide: Unauthorized call to set constants"
-#     )
+    await assert_revert( 
+        signer3.send_transaction(user1, hightide.contract_address, 'set_constants', [1, 2, 3, 4, 5]),
+        reverted_with="HighTide: Unauthorized call to set constants"
+    )
 
-# @pytest.mark.asyncio
-# async def test_set_constants_authorized_admin(adminAuth_factory):
-#     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
+@pytest.mark.asyncio
+async def test_set_constants_authorized_admin(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
 
-#     set_constants_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'set_constants', [
-#         1, 2, 3, 4, 5])
+    set_constants_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'set_constants', [
+        1, 2, 3, 4, 5])
     
-#     assert_event_emitted(
-#         set_constants_tx,
-#         from_address=hightide.contract_address,
-#         name="constants_for_trader_score_added",
-#         data=[
-#             admin1.contract_address,1,2,3,4,5
-#         ]
-#     )
+    assert_event_emitted(
+        set_constants_tx,
+        from_address=hightide.contract_address,
+        name="constants_for_trader_score_added",
+        data=[
+            admin1.contract_address,1,2,3,4,5
+        ]
+    )
 
-#     execution_info = await hightide.get_constants().call()
-#     fetched_constants = execution_info.result.constants
+    execution_info = await hightide.get_constants().call()
+    fetched_constants = execution_info.result.constants
 
-#     assert fetched_constants.a == 1
-#     assert fetched_constants.b == 2
-#     assert fetched_constants.c == 3
-#     assert fetched_constants.z == 4
-#     assert fetched_constants.e == 5
+    assert fetched_constants.a == 1
+    assert fetched_constants.b == 2
+    assert fetched_constants.c == 3
+    assert fetched_constants.z == 4
+    assert fetched_constants.e == 5
 
-# @pytest.mark.asyncio
-# async def test_setup_trading_season_unauthorized_user(adminAuth_factory):
-#     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
+@pytest.mark.asyncio
+async def test_setup_trading_season_unauthorized_user(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
 
-#     await assert_revert( 
-#         signer3.send_transaction(user1, hightide.contract_address, 'setup_trade_season', [timestamp, to64x61(30)]),
-#         "HighTide: Unauthorized call to setup trade season"
-#     )
+    await assert_revert( 
+        signer3.send_transaction(user1, hightide.contract_address, 'setup_trade_season', [timestamp, to64x61(30)]),
+        "HighTide: Unauthorized call to setup trade season"
+    )
 
 @pytest.mark.asyncio
 async def test_setup_trading_season_authorized_admin(adminAuth_factory):
@@ -351,9 +351,9 @@ async def test_activate_hightide_with_zero_fund_transfer(adminAuth_factory):
         "HighTide: Liquidity pool should be fully funded"
     )
 
-# activating hightide by funding only native tokens
+# Hightide activation fails becuase of insufficient native tokens
 @pytest.mark.asyncio
-async def test_activate_hightide_with_native_token_funds(adminAuth_factory):
+async def test_activate_hightide_with_insufficient_native_tokens(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
 
     execution_info = await hightide.get_current_season_id().call()
@@ -362,11 +362,38 @@ async def test_activate_hightide_with_native_token_funds(adminAuth_factory):
 
     execution_info = await hightide.get_hightide(hightide_id).call()
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
+    print("liquidity pool address1:", liquidity_pool_address)
 
     await signer1.send_transaction(admin1, native_erc20_usdc.contract_address,
-                                    'mint',[liquidity_pool_address, 1000, 0],)
+                                    'mint',[liquidity_pool_address, 500, 0],)
 
     await signer1.send_transaction(admin1, native_erc20_ust.contract_address,
+                                    'mint',[liquidity_pool_address, 500, 0],)
+    
+    await assert_revert(
+        signer1.send_transaction(
+            admin1,
+            hightide.contract_address,
+            "activate_high_tide",
+            [hightide_id],
+        ),
+        "HighTide: Liquidity pool should be fully funded"
+    )
+
+# Hightide activation with sufficient native tokens
+@pytest.mark.asyncio
+async def test_activate_hightide_with_sufficient_native_tokens(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
+
+    execution_info = await hightide.get_current_season_id().call()
+    season_id = execution_info.result.season_id
+    hightide_id = 1
+
+    execution_info = await hightide.get_hightide(hightide_id).call()
+    liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
+    print("liquidity pool address1:", liquidity_pool_address)
+
+    await signer1.send_transaction(admin1, native_erc20_usdc.contract_address,
                                     'mint',[liquidity_pool_address, 500, 0],)
 
     tx_exec_info = await signer1.send_transaction(admin1, hightide.contract_address,
@@ -380,7 +407,7 @@ async def test_activate_hightide_with_native_token_funds(adminAuth_factory):
         ]
     )
 
-# activating hightide will fail as hightide is already activated
+# Hightide activation fails becuase, hightide is already activated
 @pytest.mark.asyncio
 async def test_activate_hightide_which_is_already_activated(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
@@ -395,7 +422,7 @@ async def test_activate_hightide_which_is_already_activated(adminAuth_factory):
         "HighTide: Hightide is already activated"
     )
 
-# activating hightide will fail as trading season already expired
+# Hightide activation fails becuase, trading season is already expired
 @pytest.mark.asyncio
 async def test_activate_hightide_for_expired_trading_season(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, starknet_service = adminAuth_factory
@@ -406,6 +433,7 @@ async def test_activate_hightide_for_expired_trading_season(adminAuth_factory):
     hightide_id = 2
     execution_info = await hightide.get_hightide(hightide_id).call()
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
+    print("liquidity pool address2:", liquidity_pool_address)
 
     await signer1.send_transaction(admin1, native_erc20_usdc.contract_address,
                                     'mint',[liquidity_pool_address, 2000, 0],)
@@ -436,50 +464,130 @@ async def test_activate_hightide_for_expired_trading_season(adminAuth_factory):
         "HighTide: Trading season already ended"
     )
 
-# # activating hightide by funding both native and non native tokens
-# @pytest.mark.asyncio
-# async def test_activate_hightide_with_native_and_non_native_token_funds(adminAuth_factory):
-#     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, starknet_service = adminAuth_factory
+# activating hightide by funding both native and non native tokens
+@pytest.mark.asyncio
+async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, starknet_service = adminAuth_factory
 
-#     execution_info = await hightide.get_current_season_id().call()
-#     season_id = execution_info.result.season_id
-#     hightide_id = 1
+    await signer1.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
+        timestamp, 50])
+    season_id = 3
+    execution_info = await hightide.get_season(season_id).call()
+    fetched_trading_season = execution_info.result.trading_season
 
-#     execution_info = await hightide.get_hightide(hightide_id).call()
-#     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
+    await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [season_id])
+    execution_info = await hightide.get_current_season_id().call()
+    season_id = execution_info.result.season_id
+    assert season_id == 3
 
-#     global whitelisted_usdc
-#     global whitelisted_ust
-#     whitelisted_usdc = await starknet_service.deploy(ContractType.ERC20,
-#                         [str_to_felt("USDC"), str_to_felt("USDC"),6,100,0,starkway.contract_address, admin1.contract_address])
-#     whitelisted_ust = await starknet_service.deploy(ContractType.ERC20,
-#                         [str_to_felt("UST"), str_to_felt("UST"),18,200,0,starkway.contract_address, admin1.contract_address])
+    tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
+        [BTC_USDC_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 3000, 0, UST_L1_address, 5000, 0])
+    hightide_id = 3
+    execution_info = await hightide.get_hightide(hightide_id).call()
+    liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
+    print("liquidity pool address3:", liquidity_pool_address)
+
+    global whitelisted_usdc
+    global whitelisted_ust
+    whitelisted_usdc = await starknet_service.deploy(ContractType.ERC20,
+                        [str_to_felt("USDC"), str_to_felt("USDC"),6,100,0,starkway.contract_address, admin1.contract_address])
+    whitelisted_ust = await starknet_service.deploy(ContractType.ERC20,
+                        [str_to_felt("UST"), str_to_felt("UST"),18,200,0,starkway.contract_address, admin1.contract_address])
     
-#     await signer1.send_transaction(admin1, whitelisted_usdc.contract_address,
-#                                     'mint',[liquidity_pool_address, 0, 150],)
+    await signer1.send_transaction(admin1, starkway.contract_address,
+                                    'whitelist_token_address',[USDC_L1_address, whitelisted_usdc.contract_address],)
+
+    await signer1.send_transaction(admin1, starkway.contract_address,
+                                    'whitelist_token_address',[UST_L1_address, whitelisted_ust.contract_address],)
+
+    await signer1.send_transaction(admin1, whitelisted_usdc.contract_address,
+                                    'mint',[liquidity_pool_address, 2000, 0],)
     
-#     await signer1.send_transaction(admin1, whitelisted_ust.contract_address,
-#                                     'mint',[liquidity_pool_address, 0, 200],)
+    await signer1.send_transaction(admin1, whitelisted_ust.contract_address,
+                                    'mint',[liquidity_pool_address, 4500, 0],)
 
-#     await signer1.send_transaction(admin1, starkway.contract_address,
-#                                     'whitelist_token_address',[USDC_L1_address, whitelisted_usdc.contract_address],)
+    await signer1.send_transaction(admin1, native_erc20_usdc.contract_address,
+                                    'mint',[liquidity_pool_address, 1000, 0],)
 
-#     await signer1.send_transaction(admin1, starkway.contract_address,
-#                                     'whitelist_token_address',[UST_L1_address, whitelisted_ust.contract_address],)
+    await signer1.send_transaction(admin1, native_erc20_ust.contract_address,
+                                    'mint',[liquidity_pool_address, 500, 0],)
 
-#     await signer1.send_transaction(admin1, native_erc20_usdc.contract_address,
-#                                     'mint',[liquidity_pool_address, 1000, 0],)
+    tx_exec_info = await signer1.send_transaction(admin1, hightide.contract_address,
+        "activate_high_tide",[hightide_id])
 
-#     await signer1.send_transaction(admin1, native_erc20_ust.contract_address,
-#                                     'mint',[liquidity_pool_address, 500, 0],)
+    assert_events_emitted(
+        tx_exec_info,
+        [
+            [0, hightide.contract_address, 'hightide_activated', [admin1.contract_address, hightide_id]],
+            [1, hightide.contract_address, 'assigned_hightide_to_season', [hightide_id, season_id]],
+        ]
+    )
 
-#     tx_exec_info = await signer1.send_transaction(admin1, hightide.contract_address,
-#         "activate_high_tide",[hightide_id])
 
-#     assert_events_emitted(
-#         tx_exec_info,
-#         [
-#             [0, hightide.contract_address, 'hightide_activated', [admin1.contract_address, hightide_id]],
-#             [1, hightide.contract_address, 'assigned_hightide_to_season', [hightide_id, season_id]],
-#         ]
-#     )
+# Hightide activation fails becuase of insufficient native tokens
+@pytest.mark.asyncio
+async def test_activate_hightide_with_insufficient_non_native_tokens(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, starknet_service = adminAuth_factory
+
+    season_id = 3
+    tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
+        [BTC_USDC_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 1000, 0, UST_L1_address, 2000, 0])
+    hightide_id = 4
+    execution_info = await hightide.get_hightide(hightide_id).call()
+    liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
+    print("liquidity pool address4:", liquidity_pool_address)
+
+    global whitelisted_usdc
+    global whitelisted_ust
+    whitelisted_usdc = await starknet_service.deploy(ContractType.ERC20,
+                        [str_to_felt("USDC"), str_to_felt("USDC"),6,100,0,starkway.contract_address, admin1.contract_address])
+    whitelisted_ust = await starknet_service.deploy(ContractType.ERC20,
+                        [str_to_felt("UST"), str_to_felt("UST"),18,200,0,starkway.contract_address, admin1.contract_address])
+    
+    await signer1.send_transaction(admin1, starkway.contract_address,
+                                    'whitelist_token_address',[USDC_L1_address, whitelisted_usdc.contract_address],)
+
+    await signer1.send_transaction(admin1, starkway.contract_address,
+                                    'whitelist_token_address',[UST_L1_address, whitelisted_ust.contract_address],)
+
+    await signer1.send_transaction(admin1, whitelisted_usdc.contract_address,
+                                    'mint',[liquidity_pool_address, 1000, 0],)
+    
+    await signer1.send_transaction(admin1, whitelisted_ust.contract_address,
+                                    'mint',[liquidity_pool_address, 1000, 0],)
+    await assert_revert(
+        signer1.send_transaction(
+            admin1,
+            hightide.contract_address,
+            "activate_high_tide",
+            [hightide_id],
+        ),
+        "HighTide: Liquidity pool should be fully funded"
+    )
+
+# Hightide activation with sufficient non native tokens
+@pytest.mark.asyncio
+async def test_activate_hightide_with_sufficient_non_native_tokens(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
+
+    execution_info = await hightide.get_current_season_id().call()
+    season_id = execution_info.result.season_id
+    hightide_id = 4
+
+    execution_info = await hightide.get_hightide(hightide_id).call()
+    liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
+    print("liquidity pool address4:", liquidity_pool_address)
+
+    await signer1.send_transaction(admin1, whitelisted_ust.contract_address,
+                                    'mint',[liquidity_pool_address, 1000, 0],)
+
+    tx_exec_info = await signer1.send_transaction(admin1, hightide.contract_address,
+        "activate_high_tide",[hightide_id])
+
+    assert_events_emitted(
+        tx_exec_info,
+        [
+            [0, hightide.contract_address, 'hightide_activated', [admin1.contract_address, hightide_id]],
+            [1, hightide.contract_address, 'assigned_hightide_to_season', [hightide_id, season_id]],
+        ]
+    )

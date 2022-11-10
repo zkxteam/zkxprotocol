@@ -110,7 +110,7 @@ func reward_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         return ();
     }
 
-    let (native_token_l2_address: felt) = IStarkway.get_native_token_l2_address(
+    let (native_token_l2_address: felt) = IStarkway.get_native_token_address(
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
 
