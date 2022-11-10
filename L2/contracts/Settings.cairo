@@ -19,15 +19,16 @@ const LINK_ID = 0;
 // Events //
 ////////////
 
-// @notice Notifies of a settings link update
-@event
-func settings_link_updated() {
-}
-
+// @notice Notifies of a settings contract creation
 @event
 func settings_contract_created(
     contract_address: felt, registry_address: felt, version: felt, caller_address: felt
 ) {
+}
+
+// @notice Notifies of a settings link update
+@event
+func settings_link_updated() {
 }
 
 /////////////////
@@ -55,8 +56,8 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // View Functions //
 ////////////////////
 
-// @notice Reads a stored settings link
-// @returns link_len - Length of a link
+// @notice Reads the stored settings link
+// @returns link_len - Length of the link
 // @returns link - List of link characters
 @view
 func get_settings_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
