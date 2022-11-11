@@ -199,18 +199,21 @@ async def test_unauthorized_call(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
 
     marketID = BTC_USD_ID
-    fee = to64x61(0.5)
+    fee_64x61 = to64x61(0.5)
     season_id = 1
+    order_volume_64x61 = to64x61(1000)
+    order_type = 1
+    pnl_64x61 = to64x61(100)
 
-    await assert_revert(dave_signer.send_transaction(dave, user_stats.contract_address, "record_fee_details", [
+    await assert_revert(dave_signer.send_transaction(dave, user_stats.contract_address, "record_trader_stats", [
         season_id,
         marketID,
         1,
         alice.contract_address,
-        fee]), "UserStats: Fee can be recorded only by Trading contract")
+        fee_64x61, order_volume_64x61, order_type, pnl_64x61]), "UserStats: Stats can be recorded only by TradingStats contract")
 
 @pytest.mark.asyncio
-async def test_record_fee_details_with_two_open_orders(adminAuth_factory):
+async def test_record_trader_stats_with_two_open_orders(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
 
     alice_balance = to64x61(50000)
@@ -287,8 +290,24 @@ async def test_record_fee_details_with_two_open_orders(adminAuth_factory):
     total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
 
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, closeOrder1)).call()
+    assert trader1_order_volume.result.number_of_orders == 1
+    assert from64x61(trader1_order_volume.result.total_volume_64x61) == from64x61(size1)*from64x61(execution_price1)
+
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, closeOrder2)).call()
+    assert trader2_order_volume.result.number_of_orders == 1
+    assert from64x61(trader2_order_volume.result.total_volume_64x61) == from64x61(size1)*from64x61(execution_price1)
+
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    assert from64x61(trader1_pnl.result.pnl.old_pnl_64x61) == 0
+    assert from64x61(trader1_pnl.result.pnl.new_pnl_64x61) == 0
+
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    assert from64x61(trader2_pnl.result.pnl.old_pnl_64x61) == 0
+    assert from64x61(trader2_pnl.result.pnl.new_pnl_64x61) == 0
+
 @pytest.mark.asyncio
-async def test_record_fee_details_with_two_close_orders(adminAuth_factory):
+async def test_record_trader_stats_with_two_close_orders(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
 
     #### Closing Of Orders ########
@@ -357,9 +376,24 @@ async def test_record_fee_details_with_two_close_orders(adminAuth_factory):
     total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
 
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, closeOrder3)).call()
+    assert trader1_order_volume.result.number_of_orders == 1
+    assert from64x61(trader1_order_volume.result.total_volume_64x61) == from64x61(size2)*from64x61(execution_price2)
+
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, closeOrder4)).call()
+    assert trader2_order_volume.result.number_of_orders == 1
+    assert from64x61(trader2_order_volume.result.total_volume_64x61) == from64x61(size2)*from64x61(execution_price2)
+
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    assert from64x61(trader1_pnl.result.pnl.old_pnl_64x61) == 0
+    assert from64x61(trader1_pnl.result.pnl.new_pnl_64x61) == -500
+
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    assert from64x61(trader2_pnl.result.pnl.old_pnl_64x61) == 0
+    assert from64x61(trader2_pnl.result.pnl.new_pnl_64x61) == 500
 
 @pytest.mark.asyncio
-async def test_record_fee_details_with_one_open_order_and_one_close_order(adminAuth_factory):
+async def test_record_trader_stats_with_one_open_order_and_one_close_order(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, user_stats, hightide = adminAuth_factory
 
     size2 = to64x61(0.5)
@@ -428,3 +462,22 @@ async def test_record_fee_details_with_one_open_order_and_one_close_order(adminA
 
     total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == 4.849999999999994
+
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, closeOrder3)).call()
+    assert trader1_order_volume.result.number_of_orders == 2
+    assert from64x61(trader1_order_volume.result.total_volume_64x61) == 8000
+
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, closeOrder4)).call()
+    assert trader2_order_volume.result.number_of_orders == 2
+    assert from64x61(trader2_order_volume.result.total_volume_64x61) == 6000
+
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    assert from64x61(trader1_pnl.result.pnl.old_pnl_64x61) == 0
+    assert from64x61(trader1_pnl.result.pnl.new_pnl_64x61) == -500
+
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    assert from64x61(trader2_pnl.result.pnl.old_pnl_64x61) == 500
+    assert from64x61(trader2_pnl.result.pnl.new_pnl_64x61) == 500
+
+
+

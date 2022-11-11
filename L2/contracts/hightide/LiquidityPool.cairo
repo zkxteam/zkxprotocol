@@ -82,7 +82,7 @@ func perform_return_or_burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         contract_address=hightide_contract_address, hightide_id=id
     );
 
-    reward_tokens_recurse(
+    return reward_tokens_recurse(
         hightide_metadata.token_lister_address,
         hightide_metadata.is_burnable,
         hightide_metadata.liquidity_pool_address,
@@ -91,7 +91,6 @@ func perform_return_or_burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         reward_tokens_list_len,
         reward_tokens_list,
     );
-    return ();
 }
 
 // ///////////
@@ -153,7 +152,7 @@ func reward_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
     );
 
-    transfer_or_burn_tokens(
+    transfer_or_burn_tokens_recurse(
         token_lister_address,
         is_burnable,
         liquidity_pool_address,
@@ -173,7 +172,9 @@ func reward_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     );
 }
 
-func transfer_or_burn_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func transfer_or_burn_tokens_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
     token_lister_address: felt,
     is_burnable: felt,
     liquidity_pool_address: felt,
@@ -203,7 +204,7 @@ func transfer_or_burn_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         tempvar syscall_ptr = syscall_ptr;
     }
 
-    return transfer_or_burn_tokens(
+    return transfer_or_burn_tokens_recurse(
         token_lister_address,
         is_burnable,
         liquidity_pool_address,

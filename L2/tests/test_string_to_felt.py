@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61, from64x61
-
+from starkware.starknet.compiler.compile import get_selector_from_name
 
 @pytest.mark.asyncio
 async def test_str_to_felt():
@@ -18,3 +18,4 @@ async def test_str_to_felt():
     print("\n margin", margin)
     print("\n borrowed", borrowed)
     print("\n leverage", leverage)
+    print("\n selector",get_selector_from_name('get_portion_executed'))
