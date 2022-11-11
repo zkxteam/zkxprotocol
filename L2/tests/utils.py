@@ -267,41 +267,6 @@ def get_raw_invoke(sender, calls):
     raw_invocation = sender.__execute__(call_array, calldata)
     return raw_invocation
 
-def build_default_asset_properties(
-    id,
-    short_name,
-    asset_version = 1,
-    is_tradable = 0,
-    is_collateral = 0,
-    token_decimal = 18
-):
-    return [
-        id, 
-        asset_version, 
-        short_name, 
-        is_tradable, 
-        is_collateral, 
-        token_decimal
-    ]
-
-
-def build_asset_properties(
-    id,
-    asset_version,
-    short_name,
-    is_tradable,
-    is_collateral,
-    token_decimal
-):
-    return [
-        id, 
-        asset_version, 
-        short_name, 
-        is_tradable, 
-        is_collateral, 
-        token_decimal
-    ]
-
 def print_parsed_positions(pos_array):
     for i in range(len(pos_array)):
         print("position #", i)

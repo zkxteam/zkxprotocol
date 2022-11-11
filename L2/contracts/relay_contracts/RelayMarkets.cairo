@@ -39,12 +39,15 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_market_: Market
+    new_market_: Market, 
+    metadata_link_len: felt, 
+    metadata_link: felt*
 ) {
+    alloc_locals;
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('add_market');
-    let (inner_address) = get_inner_contract();
-    IMarkets.add_market(contract_address=inner_address, new_market_=new_market_);
+    let (local inner_address) = get_inner_contract();
+    IMarkets.add_market(inner_address, new_market_, metadata_link_len, metadata_link);
     return ();
 }
 
@@ -150,6 +153,23 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return ();
 }
 
+@external
+func update_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt, link_len: felt, link: felt*
+) {
+    alloc_locals;
+    verify_caller_authority(ManageMarkets_ACTION);
+    record_call_details('update_metadata_link');
+    let (inner_address) = get_inner_contract();
+    IMarkets.update_metadata_link(
+        inner_address,
+        market_id_,
+        link_len,
+        link
+    );
+    return ();
+}
+
 //////////
 // View //
 //////////
@@ -179,4 +199,13 @@ func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (inner_address) = get_inner_contract();
     let (array_list_len, array_list: Market*) = IMarkets.get_all_markets(inner_address);
     return (array_list_len, array_list);
+}
+
+@view
+func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (link_len: felt, link: felt*) {
+    let (inner_address) = get_inner_contract();
+    let (link_len, link) = IMarkets.get_metadata_link(inner_address, market_id_);
+    return (link_len, link);
 }

@@ -23,8 +23,8 @@ from contracts.libraries.Utils import verify_caller_authority
 
 const ADD_ASSET = 1;
 const REMOVE_ASSET = 2;
-const ICON_LINK_TYPE = 'ICON_LINK_TYPE';
-const METADATA_LINK_TYPE = 'METADATA_LINK_TYPE';
+const ICON_LINK_TYPE = 'ASSET_ICON_LINK';
+const METADATA_LINK_TYPE = 'ASSET_METADATA_LINK';
 
 ////////////
 // Events //

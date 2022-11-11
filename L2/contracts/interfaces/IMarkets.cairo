@@ -8,7 +8,7 @@ namespace IMarkets {
     // External functions //
     ////////////////////////
 
-    func add_market(new_market_: Market) {
+    func add_market(new_market_: Market, metadata_link_len: felt, metadata_link: felt*) {
     }
 
     func remove_market(market_id_: felt) {
@@ -46,6 +46,9 @@ namespace IMarkets {
     func change_max_leverage(new_max_leverage_: felt) {
     }
 
+    func update_metadata_link(market_id_: felt, link_len: felt, link: felt*) {
+    }
+
     ////////////////////
     // View functions //
     ////////////////////
@@ -73,5 +76,8 @@ namespace IMarkets {
     }
 
     func get_maintenance_margin(market_id_: felt) -> (maintenance_margin: felt) {
+    }
+
+    func get_metadata_link(market_id_: felt) -> (link_len: felt, link: felt*) {
     }
 }
