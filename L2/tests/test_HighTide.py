@@ -287,6 +287,7 @@ async def test_initialize_hightide_with_zero_class_hash(adminAuth_factory):
 async def test_initialize_hightide(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, _ = adminAuth_factory
     
+    # 1. Setup and start new season
     await signer1.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
         timestamp, 40])
     season_id = 2
@@ -301,6 +302,7 @@ async def test_initialize_hightide(adminAuth_factory):
     season_id = execution_info.result.season_id
     assert season_id == 2
 
+    # 2. Set Liquidity pool contract class hash 
     tx_exec_info=await signer1.send_transaction(admin1, 
                                    hightide.contract_address,
                                    'set_liquidity_pool_contract_class_hash',
@@ -315,6 +317,7 @@ async def test_initialize_hightide(adminAuth_factory):
         ]
     )
 
+    # 3. Initialize hightide 
     tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
         [BTC_USDC_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 1000, 0, UST_L1_address, 500, 0])
     hightide_id = 1
@@ -364,12 +367,14 @@ async def test_activate_hightide_with_insufficient_native_tokens(adminAuth_facto
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
     print("liquidity pool address1:", liquidity_pool_address)
 
+    # 1. Fund liquidity pool with insufficient no. of native tokens
     await signer1.send_transaction(admin1, native_erc20_usdc.contract_address,
                                     'mint',[liquidity_pool_address, 500, 0],)
 
     await signer1.send_transaction(admin1, native_erc20_ust.contract_address,
                                     'mint',[liquidity_pool_address, 500, 0],)
     
+    # 2. Activate Hightide 
     await assert_revert(
         signer1.send_transaction(
             admin1,
@@ -393,9 +398,11 @@ async def test_activate_hightide_with_sufficient_native_tokens(adminAuth_factory
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
     print("liquidity pool address1:", liquidity_pool_address)
 
+    # 1. Fund liquidity pool with sufficient native tokens
     await signer1.send_transaction(admin1, native_erc20_usdc.contract_address,
                                     'mint',[liquidity_pool_address, 500, 0],)
 
+    # 2. Activate Hightide 
     tx_exec_info = await signer1.send_transaction(admin1, hightide.contract_address,
         "activate_high_tide",[hightide_id])
 
@@ -428,6 +435,7 @@ async def test_activate_hightide_for_expired_trading_season(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, starknet_service = adminAuth_factory
 
     season_id = 2
+    # 1. Initialize Hightide
     tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
         [BTC_USDC_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 2000, 0, UST_L1_address, 2000, 0])
     hightide_id = 2
@@ -435,12 +443,14 @@ async def test_activate_hightide_for_expired_trading_season(adminAuth_factory):
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
     print("liquidity pool address2:", liquidity_pool_address)
 
+    # 2. Fund Liquidity pool with sufficient native tokens
     await signer1.send_transaction(admin1, native_erc20_usdc.contract_address,
                                     'mint',[liquidity_pool_address, 2000, 0],)
 
     await signer1.send_transaction(admin1, native_erc20_ust.contract_address,
                                     'mint',[liquidity_pool_address, 2000, 0],)
 
+    # 3. End trading season
     execution_info = await hightide.get_season(season_id).call()
     fetched_trading_season = execution_info.result.trading_season
     num_trading_days = fetched_trading_season.num_trading_days
@@ -454,6 +464,7 @@ async def test_activate_hightide_for_expired_trading_season(adminAuth_factory):
     await signer1.send_transaction(admin1, hightide.contract_address,
                             "end_trade_season",[season_id])
 
+    # 4. Activate Hightide 
     await assert_revert(
         signer1.send_transaction(
             admin1,
@@ -469,6 +480,7 @@ async def test_activate_hightide_for_expired_trading_season(adminAuth_factory):
 async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, starknet_service = adminAuth_factory
 
+    # 1. Setup and start new season
     await signer1.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
         timestamp, 50])
     season_id = 3
@@ -480,6 +492,7 @@ async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_fac
     season_id = execution_info.result.season_id
     assert season_id == 3
 
+    # 2. Initialize Hightide
     tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
         [BTC_USDC_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 3000, 0, UST_L1_address, 5000, 0])
     hightide_id = 3
@@ -487,6 +500,7 @@ async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_fac
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
     print("liquidity pool address3:", liquidity_pool_address)
 
+    # 3. Deploy non native token contracts and whitelist the addresses
     global whitelisted_usdc
     global whitelisted_ust
     whitelisted_usdc = await starknet_service.deploy(ContractType.ERC20,
@@ -500,6 +514,7 @@ async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_fac
     await signer1.send_transaction(admin1, starkway.contract_address,
                                     'whitelist_token_address',[UST_L1_address, whitelisted_ust.contract_address],)
 
+    # 4. Fund liquidity pool with both native and non native tokens 
     await signer1.send_transaction(admin1, whitelisted_usdc.contract_address,
                                     'mint',[liquidity_pool_address, 2000, 0],)
     
@@ -512,6 +527,7 @@ async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_fac
     await signer1.send_transaction(admin1, native_erc20_ust.contract_address,
                                     'mint',[liquidity_pool_address, 500, 0],)
 
+    # 5. Activate Hightide 
     tx_exec_info = await signer1.send_transaction(admin1, hightide.contract_address,
         "activate_high_tide",[hightide_id])
 
@@ -530,6 +546,7 @@ async def test_activate_hightide_with_insufficient_non_native_tokens(adminAuth_f
     adminAuth, hightide, admin1, admin2, user1, timestamp, native_erc20_usdc, native_erc20_ust, starkway, starknet_service = adminAuth_factory
 
     season_id = 3
+    # 1. Initialize Hightide
     tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
         [BTC_USDC_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 1000, 0, UST_L1_address, 2000, 0])
     hightide_id = 4
@@ -537,6 +554,7 @@ async def test_activate_hightide_with_insufficient_non_native_tokens(adminAuth_f
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
     print("liquidity pool address4:", liquidity_pool_address)
 
+    # 2. Deploy non native token contracts and whitelist the addresses
     global whitelisted_usdc
     global whitelisted_ust
     whitelisted_usdc = await starknet_service.deploy(ContractType.ERC20,
@@ -550,11 +568,14 @@ async def test_activate_hightide_with_insufficient_non_native_tokens(adminAuth_f
     await signer1.send_transaction(admin1, starkway.contract_address,
                                     'whitelist_token_address',[UST_L1_address, whitelisted_ust.contract_address],)
 
+    # 3. Fund liquidity pool with non native tokens. But, no of tokens should be insufficient to activate hightide
     await signer1.send_transaction(admin1, whitelisted_usdc.contract_address,
                                     'mint',[liquidity_pool_address, 1000, 0],)
     
     await signer1.send_transaction(admin1, whitelisted_ust.contract_address,
                                     'mint',[liquidity_pool_address, 1000, 0],)
+
+    # 4. Activate Hightide 
     await assert_revert(
         signer1.send_transaction(
             admin1,
@@ -578,9 +599,11 @@ async def test_activate_hightide_with_sufficient_non_native_tokens(adminAuth_fac
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
     print("liquidity pool address4:", liquidity_pool_address)
 
+    # 1. Fund liquidity pool with sufficient non native tokens
     await signer1.send_transaction(admin1, whitelisted_ust.contract_address,
                                     'mint',[liquidity_pool_address, 1000, 0],)
 
+    # 2. Activate Hightide 
     tx_exec_info = await signer1.send_transaction(admin1, hightide.contract_address,
         "activate_high_tide",[hightide_id])
 
