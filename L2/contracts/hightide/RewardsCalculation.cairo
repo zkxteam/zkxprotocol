@@ -106,89 +106,6 @@ func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     return (xp_value_user,);
 }
-// ///////////
-// Internal //
-// ///////////
-
-// @notice This function is called by get_block_numbers
-// @param block_numbers_ - Array of populated block numbers
-// @param current_index_ - Index at which the block number is currently pointing to
-// @param ending_index_ - Index at which to stop
-// @param iterator_ - Stores the current length of the populated array
-// @param xp_values_ - Array of XpValues struct
-// @returns block_numbers_len - Length of the final block_numbers array
-func get_block_number_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    block_numbers_: felt*, current_index_: felt, ending_index_: felt, iterator_: felt
-) -> (block_numbers_len: felt) {
-    // Return condition 1, return if we reach the starting index of the next season_id
-    if (current_index_ == ending_index_) {
-        return (iterator_,);
-    }
-
-    let (current_block_number: felt) = block_number_array.read(index=current_index_);
-
-    // Return condition 2, return if we reach an index where the blocknumber is not set
-    if (current_block_number == 0) {
-        return (iterator_,);
-    }
-
-    // Set the blocknumber in our array
-    assert block_numbers_[iterator_] = current_block_number;
-
-    // Recursively call the next index
-    return get_block_number_recurse(
-        block_numbers_=block_numbers_,
-        current_index_=current_index_ + 1,
-        ending_index_=ending_index_,
-        iterator_=iterator_ + 1,
-    );
-}
-
-// @notice This function is called by set_user_xp_values
-// @param season_id_ - id of the season
-// @param xp_values_len_ - Length of the xp array
-// @param xp_values_ - Array of XpValues struct
-func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, xp_values_len_: felt, xp_values_: XpValues*
-) {
-    alloc_locals;
-    // Termination conditon
-    if (xp_values_len_ == 0) {
-        return ();
-    }
-
-    // Validate the input
-    with_attr error_message("RewardsCalculation: Xp value cannot be <= 0") {
-        assert_le(0, [xp_values_].final_xp_value);
-    }
-
-    if ([xp_values_].user_address == 0x0) {
-        with_attr error_message("RewardsCalculation: User Address cannot be 0") {
-            assert 1 = 0;
-        }
-    }
-
-    let (current_xp_value: felt) = xp_value.read(
-        season_id=season_id_, user_address=[xp_values_].user_address
-    );
-
-    // Check if the xp value is already set
-    with_attr error_message("RewardsCalculation: Xp value already set") {
-        assert current_xp_value = 0;
-    }
-    // Write the value
-    xp_value.write(
-        season_id=season_id_,
-        user_address=[xp_values_].user_address,
-        value=[xp_values_].final_xp_value,
-    );
-
-    return set_user_xp_values_recurse(
-        season_id_=season_id_,
-        xp_values_len_=xp_values_len_ - 1,
-        xp_values_=xp_values_ + XpValues.SIZE,
-    );
-}
 
 // ///////////
 // External //
@@ -286,6 +203,90 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     }
 
     return ();
+}
+
+// ///////////
+// Internal //
+// ///////////
+
+// @notice This function is called by get_block_numbers
+// @param block_numbers_ - Array of populated block numbers
+// @param current_index_ - Index at which the block number is currently pointing to
+// @param ending_index_ - Index at which to stop
+// @param iterator_ - Stores the current length of the populated array
+// @param xp_values_ - Array of XpValues struct
+// @returns block_numbers_len - Length of the final block_numbers array
+func get_block_number_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    block_numbers_: felt*, current_index_: felt, ending_index_: felt, iterator_: felt
+) -> (block_numbers_len: felt) {
+    // Return condition 1, return if we reach the starting index of the next season_id
+    if (current_index_ == ending_index_) {
+        return (iterator_,);
+    }
+
+    let (current_block_number: felt) = block_number_array.read(index=current_index_);
+
+    // Return condition 2, return if we reach an index where the blocknumber is not set
+    if (current_block_number == 0) {
+        return (iterator_,);
+    }
+
+    // Set the blocknumber in our array
+    assert block_numbers_[iterator_] = current_block_number;
+
+    // Recursively call the next index
+    return get_block_number_recurse(
+        block_numbers_=block_numbers_,
+        current_index_=current_index_ + 1,
+        ending_index_=ending_index_,
+        iterator_=iterator_ + 1,
+    );
+}
+
+// @notice This function is called by set_user_xp_values
+// @param season_id_ - id of the season
+// @param xp_values_len_ - Length of the xp array
+// @param xp_values_ - Array of XpValues struct
+func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, xp_values_len_: felt, xp_values_: XpValues*
+) {
+    alloc_locals;
+    // Termination conditon
+    if (xp_values_len_ == 0) {
+        return ();
+    }
+
+    // Validate the input
+    with_attr error_message("RewardsCalculation: Xp value cannot be <= 0") {
+        assert_le(0, [xp_values_].final_xp_value);
+    }
+
+    if ([xp_values_].user_address == 0x0) {
+        with_attr error_message("RewardsCalculation: User Address cannot be 0") {
+            assert 1 = 0;
+        }
+    }
+
+    let (current_xp_value: felt) = xp_value.read(
+        season_id=season_id_, user_address=[xp_values_].user_address
+    );
+
+    // Check if the xp value is already set
+    with_attr error_message("RewardsCalculation: Xp value already set") {
+        assert current_xp_value = 0;
+    }
+    // Write the value
+    xp_value.write(
+        season_id=season_id_,
+        user_address=[xp_values_].user_address,
+        value=[xp_values_].final_xp_value,
+    );
+
+    return set_user_xp_values_recurse(
+        season_id_=season_id_,
+        xp_values_len_=xp_values_len_ - 1,
+        xp_values_=xp_values_ + XpValues.SIZE,
+    );
 }
 
 // @dev - Returns current day of the season based on current timestamp
