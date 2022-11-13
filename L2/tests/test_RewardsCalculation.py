@@ -159,13 +159,23 @@ async def test_initialize_hightide(adminAuth_factory):
 async def test_set_block_numbers_authorized_caller(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
-    await signer1.send_transaction(
+    new_block_tx = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
         [
             123243343,
         ],
+    )
+
+    assert_event_emitted(
+        new_block_tx,
+        from_address=rewardsCalculation.contract_address,
+        name="block_number_set",
+        data=[
+            1,
+            123243343
+        ]
     )
 
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
@@ -176,7 +186,7 @@ async def test_set_block_numbers_authorized_caller(adminAuth_factory):
 async def test_set_block_numbers_authorized_caller_2(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
-    await signer1.send_transaction(
+    new_block_tx = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
@@ -185,13 +195,57 @@ async def test_set_block_numbers_authorized_caller_2(adminAuth_factory):
         ],
     )
 
+    assert_event_emitted(
+        new_block_tx,
+        from_address=rewardsCalculation.contract_address,
+        name="block_number_set",
+        data=[
+            1,
+            123243787
+        ]
+    )
+
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
     assert block_numbers.result.block_numbers == [123243343 ,123243787]
 
 @pytest.mark.asyncio
+async def test_set_xp_values_during_season(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
+
+    await assert_revert(
+        signer1.send_transaction(
+            admin1,
+            rewardsCalculation.contract_address,
+            "set_user_xp_values",
+            [
+                1,
+                1,
+                alice.contract_address,
+                to64x61(100)
+            ],
+        ),
+        "RewardsCalculation: Season still ongoing"
+    )
+
+    xp_value_alice = await rewardsCalculation.get_user_xp_value(1, alice.contract_address).call()
+    assert xp_value_alice.result.xp_value == to64x61(0) 
+    
+
+@pytest.mark.asyncio
 async def test_set_xp_values_authorized_caller_0_user_address(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp1, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
+    # end trade season
+    await signer1.send_transaction(admin1, hightide.contract_address, 'end_trade_season', [1])
 
     await assert_revert(
         signer1.send_transaction(
@@ -215,7 +269,7 @@ async def test_set_xp_values_authorized_caller_0_user_address(adminAuth_factory)
 async def test_set_xp_values(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
 
-    await signer1.send_transaction(
+    xp_tx = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_user_xp_values",
@@ -227,7 +281,15 @@ async def test_set_xp_values(adminAuth_factory):
             bob.contract_address,
             to64x61(50)
         ],
-    ),
+    )
+
+    assert_events_emitted(
+        xp_tx,
+        [
+            [0, rewardsCalculation.contract_address, 'xp_value_set', [1, alice.contract_address, to64x61(100)]],
+            [1, rewardsCalculation.contract_address, 'xp_value_set', [1, bob.contract_address, to64x61(50)]],
+        ]
+    )
         
 
     xp_value_alice = await rewardsCalculation.get_user_xp_value(1, alice.contract_address).call()
@@ -261,17 +323,6 @@ async def test_set_xp_values_reset_xp(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_set_block_numbers_after_season_end(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
-
-    starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
-        block_timestamp=timestamp1, 
-        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
-    )
-
-    # end trade season
-    await signer1.send_transaction(admin1, hightide.contract_address, 'end_trade_season', [1])
 
     await assert_revert(
         signer1.send_transaction(
@@ -315,7 +366,7 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
     assert block_numbers.result.block_numbers == []
 
 
-    await signer1.send_transaction(
+    new_block_tx_1 = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
@@ -324,7 +375,17 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
         ],
     )
 
-    await signer1.send_transaction(
+    assert_event_emitted(
+        new_block_tx_1,
+        from_address=rewardsCalculation.contract_address,
+        name="block_number_set",
+        data=[
+            2,
+            12328000
+        ]
+    )
+
+    new_block_tx_2 = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
@@ -333,13 +394,33 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
         ],
     )
 
-    await signer1.send_transaction(
+    assert_event_emitted(
+        new_block_tx_2,
+        from_address=rewardsCalculation.contract_address,
+        name="block_number_set",
+        data=[
+            2,
+            12328025
+        ]
+    )
+
+    new_block_tx_3 = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
         [
             12328050,
         ],
+    )
+
+    assert_event_emitted(
+        new_block_tx_3,
+        from_address=rewardsCalculation.contract_address,
+        name="block_number_set",
+        data=[
+            2,
+            12328050
+        ]
     )
 
     block_numbers = await rewardsCalculation.get_block_numbers(2).call()
@@ -389,7 +470,7 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
     assert block_numbers.result.block_numbers == []
 
 
-    await signer1.send_transaction(
+    new_block_tx_1 = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
@@ -398,7 +479,17 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
         ],
     )
 
-    await signer1.send_transaction(
+    assert_event_emitted(
+        new_block_tx_1,
+        from_address=rewardsCalculation.contract_address,
+        name="block_number_set",
+        data=[
+            3,
+            12328090
+        ]
+    )
+
+    new_block_tx_2 = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
@@ -407,13 +498,33 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
         ],
     )
 
-    await signer1.send_transaction(
+    assert_event_emitted(
+        new_block_tx_2,
+        from_address=rewardsCalculation.contract_address,
+        name="block_number_set",
+        data=[
+            3,
+            12328095
+        ]
+    )
+
+    new_block_tx_3 = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
         [
             12328125,
         ],
+    )
+
+    assert_event_emitted(
+        new_block_tx_3,
+        from_address=rewardsCalculation.contract_address,
+        name="block_number_set",
+        data=[
+            3,
+            12328125
+        ]
     )
 
     block_numbers = await rewardsCalculation.get_block_numbers(3).call()

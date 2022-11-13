@@ -1,15 +1,34 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero, unsigned_div_rem
+from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.DataTypes import XpValues, TradingSeason
-from starkware.starknet.common.syscalls import get_caller_address, get_block_timestamp
-from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
+from contracts.Constants import Hightide_INDEX
+from contracts.DataTypes import TradingSeason, XpValues
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
-from contracts.Constants import Hightide_INDEX
+from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
+
+// /////////
+// Events //
+// /////////
+
+// Event emitted whenever collateral is transferred from account by trading
+@event
+func block_number_set(season_id: felt, block_number: felt) {
+}
+
+// Event emitted whenever collateral is transferred to account by trading
+@event
+func xp_value_set(season_id: felt, user_address: felt, xp_value: felt) {
+}
+
+// //////////
+// Storage //
+// //////////
 
 // This stores the block numbers set by the Nodes
 @storage_var
@@ -37,13 +56,13 @@ func xp_value(season_id, user_address: felt) -> (res: felt) {
 // //////////////
 
 // @notice Constructor of the smart-contract
-// @param registry_address Address of the AuthorizedRegistry contract
-// @param version Version of this contract
+// @param registry_address_ - Address of the AuthorizedRegistry contract
+// @param version_ - Version of this contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address: felt, version: felt
+    registry_address_: felt, version_: felt
 ) {
-    CommonLib.initialize(registry_address, version);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -89,7 +108,7 @@ func get_block_numbers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @notice This function is gets the xp value for a user in a season
 // @param season_id_ - id of the season
 // @param user_address_ - Address of the user
-// @param xp_value - Xp value for that user in the required season
+// @returns xp_value - Xp value for that user in the required season
 @view
 func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, user_address_: felt
@@ -128,16 +147,13 @@ func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    let (season: TradingSeason) = IHighTide.get_season(
+    let (is_expired: felt) = IHighTide.get_season_expiry_state(
         contract_address=hightide_address, season_id=season_id_
     );
 
-    // Get the day count
-    let current_day = get_current_day(season.start_timestamp);
-
     // Revert if season is still ongoing
     with_attr error_message("RewardsCalculation: Season still ongoing") {
-        assert_le(current_day, season.num_trading_days - 1);
+        assert is_expired = TRUE;
     }
 
     // Recursively update the users' xp value
@@ -151,6 +167,7 @@ func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     block_number_: felt
 ) {
+    alloc_locals;
     // Auth check
     let (registry) = get_registry_address();
     let (version) = get_contract_version();
@@ -202,6 +219,8 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         block_number_array_len.write(current_array_len + 1);
     }
 
+    block_number_set.emit(season_id=season_id, block_number=block_number_);
+
     return ();
 }
 
@@ -214,7 +233,6 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 // @param current_index_ - Index at which the block number is currently pointing to
 // @param ending_index_ - Index at which to stop
 // @param iterator_ - Stores the current length of the populated array
-// @param xp_values_ - Array of XpValues struct
 // @returns block_numbers_len - Length of the final block_numbers array
 func get_block_number_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     block_numbers_: felt*, current_index_: felt, ending_index_: felt, iterator_: felt
@@ -261,10 +279,8 @@ func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         assert_le(0, [xp_values_].final_xp_value);
     }
 
-    if ([xp_values_].user_address == 0x0) {
-        with_attr error_message("RewardsCalculation: User Address cannot be 0") {
-            assert 1 = 0;
-        }
+    with_attr error_message("RewardsCalculation: User Address cannot be 0") {
+        assert_not_zero([xp_values_].user_address);
     }
 
     let (current_xp_value: felt) = xp_value.read(
@@ -282,25 +298,15 @@ func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         value=[xp_values_].final_xp_value,
     );
 
+    xp_value_set.emit(
+        season_id=season_id_,
+        user_address=[xp_values_].user_address,
+        xp_value=[xp_values_].final_xp_value,
+    );
+
     return set_user_xp_values_recurse(
         season_id_=season_id_,
         xp_values_len_=xp_values_len_ - 1,
         xp_values_=xp_values_ + XpValues.SIZE,
     );
-}
-
-// @dev - Returns current day of the season based on current timestamp
-// if season has ended then it returns max number of trading days configured for the season
-func get_current_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    start_timestamp: felt
-) -> felt {
-    alloc_locals;
-
-    let (current_timestamp) = get_block_timestamp();
-    local time_since_start = current_timestamp - start_timestamp;
-
-    // Calculate current day = S/number of seconds in a day where S=time since start of season
-    let (current_day, r) = unsigned_div_rem(time_since_start, 24 * 60 * 60);
-
-    return current_day;
 }
