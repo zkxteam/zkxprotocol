@@ -98,6 +98,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
     trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
+    user_stats = await starknet_service.deploy(ContractType.UserStats, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -140,6 +141,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [26, 1, user_stats.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -204,6 +206,11 @@ async def test_unauthorized_call(adminAuth_factory):
 
     size1 = to64x61(1)
     marketID_1 = BTC_USD_ID
+    season_id = 1
+    fee_64x61 = to64x61(0.5)
+    order_volume_64x61 = to64x61(1000)
+    open_type = 1
+    pnl_64x61 = to64x61(100)
 
     order_id_1 = str_to_felt("sdj324hka8kaedf")
     assetID_1 = BTC_ID
@@ -250,6 +257,7 @@ async def test_unauthorized_call(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
+            1, alice.contract_address, fee_64x61, order_volume_64x61, open_type, pnl_64x61
     ]), "Trade can be recorded only by Trading contract")
 
 

@@ -1,16 +1,18 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import unsigned_div_rem, assert_le, assert_in_range, assert_lt
 from starkware.cairo.common.math_cmp import is_nn, is_le
 
-from contracts.Constants import Hightide_INDEX, Trading_INDEX
-from contracts.DataTypes import VolumeMetaData, TradingSeason, MultipleOrder
+from contracts.Constants import Hightide_INDEX, Trading_INDEX, UserStats_INDEX
+from contracts.DataTypes import VolumeMetaData, TraderStats, TradingSeason, MultipleOrder
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
+from contracts.interfaces.IUserStats import IUserStats
 from contracts.libraries.CommonLibrary import (
     CommonLib,
     get_contract_version,
@@ -102,37 +104,6 @@ func get_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (current_num_orders, current_total_volume_64x61);
 }
 
-@view
-func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
-) -> (average_volume: felt) {
-    alloc_locals;
-
-    let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=1
-    );
-
-    let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=0
-    );
-
-    let (current_num_orders_open) = num_orders.read(volume_metadata_pair_open);
-    let (current_num_orders_close) = num_orders.read(volume_metadata_pair_close);
-
-    let (current_total_volume_open_64x61) = order_volume.read(volume_metadata_pair_open);
-    let (current_total_volume_close_64x61) = order_volume.read(volume_metadata_pair_close);
-
-    let (total_volume_64x61) = Math64x61_add(
-        current_total_volume_open_64x61, current_total_volume_close_64x61
-    );
-    let total_orders = current_num_orders_open + current_num_orders_close;
-    let (total_orders_64x61) = Math64x61_fromIntFelt(total_orders);
-
-    let (average_volume) = Math64x61_div(total_volume_64x61, total_orders_64x61);
-
-    return (average_volume,);
-}
-
 // @dev - Returns current active trader count for given <season_id, pair_id>
 // This might be used to calculate x_4 according to the hightide algorithm
 @view
@@ -217,6 +188,8 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     execution_price_64x61_: felt,
     request_list_len: felt,
     request_list: MultipleOrder*,
+    trader_stats_list_len: felt,
+    trader_stats_list: TraderStats*,
 ) {
     alloc_locals;
 
@@ -232,37 +205,40 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     with_attr error_message("Trade can be recorded only by Trading contract") {
         assert caller = trading_address;
     }
-    // Get HightideAdmin address from Authorized Registry
+
+    // Get Hightide address from Authorized Registry
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    // Get current season id from hightide
     let (season_id_) = IHighTide.get_current_season_id(hightide_address);
-    let invalid_season_id = is_le(season_id_, 0);
-
-    // Season id <=0 means that Hightide module has not been activated - in other words no season has been started in the system
-    // This scenario is similar to when a season has ended but a new one has not started yet
-    // In such a situation we just return without recording the trade stats
-    if (invalid_season_id == 1) {
+    if (season_id_ == 0) {
         return ();
     }
 
-    let (current_timestamp) = get_block_timestamp();
+    let (is_expired) = IHighTide.get_season_expiry_state(hightide_address, season_id_);
+    if (is_expired == TRUE) {
+        return ();
+    }
+
+    // Get User stats address
+    let (user_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=UserStats_INDEX, version=version
+    );
+
+    IUserStats.record_trader_stats(
+        contract_address=user_stats_address,
+        season_id=season_id_,
+        pair_id=pair_id_,
+        trader_stats_list_len=trader_stats_list_len,
+        trader_stats_list=trader_stats_list,
+    );
 
     // Get trading season data
     let (season: TradingSeason) = IHighTide.get_season(hightide_address, season_id_);
 
     // Get the current day according to the season
     let current_day = get_current_day(season.start_timestamp);
-
-    let within_season = is_le(current_day, season.num_trading_days - 1);
-
-    // If the season is over, return without setting the trading stats
-    // we do not check whether season has started, since Hightide returns only a season_id when it has started
-    if (within_season == 0) {
-        return ();
-    }
 
     let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, current_day);
 

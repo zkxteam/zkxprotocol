@@ -315,3 +315,18 @@ struct HighTideFactors {
     x_3: felt,
     x_4: felt,
 }
+
+// Struct to store Trader's stats
+struct TraderStats {
+    trader_address: felt,
+    fee_64x61: felt,
+    order_volume_64x61: felt,
+    order_type: felt,  // 0 for open order, 1 for close order
+    pnl_64x61: felt,
+}
+
+// Struct to store Trader's pnl
+struct PnL {
+    old_pnl_64x61: felt,
+    new_pnl_64x61: felt,
+}
