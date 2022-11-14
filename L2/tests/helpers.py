@@ -38,6 +38,7 @@ class ContractType(Enum):
     PubkeyWhitelister = "contracts/signature_infra/PubkeyWhitelister.cairo"
     HighTide = "contracts/hightide/HighTide.cairo"
     HighTideCalc = "contracts/hightide/HighTideCalc.cairo"
+    RewardsCalculation = "contracts/hightide/RewardsCalculation.cairo"
     TradingStats = "contracts/hightide/TradingStats.cairo"
     LiquidityPool = "contracts/hightide/LiquidityPool.cairo"
     UserStats = "contracts/hightide/UserStats.cairo"

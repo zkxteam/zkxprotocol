@@ -330,3 +330,9 @@ struct PnL {
     old_pnl_64x61: felt,
     new_pnl_64x61: felt,
 }
+
+// Struct to pass xp values to L2
+struct XpValues {
+    user_address: felt,
+    final_xp_value: felt,
+}
