@@ -61,6 +61,7 @@ class ContractType(Enum):
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
     TestAsset = "tests/contracts/Asset.cairo"
+    TestHighTide = "tests/testable/TestHighTide.cairo"
 
 class OptimizedStarknetState(StarknetState):
 

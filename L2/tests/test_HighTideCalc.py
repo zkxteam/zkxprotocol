@@ -5,9 +5,10 @@ import time
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
+from starkware.starknet.core.os.class_hash import compute_class_hash
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals, assert_events_emitted
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -35,6 +36,7 @@ TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
+class_hash = 0
 
 initial_timestamp = int(time.time())
 timestamp2 = int(time.time()) + (60*60*24) + 60
@@ -61,6 +63,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
     fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
+
+    contract_class = starknet_service.contracts_holder.get_contract_class(ContractType.LiquidityPool)
+    global class_hash
+    class_hash, _ = await starknet_service.starknet.state.declare(contract_class)
+    direct_class_hash = compute_class_hash(contract_class)
+    class_hash = int.from_bytes(class_hash,'big')
+    assert direct_class_hash == class_hash
 
     ### Deploy user accounts
     account_factory = AccountFactory(
@@ -100,9 +109,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ContractType.CollateralPrices, 
         [registry.contract_address, 1]
     )
-    hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
+    hightide = await starknet_service.deploy(ContractType.TestHighTide, [registry.contract_address, 1])
     hightideCalc = await starknet_service.deploy(ContractType.HighTideCalc, [registry.contract_address, 1])
     trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
+    user_stats = await starknet_service.deploy(ContractType.UserStats, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -145,8 +155,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [26, 1, trading_stats.contract_address])
-
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [26, 1, user_stats.contract_address])
+    
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
     base_fee_taker1 = to64x61(0.0005)
@@ -194,149 +204,29 @@ async def adminAuth_factory(starknet_service: StarknetService):
     season_id = 1
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
         initial_timestamp, 4])
+    
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [1])
 
+    await admin1_signer.send_transaction(admin1, hightide.contract_address,'set_liquidity_pool_contract_class_hash',[class_hash])
+
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [ETH_USD_ID, 1, admin1.contract_address, 1, 2, USDC_ID, 1000, 0, UST_ID, 500, 0])
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [TSLA_USD_ID, 1, admin1.contract_address, 1, 2, USDC_ID, 1000, 0, UST_ID, 500, 0])
+
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'activate_high_tide', [1])
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'activate_high_tide', [2])
+
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, to64x61(100000)])
+    await admin1_signer.send_transaction(admin1, bob.contract_address, 'set_balance', [USDC_ID, to64x61(100000)])
+
+    markets = await market.get_markets_by_state(1,0).call()
+    print(markets.result)
     return starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate, trading_stats, hightide, hightideCalc
 
-@pytest.mark.asyncio
-async def test_unauthorized_call(adminAuth_factory):
-    
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, factors = adminAuth_factory
 
-    alice_balance = to64x61(50000)
-    bob_balance = to64x61(50000)
-    
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
-
-    size1 = to64x61(1)
-    marketID_1 = BTC_USD_ID
-
-    order_id_1 = str_to_felt("sdj324hka8kaedf")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
-    price1 = to64x61(5000)
-    stopPrice1 = 0
-    orderType1 = 0
-    position1 = to64x61(1)
-    direction1 = 0
-    closeOrder1 = 0
-    parentOrder1 = 0
-    leverage1 = to64x61(1)
-    liquidatorAddress1 = 0
-
-    order_id_2 = str_to_felt("wer4iljerw")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
-    price2 = to64x61(5000)
-    stopPrice2 = 0
-    orderType2 = 0
-    position2 = to64x61(1)
-    direction2 = 1
-    closeOrder2 = 0
-    parentOrder2 = 0
-    leverage2 = to64x61(1)
-    liquidatorAddress2 = 0
-
-    execution_price1 = to64x61(5000)
-
-    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
-    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
-
-    signed_message1 = alice_signer.sign(hash_computed1)
-    signed_message2 = bob_signer.sign(hash_computed2)
-
-    await assert_revert(dave_signer.send_transaction(dave, trading_stats.contract_address, "record_trade_batch_stats", [
-        marketID_1,
-        size1,
-        execution_price1,
-        2,
-        alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
-        bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
-    ]), "Trade can be recorded only by Trading contract")
-
-
-@pytest.mark.asyncio
-async def test_invalid_season_id_call(adminAuth_factory):
-    
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, hightideCalc = adminAuth_factory
-     ####### Opening of Orders #######
-    size1 = to64x61(1)
-    marketID_1 = BTC_USD_ID
-
-    order_id_1 = str_to_felt("12345")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
-    price1 = to64x61(5000)
-    stopPrice1 = 0
-    orderType1 = 0
-    position1 = to64x61(1)
-    direction1 = 0
-    closeOrder1 = 0
-    parentOrder1 = 0
-    leverage1 = to64x61(1)
-    liquidatorAddress1 = 0
-
-    order_id_2 = str_to_felt("67899")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
-    price2 = to64x61(5000)
-    stopPrice2 = 0
-    orderType2 = 0
-    position2 = to64x61(1)
-    direction2 = 1
-    closeOrder2 = 0
-    parentOrder2 = 0
-    leverage2 = to64x61(1)
-    liquidatorAddress2 = 0
-
-    execution_price1 = to64x61(5000)
-
-    hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-                                price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
-    hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-                                price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
-
-    signed_message1 = alice_signer.sign(hash_computed1)
-    signed_message2 = bob_signer.sign(hash_computed2)
-
-
-    res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
-        size1,
-        execution_price1,
-        marketID_1,
-        2,
-        alice.contract_address, signed_message1[0], signed_message1[
-            1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
-        bob.contract_address, signed_message2[0], signed_message2[
-            1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
-    ])
-    
-    season_id=0
-    pair_id=marketID_1
-
-    await assert_revert(trading_stats.get_total_days_traded(season_id, pair_id).call(),"Invalid season id")
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
-    assert active_traders.result.res == 0
-
-    await assert_revert(trading_stats.get_max_trades_in_day(season_id, pair_id).call(),"Invalid season id")
-
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 0)).call()
-    assert order_volume.result[0] == 0
-    assert from64x61(order_volume.result[1]) == 0
-
+ 
 @pytest.mark.asyncio
 async def test_placing_orders_day_0(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, hightideCalc = adminAuth_factory
-
-    # start season to test recording of trade stats
-    season_id=1
-    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [
-        season_id])
 
     ####### Opening of BTC_USD Orders #######
     size1 = to64x61(1)
@@ -812,7 +702,6 @@ async def test_closing_orders_day_1(adminAuth_factory):
     assert from64x61(order_volume.result[1]) == 2*from64x61(size2)*from64x61(execution_price2)
     print("final long volume TSLA", from64x61(order_volume.result[1]))
 
-
 @pytest.mark.asyncio
 async def test_opening_orders_day_2(adminAuth_factory):
     starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, hightideCalc = adminAuth_factory
@@ -984,7 +873,6 @@ async def test_opening_orders_day_2(adminAuth_factory):
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1])== 2*from64x61(size2)*from64x61(execution_price2)
 
-
 @pytest.mark.asyncio
 async def test_opening_closing_orders_day_3(adminAuth_factory):
     starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, hightideCalc = adminAuth_factory
@@ -1149,16 +1037,19 @@ async def test_calculating_factors(adminAuth_factory):
         starknet_version = STARKNET_VERSION
     )
 
-    await dave_signer.send_transaction(dave, hightideCalc.contract_address, "calculate_high_tide_factors", [
-        2,
-        ETH_USD_ID,
-        TSLA_USD_ID,
-        1, 
-        BTC_USD_ID
+    markets = await hightide.get_hightides_by_season_id(1).call()
+    print(markets.result)
+
+    top_stats = await hightideCalc.find_top_stats(1).call()
+    print(top_stats.result)
+
+    set_factors_tx = await dave_signer.send_transaction(dave, hightideCalc.contract_address, "calculate_high_tide_factors", [
+        1,
     ])
 
     ETH_factors = await hightideCalc.get_hightide_factors(1, ETH_USD_ID).call()
     ETH_parsed = list(ETH_factors.result.res)
+    print(ETH_parsed)
 
     assert from64x61(ETH_parsed[0]) == pytest.approx(((3600/4)/(76000/12)), abs=1e-6)
     assert from64x61(ETH_parsed[1]) == (2/4)
@@ -1167,11 +1058,22 @@ async def test_calculating_factors(adminAuth_factory):
 
     TSLA_factors = await hightideCalc.get_hightide_factors(1, TSLA_USD_ID).call()
     TSLA_parsed = list(TSLA_factors.result.res)
+    print(TSLA_parsed)
 
     assert from64x61(TSLA_parsed[0]) == pytest.approx(((640/4)/(76000/12)), abs=1e-6)
     assert from64x61(TSLA_parsed[1]) == (2/4)
     assert from64x61(TSLA_parsed[2]) == (2/4)
     assert from64x61(TSLA_parsed[3]) == (2/3)
+
+    assert_events_emitted(
+        set_factors_tx,
+        [
+            [0, hightideCalc.contract_address, "high_tide_factors_set", [1, ETH_USD_ID] + ETH_parsed],
+            [1, hightideCalc.contract_address, "high_tide_factors_set", [1, TSLA_USD_ID] + TSLA_parsed]
+        ]
+    )
+
+    
     
 
     

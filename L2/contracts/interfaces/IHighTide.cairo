@@ -20,4 +20,9 @@ namespace IHighTide {
 
     func get_season_expiry_state(season_id: felt) -> (is_expired: felt) {
     }
+
+    func get_hightides_by_season_id(season_id: felt) -> (
+        hightide_list_len: felt, hightide_list: felt*
+    ) {
+    }
 }

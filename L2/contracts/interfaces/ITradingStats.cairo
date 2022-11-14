@@ -13,7 +13,9 @@ namespace ITradingStats {
     ) {
     }
 
-    func get_average_order_volume(season_id_: felt, pair_id_: felt) -> (average_volume: felt) {
+    func get_average_order_volume(season_id_: felt, pair_id_: felt) -> (
+        average_volume_64x61: felt
+    ) {
     }
 
     func get_max_trades_in_day(season_id_: felt, pair_id_: felt) -> (res: felt) {
