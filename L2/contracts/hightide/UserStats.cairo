@@ -41,6 +41,18 @@ func trader_orders_count_recorded(
 ) {
 }
 
+// Event emitted when trader's pnl for a pair in a season is recorded
+@event
+func trader_pnl_recorded(season_id: felt, pair_id: felt, trader_address: felt, pnl_64x61: felt) {
+}
+
+// Event emitted when trader's margin for a pair in a season is recorded
+@event
+func trader_margin_recorded(
+    season_id: felt, pair_id: felt, trader_address: felt, margin_amount_64x61: felt
+) {
+}
+
 // //////////
 // Storage //
 // //////////
@@ -275,6 +287,9 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         let (updated_pnl_64x61) = Math64x61_add(current_pnl_64x61, abs_pnl_64x61);
         trader_pnl_by_market.write(season_id, pair_id, trader_address, updated_pnl_64x61);
 
+        // Emit event
+        trader_pnl_recorded.emit(season_id, pair_id, trader_address, updated_pnl_64x61);
+
         let margin_amount_64x61 = [trader_stats_list].margin_amount_64x61;
         let (current_margin_amount_64x61) = trader_margin_by_market.read(
             season_id, pair_id, trader_address
@@ -283,6 +298,11 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
             current_margin_amount_64x61, margin_amount_64x61
         );
         trader_margin_by_market.write(
+            season_id, pair_id, trader_address, updated_margin_amount_64x61
+        );
+
+        // Emit event
+        trader_margin_recorded.emit(
             season_id, pair_id, trader_address, updated_margin_amount_64x61
         );
 
