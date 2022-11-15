@@ -377,6 +377,7 @@ func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func calculate_f_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (f_p: felt) {
+    // Get trader's individual trading fees paid
     let (fee_64x61) = IUserStats.get_trader_fee(
         contract_address=user_stats_address_,
         season_id_=season_id_,
@@ -395,6 +396,7 @@ func calculate_f_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func calculate_f_t{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, user_stats_address_: felt
 ) -> (f_t: felt) {
+    // Get overall zkx platform trading fees
     let (total_fee_64x61) = IUserStats.get_total_fee(
         contract_address=user_stats_address_, season_id_=season_id_, pair_id_=pair_id_
     );
@@ -475,12 +477,15 @@ func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (p: felt) {
+    // Get pnl for a pair
     let (pnl_64x61) = IUserStats.get_trader_pnl(
         contract_address=user_stats_address_,
         season_id_=season_id_,
         pair_id_=pair_id_,
         trader_address_=trader_address_,
     );
+
+    // Get margin amount for an order that is getting closed
     let (margin_amount_64x61) = IUserStats.get_trader_margin_amount(
         contract_address=user_stats_address_,
         season_id_=season_id_,
@@ -488,6 +493,7 @@ func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         trader_address_=trader_address_,
     );
 
+    // Calculate ratio of pnl to the margin
     let (p: felt) = Math64x61_div(pnl_64x61, margin_amount_64x61);
 
     return (p,);
