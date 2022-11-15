@@ -154,13 +154,13 @@ func hightide_by_season_id(season_id: felt, index: felt) -> (hightide_id: felt) 
 // //////////////
 
 // @notice Constructor of the smart-contract
-// @param registry_address Address of the AuthorizedRegistry contract
-// @param version Version of this contract
+// @param registry_address_ Address of the AuthorizedRegistry contract
+// @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address: felt, version: felt
+    registry_address_: felt, version_: felt
 ) {
-    CommonLib.initialize(registry_address, version);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -179,26 +179,26 @@ func get_current_season_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 }
 
 // @notice View function to get the trading season for the supplied season id
-// @param season_id - id of the season
+// @param season_id_ - id of the season
 // @return trading_season - structure of trading season
 @view
 func get_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt
+    season_id_: felt
 ) -> (trading_season: TradingSeason) {
-    verify_season_id_exists(season_id);
-    let (trading_season) = trading_season_by_id.read(season_id=season_id);
+    verify_season_id_exists(season_id_);
+    let (trading_season) = trading_season_by_id.read(season_id=season_id_);
     return (trading_season,);
 }
 
 // @notice View function to get hightide metadata for the supplied hightide id
-// @param hightide_id - id of hightide
+// @param hightide_id_ - id of hightide
 // @return hightide_metadata - structure of hightide metadata
 @view
 func get_hightide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hightide_id: felt
+    hightide_id_: felt
 ) -> (hightide_metadata: HighTideMetaData) {
-    verify_hightide_id_exists(hightide_id);
-    let (hightide_metadata) = hightide_by_id.read(hightide_id=hightide_id);
+    verify_hightide_id_exists(hightide_id_);
+    let (hightide_metadata) = hightide_by_id.read(hightide_id=hightide_id_);
     return (hightide_metadata,);
 }
 
@@ -223,36 +223,36 @@ func get_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 }
 
 // @notice View function to get list of reward tokens
-// @param hightide_id - id of hightide
+// @param hightide_id_ - id of hightide
 // @return reward_tokens_list_len - length of reward tokens list
 // @return reward_tokens_list - list of reward tokens
 @view
 func get_hightide_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hightide_id: felt
+    hightide_id_: felt
 ) -> (reward_tokens_list_len: felt, reward_tokens_list: RewardToken*) {
     alloc_locals;
-    verify_hightide_id_exists(hightide_id);
+    verify_hightide_id_exists(hightide_id_);
     let (reward_tokens: RewardToken*) = alloc();
-    let (local reward_tokens_len) = reward_tokens_len_by_hightide.read(hightide_id);
-    populate_reward_tokens_recurse(hightide_id, 0, reward_tokens_len, reward_tokens);
+    let (local reward_tokens_len) = reward_tokens_len_by_hightide.read(hightide_id_);
+    populate_reward_tokens_recurse(hightide_id_, 0, reward_tokens_len, reward_tokens);
     return (reward_tokens_len, reward_tokens);
 }
 
 // @notice View function to get season's expiry state
-// @param season_id - id of the season
+// @param season_id_ - id of the season
 // @return is_expired - returns FALSE if it is not expired else TRUE
 @view
 func get_season_expiry_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt
+    season_id_: felt
 ) -> (is_expired: felt) {
     alloc_locals;
 
-    verify_season_id_exists(season_id);
+    verify_season_id_exists(season_id_);
     // get current block timestamp
     let (local current_timestamp) = get_block_timestamp();
 
     // calculates current trading seasons end timestamp
-    let (current_season: TradingSeason) = get_season(season_id);
+    let (current_season: TradingSeason) = get_season(season_id_);
     let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
     let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
 
@@ -264,17 +264,17 @@ func get_season_expiry_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 }
 
 // @notice View function to get the list of hightide ids corresponding to the season id
-// @param season_id - id of the season
+// @param season_id_ - id of the season
 // @return hightide_list_len - length of hightide list
 // @return hightide_list - list of hightide ids
 @view
 func get_hightides_by_season_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt
+    season_id_: felt
 ) -> (hightide_list_len: felt, hightide_list: felt*) {
     alloc_locals;
     let (hightide_list: felt*) = alloc();
-    let (local hightide_list_len) = hightide_by_season_id.read(season_id, 0);
-    populate_hightide_list_recurse(season_id, 0, hightide_list_len, hightide_list);
+    let (local hightide_list_len) = hightide_by_season_id.read(season_id_, 0);
+    populate_hightide_list_recurse(season_id_, 0, hightide_list_len, hightide_list);
     return (hightide_list_len, hightide_list);
 }
 
@@ -283,11 +283,11 @@ func get_hightides_by_season_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 // ///////////
 
 // @notice - This function is used for setting up trade season
-// @param start_timestamp - start timestamp of the season
-// @param num_trading_days - number of trading days
+// @param start_timestamp_ - start timestamp of the season
+// @param num_trading_days_ - number of trading days
 @external
 func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    start_timestamp: felt, num_trading_days: felt
+    start_timestamp_: felt, num_trading_days_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -303,7 +303,7 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Create Trading season struct to store
     let trading_season: TradingSeason = TradingSeason(
-        start_block_number=0, start_timestamp=start_timestamp, num_trading_days=num_trading_days
+        start_block_number=0, start_timestamp=start_timestamp_, num_trading_days=num_trading_days_
     );
 
     trading_season_by_id.write(season_id, trading_season);
@@ -315,10 +315,10 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 }
 
 // @notice - This function is used for starting trade season
-// @param season_id - id of the season
+// @param season_id_ - id of the season
 @external
 func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt
+    season_id_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -327,9 +327,9 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     with_attr error_message("HighTide: Unauthorized call to start trade season") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    validate_season_to_start(season_id);
+    validate_season_to_start(season_id_);
 
-    let (new_season: TradingSeason) = get_season(season_id);
+    let (new_season: TradingSeason) = get_season(season_id_);
 
     // get current block number
     let (current_block_number) = get_block_number();
@@ -341,20 +341,20 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         num_trading_days=new_season.num_trading_days,
     );
 
-    trading_season_by_id.write(season_id, trading_season);
-    current_trading_season.write(season_id);
+    trading_season_by_id.write(season_id_, trading_season);
+    current_trading_season.write(season_id_);
 
     // Emit event
     let (caller) = get_caller_address();
-    trading_season_started.emit(caller, season_id);
+    trading_season_started.emit(caller, season_id_);
     return ();
 }
 
 // @notice - This function is used for ending trade season
-// @param season_id - id of the season
+// @param season_id_ - id of the season
 @external
 func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt
+    season_id_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -364,7 +364,7 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
 
-    let (is_expired) = get_season_expiry_state(season_id);
+    let (is_expired) = get_season_expiry_state(season_id_);
     with_attr error_message("HighTide: Trading season is still active") {
         assert is_expired = TRUE;
     }
@@ -373,18 +373,18 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     // Emit event
     let (caller) = get_caller_address();
-    trading_season_ended.emit(caller, season_id);
+    trading_season_ended.emit(caller, season_id_);
     return ();
 }
 
 // @notice - This function is used for setting multipliers
-// @param a1 - alpha1 value
-// @param a2 - alpha2 value
-// @param a3 - alpha3 value
-// @param a4 - alpha4 value
+// @param a1_ - alpha1 value
+// @param a2_ - alpha2 value
+// @param a3_ - alpha3 value
+// @param a4_ - alpha4 value
 @external
 func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    a1: felt, a2: felt, a3: felt, a4: felt
+    a1_: felt, a2_: felt, a3_: felt, a4_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -395,7 +395,7 @@ func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     }
 
     // Create Multipliers struct to store
-    let multipliers: Multipliers = Multipliers(a1=a1, a2=a2, a3=a3, a4=a4);
+    let multipliers: Multipliers = Multipliers(a1=a1_, a2=a2_, a3=a3_, a4=a4_);
     multipliers_to_calculate_reward.write(multipliers);
 
     // Emit event
@@ -405,14 +405,14 @@ func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 }
 
 // @notice - This function is used for setting constants
-// @param a - a value
-// @param b - b value
-// @param c - c value
-// @param z - z value
-// @param e - e value
+// @param a_ - a value
+// @param b_ - b value
+// @param c_ - c value
+// @param z_ - z value
+// @param e_ - e value
 @external
 func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    a: felt, b: felt, c: felt, z: felt, e: felt
+    a_: felt, b_: felt, c_: felt, z_: felt, e_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -423,7 +423,7 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     }
 
     // Create Constants struct to store
-    let constants: Constants = Constants(a=a, b=b, c=c, z=z, e=e);
+    let constants: Constants = Constants(a=a_, b=b_, c=c_, z=z_, e=e_);
     constants_to_calculate_trader_score.write(constants);
 
     // Emit event
@@ -433,41 +433,41 @@ func set_constants{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 }
 
 // @notice external function to set class hash of liquidity pool contract
-// @param class_hash -  class hash of the liquidity pool contract
+// @param class_hash_ -  class hash of the liquidity pool contract
 @external
 func set_liquidity_pool_contract_class_hash{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(class_hash: felt) {
+}(class_hash_: felt) {
     let (current_registry_address) = CommonLib.get_registry_address();
     let (current_version) = CommonLib.get_contract_version();
 
     verify_caller_authority(current_registry_address, current_version, ManageHighTide_ACTION);
 
     with_attr error_message("HighTide: Class hash cannot be 0") {
-        assert_not_zero(class_hash);
+        assert_not_zero(class_hash_);
     }
 
-    liquidity_pool_contract_class_hash.write(class_hash);
+    liquidity_pool_contract_class_hash.write(class_hash_);
 
     // Emit event
-    liquidity_pool_contract_class_hash_changed.emit(class_hash=class_hash);
+    liquidity_pool_contract_class_hash_changed.emit(class_hash=class_hash_);
 
     return ();
 }
 
 // @notice - This function is used to initialize high tide
-// @param pair_id - supported market pair
-// @param season_id - preferred season
-// @param token_lister_address - L2 address of token lister
-// @param is_burnable - if 0 - return to token lister, 1 - burn tokens
+// @param pair_id_ - supported market pair
+// @param season_id_ - preferred season
+// @param token_lister_address_ - L2 address of token lister
+// @param is_burnable_ - if 0 - return to token lister, 1 - burn tokens
 // @param reward_tokens_list_len - no.of reward tokens for an hightide
 // @param reward_tokens_list - array of tokens to be given as reward
 @external
 func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id: felt,
-    season_id: felt,
-    token_lister_address: felt,
-    is_burnable: felt,
+    pair_id_: felt,
+    season_id_: felt,
+    token_lister_address_: felt,
+    is_burnable_: felt,
     reward_tokens_list_len: felt,
     reward_tokens_list: RewardToken*,
 ) {
@@ -479,10 +479,10 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     with_attr error_message("HighTide: Unauthorized call to initialize hightide") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
-    verify_season_id_exists(season_id);
+    verify_season_id_exists(season_id_);
 
     with_attr error_message("HighTide: Token lister address cannot be 0") {
-        assert_not_zero(token_lister_address);
+        assert_not_zero(token_lister_address_);
     }
 
     // Get market contract address
@@ -492,7 +492,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Get Market from the corresponding market id
     let (market: Market) = IMarkets.get_market(
-        contract_address=market_contract_address, id=pair_id
+        contract_address=market_contract_address, id=pair_id_
     );
 
     with_attr error_message("HighTide: Listed market pair does not exist") {
@@ -500,7 +500,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     with_attr error_message("HighTide: is_burnable value should be boolean") {
-        assert_bool(is_burnable);
+        assert_bool(is_burnable_);
     }
 
     let (curr_len) = hightides_array_len.read();
@@ -511,11 +511,11 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Create hightide metadata structure
     let hightide: HighTideMetaData = HighTideMetaData(
-        pair_id=pair_id,
+        pair_id=pair_id_,
         status=HIGHTIDE_INITIATED,
-        season_id=season_id,
-        token_lister_address=token_lister_address,
-        is_burnable=is_burnable,
+        season_id=season_id_,
+        token_lister_address=token_lister_address_,
+        is_burnable=is_burnable_,
         liquidity_pool_address=liquidity_pool_address,
     );
 
@@ -532,13 +532,13 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 }
 
 // @notice - This function is used to activate high tide
-// @param hightide_id - id of hightide
+// @param hightide_id_ - id of hightide
 @external
 func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hightide_id: felt
+    hightide_id_: felt
 ) {
     alloc_locals;
-    verify_hightide_id_exists(hightide_id);
+    verify_hightide_id_exists(hightide_id_);
 
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -549,9 +549,9 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     let (
         reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
-    ) = get_hightide_reward_tokens(hightide_id);
+    ) = get_hightide_reward_tokens(hightide_id_);
 
-    let (hightide_metadata: HighTideMetaData) = get_hightide(hightide_id);
+    let (hightide_metadata: HighTideMetaData) = get_hightide(hightide_id_);
     let (status) = check_activation_recurse(
         hightide_metadata.liquidity_pool_address,
         starkway_contract_address,
@@ -570,13 +570,13 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             liquidity_pool_address=hightide_metadata.liquidity_pool_address,
         );
 
-        hightide_by_id.write(hightide_id, hightide);
+        hightide_by_id.write(hightide_id_, hightide);
 
         // Emit event
         let (caller) = get_caller_address();
-        hightide_activated.emit(caller=caller, hightide_id=hightide_id);
+        hightide_activated.emit(caller=caller, hightide_id=hightide_id_);
 
-        assign_hightide_to_season(hightide_id, hightide_metadata.season_id);
+        assign_hightide_to_season(hightide_id_, hightide_metadata.season_id);
     } else {
         return ();
     }
@@ -588,31 +588,31 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // ///////////
 
 func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt
+    season_id_: felt
 ) {
     with_attr error_message("HighTide: Trading season id existence mismatch") {
-        assert_nn(season_id);
-        assert_not_zero(season_id);
+        assert_nn(season_id_);
+        assert_not_zero(season_id_);
         let (seasons_len) = seasons_array_len.read();
-        assert_le(season_id, seasons_len);
+        assert_le(season_id_, seasons_len);
     }
     return ();
 }
 
 func verify_hightide_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hightide_id: felt
+    hightide_id_: felt
 ) {
     with_attr error_message("HighTide: Hightide id existence mismatch") {
-        assert_nn(hightide_id);
-        assert_not_zero(hightide_id);
+        assert_nn(hightide_id_);
+        assert_not_zero(hightide_id_);
         let (hightide_len) = hightides_array_len.read();
-        assert_le(hightide_id, hightide_len);
+        assert_le(hightide_id_, hightide_len);
     }
     return ();
 }
 
 func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt
+    season_id_: felt
 ) {
     alloc_locals;
 
@@ -630,9 +630,9 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         assert is_expired = TRUE;
     }
 
-    verify_season_id_exists(season_id);
+    verify_season_id_exists(season_id_);
     // calculates new trading seasons end timestamp
-    let (new_season: TradingSeason) = get_season(season_id);
+    let (new_season: TradingSeason) = get_season(season_id_);
     let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * 24 * 60 * 60;
     let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
 
@@ -648,8 +648,10 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
 func set_hightide_reward_tokens_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(hightide_id: felt, index: felt, reward_tokens_list_len: felt, reward_tokens_list: RewardToken*) {
-    if (index == reward_tokens_list_len) {
+}(
+    hightide_id_: felt, index_: felt, reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
+) {
+    if (index_ == reward_tokens_list_len) {
         return ();
     }
 
@@ -658,16 +660,16 @@ func set_hightide_reward_tokens_recurse{
         token_id=[reward_tokens_list].token_id, no_of_tokens=[reward_tokens_list].no_of_tokens
     );
 
-    hightide_rewards_by_id.write(hightide_id, index, reward_token);
+    hightide_rewards_by_id.write(hightide_id_, index_, reward_token);
     return set_hightide_reward_tokens_recurse(
-        hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list + RewardToken.SIZE
+        hightide_id_, index_ + 1, reward_tokens_list_len, reward_tokens_list + RewardToken.SIZE
     );
 }
 
 func deploy_liquidity_pool_contract{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(hightide_id: felt) -> (deployed_address: felt) {
-    let (hightide_metadata) = get_hightide(hightide_id);
+}(hightide_id_: felt) -> (deployed_address: felt) {
+    let (hightide_metadata) = get_hightide(hightide_id_);
     let (hash) = liquidity_pool_contract_class_hash.read();
     let (current_registry_address) = CommonLib.get_registry_address();
     let (current_version) = CommonLib.get_contract_version();
@@ -684,7 +686,7 @@ func deploy_liquidity_pool_contract{
     // prepare constructor calldata for deploy call
     let calldata: felt* = alloc();
 
-    assert calldata[0] = hightide_id;
+    assert calldata[0] = hightide_id_;
     assert calldata[1] = current_registry_address;
     assert calldata[2] = current_version;
 
@@ -692,7 +694,7 @@ func deploy_liquidity_pool_contract{
 
     // Emit event
     liquidity_pool_contract_deployed.emit(
-        hightide_id=hightide_id, contract_address=deployed_address
+        hightide_id=hightide_id_, contract_address=deployed_address
     );
 
     return (deployed_address=deployed_address);
@@ -700,44 +702,46 @@ func deploy_liquidity_pool_contract{
 
 func populate_reward_tokens_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(hightide_id: felt, index: felt, reward_tokens_list_len: felt, reward_tokens_list: RewardToken*) {
-    if (index == reward_tokens_list_len) {
+}(
+    hightide_id_: felt, index_: felt, reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
+) {
+    if (index_ == reward_tokens_list_len) {
         return ();
     }
 
-    let reward_token: RewardToken = hightide_rewards_by_id.read(hightide_id, index);
-    assert reward_tokens_list[index] = reward_token;
+    let reward_token: RewardToken = hightide_rewards_by_id.read(hightide_id_, index_);
+    assert reward_tokens_list[index_] = reward_token;
     return populate_reward_tokens_recurse(
-        hightide_id, index + 1, reward_tokens_list_len, reward_tokens_list
+        hightide_id_, index_ + 1, reward_tokens_list_len, reward_tokens_list
     );
 }
 
 func check_activation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    liquidity_pool_address: felt,
-    starkway_contract_address: felt,
-    iterator: felt,
+    liquidity_pool_address_: felt,
+    starkway_contract_address_: felt,
+    iterator_: felt,
     reward_tokens_list_len: felt,
     reward_tokens_list: RewardToken*,
 ) -> (status: felt) {
     alloc_locals;
-    if (iterator == reward_tokens_list_len) {
+    if (iterator_ == reward_tokens_list_len) {
         return (TRUE,);
     }
 
     let (
         contract_address_list_len: felt, contract_address_list: felt*
     ) = IStarkway.get_whitelisted_token_addresses(
-        contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
+        contract_address=starkway_contract_address_, token_id=[reward_tokens_list].token_id
     );
 
     local balance_Uint256: Uint256 = cast((low=0, high=0), Uint256);
     let (native_token_l2_address: felt) = IStarkway.get_native_token_l2_address(
-        contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
+        contract_address=starkway_contract_address_, token_id=[reward_tokens_list].token_id
     );
 
     if (native_token_l2_address != 0) {
         let current_balance_Uint256: Uint256 = IERC20.balanceOf(
-            native_token_l2_address, liquidity_pool_address
+            native_token_l2_address, liquidity_pool_address_
         );
         assert balance_Uint256 = current_balance_Uint256;
         tempvar syscall_ptr = syscall_ptr;
@@ -750,7 +754,11 @@ func check_activation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     }
 
     let (token_balance_Uint256) = verify_token_balance_recurse(
-        liquidity_pool_address, balance_Uint256, 0, contract_address_list_len, contract_address_list
+        liquidity_pool_address_,
+        balance_Uint256,
+        0,
+        contract_address_list_len,
+        contract_address_list,
     );
     let (result) = uint256_lt(token_balance_Uint256, [reward_tokens_list].no_of_tokens);
     if (result == TRUE) {
@@ -758,68 +766,68 @@ func check_activation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     }
 
     return check_activation_recurse(
-        liquidity_pool_address,
-        starkway_contract_address,
-        iterator + 1,
+        liquidity_pool_address_,
+        starkway_contract_address_,
+        iterator_ + 1,
         reward_tokens_list_len,
         reward_tokens_list + RewardToken.SIZE,
     );
 }
 
 func verify_token_balance_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    liquidity_pool_address: felt,
-    balance_Uint256: Uint256,
-    iterator: felt,
+    liquidity_pool_address_: felt,
+    balance_Uint256_: Uint256,
+    iterator_: felt,
     contract_address_list_len: felt,
     contract_address_list: felt*,
 ) -> (token_balance_Uint256: Uint256) {
-    if (iterator == contract_address_list_len) {
-        return (balance_Uint256,);
+    if (iterator_ == contract_address_list_len) {
+        return (balance_Uint256_,);
     }
 
     let current_balance_Uint256: Uint256 = IERC20.balanceOf(
-        [contract_address_list], liquidity_pool_address
+        [contract_address_list], liquidity_pool_address_
     );
 
-    let (new_balance_Uint256, carry) = uint256_add(balance_Uint256, current_balance_Uint256);
+    let (new_balance_Uint256, carry) = uint256_add(balance_Uint256_, current_balance_Uint256);
     return verify_token_balance_recurse(
-        liquidity_pool_address,
+        liquidity_pool_address_,
         new_balance_Uint256,
-        iterator + 1,
+        iterator_ + 1,
         contract_address_list_len,
         contract_address_list + 1,
     );
 }
 
 func assign_hightide_to_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hightide_id: felt, season_id: felt
+    hightide_id_: felt, season_id_: felt
 ) {
-    let (is_expired) = get_season_expiry_state(season_id);
+    let (is_expired) = get_season_expiry_state(season_id_);
 
     with_attr error_message("HighTide: Trading season already ended") {
         assert is_expired = FALSE;
     }
 
-    let (index) = hightide_by_season_id.read(season_id, 0);
-    hightide_by_season_id.write(season_id, index + 1, hightide_id);
+    let (index) = hightide_by_season_id.read(season_id_, 0);
+    hightide_by_season_id.write(season_id_, index + 1, hightide_id_);
 
     // 0th index always stores the no.of hightides corresponding to the season
-    hightide_by_season_id.write(season_id, 0, index + 1);
+    hightide_by_season_id.write(season_id_, 0, index + 1);
 
     // Emit event
-    assigned_hightide_to_season.emit(hightide_id=hightide_id, season_id=season_id);
+    assigned_hightide_to_season.emit(hightide_id=hightide_id_, season_id=season_id_);
 
     return ();
 }
 
 func populate_hightide_list_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(season_id: felt, index: felt, hightide_list_len: felt, hightide_list: felt*) {
-    if (index == hightide_list_len) {
+}(season_id_: felt, index_: felt, hightide_list_len: felt, hightide_list: felt*) {
+    if (index_ == hightide_list_len) {
         return ();
     }
 
-    let (hightide_id) = hightide_by_season_id.read(season_id, index + 1);
-    assert hightide_list[index] = hightide_id;
-    return populate_hightide_list_recurse(season_id, index + 1, hightide_list_len, hightide_list);
+    let (hightide_id) = hightide_by_season_id.read(season_id_, index_ + 1);
+    assert hightide_list[index_] = hightide_id;
+    return populate_hightide_list_recurse(season_id_, index_ + 1, hightide_list_len, hightide_list);
 }
