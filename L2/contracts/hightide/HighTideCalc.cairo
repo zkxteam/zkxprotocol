@@ -1,14 +1,22 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from contracts.Constants import Hightide_INDEX, Market_INDEX, TradingStats_INDEX
-from contracts.DataTypes import HighTideFactors, HighTideMetaData, Market, TradingSeason
+from contracts.DataTypes import (
+    HighTideFactors,
+    HighTideMetaData,
+    Market,
+    TradingSeason,
+    VolumeMetaData,
+)
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingStats import ITradingStats
+from contracts.interfaces.IUserStats import IUserStats
 from contracts.libraries.CommonLibrary import (
     CommonLib,
     get_contract_version,
@@ -16,29 +24,29 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
-from contracts.Math_64x61 import Math64x61_div, Math64x61_fromIntFelt
+from contracts.Math_64x61 import Math64x61_div, Math64x61_fromIntFelt, Math64x61_sub
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever collateral is transferred from account by trading
 @event
 func high_tide_factors_set(season_id: felt, pair_id: felt, factors: HighTideFactors) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores high tide factors for
 @storage_var
 func high_tide_factors(season_id: felt, pair_id: felt) -> (factors: HighTideFactors) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -51,9 +59,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice view function to get the hightide factors of a pair
 // @param season_id_ - Id of the season
@@ -115,9 +123,9 @@ func find_top_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     );
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice external function to calculate the factors
 // @param season_id_ - Season Id for which to calculate the factors of a pair
@@ -179,9 +187,9 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     );
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// ///////////
+// Internal //
+// ///////////
 
 // @notice internal function to recursively calculate the factors
 // @param pair_id_list_len - Length of the pair_id array
@@ -358,6 +366,131 @@ func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     let (x_4: felt) = Math64x61_div(number_of_traders_64x61, number_of_traders_top_pair_64x61_);
 
     return (x_4,);
+}
+
+// @notice internal function to calculate f_p for a pair corresponding to a trader
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param pair_id_- Pair Id for which to calculate x_4
+// @param trader_address_ - l2 address of the trader
+// @param user_stats_address_ - Address of the User stats contract
+// @return f_p - returns trader's individual trading fees paid
+func calculate_f_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
+) -> (f_p: felt) {
+    let (fee_64x61) = IUserStats.get_trader_fee(
+        contract_address=user_stats_address_,
+        season_id_=season_id_,
+        pair_id_=pair_id_,
+        trader_address_=trader_address_,
+    );
+
+    return (fee_64x61,);
+}
+
+// @notice internal function to calculate f_t for a pair
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param pair_id_- Pair Id for which to calculate x_4
+// @param user_stats_address_ - Address of the User stats contract
+// @return f_t - returns overall zkx platform trading fees
+func calculate_f_t{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt, user_stats_address_: felt
+) -> (f_t: felt) {
+    let (total_fee_64x61) = IUserStats.get_total_fee(
+        contract_address=user_stats_address_, season_id_=season_id_, pair_id_=pair_id_
+    );
+
+    return (total_fee_64x61,);
+}
+
+// @notice internal function to calculate d for a pair corresponding to a trader
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param pair_id_- Pair Id for which to calculate x_4
+// @param trader_address_ - l2 address of the trader
+// @param user_stats_address_ - Address of the User stats contract
+// @return d - returns trader's average open interest
+func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
+) -> (d: felt) {
+    // Create a VolumeMetadata struct for open orders
+    let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, pair_id=pair_id_, order_type=0
+    );
+
+    // Create a VolumeMetadata struct for close orders
+    let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, pair_id=pair_id_, order_type=1
+    );
+
+    // Get the order volume for open orders
+    let (
+        current_num_orders_open: felt, current_total_volume_open_64x61: felt
+    ) = IUserStats.get_trader_order_volume(
+        contract_address=user_stats_address_,
+        trader_address_=trader_address_,
+        volume_type_=volume_metadata_pair_open,
+    );
+
+    // Get the order volume for close orders
+    let (
+        current_num_orders_close: felt, current_total_volume_close_64x61: felt
+    ) = IUserStats.get_trader_order_volume(
+        contract_address=user_stats_address_,
+        trader_address_=trader_address_,
+        volume_type_=volume_metadata_pair_close,
+    );
+
+    // check whether subtracting close order volume from open order volume is either positive or negative
+    let is_negative = is_le(current_total_volume_open_64x61, current_total_volume_close_64x61);
+    if (is_negative == TRUE) {
+        return (0,);
+    }
+
+    // Find remaining open order volume after subtracting close order volume from it
+    let (remaining_volume_open_64x61) = Math64x61_sub(
+        current_total_volume_open_64x61, current_total_volume_close_64x61
+    );
+
+    // Find total orders by adding open and close orders
+    let total_orders = current_num_orders_open + current_num_orders_close;
+
+    if (total_orders == 0) {
+        return (0,);
+    }
+
+    // Convert the total to 64x61 format
+    let (total_orders_64x61) = Math64x61_fromIntFelt(total_orders);
+
+    // Calculate average open interest
+    let (d) = Math64x61_div(remaining_volume_open_64x61, total_orders_64x61);
+
+    return (d,);
+}
+
+// @notice internal function to calculate p for a pair corresponding to a trader
+// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param pair_id_- Pair Id for which to calculate x_4
+// @param trader_address_ - l2 address of the trader
+// @param user_stats_address_ - Address of the User stats contract
+// @return p - returns p value for a pair corresponding to a trader
+func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
+) -> (p: felt) {
+    let (pnl_64x61) = IUserStats.get_trader_pnl(
+        contract_address=user_stats_address_,
+        season_id_=season_id_,
+        pair_id_=pair_id_,
+        trader_address_=trader_address_,
+    );
+    let (margin_amount_64x61) = IUserStats.get_trader_margin_amount(
+        contract_address=user_stats_address_,
+        season_id_=season_id_,
+        pair_id_=pair_id_,
+        trader_address_=trader_address_,
+    );
+
+    let (p: felt) = Math64x61_div(pnl_64x61, margin_amount_64x61);
+
+    return (p,);
 }
 
 // @notice internal function to recursively calculate the top stats in a season
