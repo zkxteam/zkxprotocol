@@ -211,6 +211,7 @@ async def test_unauthorized_call(adminAuth_factory):
     order_volume_64x61 = to64x61(1000)
     open_type = 1
     pnl_64x61 = to64x61(100)
+    margin_amount_64x61 = to64x61(5000)
 
     order_id_1 = str_to_felt("sdj324hka8kaedf")
     assetID_1 = BTC_ID
@@ -257,7 +258,7 @@ async def test_unauthorized_call(adminAuth_factory):
             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 0,
         bob.contract_address, signed_message2[0], signed_message2[
             1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 1,
-            1, alice.contract_address, fee_64x61, order_volume_64x61, open_type, pnl_64x61
+            1, alice.contract_address, fee_64x61, order_volume_64x61, open_type, pnl_64x61, margin_amount_64x61
     ]), "Trade can be recorded only by Trading contract")
 
 
