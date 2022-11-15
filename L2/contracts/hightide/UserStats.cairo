@@ -102,13 +102,13 @@ func trader_margin_by_market(season_id: felt, pair_id: felt, trader_address: fel
 // //////////////
 
 // @notice Constructor of the smart-contract
-// @param registry_address - Address of the AuthorizedRegistry contract
-// @param version - Version of this contract
+// @param registry_address_ - Address of the AuthorizedRegistry contract
+// @param version_ - Version of this contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address: felt, version: felt
+    registry_address_: felt, version_: felt
 ) {
-    CommonLib.initialize(registry_address, version);
+    CommonLib.initialize(registry_address_, version_);
     return ();
 }
 
@@ -117,54 +117,70 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ///////
 
 // @notice View function to get trader's recorded fee
-// @param season_id - id of the season
-// @param pair_id - id of the pair
-// @param trader_address - l2 address of the trader
+// @param season_id_ - id of the season
+// @param pair_id_ - id of the pair
+// @param trader_address_ - l2 address of the trader
 // @return fee_64x61 - returns the fee charged on a trader for a pair in a season
 @view
 func get_trader_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt, pair_id: felt, trader_address: felt
+    season_id_: felt, pair_id_: felt, trader_address_: felt
 ) -> (fee_64x61: felt) {
-    let (fee_64x61) = trader_fee_by_market.read(season_id, pair_id, trader_address);
+    let (fee_64x61) = trader_fee_by_market.read(season_id_, pair_id_, trader_address_);
     return (fee_64x61,);
 }
 
 // @notice View function to get the total fee collected by the platform for a pair in a season
-// @param season_id - id of the season
-// @param pair_id - id of the pair
+// @param season_id_ - id of the season
+// @param pair_id_ - id of the pair
 // @return total_fee_64x61 - returns total fee collected by the platform for a pair in a season
 @view
 func get_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt, pair_id: felt
+    season_id_: felt, pair_id_: felt
 ) -> (total_fee_64x61: felt) {
-    let (total_fee_64x61) = total_fee_by_market.read(season_id, pair_id);
+    let (total_fee_64x61) = total_fee_by_market.read(season_id_, pair_id_);
     return (total_fee_64x61,);
 }
 
 // @notice View function to get trader's order volume for a pair in a season
-// @param trader_address - l2 address of the trader
-// @param volume_type - contains season_id, pair_id and order type
+// @param trader_address_ - l2 address of the trader
+// @param volume_type_ - contains season_id, pair_id and order type
+// @return number_of_orders - returns the no.of orders for a pair in a season by a trader
+// @return total_volume_64x61 - returns the total order volume for a pair in a season by a trader
 @view
 func get_trader_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    trader_address: felt, volume_type: VolumeMetaData
+    trader_address_: felt, volume_type_: VolumeMetaData
 ) -> (number_of_orders: felt, total_volume_64x61: felt) {
-    let (current_num_orders) = trader_orders_count_by_market.read(trader_address, volume_type);
+    let (current_num_orders) = trader_orders_count_by_market.read(trader_address_, volume_type_);
     let (current_total_volume_64x61) = trader_order_volume_by_market.read(
-        trader_address, volume_type
+        trader_address_, volume_type_
     );
     return (current_num_orders, current_total_volume_64x61);
 }
 
 // @notice View function to get trader's pnl for a pair in a season
-// @param season_id - id of the season
-// @param pair_id - id of the pair
-// @param trader_address - l2 address of the trader
+// @param season_id_ - id of the season
+// @param pair_id_ - id of the pair
+// @param trader_address_ - l2 address of the trader
+// @return pnl_64x61 - returns profit or loss on a trader for a pair in a season
 @view
 func get_trader_pnl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt, pair_id: felt, trader_address: felt
+    season_id_: felt, pair_id_: felt, trader_address_: felt
 ) -> (pnl_64x61: felt) {
-    let (pnl_64x61) = trader_pnl_by_market.read(season_id, pair_id, trader_address);
+    let (pnl_64x61) = trader_pnl_by_market.read(season_id_, pair_id_, trader_address_);
     return (pnl_64x61,);
+}
+
+// @notice View function to get trader's margin amount for a pair in a season
+// @param season_id_ - id of the season
+// @param pair_id_ - id of the pair
+// @param trader_address_ - l2 address of the trader
+// @return margin_amount_64x61 - returns trader'a margin amount for a pair in a season
+@view
+func get_trader_margin_amount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt, trader_address_: felt
+) -> (margin_amount_64x61: felt) {
+    let (margin_amount_64x61) = trader_margin_by_market.read(season_id_, pair_id_, trader_address_);
+    return (margin_amount_64x61,);
 }
 
 // ///////////
@@ -172,13 +188,13 @@ func get_trader_pnl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 // ///////////
 
 // @notice This function is used to record trader stats for a pair in a season
-// @param season_id - id of the season
-// @param pair_id - id of the pair
+// @param season_id_ - id of the season
+// @param pair_id_ - id of the pair
 // @param trader_stats_list_len - length of the trader fee list
 // @param trader_stats_list - List which stores traders fee
 @external
 func record_trader_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt, pair_id: felt, trader_stats_list_len: felt, trader_stats_list: TraderStats*
+    season_id_: felt, pair_id_: felt, trader_stats_list_len: felt, trader_stats_list: TraderStats*
 ) {
     let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
@@ -194,7 +210,7 @@ func record_trader_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     }
 
     return update_trader_stats_recurse(
-        season_id, pair_id, 0, 0, trader_stats_list_len, trader_stats_list
+        season_id_, pair_id_, 0, 0, trader_stats_list_len, trader_stats_list
     );
 }
 
@@ -203,21 +219,21 @@ func record_trader_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // ///////////
 
 func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id: felt,
-    pair_id: felt,
-    iterator: felt,
-    current_total_fee_64x61: felt,
+    season_id_: felt,
+    pair_id_: felt,
+    iterator_: felt,
+    current_total_fee_64x61_: felt,
     trader_stats_list_len: felt,
     trader_stats_list: TraderStats*,
 ) {
     alloc_locals;
-    if (iterator == trader_stats_list_len) {
-        let (current_fee_64x61) = total_fee_by_market.read(season_id, pair_id);
-        let (updated_fee_64x61) = Math64x61_add(current_total_fee_64x61, current_fee_64x61);
-        total_fee_by_market.write(season_id, pair_id, updated_fee_64x61);
+    if (iterator_ == trader_stats_list_len) {
+        let (current_fee_64x61) = total_fee_by_market.read(season_id_, pair_id_);
+        let (updated_fee_64x61) = Math64x61_add(current_total_fee_64x61_, current_fee_64x61);
+        total_fee_by_market.write(season_id_, pair_id_, updated_fee_64x61);
 
         // Emit event
-        total_fee_recorded.emit(season_id, pair_id, updated_fee_64x61);
+        total_fee_recorded.emit(season_id_, pair_id_, updated_fee_64x61);
 
         return ();
     }
@@ -229,20 +245,20 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     if ([trader_stats_list].order_type == 0) {
         let fee_64x61 = [trader_stats_list].fee_64x61;
         let (current_trader_fee_64x61) = trader_fee_by_market.read(
-            season_id, pair_id, trader_address
+            season_id_, pair_id_, trader_address
         );
         let (updated_trader_fee_64x61) = Math64x61_add(current_trader_fee_64x61, fee_64x61);
-        let (updated_total_fee_64x61) = Math64x61_add(current_total_fee_64x61, fee_64x61);
-        trader_fee_by_market.write(season_id, pair_id, trader_address, updated_trader_fee_64x61);
+        let (updated_total_fee_64x61) = Math64x61_add(current_total_fee_64x61_, fee_64x61);
+        trader_fee_by_market.write(season_id_, pair_id_, trader_address, updated_trader_fee_64x61);
         assert total_fee_64x61 = updated_total_fee_64x61;
 
         // Emit event
-        trader_fee_recorded.emit(season_id, pair_id, trader_address, updated_trader_fee_64x61);
+        trader_fee_recorded.emit(season_id_, pair_id_, trader_address, updated_trader_fee_64x61);
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
-        assert total_fee_64x61 = current_total_fee_64x61;
+        assert total_fee_64x61 = current_total_fee_64x61_;
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -252,7 +268,7 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     // Order volume is recorded for all order types
     let order_volume_64x61 = [trader_stats_list].order_volume_64x61;
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id, pair_id=pair_id, order_type=[trader_stats_list].order_type
+        season_id=season_id_, pair_id=pair_id_, order_type=[trader_stats_list].order_type
     );
 
     let (current_order_volume_64x61) = trader_order_volume_by_market.read(
@@ -267,7 +283,7 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     // Emit event
     trader_order_volume_recorded.emit(
-        season_id, pair_id, trader_address, updated_order_volume_64x61
+        season_id_, pair_id_, trader_address, updated_order_volume_64x61
     );
 
     let (current_orders_count) = trader_orders_count_by_market.read(
@@ -276,34 +292,36 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     trader_orders_count_by_market.write(trader_address, volume_metadata, current_orders_count + 1);
 
     // Emit event
-    trader_orders_count_recorded.emit(season_id, pair_id, trader_address, current_orders_count + 1);
+    trader_orders_count_recorded.emit(
+        season_id_, pair_id_, trader_address, current_orders_count + 1
+    );
 
     // 3. Update PnL
     // Realized PnL is calculated when trader closes a position. So, we record PnL for close orders.
     if ([trader_stats_list].order_type == 1) {
         let pnl_64x61 = [trader_stats_list].pnl_64x61;
         let abs_pnl_64x61 = abs_value(pnl_64x61);
-        let (current_pnl_64x61) = trader_pnl_by_market.read(season_id, pair_id, trader_address);
+        let (current_pnl_64x61) = trader_pnl_by_market.read(season_id_, pair_id_, trader_address);
         let (updated_pnl_64x61) = Math64x61_add(current_pnl_64x61, abs_pnl_64x61);
-        trader_pnl_by_market.write(season_id, pair_id, trader_address, updated_pnl_64x61);
+        trader_pnl_by_market.write(season_id_, pair_id_, trader_address, updated_pnl_64x61);
 
         // Emit event
-        trader_pnl_recorded.emit(season_id, pair_id, trader_address, updated_pnl_64x61);
+        trader_pnl_recorded.emit(season_id_, pair_id_, trader_address, updated_pnl_64x61);
 
         let margin_amount_64x61 = [trader_stats_list].margin_amount_64x61;
         let (current_margin_amount_64x61) = trader_margin_by_market.read(
-            season_id, pair_id, trader_address
+            season_id_, pair_id_, trader_address
         );
         let (updated_margin_amount_64x61) = Math64x61_add(
             current_margin_amount_64x61, margin_amount_64x61
         );
         trader_margin_by_market.write(
-            season_id, pair_id, trader_address, updated_margin_amount_64x61
+            season_id_, pair_id_, trader_address, updated_margin_amount_64x61
         );
 
         // Emit event
         trader_margin_recorded.emit(
-            season_id, pair_id, trader_address, updated_margin_amount_64x61
+            season_id_, pair_id_, trader_address, updated_margin_amount_64x61
         );
 
         tempvar syscall_ptr = syscall_ptr;
@@ -316,9 +334,9 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     }
 
     return update_trader_stats_recurse(
-        season_id,
-        pair_id,
-        iterator + 1,
+        season_id_,
+        pair_id_,
+        iterator_ + 1,
         total_fee_64x61,
         trader_stats_list_len,
         trader_stats_list + TraderStats.SIZE,
