@@ -480,7 +480,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
 
-    let (is_expired) = get_season_expiry_state(season_id);
+    let (is_expired) = get_season_expiry_state(season_id_);
 
     with_attr error_message("HighTide: Trading season already ended") {
         assert is_expired = FALSE;
@@ -556,7 +556,7 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
     ) = get_hightide_reward_tokens(hightide_id_);
 
-    let (hightide_metadata: HighTideMetaData) = get_hightide(hightide_id);
+    let (hightide_metadata: HighTideMetaData) = get_hightide(hightide_id_);
 
     with_attr error_message("HighTide: Hightide is already activated") {
         assert hightide_metadata.status = HIGHTIDE_INITIATED;
@@ -746,7 +746,7 @@ func check_activation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     local balance_Uint256: Uint256;
     let (native_token_l2_address: felt) = IStarkway.get_native_token_address(
-        contract_address=starkway_contract_address, token_id=[reward_tokens_list].token_id
+        contract_address=starkway_contract_address_, token_id=[reward_tokens_list].token_id
     );
 
     if (native_token_l2_address != 0) {
