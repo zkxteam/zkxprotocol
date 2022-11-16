@@ -276,8 +276,8 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     IUserStats.record_trader_stats(
         contract_address=user_stats_address,
-        season_id=season_id_,
-        pair_id=pair_id_,
+        season_id_=season_id_,
+        pair_id_=pair_id_,
         trader_stats_list_len=trader_stats_list_len,
         trader_stats_list=trader_stats_list,
     );
