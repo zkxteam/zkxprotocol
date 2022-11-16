@@ -18,4 +18,4 @@ async def test_str_to_felt():
     print("\n margin", margin)
     print("\n borrowed", borrowed)
     print("\n leverage", leverage)
-    print("\n selector",get_selector_from_name('get_portion_executed'))
+    print("\n selector",get_selector_from_name('activate_high_tide'))
