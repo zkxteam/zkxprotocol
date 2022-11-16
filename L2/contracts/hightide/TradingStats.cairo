@@ -224,6 +224,22 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     return (average_volume,);
 }
 
+// @notice View function to get the list of traders in a pair
+// @param season_id_ - id of the season
+// @param pair_id_ - id of the market pair
+// @return trader_list_len - length of trader's list
+// @return trader_list - list of trader's
+@view
+func get_traders_in_pair{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_ : felt
+) -> (trader_list_len: felt, trader_list: felt*) {
+    alloc_locals;
+    let (trader_list: felt*) = alloc();
+    let (trader_list_len) = num_traders.read(season_id_, pair_id_);
+    populate_trader_list_recurse(season_id_, pair_id_, 0, trader_list_len, trader_list);
+    return (trader_list_len, trader_list);
+}
+
 //#####################
 // External Functions #
 //#####################
@@ -525,4 +541,17 @@ func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         assert number_of_days = season.num_trading_days;
     }
     return number_of_days;
+}
+
+// @dev - This function populates trader list for a pair in the season
+func populate_trader_list_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(season_id_: felt, pair_id_: felt, iterator_: felt, trader_list_len: felt, trader_list: felt*) {
+    if (iterator_ == trader_list_len) {
+        return ();
+    }
+
+    let (trader_address) = traders_in_pair.read(season_id_, pair_id_, iterator_);
+    assert trader_list[iterator_] = trader_address;
+    return populate_trader_list_recurse(season_id_, pair_id_, iterator_ + 1, trader_list_len, trader_list);
 }
