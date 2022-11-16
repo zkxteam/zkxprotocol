@@ -231,7 +231,7 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 // @return trader_list - list of trader's
 @view
 func get_traders_in_pair{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_ : felt
+    season_id_: felt, pair_id_: felt
 ) -> (trader_list_len: felt, trader_list: felt*) {
     alloc_locals;
     let (trader_list: felt*) = alloc();
@@ -544,14 +544,16 @@ func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 }
 
 // @dev - This function populates trader list for a pair in the season
-func populate_trader_list_recurse{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(season_id_: felt, pair_id_: felt, iterator_: felt, trader_list_len: felt, trader_list: felt*) {
+func populate_trader_list_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt, iterator_: felt, trader_list_len: felt, trader_list: felt*
+) {
     if (iterator_ == trader_list_len) {
         return ();
     }
 
     let (trader_address) = traders_in_pair.read(season_id_, pair_id_, iterator_);
     assert trader_list[iterator_] = trader_address;
-    return populate_trader_list_recurse(season_id_, pair_id_, iterator_ + 1, trader_list_len, trader_list);
+    return populate_trader_list_recurse(
+        season_id_, pair_id_, iterator_ + 1, trader_list_len, trader_list
+    );
 }

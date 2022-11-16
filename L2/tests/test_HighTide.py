@@ -485,6 +485,14 @@ async def test_activate_hightide_with_sufficient_native_tokens(adminAuth_factory
         ]
     )
 
+    execution_info = await hightide.get_hightides_by_season_id(season_id).call()
+    hightide_list = execution_info.result.hightide_list
+    assert hightide_list[0] == hightide_id
+    execution_info = await hightide.get_hightide_pairs_by_season_id(season_id).call()
+    hightide_pair_list = execution_info.result.hightide_pair_list
+    assert hightide_pair_list[0] == BTC_USDC_ID
+
+
 # Hightide activation fails becuase, hightide is already activated
 @pytest.mark.asyncio
 async def test_activate_hightide_which_is_already_activated(adminAuth_factory):
@@ -610,6 +618,13 @@ async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_fac
         ]
     )
 
+    execution_info = await hightide.get_hightides_by_season_id(season_id).call()
+    hightide_list = execution_info.result.hightide_list
+    assert hightide_list[0] == hightide_id
+    execution_info = await hightide.get_hightide_pairs_by_season_id(season_id).call()
+    hightide_pair_list = execution_info.result.hightide_pair_list
+    assert hightide_pair_list[0] == BTC_USDC_ID
+
 
 # Hightide activation fails becuase of insufficient native tokens
 @pytest.mark.asyncio
@@ -685,3 +700,12 @@ async def test_activate_hightide_with_sufficient_non_native_tokens(adminAuth_fac
             [1, hightide.contract_address, 'assigned_hightide_to_season', [hightide_id, season_id]],
         ]
     )
+
+    execution_info = await hightide.get_hightides_by_season_id(season_id).call()
+    hightide_list = execution_info.result.hightide_list
+    assert hightide_list[0] == hightide_id - 1
+    assert hightide_list[1] == hightide_id
+    execution_info = await hightide.get_hightide_pairs_by_season_id(season_id).call()
+    hightide_pair_list = execution_info.result.hightide_pair_list
+    assert hightide_pair_list[0] == BTC_USDC_ID
+    assert hightide_pair_list[1] == BTC_USDC_ID
