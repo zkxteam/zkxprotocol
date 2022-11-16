@@ -43,4 +43,9 @@ namespace IMarkets {
 
     func get_all_markets() -> (array_list_len: felt, array_list: Market*) {
     }
+
+    func get_markets_by_state(tradable_: felt, archived_: felt) -> (
+        array_list_len: felt, array_list: Market*
+    ) {
+    }
 }
