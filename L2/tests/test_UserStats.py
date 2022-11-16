@@ -204,13 +204,14 @@ async def test_unauthorized_call(adminAuth_factory):
     order_volume_64x61 = to64x61(1000)
     order_type = 1
     pnl_64x61 = to64x61(100)
+    margin_amount_64x61 = to64x61(500)
 
     await assert_revert(dave_signer.send_transaction(dave, user_stats.contract_address, "record_trader_stats", [
         season_id,
         marketID,
         1,
         alice.contract_address,
-        fee_64x61, order_volume_64x61, order_type, pnl_64x61]), "UserStats: Stats can be recorded only by TradingStats contract")
+        fee_64x61, order_volume_64x61, order_type, pnl_64x61, margin_amount_64x61]), "UserStats: Stats can be recorded only by TradingStats contract")
 
 @pytest.mark.asyncio
 async def test_record_trader_stats_with_two_open_orders(adminAuth_factory):
@@ -299,12 +300,14 @@ async def test_record_trader_stats_with_two_open_orders(adminAuth_factory):
     assert from64x61(trader2_order_volume.result.total_volume_64x61) == from64x61(size1)*from64x61(execution_price1)
 
     trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
-    assert from64x61(trader1_pnl.result.pnl.old_pnl_64x61) == 0
-    assert from64x61(trader1_pnl.result.pnl.new_pnl_64x61) == 0
+    assert from64x61(trader1_pnl.result.pnl_64x61) == 0
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    assert from64x61(trader1_margin.result.margin_amount_64x61) == 0
 
     trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
-    assert from64x61(trader2_pnl.result.pnl.old_pnl_64x61) == 0
-    assert from64x61(trader2_pnl.result.pnl.new_pnl_64x61) == 0
+    assert from64x61(trader2_pnl.result.pnl_64x61) == 0
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    assert from64x61(trader2_margin.result.margin_amount_64x61) == 0
 
 @pytest.mark.asyncio
 async def test_record_trader_stats_with_two_close_orders(adminAuth_factory):
@@ -385,12 +388,14 @@ async def test_record_trader_stats_with_two_close_orders(adminAuth_factory):
     assert from64x61(trader2_order_volume.result.total_volume_64x61) == from64x61(size2)*from64x61(execution_price2)
 
     trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
-    assert from64x61(trader1_pnl.result.pnl.old_pnl_64x61) == 0
-    assert from64x61(trader1_pnl.result.pnl.new_pnl_64x61) == -500
+    assert from64x61(trader1_pnl.result.pnl_64x61) == 500
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    assert from64x61(trader1_margin.result.margin_amount_64x61) == 2500
 
     trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
-    assert from64x61(trader2_pnl.result.pnl.old_pnl_64x61) == 0
-    assert from64x61(trader2_pnl.result.pnl.new_pnl_64x61) == 500
+    assert from64x61(trader2_pnl.result.pnl_64x61) == 500
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    assert from64x61(trader2_margin.result.margin_amount_64x61) == 2500
 
 @pytest.mark.asyncio
 async def test_record_trader_stats_with_one_open_order_and_one_close_order(adminAuth_factory):
@@ -472,12 +477,14 @@ async def test_record_trader_stats_with_one_open_order_and_one_close_order(admin
     assert from64x61(trader2_order_volume.result.total_volume_64x61) == 6000
 
     trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
-    assert from64x61(trader1_pnl.result.pnl.old_pnl_64x61) == 0
-    assert from64x61(trader1_pnl.result.pnl.new_pnl_64x61) == -500
+    assert from64x61(trader1_pnl.result.pnl_64x61) == 500
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    assert from64x61(trader1_margin.result.margin_amount_64x61) == 2500
 
     trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
-    assert from64x61(trader2_pnl.result.pnl.old_pnl_64x61) == 500
-    assert from64x61(trader2_pnl.result.pnl.new_pnl_64x61) == 500
+    assert from64x61(trader2_pnl.result.pnl_64x61) == 1000
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    assert from64x61(trader2_margin.result.margin_amount_64x61) == 5000
 
 
 

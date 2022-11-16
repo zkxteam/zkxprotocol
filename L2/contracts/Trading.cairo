@@ -3,8 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import assert_in_range, assert_le, assert_not_zero
-from starkware.cairo.common.math import abs_value
+from starkware.cairo.common.math import abs_value, assert_in_range, assert_le, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_block_timestamp
@@ -496,7 +495,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
 
     // Update Trader stats
-    let element: TraderStats = TraderStats(order_.pub_key, fees, order_volume_64x61, 0, 0);
+    let element: TraderStats = TraderStats(order_.pub_key, fees, order_volume_64x61, 0, 0, 0);
     assert [trader_stats_list_] = element;
 
     // Deduct the amount from liquidity funds if order is leveraged
@@ -609,12 +608,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (pnl) = Math64x61_mul(order_size_, diff);
     net_acc_value = margin_amount + pnl;
 
-    let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
-
-    // update trader stats
-    let element: TraderStats = TraderStats(order_.pub_key, 0, order_volume_64x61, 1, pnl);
-    assert [trader_stats_list_] = element;
-
     // Total value of the asset at current price
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
 
@@ -622,15 +615,28 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (percent_of_order) = Math64x61_div(order_size_, parent_position.position_size);
     let (value_to_be_returned) = Math64x61_mul(borrowed_amount, percent_of_order);
     let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order);
+    local margin_amount_open_64x61;
 
     // Calculate new values for margin and borrowed amounts
     if (order_.orderType == DELEVERAGING_ORDER) {
         borrowed_amount_close = borrowed_amount - leveraged_amount_out;
         margin_amount_close = margin_amount;
+        margin_amount_open_64x61 = 0;
     } else {
         borrowed_amount_close = borrowed_amount - value_to_be_returned;
         margin_amount_close = margin_amount - margin_to_be_reduced;
+        margin_amount_open_64x61 = margin_to_be_reduced;
     }
+
+    let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
+
+    // Update trader stats.
+    // If close order is a deleveraging order, margin won't be reduced. So, we will record 0.
+    // Else, we will record margin_to_be_reduced
+    let element: TraderStats = TraderStats(
+        order_.pub_key, 0, order_volume_64x61, 1, pnl, margin_amount_open_64x61
+    );
+    assert [trader_stats_list_] = element;
 
     // Check if the position is to be liquidated
     let not_liquidation = is_le(order_.orderType, 2);
