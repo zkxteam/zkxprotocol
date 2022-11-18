@@ -315,11 +315,16 @@ struct TraderStats {
     order_volume_64x61: felt,
     order_type: felt,  // 0 for open order, 1 for close order
     pnl_64x61: felt,
-    margin_amount_64x61:  felt,
+    margin_amount_64x61: felt,
 }
 
 // Struct to pass xp values to L2
 struct XpValues {
     user_address: felt,
     final_xp_value: felt,
+}
+
+struct LeaderboardStat {
+    user_address: felt,
+    reward: felt,
 }
