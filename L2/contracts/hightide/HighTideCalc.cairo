@@ -4,8 +4,13 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
-
-from contracts.Constants import Hightide_INDEX, Market_INDEX, RewardsCalculation_INDEX, TradingStats_INDEX, UserStats_INDEX
+from contracts.Constants import (
+    Hightide_INDEX,
+    Market_INDEX,
+    RewardsCalculation_INDEX,
+    TradingStats_INDEX,
+    UserStats_INDEX,
+)
 from contracts.DataTypes import (
     Constants,
     HighTideFactors,
@@ -81,6 +86,8 @@ func trader_w_value_by_market(season_id: felt, pair_id: felt, trader_address: fe
 ) {
 }
 
+// Stores the cumulative sum of w values for a pair in a season
+// Here, total w value is the denominator of trader score formula
 @storage_var
 func total_w_value_by_market(season_id: felt, pair_id: felt) -> (total_w_value_64x61: felt) {
 }
@@ -275,6 +282,7 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     season_id_: felt, pair_id_: felt, trader_list_len: felt, trader_list: felt*
 ) {
     // To-do: Need to integrate signature infra for the authentication
+
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
