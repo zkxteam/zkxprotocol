@@ -37,6 +37,7 @@ class ContractType(Enum):
     SigRequirementsManager = "contracts/signature_infra/SigRequirementsManager.cairo"
     PubkeyWhitelister = "contracts/signature_infra/PubkeyWhitelister.cairo"
     HighTide = "contracts/hightide/HighTide.cairo"
+    HighTideCalc = "contracts/hightide/HighTideCalc.cairo"
     RewardsCalculation = "contracts/hightide/RewardsCalculation.cairo"
     TradingStats = "contracts/hightide/TradingStats.cairo"
     LiquidityPool = "contracts/hightide/LiquidityPool.cairo"
@@ -61,6 +62,9 @@ class ContractType(Enum):
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
     TestAsset = "tests/contracts/Asset.cairo"
+    TestHighTide = "tests/testable/TestHighTide.cairo"
+    Starkway = "tests/testable/StarkwayProxy.cairo"
+    ERC20 = "tests/testable/TestERC20Mintable.cairo"
 
 class OptimizedStarknetState(StarknetState):
 

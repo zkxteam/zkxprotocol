@@ -308,6 +308,14 @@ struct HighTideMetaData {
     liquidity_pool_address: felt,  // contract address of liquidity pool associated with hightide
 }
 
+// Struct to store high-tide factors
+struct HighTideFactors {
+    x_1: felt,
+    x_2: felt,
+    x_3: felt,
+    x_4: felt,
+}
+
 // Struct to store Trader's stats
 struct TraderStats {
     trader_address: felt,

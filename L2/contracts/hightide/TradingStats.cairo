@@ -20,7 +20,7 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_add
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_add, Math64x61_div, Math64x61_fromIntFelt
 
 // This contract can be used as a source of truth for all consumers of trade stats off-chain/on-chain
 // This does not have functions to calculate any of the hightide formulas
@@ -174,6 +174,54 @@ func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     // The 4th argument of the following function call keeeps a running total of days traded
     let count = count_num_days_traded(season_id_, pair_id_, number_of_days, 0);
     return (count,);
+}
+
+// @dev - Function called by HighTideCalc, this calculates the average volume for the pair
+@view
+func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt
+) -> (average_volume_64x61: felt) {
+    alloc_locals;
+
+    // Create a VolumeMetadata struct for open orders
+    let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, pair_id=pair_id_, order_type=1
+    );
+
+    // Create a VolumeMetadata struct for close orders
+    let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, pair_id=pair_id_, order_type=0
+    );
+
+    // Get the order volume for open orders
+    let (current_num_orders_open: felt, current_total_volume_open_64x61: felt) = get_order_volume(
+        volume_type_=volume_metadata_pair_open
+    );
+
+    // Get the order volume for close orders
+    let (current_num_orders_close: felt, current_total_volume_close_64x61: felt) = get_order_volume(
+        volume_type_=volume_metadata_pair_close
+    );
+
+    // Find total volume by adding open and close order volume
+    let (total_volume_64x61) = Math64x61_add(
+        current_total_volume_open_64x61, current_total_volume_close_64x61
+    );
+
+    // Find total orders by adding open and close orders
+    let total_orders = current_num_orders_open + current_num_orders_close;
+
+    if (total_orders == 0) {
+        return (0,);
+    }
+
+    // Convert the total to 64x61 format
+    let (total_orders_64x61) = Math64x61_fromIntFelt(total_orders);
+
+    // Calculate average volume
+    let (average_volume) = Math64x61_div(total_volume_64x61, total_orders_64x61);
+
+    return (average_volume,);
 }
 
 //#####################
