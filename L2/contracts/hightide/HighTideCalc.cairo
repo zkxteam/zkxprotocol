@@ -32,7 +32,20 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
-from contracts.Math_64x61 import Math64x61_div, Math64x61_fromIntFelt, Math64x61_sub
+from contracts.Math_64x61 import (
+    Math64x61_add,
+    Math64x61_div,
+    Math64x61_fromIntFelt,
+    Math64x61_mul,
+    Math64x61_pow,
+    Math64x61_sub,
+)
+
+// ////////////
+// Constants //
+// ////////////
+
+const NUM_1_64x61 = 2305843009213693952;
 
 // /////////
 // Events //
@@ -521,30 +534,58 @@ func calculate_w_per_market_recurse{
     hightide_pair_list_len: felt,
     hightide_pair_list: felt*,
 ) {
+    alloc_locals;
+
     if (hightide_pair_list_len == 0) {
         return ();
     }
 
-    let (f_p: felt) = calculate_f_p(
+    let (local fp_value: felt) = calculate_fp(
         season_id_=season_id_,
         pair_id_=[hightide_pair_list],
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
 
-    let (d: felt) = calculate_d(
+    let (local ft_value: felt) = calculate_ft(
+        season_id_=season_id_,
+        pair_id_=[hightide_pair_list],
+        user_stats_address_=user_stats_address_,
+    );
+
+    let (d_value: felt) = calculate_d(
         season_id_=season_id_,
         pair_id_=[hightide_pair_list],
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
 
-    let (p: felt) = calculate_p(
+    let (p_value: felt) = calculate_p(
         season_id_=season_id_,
         pair_id_=[hightide_pair_list],
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
+
+    // Calculate w value
+    let (w_value_64x61: felt) = calculate_w_value(
+        fp_value_64x61_=fp_value,
+        ft_value_64x61_=ft_value,
+        d_value_64x61_=d_value,
+        p_value_64x61_=p_value,
+        xp_value_=xp_value_,
+        constants_=constants_,
+    );
+
+    // Update w value for a pair corresponding to a trader
+    trader_w_value_by_market.write(
+        season_id_, [hightide_pair_list], trader_address_, w_value_64x61
+    );
+
+    // Update total w value for a pair
+    let (current_w_value_64x61) = total_w_value_by_market.read(season_id_, [hightide_pair_list]);
+    let (new_w_value_64x61) = Math64x61_add(current_w_value_64x61, w_value_64x61);
+    total_w_value_by_market.write(season_id_, [hightide_pair_list], new_w_value_64x61);
 
     return calculate_w_per_market_recurse(
         season_id_=season_id_,
@@ -558,15 +599,15 @@ func calculate_w_per_market_recurse{
     );
 }
 
-// @notice internal function to calculate f_p for a pair corresponding to a trader
+// @notice internal function to calculate fp for a pair corresponding to a trader
 // @param season_id_ - Season Id for which to calculate the factors of a pair
 // @param pair_id_- Pair Id for which to calculate x_4
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
-// @return f_p - returns trader's individual trading fees paid
-func calculate_f_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+// @return fp - returns trader's individual trading fees paid
+func calculate_fp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
-) -> (f_p: felt) {
+) -> (fp_value: felt) {
     // Get trader's individual trading fees paid
     let (fee_64x61) = IUserStats.get_trader_fee(
         contract_address=user_stats_address_,
@@ -578,14 +619,14 @@ func calculate_f_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return (fee_64x61,);
 }
 
-// @notice internal function to calculate f_t for a pair
+// @notice internal function to calculate ft for a pair
 // @param season_id_ - Season Id for which to calculate the factors of a pair
 // @param pair_id_- Pair Id for which to calculate x_4
 // @param user_stats_address_ - Address of the User stats contract
-// @return f_t - returns overall zkx platform trading fees
-func calculate_f_t{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+// @return ft - returns overall zkx platform trading fees
+func calculate_ft{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, user_stats_address_: felt
-) -> (f_t: felt) {
+) -> (ft_value: felt) {
     // Get overall zkx platform trading fees
     let (total_fee_64x61) = IUserStats.get_total_fee(
         contract_address=user_stats_address_, season_id_=season_id_, pair_id_=pair_id_
@@ -687,6 +728,59 @@ func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     let (p: felt) = Math64x61_div(pnl_64x61, margin_amount_64x61);
 
     return (p,);
+}
+
+// @notice internal function to calculate w for a pair corresponding to a trader
+// @param fp_value_64x61_ - fp value for a pair corresponding to a trader
+// @param ft_value_64x61_- ft value for a pair
+// @param d_value_64x61_ - d value for a pair corresponding to a trader
+// @param p_value_64x61_ - p value for a pair corresponding to a trader
+// @param xp_value_ - xp value for a trader
+// @param constants_ - constants used for calculating trader's score
+func calculate_w_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    fp_value_64x61_: felt,
+    ft_value_64x61_: felt,
+    d_value_64x61_: felt,
+    p_value_64x61_: felt,
+    xp_value_: felt,
+    constants_: Constants,
+) -> (w_value_64x61: felt) {
+    alloc_locals;
+
+    let (updated_fp_value_64x61) = Math64x61_add(NUM_1_64x61, fp_value_64x61_);
+    let (updated_ft_value_64x61) = Math64x61_add(NUM_1_64x61, ft_value_64x61_);
+    let (fp_by_ft_64x61) = Math64x61_div(updated_fp_value_64x61, updated_ft_value_64x61);
+    let (a_64x61) = Math64x61_fromIntFelt(constants_.a);
+    let (local fee_power_a) = Math64x61_pow(fp_by_ft_64x61, a_64x61);
+
+    let (updated_d_value_64x61) = Math64x61_add(NUM_1_64x61, d_value_64x61_);
+    let (b_64x61) = Math64x61_fromIntFelt(constants_.b);
+    let (d_power_b) = Math64x61_pow(updated_d_value_64x61, b_64x61);
+
+    let (updated_xp_value) = max_of(constants_.z, xp_value_);
+    let (updated_xp_value_64x61) = Math64x61_fromIntFelt(updated_xp_value);
+    let (c_64x61) = Math64x61_fromIntFelt(constants_.c);
+    let (xp_power_c) = Math64x61_pow(updated_xp_value_64x61, c_64x61);
+
+    let (updated_p_value_64x61) = Math64x61_add(NUM_1_64x61, p_value_64x61_);
+    let (e_64x61) = Math64x61_fromIntFelt(constants_.e);
+    let (p_power_e) = Math64x61_pow(updated_p_value_64x61, e_64x61);
+
+    let (temp_1_64x61) = Math64x61_mul(fee_power_a, d_power_b);
+    let (temp_2_64x61) = Math64x61_mul(temp_1_64x61, xp_power_c);
+    let (w_value_64x61) = Math64x61_mul(temp_2_64x61, p_power_e);
+
+    return (w_value_64x61,);
+}
+
+// @dev - returns the maximum of the 2 function arguments
+func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(x: felt, y: felt) -> (
+    res: felt
+) {
+    if (is_le(x, y) == 1) {
+        return (y,);
+    }
+    return (x,);
 }
 
 // @notice internal function to recursively calculate the top stats in a season
