@@ -20,7 +20,7 @@ from contracts.libraries.Utils import verify_caller_authority
 
 // Event emitted whenever collateral is transferred from account by trading
 @event
-func leaderboard_update(season_id: felt, epoch: felt, timestamp: felt) {
+func leaderboard_update(season_id: felt, pair_id: felt, epoch: felt, timestamp: felt) {
 }
 
 // Event emitted whenever the number_of_traders variable is changed
@@ -39,7 +39,9 @@ func time_between_calls_update(old_value: felt, new_value: felt) {
 
 // This stores the leaderboard data in a mapping
 @storage_var
-func leaderboard_mapping(season_id: felt, epoch: felt, index: felt) -> (value: LeaderboardStat) {
+func leaderboard_mapping(season_id: felt, pair_id: felt, epoch: felt, index: felt) -> (
+    value: LeaderboardStat
+) {
 }
 
 // Stores the number of epochs
@@ -215,7 +217,7 @@ func set_number_of_top_traders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
 @external
 func set_leaderboard{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    leaderboard_array_len: felt, leaderboard_array: LeaderboardStat*
+    pair_id_: felt, leaderboard_array_len: felt, leaderboard_array: LeaderboardStat*
 ) -> (res: felt) {
     alloc_locals;
     // Get status
@@ -257,6 +259,7 @@ func set_leaderboard{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         leaderboard_array_len_=leaderboard_array_len,
         leaderboard_array_=leaderboard_array,
         season_id_=season_id,
+        pair_id_=pair_id_,
         epoch_=current_epoch,
         iterator_=0,
     );
@@ -267,7 +270,9 @@ func set_leaderboard{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     // Update the last called timestamp
     last_call_timestamp.write(season_id=season_id, value=current_timestamp);
 
-    leaderboard_update.emit(season_id=season_id, epoch=current_epoch, timestamp=current_timestamp);
+    leaderboard_update.emit(
+        season_id=season_id, pair_id=pair_id_, epoch=current_epoch, timestamp=current_timestamp
+    );
     return (1,);
 }
 
@@ -279,6 +284,7 @@ func set_leaderboard_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     leaderboard_array_len_: felt,
     leaderboard_array_: LeaderboardStat*,
     season_id_: felt,
+    pair_id_: felt,
     epoch_: felt,
     iterator_: felt,
 ) {
@@ -293,7 +299,11 @@ func set_leaderboard_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // Write to leaderboard mapping
     leaderboard_mapping.write(
-        season_id=season_id_, epoch=epoch_, index=iterator_, value=[leaderboard_array_]
+        season_id=season_id_,
+        pair_id=pair_id_,
+        epoch=epoch_,
+        index=iterator_,
+        value=[leaderboard_array_],
     );
 
     // Set the next value
@@ -301,6 +311,7 @@ func set_leaderboard_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         leaderboard_array_len_=leaderboard_array_len_,
         leaderboard_array_=leaderboard_array_ + LeaderboardStat.SIZE,
         season_id_=season_id_,
+        pair_id_=pair_id_,
         epoch_=epoch_,
         iterator_=iterator_ + 1,
     );
