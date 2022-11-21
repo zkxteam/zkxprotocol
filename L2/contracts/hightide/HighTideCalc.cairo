@@ -66,6 +66,7 @@ func high_tide_factors(season_id: felt, pair_id: felt) -> (factors: HighTideFact
 }
 
 // Stores the w values for a trader per pair in a season
+// Here, w value is the numerator of trader score formula
 @storage_var
 func trader_w_value_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
     w_value_64x61: felt
@@ -73,8 +74,16 @@ func trader_w_value_by_market(season_id: felt, pair_id: felt, trader_address: fe
 }
 
 // Stores the cumulative sum of w values for a pair in a season
+// Here, total w value is the denominator of trader score formula
 @storage_var
 func total_w_value_by_market(season_id: felt, pair_id: felt) -> (total_w_value_64x61: felt) {
+}
+
+// Stores the trader score per pair in a season
+@storage_var
+func trader_score_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
+    trader_score_64x61: felt
+) {
 }
 
 // //////////////
@@ -272,6 +281,45 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         hightide_address_=hightide_address,
         user_stats_address_=user_stats_address,
         rewards_calculation_address_=rewards_calculation_address,
+    );
+}
+
+// @notice external function to calculate trader score
+// @param season_id_ - Season Id for which to calculate the w for a trader per pair
+// @param trader_list_len - length of trader's list
+// @param trader_list - list of trader's
+@external
+func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, trader_list_len: felt, trader_list: felt*
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get HightideAdmin address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Get trading season data
+    let (season: TradingSeason) = IHighTide.get_season(
+        contract_address=hightide_address, season_id=season_id_
+    );
+
+    // Get the current day according to the season
+    let (is_expired: felt) = IHighTide.get_season_expiry_state(
+        contract_address=hightide_address, season_id=season_id_
+    );
+
+    with_attr error_message("HighTideCalc: Season still ongoing") {
+        assert is_expired = TRUE;
+    }
+
+    // Recursively calculate trader score
+    return calculate_trader_score_recurse(
+        season_id_=season_id_,
+        trader_list_len=trader_list_len,
+        trader_list=trader_list,
+        hightide_address_=hightide_address,
     );
 }
 
@@ -781,6 +829,75 @@ func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(x: 
         return (y,);
     }
     return (x,);
+}
+
+// @notice internal function to recursively calculate trader score
+// @param season_id_ - Season Id for which to calculate w for each trader of a pair
+// @param trader_list_len - Length of the traders array
+// @param trader_list - Array of traders
+// @param hightide_address_ - Address of the HighTide contract
+func calculate_trader_score_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(season_id_: felt, trader_list_len: felt, trader_list: felt*, hightide_address_: felt) {
+    if (trader_list_len == 0) {
+        return ();
+    }
+
+    // Get highTide market pairs
+    let (
+        hightide_pair_list_len: felt, hightide_pair_list: felt*
+    ) = IHighTide.get_hightide_pairs_by_season_id(
+        contract_address=hightide_address_, season_id=season_id_
+    );
+
+    calculate_trader_score_per_market_recurse(
+        season_id_=season_id_,
+        trader_address_=[trader_list],
+        hightide_pair_list_len=hightide_pair_list_len,
+        hightide_pair_list=hightide_pair_list,
+    );
+
+    return calculate_trader_score_recurse(
+        season_id_=season_id_,
+        trader_list_len=trader_list_len - 1,
+        trader_list=trader_list,
+        hightide_address_=hightide_address_,
+    );
+}
+
+// @notice internal function to recursively calculate trader score
+// @param season_id_ - Season Id for which to calculate w for each trader of a pair
+// @param trader_address_ - Address of the trader
+// @param hightide_pair_list_len_, length of hightide market pair id's
+// @param hightide_pair_list_ - List of hightide market pair_ids
+func calculate_trader_score_per_market_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    season_id_: felt, trader_address_: felt, hightide_pair_list_len: felt, hightide_pair_list: felt*
+) {
+    if (hightide_pair_list_len == 0) {
+        return ();
+    }
+
+    // Get w value for a pair corresponding to a trader
+    let (w_value_64x61) = trader_w_value_by_market.read(
+        season_id_, [hightide_pair_list], trader_address_
+    );
+
+    // Get total w value for a pair
+    let (total_w_value_64x61) = total_w_value_by_market.read(season_id_, [hightide_pair_list]);
+
+    let (trader_score_64x61) = Math64x61_div(w_value_64x61, total_w_value_64x61);
+    trader_score_by_market.write(
+        season_id_, [hightide_pair_list], trader_address_, trader_score_64x61
+    );
+
+    return calculate_trader_score_per_market_recurse(
+        season_id_=season_id_,
+        trader_address_=trader_address_,
+        hightide_pair_list_len=hightide_pair_list_len - 1,
+        hightide_pair_list=hightide_pair_list,
+    );
 }
 
 // @notice internal function to recursively calculate the top stats in a season
