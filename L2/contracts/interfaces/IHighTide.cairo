@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.DataTypes import HighTideMetaData, RewardToken, TradingSeason
+from contracts.DataTypes import Constants, HighTideMetaData, Multipliers, RewardToken, TradingSeason
 
 @contract_interface
 namespace IHighTide {
@@ -29,5 +29,11 @@ namespace IHighTide {
     func get_hightide_pairs_by_season_id(season_id: felt) -> (
         hightide_pair_list_len: felt, hightide_pair_list: felt*
     ) {
+    }
+
+    func get_multipliers() -> (multipliers: Multipliers) {
+    }
+
+    func get_constants() -> (constants: Constants) {
     }
 }

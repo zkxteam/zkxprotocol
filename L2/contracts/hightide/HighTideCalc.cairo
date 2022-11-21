@@ -12,6 +12,7 @@ from contracts.Constants import (
     UserStats_INDEX,
 )
 from contracts.DataTypes import (
+    Constants,
     HighTideFactors,
     HighTideMetaData,
     Market,
@@ -246,9 +247,13 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         assert is_expired = TRUE;
     }
 
+    // Get Constants to calculate traders individual trader score
+    let (constants: Constants) = IHighTide.get_constants(contract_address=hightide_address);
+
     // Recursively calculate w for each trader
     return calculate_w_recurse(
         season_id_=season_id_,
+        constants_=constants,
         trader_list_len=trader_list_len,
         trader_list=trader_list,
         hightide_address_=hightide_address,
@@ -440,6 +445,7 @@ func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
 // @notice internal function to recursively calculate w for each trader
 // @param season_id_ - Season Id for which to calculate w for each trader of a pair
+// @param constants_ - Constants used to calculate individual trader score
 // @param trader_list_len - Length of the traders array
 // @param trader_list - Array of traders
 // @param hightide_address_ - Address of the HighTide contract
@@ -447,6 +453,7 @@ func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param rewards_calculation_address_ - Address of the rewards calculation contract
 func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
+    constants_: Constants,
     trader_list_len: felt,
     trader_list: felt*,
     hightide_address_: felt,
@@ -477,12 +484,14 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         hightide_address_=hightide_address_,
         user_stats_address_=user_stats_address_,
         xp_value_=xp_value,
+        constants_=constants_,
         hightide_pair_list_len=hightide_pair_list_len,
         hightide_pair_list=hightide_pair_list,
     );
 
     return calculate_w_recurse(
         season_id_=season_id_,
+        constants_=constants_,
         trader_list_len=trader_list_len - 1,
         trader_list=trader_list,
         hightide_address_=hightide_address_,
@@ -497,6 +506,7 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @param hightide_address_ - Address of the HighTide contract
 // @param user_stats_address_ - Address of the User stats contract
 // @param xp_value_ - xp_value of a trader
+// @param constants_ - Constants used to calculate individual trader score
 // @param hightide_pair_list_len_, length of hightide market pair id's
 // @param hightide_pair_list_ - List of hightide market pair_ids
 func calculate_w_per_market_recurse{
@@ -507,6 +517,7 @@ func calculate_w_per_market_recurse{
     hightide_address_: felt,
     user_stats_address_: felt,
     xp_value_: felt,
+    constants_: Constants,
     hightide_pair_list_len: felt,
     hightide_pair_list: felt*,
 ) {
@@ -541,6 +552,7 @@ func calculate_w_per_market_recurse{
         hightide_address_=hightide_address_,
         user_stats_address_=user_stats_address_,
         xp_value_=xp_value_,
+        constants_=constants_,
         hightide_pair_list_len=hightide_pair_list_len - 1,
         hightide_pair_list=hightide_pair_list,
     );
