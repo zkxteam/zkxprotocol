@@ -29,6 +29,7 @@ const TradingStats_INDEX = 25;
 const UserStats_INDEX = 26;
 const Starkway_INDEX = 27;
 const Settings_INDEX = 28;
+const RewardsCalculation_INDEX = 29;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 

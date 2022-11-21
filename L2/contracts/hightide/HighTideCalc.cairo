@@ -4,7 +4,13 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
-from contracts.Constants import Hightide_INDEX, Market_INDEX, TradingStats_INDEX, UserStats_INDEX
+from contracts.Constants import (
+    Hightide_INDEX,
+    Market_INDEX,
+    RewardsCalculation_INDEX,
+    TradingStats_INDEX,
+    UserStats_INDEX,
+)
 from contracts.DataTypes import (
     HighTideFactors,
     HighTideMetaData,
@@ -15,6 +21,7 @@ from contracts.DataTypes import (
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.IRewardsCalculation import IRewardsCalculation
 from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.IUserStats import IUserStats
 from contracts.libraries.CommonLibrary import (
@@ -220,6 +227,11 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         contract_address=registry, index=UserStats_INDEX, version=version
     );
 
+    // Get rewards calculation contract from Authorized Registry
+    let (rewards_calculation_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=RewardsCalculation_INDEX, version=version
+    );
+
     // Get trading season data
     let (season: TradingSeason) = IHighTide.get_season(
         contract_address=hightide_address, season_id=season_id_
@@ -241,6 +253,7 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         trader_list=trader_list,
         hightide_address_=hightide_address,
         user_stats_address_=user_stats_address,
+        rewards_calculation_address_=rewards_calculation_address,
     );
 }
 
@@ -431,12 +444,14 @@ func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param trader_list - Array of traders
 // @param hightide_address_ - Address of the HighTide contract
 // @param user_stats_address_ - Address of the User stats contract
+// @param rewards_calculation_address_ - Address of the rewards calculation contract
 func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
     trader_list_len: felt,
     trader_list: felt*,
     hightide_address_: felt,
     user_stats_address_: felt,
+    rewards_calculation_address_: felt,
 ) {
     if (trader_list_len == 0) {
         return ();
@@ -449,11 +464,19 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         contract_address=hightide_address_, season_id=season_id_
     );
 
+    // Get xp value
+    let (xp_value: felt) = IRewardsCalculation.get_user_xp_value(
+        contract_address=rewards_calculation_address_,
+        season_id_=season_id_,
+        user_address_=[trader_list],
+    );
+
     calculate_w_per_market_recurse(
         season_id_=season_id_,
         trader_address_=[trader_list],
         hightide_address_=hightide_address_,
         user_stats_address_=user_stats_address_,
+        xp_value_=xp_value,
         hightide_pair_list_len=hightide_pair_list_len,
         hightide_pair_list=hightide_pair_list,
     );
@@ -464,6 +487,7 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         trader_list=trader_list,
         hightide_address_=hightide_address_,
         user_stats_address_=user_stats_address_,
+        rewards_calculation_address_=rewards_calculation_address_,
     );
 }
 
@@ -472,6 +496,7 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @param trader_address_ - Address of the trader
 // @param hightide_address_ - Address of the HighTide contract
 // @param user_stats_address_ - Address of the User stats contract
+// @param xp_value_ - xp_value of a trader
 // @param hightide_pair_list_len_, length of hightide market pair id's
 // @param hightide_pair_list_ - List of hightide market pair_ids
 func calculate_w_per_market_recurse{
@@ -481,6 +506,7 @@ func calculate_w_per_market_recurse{
     trader_address_: felt,
     hightide_address_: felt,
     user_stats_address_: felt,
+    xp_value_: felt,
     hightide_pair_list_len: felt,
     hightide_pair_list: felt*,
 ) {
@@ -514,6 +540,7 @@ func calculate_w_per_market_recurse{
         trader_address_=trader_address_,
         hightide_address_=hightide_address_,
         user_stats_address_=user_stats_address_,
+        xp_value_=xp_value_,
         hightide_pair_list_len=hightide_pair_list_len - 1,
         hightide_pair_list=hightide_pair_list,
     );
