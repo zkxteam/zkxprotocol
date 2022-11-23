@@ -354,6 +354,54 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     );
 }
 
+// @notice external function to calculate the funds flowing from LP (Liquidity Pool) to RP (Rewards Pool)
+// @param season_id_ - Season Id for which to calculate the flow of a pair
+@external
+func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) {
+    alloc_locals;
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Hightide contract address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Get trading season data
+    let (season: TradingSeason) = IHighTide.get_season(
+        contract_address=hightide_address, season_id=season_id_
+    );
+
+    // Get the current day according to the season
+    let (is_expired: felt) = IHighTide.get_season_expiry_state(
+        contract_address=hightide_address, season_id=season_id_
+    );
+
+    with_attr error_message("HighTideCalc: Season still ongoing") {
+        assert is_expired = TRUE;
+    }
+
+    // get hightide pairs
+    let (
+        hightide_pair_list_len: felt, hightide_pair_list: felt*
+    ) = IHighTide.get_hightide_pairs_by_season_id(
+        contract_address=hightide_address, season_id=season_id_
+    );
+
+    // Get multipliers to calculate funds flow
+    let (multipliers: Multipliers) = IHighTide.get_multipliers(contract_address=hightide_address);
+
+    // Recursively calculate the flow for each pair_id
+    return calculate_funds_flow_recurse(
+        season_id_=season_id_,
+        multipliers_=multipliers,
+        hightide_pair_list_len=hightide_pair_list_len,
+        hightide_pair_list=hightide_pair_list,
+    );
+}
+
 // ///////////
 // Internal //
 // ///////////
@@ -1028,5 +1076,61 @@ func find_top_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         max_trades_top_pair_64x61_=current_max_trades_pair,
         number_of_traders_top_pair_64x61_=current_top_number_of_traders,
         average_volume_top_pair_64x61_=current_top_average_volume,
+    );
+}
+
+// @notice internal function to recursively calculate funds flow for each pair
+// @param season_id_ - Season Id for which to calculate funds flow for each pair
+// @param multipliers_ - Multipliers used to calculate funds flow
+// @param hightide_pair_list_len_, length of hightide market pair id's
+// @param hightide_pair_list_ - List of hightide market pair_ids
+func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt,
+    multipliers_: Multipliers,
+    hightide_pair_list_len: felt,
+    hightide_pair_list: felt*,
+) {
+    alloc_locals;
+
+    if (hightide_pair_list_len == 0) {
+        return ();
+    }
+
+    // Get hightide factors corresponding to a pair
+    let (factors: HighTideFactors) = high_tide_factors.read(
+        season_id=season_id_, pair_id=[hightide_pair_list]
+    );
+
+    // Find cumulative sum of multipliers to the hightide factors
+    let (x_1_times_a_1) = Math64x61_mul(factors.x_1, multipliers_.a_1);
+    let (x_2_times_a_2) = Math64x61_mul(factors.x_2, multipliers_.a_2);
+    let (x_3_times_a_3) = Math64x61_mul(factors.x_3, multipliers_.a_3);
+    let (x_4_times_a_4) = Math64x61_mul(factors.x_4, multipliers_.a_4);
+
+    let (temp_1_64x61) = Math64x61_add(x_1_times_a_1, x_2_times_a_2);
+    let (temp_2_64x61) = Math64x61_add(temp_1_64x61, x_3_times_a_3);
+    let (numerator_64x61) = Math64x61_add(temp_2_64x61, x_4_times_a_4);
+
+    // Find sum of all multipliers
+    let (temp_3_64x61) = Math64x61_add(multipliers_.a_1, multipliers_.a_2);
+    let (temp_4_64x61) = Math64x61_add(temp_3_64x61, multipliers_.a_3);
+    let (denominator_64x61) = Math64x61_add(temp_4_64x61, multipliers_.a_4);
+
+    // return if the denominator is 0
+    if (denominator_64x61 == 0) {
+        return ();
+    }
+
+    // Find percentage of funds to be transferred from LP to RP
+    let (funds_flow_64x61) = Math64x61_div(numerator_64x61, denominator_64x61);
+
+    // Update funds flow for a pair
+    funds_flow_by_market.write(season_id_, [hightide_pair_list], funds_flow_64x61);
+
+    return calculate_funds_flow_recurse(
+        season_id_=season_id_,
+        multipliers_=multipliers_,
+        hightide_pair_list_len=hightide_pair_list_len - 1,
+        hightide_pair_list=hightide_pair_list,
     );
 }

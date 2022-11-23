@@ -393,13 +393,13 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 }
 
 // @notice - This function is used for setting multipliers
-// @param a1_ - alpha1 value
-// @param a2_ - alpha2 value
-// @param a3_ - alpha3 value
-// @param a4_ - alpha4 value
+// @param a_1_ - alpha1 value
+// @param a_2_ - alpha2 value
+// @param a_3_ - alpha3 value
+// @param a_4_ - alpha4 value
 @external
 func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    a1_: felt, a2_: felt, a3_: felt, a4_: felt
+    a_1_: felt, a_2_: felt, a_3_: felt, a_4_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -410,7 +410,7 @@ func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     }
 
     // Create Multipliers struct to store
-    let multipliers: Multipliers = Multipliers(a1=a1_, a2=a2_, a3=a3_, a4=a4_);
+    let multipliers: Multipliers = Multipliers(a_1=a_1_, a_2=a_2_, a_3=a_3_, a_4=a_4_);
     multipliers_to_calculate_reward.write(multipliers);
 
     // Emit event
