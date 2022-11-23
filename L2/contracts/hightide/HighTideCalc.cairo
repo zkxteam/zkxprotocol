@@ -1116,7 +1116,7 @@ func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     let (temp_4_64x61) = Math64x61_add(temp_3_64x61, multipliers_.a_3);
     let (denominator_64x61) = Math64x61_add(temp_4_64x61, multipliers_.a_4);
 
-    // return if the denominator is 0
+    // if the denominator is 0, simply return 
     if (denominator_64x61 == 0) {
         return ();
     }
@@ -1127,6 +1127,7 @@ func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     // Update funds flow for a pair
     funds_flow_by_market.write(season_id_, [hightide_pair_list], funds_flow_64x61);
 
+    // Recursively calculate the flow for each pair_id
     return calculate_funds_flow_recurse(
         season_id_=season_id_,
         multipliers_=multipliers_,

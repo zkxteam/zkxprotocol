@@ -190,10 +190,10 @@ async def test_set_multipliers_authorized_admin(adminAuth_factory):
     execution_info = await hightide.get_multipliers().call()
     fetched_multipliers = execution_info.result.multipliers
 
-    assert fetched_multipliers.a1 == 1
-    assert fetched_multipliers.a2 == 2
-    assert fetched_multipliers.a3 == 3
-    assert fetched_multipliers.a4 == 4
+    assert fetched_multipliers.a_1 == 1
+    assert fetched_multipliers.a_2 == 2
+    assert fetched_multipliers.a_3 == 3
+    assert fetched_multipliers.a_4 == 4
 
 @pytest.mark.asyncio
 async def test_set_constants_unauthorized_user(adminAuth_factory):
