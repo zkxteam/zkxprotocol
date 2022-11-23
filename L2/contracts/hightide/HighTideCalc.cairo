@@ -785,6 +785,10 @@ func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         trader_address_=trader_address_,
     );
 
+    if (margin_amount_64x61 == 0) {
+        return (0,);
+    }
+
     // Calculate ratio of pnl to the margin
     let (p: felt) = Math64x61_div(pnl_64x61, margin_amount_64x61);
 
@@ -811,21 +815,17 @@ func calculate_w_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (updated_fp_value_64x61) = Math64x61_add(NUM_1_64x61, fp_value_64x61_);
     let (updated_ft_value_64x61) = Math64x61_add(NUM_1_64x61, ft_value_64x61_);
     let (fp_by_ft_64x61) = Math64x61_div(updated_fp_value_64x61, updated_ft_value_64x61);
-    let (a_64x61) = Math64x61_fromIntFelt(constants_.a);
-    let (local fee_power_a) = Math64x61_pow(fp_by_ft_64x61, a_64x61);
+    let (local fee_power_a) = Math64x61_pow(fp_by_ft_64x61, constants_.a);
 
     let (updated_d_value_64x61) = Math64x61_add(NUM_1_64x61, d_value_64x61_);
-    let (b_64x61) = Math64x61_fromIntFelt(constants_.b);
-    let (d_power_b) = Math64x61_pow(updated_d_value_64x61, b_64x61);
+    let (d_power_b) = Math64x61_pow(updated_d_value_64x61, constants_.b);
 
-    let (updated_xp_value) = max_of(constants_.z, xp_value_);
-    let (updated_xp_value_64x61) = Math64x61_fromIntFelt(updated_xp_value);
-    let (c_64x61) = Math64x61_fromIntFelt(constants_.c);
-    let (xp_power_c) = Math64x61_pow(updated_xp_value_64x61, c_64x61);
+    let (xp_value_64x61) = Math64x61_fromIntFelt(xp_value_);
+    let (updated_xp_value) = max_of(constants_.z, xp_value_64x61);
+    let (xp_power_c) = Math64x61_pow(updated_xp_value, constants_.c);
 
     let (updated_p_value_64x61) = Math64x61_add(NUM_1_64x61, p_value_64x61_);
-    let (e_64x61) = Math64x61_fromIntFelt(constants_.e);
-    let (p_power_e) = Math64x61_pow(updated_p_value_64x61, e_64x61);
+    let (p_power_e) = Math64x61_pow(updated_p_value_64x61, constants_.e);
 
     let (temp_1_64x61) = Math64x61_mul(fee_power_a, d_power_b);
     let (temp_2_64x61) = Math64x61_mul(temp_1_64x61, xp_power_c);
@@ -900,7 +900,12 @@ func calculate_trader_score_per_market_recurse{
     // Get total w value for a pair
     let (total_w_value_64x61) = total_w_value_by_market.read(season_id_, [hightide_pair_list]);
 
+    if (total_w_value_64x61 == 0) {
+        return ();
+    }
+
     let (trader_score_64x61) = Math64x61_div(w_value_64x61, total_w_value_64x61);
+
     trader_score_by_market.write(
         season_id_, [hightide_pair_list], trader_address_, trader_score_64x61
     );
