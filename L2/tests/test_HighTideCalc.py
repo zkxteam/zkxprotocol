@@ -1594,50 +1594,50 @@ async def test_calculating_factors(adminAuth_factory):
 #     starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, hightideCalc, user_stats, rewardsCalculation = adminAuth_factory
 >>>>>>> 0d0b13a (ZKX-1074 adding tests wip)
 
-#     # increment to a later date 
-#     starknet_service.starknet.state.state.block_info = BlockInfo(
-#         block_number=1, 
-#         block_timestamp=timestamp5, 
-#         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
-#         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-#         starknet_version = STARKNET_VERSION
-#     )
+    # increment to a later date 
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1, 
+        block_timestamp=timestamp5, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
 
-#     markets = await hightide.get_hightides_by_season_id(1).call()
-#     print(markets.result)
+    markets = await hightide.get_hightides_by_season_id(1).call()
+    print(markets.result)
 
-#     top_stats = await hightideCalc.find_top_stats(1).call()
-#     print(top_stats.result)
+    top_stats = await hightideCalc.find_top_stats(1).call()
+    print(top_stats.result)
 
-#     set_factors_tx = await dave_signer.send_transaction(dave, hightideCalc.contract_address, "calculate_high_tide_factors", [
-#         1,
-#     ])
+    set_factors_tx = await dave_signer.send_transaction(dave, hightideCalc.contract_address, "calculate_high_tide_factors", [
+        1,
+    ])
 
-#     ETH_factors = await hightideCalc.get_hightide_factors(1, ETH_USD_ID).call()
-#     ETH_parsed = list(ETH_factors.result.res)
-#     print(ETH_parsed)
+    ETH_factors = await hightideCalc.get_hightide_factors(1, ETH_USD_ID).call()
+    ETH_parsed = list(ETH_factors.result.res)
+    print(ETH_parsed)
 
-#     assert from64x61(ETH_parsed[0]) == pytest.approx(((3600/4)/(76000/12)), abs=1e-6)
-#     assert from64x61(ETH_parsed[1]) == (2/4)
-#     assert from64x61(ETH_parsed[2]) == (2/4)
-#     assert from64x61(ETH_parsed[3]) == (2/3)
+    assert from64x61(ETH_parsed[0]) == pytest.approx(((3600/4)/(76000/12)), abs=1e-6)
+    assert from64x61(ETH_parsed[1]) == (2/4)
+    assert from64x61(ETH_parsed[2]) == (2/4)
+    assert from64x61(ETH_parsed[3]) == (2/3)
 
-#     TSLA_factors = await hightideCalc.get_hightide_factors(1, TSLA_USD_ID).call()
-#     TSLA_parsed = list(TSLA_factors.result.res)
-#     print(TSLA_parsed)
+    TSLA_factors = await hightideCalc.get_hightide_factors(1, TSLA_USD_ID).call()
+    TSLA_parsed = list(TSLA_factors.result.res)
+    print(TSLA_parsed)
 
-#     assert from64x61(TSLA_parsed[0]) == pytest.approx(((640/4)/(76000/12)), abs=1e-6)
-#     assert from64x61(TSLA_parsed[1]) == (2/4)
-#     assert from64x61(TSLA_parsed[2]) == (2/4)
-#     assert from64x61(TSLA_parsed[3]) == (2/3)
+    assert from64x61(TSLA_parsed[0]) == pytest.approx(((640/4)/(76000/12)), abs=1e-6)
+    assert from64x61(TSLA_parsed[1]) == (2/4)
+    assert from64x61(TSLA_parsed[2]) == (2/4)
+    assert from64x61(TSLA_parsed[3]) == (2/3)
 
-#     assert_events_emitted(
-#         set_factors_tx,
-#         [
-#             [0, hightideCalc.contract_address, "high_tide_factors_set", [1, ETH_USD_ID] + ETH_parsed],
-#             [1, hightideCalc.contract_address, "high_tide_factors_set", [1, TSLA_USD_ID] + TSLA_parsed]
-#         ]
-#     )
+    assert_events_emitted(
+        set_factors_tx,
+        [
+            [0, hightideCalc.contract_address, "high_tide_factors_set", [1, ETH_USD_ID] + ETH_parsed],
+            [1, hightideCalc.contract_address, "high_tide_factors_set", [1, TSLA_USD_ID] + TSLA_parsed]
+        ]
+    )
 
     season_id = 1
     execution_info = await hightide.get_season(season_id).call()
