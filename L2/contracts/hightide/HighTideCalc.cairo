@@ -16,6 +16,7 @@ from contracts.DataTypes import (
     HighTideFactors,
     HighTideMetaData,
     Market,
+    Multipliers,
     TradingSeason,
     VolumeMetaData,
 )
@@ -84,6 +85,11 @@ func total_w_value_by_market(season_id: felt, pair_id: felt) -> (total_w_value_6
 func trader_score_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
     trader_score_64x61: felt
 ) {
+}
+
+// Stores funds flow per pair in a season
+@storage_var
+func funds_flow_by_market(season_id: felt, pair_id: felt) -> (funds_flow_64x61: felt) {
 }
 
 // //////////////
@@ -176,6 +182,18 @@ func get_trader_score_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 ) -> (trader_score: felt) {
     let (trader_score) = trader_score_by_market.read(season_id_, pair_id_, trader_address_);
     return (trader_score,);
+}
+
+// @notice view function to get funds flow of a pair
+// @param season_id_ - Id of the season
+// @param pair_id_ - Market Id of the pair
+// @return funds_flow - returns the funds transferred from liquidity pool to reward pool for a pair
+@view
+func get_funds_flow_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt
+) -> (funds_flow: felt) {
+    let (funds_flow) = funds_flow_by_market.read(season_id_, pair_id_);
+    return (funds_flow,);
 }
 
 // ///////////
