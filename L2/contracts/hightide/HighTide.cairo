@@ -278,21 +278,6 @@ func get_hightides_by_season_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     return (hightide_list_len, hightide_list);
 }
 
-// @notice View function to get the list of hightide pair ids corresponding to the season id
-// @param season_id_ - id of the season
-// @return hightide_pair_list_len - length of hightide pair list
-// @return hightide_pair_list - list of hightide pairs ids
-@view
-func get_hightide_pairs_by_season_id{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(season_id_: felt) -> (hightide_pair_list_len: felt, hightide_pair_list: felt*) {
-    alloc_locals;
-    let (hightide_pair_list: felt*) = alloc();
-    let (hightide_list_len: felt, hightide_list: felt*) = get_hightides_by_season_id(season_id_);
-    populate_hightide_pair_list_recurse(0, hightide_pair_list, hightide_list_len, hightide_list);
-    return (hightide_list_len, hightide_pair_list);
-}
-
 // ///////////
 // External //
 // ///////////
@@ -856,19 +841,4 @@ func populate_hightide_list_recurse{
     let (hightide_id) = hightide_by_season_id.read(season_id_, index_ + 1);
     assert hightide_list[index_] = hightide_id;
     return populate_hightide_list_recurse(season_id_, index_ + 1, hightide_list_len, hightide_list);
-}
-
-func populate_hightide_pair_list_recurse{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(iterator_: felt, hightide_pair_list: felt*, hightide_list_len: felt, hightide_list: felt*) {
-    if (iterator_ == hightide_list_len) {
-        return ();
-    }
-
-    let (hightide_metadata: HighTideMetaData) = get_hightide([hightide_list]);
-    assert hightide_pair_list[iterator_] = hightide_metadata.pair_id;
-
-    return populate_hightide_pair_list_recurse(
-        iterator_ + 1, hightide_pair_list, hightide_list_len, hightide_list
-    );
 }

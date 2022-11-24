@@ -384,9 +384,7 @@ func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     // get hightide pairs
-    let (
-        hightide_pair_list_len: felt, hightide_pair_list: felt*
-    ) = IHighTide.get_hightide_pairs_by_season_id(
+    let (hightide_list_len: felt, hightide_list: felt*) = IHighTide.get_hightides_by_season_id(
         contract_address=hightide_address, season_id=season_id_
     );
 
@@ -397,8 +395,9 @@ func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return calculate_funds_flow_recurse(
         season_id_=season_id_,
         multipliers_=multipliers,
-        hightide_pair_list_len=hightide_pair_list_len,
-        hightide_pair_list=hightide_pair_list,
+        hightide_address_=hightide_address,
+        hightide_list_len=hightide_list_len,
+        hightide_list=hightide_list,
     );
 }
 
@@ -604,10 +603,8 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         return ();
     }
 
-    // Get highTide market pairs
-    let (
-        hightide_pair_list_len: felt, hightide_pair_list: felt*
-    ) = IHighTide.get_hightide_pairs_by_season_id(
+    // Get hightide list
+    let (hightide_list_len: felt, hightide_list: felt*) = IHighTide.get_hightides_by_season_id(
         contract_address=hightide_address_, season_id=season_id_
     );
 
@@ -625,8 +622,8 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         user_stats_address_=user_stats_address_,
         xp_value_=xp_value,
         constants_=constants_,
-        hightide_pair_list_len=hightide_pair_list_len,
-        hightide_pair_list=hightide_pair_list,
+        hightide_list_len=hightide_list_len,
+        hightide_list=hightide_list,
     );
 
     return calculate_w_recurse(
@@ -647,8 +644,8 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @param user_stats_address_ - Address of the User stats contract
 // @param xp_value_ - xp_value of a trader
 // @param constants_ - Constants used to calculate individual trader score
-// @param hightide_pair_list_len_, length of hightide market pair id's
-// @param hightide_pair_list_ - List of hightide market pair_ids
+// @param hightide_list_len_, length of hightide id's
+// @param hightide_list_ - List of hightide id's
 func calculate_w_per_market_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
@@ -658,38 +655,43 @@ func calculate_w_per_market_recurse{
     user_stats_address_: felt,
     xp_value_: felt,
     constants_: Constants,
-    hightide_pair_list_len: felt,
-    hightide_pair_list: felt*,
+    hightide_list_len: felt,
+    hightide_list: felt*,
 ) {
     alloc_locals;
 
-    if (hightide_pair_list_len == 0) {
+    if (hightide_list_len == 0) {
         return ();
     }
 
+    // Fetch hightide details
+    let (hightide_details: HighTideMetaData) = IHighTide.get_hightide(
+        contract_address=hightide_address_, hightide_id=[hightide_list]
+    );
+
     let (local fp_value: felt) = calculate_fp(
         season_id_=season_id_,
-        pair_id_=[hightide_pair_list],
+        pair_id_=hightide_details.pair_id,
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
 
     let (local ft_value: felt) = calculate_ft(
         season_id_=season_id_,
-        pair_id_=[hightide_pair_list],
+        pair_id_=hightide_details.pair_id,
         user_stats_address_=user_stats_address_,
     );
 
     let (d_value: felt) = calculate_d(
         season_id_=season_id_,
-        pair_id_=[hightide_pair_list],
+        pair_id_=hightide_details.pair_id,
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
 
     let (p_value: felt) = calculate_p(
         season_id_=season_id_,
-        pair_id_=[hightide_pair_list],
+        pair_id_=hightide_details.pair_id,
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
@@ -706,13 +708,15 @@ func calculate_w_per_market_recurse{
 
     // Update w value for a pair corresponding to a trader
     trader_w_value_by_market.write(
-        season_id_, [hightide_pair_list], trader_address_, w_value_64x61
+        season_id_, hightide_details.pair_id, trader_address_, w_value_64x61
     );
 
     // Update total w value for a pair
-    let (current_w_value_64x61) = total_w_value_by_market.read(season_id_, [hightide_pair_list]);
+    let (current_w_value_64x61) = total_w_value_by_market.read(
+        season_id_, hightide_details.pair_id
+    );
     let (new_w_value_64x61) = Math64x61_add(current_w_value_64x61, w_value_64x61);
-    total_w_value_by_market.write(season_id_, [hightide_pair_list], new_w_value_64x61);
+    total_w_value_by_market.write(season_id_, hightide_details.pair_id, new_w_value_64x61);
 
     return calculate_w_per_market_recurse(
         season_id_=season_id_,
@@ -721,8 +725,8 @@ func calculate_w_per_market_recurse{
         user_stats_address_=user_stats_address_,
         xp_value_=xp_value_,
         constants_=constants_,
-        hightide_pair_list_len=hightide_pair_list_len - 1,
-        hightide_pair_list=hightide_pair_list,
+        hightide_list_len=hightide_list_len - 1,
+        hightide_list=hightide_list,
     );
 }
 
@@ -732,6 +736,7 @@ func calculate_w_per_market_recurse{
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @return fp - returns trader's individual trading fees paid
+@view
 func calculate_fp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (fp_value: felt) {
@@ -751,6 +756,7 @@ func calculate_fp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @param pair_id_- Pair Id for which to calculate x_4
 // @param user_stats_address_ - Address of the User stats contract
 // @return ft - returns overall zkx platform trading fees
+@view
 func calculate_ft{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, user_stats_address_: felt
 ) -> (ft_value: felt) {
@@ -768,6 +774,7 @@ func calculate_ft{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @return d - returns trader's average open interest
+@view
 func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (d: felt) {
@@ -832,6 +839,7 @@ func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @return p - returns p value for a pair corresponding to a trader
+@view
 func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (p: felt) {
@@ -922,18 +930,17 @@ func calculate_trader_score_recurse{
         return ();
     }
 
-    // Get highTide market pairs
-    let (
-        hightide_pair_list_len: felt, hightide_pair_list: felt*
-    ) = IHighTide.get_hightide_pairs_by_season_id(
+    // Get list of hightide id's
+    let (hightide_list_len: felt, hightide_list: felt*) = IHighTide.get_hightides_by_season_id(
         contract_address=hightide_address_, season_id=season_id_
     );
 
     calculate_trader_score_per_market_recurse(
         season_id_=season_id_,
         trader_address_=[trader_list],
-        hightide_pair_list_len=hightide_pair_list_len,
-        hightide_pair_list=hightide_pair_list,
+        hightide_address_=hightide_address_,
+        hightide_list_len=hightide_list_len,
+        hightide_list=hightide_list,
     );
 
     return calculate_trader_score_recurse(
@@ -947,24 +954,34 @@ func calculate_trader_score_recurse{
 // @notice internal function to recursively calculate trader score
 // @param season_id_ - Season Id for which to calculate w for each trader of a pair
 // @param trader_address_ - Address of the trader
-// @param hightide_pair_list_len_, length of hightide market pair id's
-// @param hightide_pair_list_ - List of hightide market pair_ids
+// @param hightide_address_ - Address of the HighTide contract
+// @param hightide_list_len_, length of hightide id's list
+// @param hightide_list_ - List of hightide id's
 func calculate_trader_score_per_market_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
-    season_id_: felt, trader_address_: felt, hightide_pair_list_len: felt, hightide_pair_list: felt*
+    season_id_: felt,
+    trader_address_: felt,
+    hightide_address_: felt,
+    hightide_list_len: felt,
+    hightide_list: felt*,
 ) {
-    if (hightide_pair_list_len == 0) {
+    if (hightide_list_len == 0) {
         return ();
     }
 
+    // Fetch hightide details
+    let (hightide_details: HighTideMetaData) = IHighTide.get_hightide(
+        contract_address=hightide_address_, hightide_id=[hightide_list]
+    );
+
     // Get w value for a pair corresponding to a trader
     let (w_value_64x61) = trader_w_value_by_market.read(
-        season_id_, [hightide_pair_list], trader_address_
+        season_id_, hightide_details.pair_id, trader_address_
     );
 
     // Get total w value for a pair
-    let (total_w_value_64x61) = total_w_value_by_market.read(season_id_, [hightide_pair_list]);
+    let (total_w_value_64x61) = total_w_value_by_market.read(season_id_, hightide_details.pair_id);
 
     if (total_w_value_64x61 == 0) {
         return ();
@@ -973,14 +990,15 @@ func calculate_trader_score_per_market_recurse{
     let (trader_score_64x61) = Math64x61_div(w_value_64x61, total_w_value_64x61);
 
     trader_score_by_market.write(
-        season_id_, [hightide_pair_list], trader_address_, trader_score_64x61
+        season_id_, hightide_details.pair_id, trader_address_, trader_score_64x61
     );
 
     return calculate_trader_score_per_market_recurse(
         season_id_=season_id_,
         trader_address_=trader_address_,
-        hightide_pair_list_len=hightide_pair_list_len - 1,
-        hightide_pair_list=hightide_pair_list,
+        hightide_address_=hightide_address_,
+        hightide_list_len=hightide_list_len - 1,
+        hightide_list=hightide_list,
     );
 }
 
@@ -1082,23 +1100,30 @@ func find_top_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // @notice internal function to recursively calculate funds flow for each pair
 // @param season_id_ - Season Id for which to calculate funds flow for each pair
 // @param multipliers_ - Multipliers used to calculate funds flow
-// @param hightide_pair_list_len_, length of hightide market pair id's
-// @param hightide_pair_list_ - List of hightide market pair_ids
+// @param hightide_address_ - Address of the HighTide contract
+// @param hightide_list_len_, length of hightide market pair id's
+// @param hightide_list_ - List of hightide market pair_ids
 func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
     multipliers_: Multipliers,
-    hightide_pair_list_len: felt,
-    hightide_pair_list: felt*,
+    hightide_address_: felt,
+    hightide_list_len: felt,
+    hightide_list: felt*,
 ) {
     alloc_locals;
 
-    if (hightide_pair_list_len == 0) {
+    if (hightide_list_len == 0) {
         return ();
     }
 
+    // Fetch hightide details
+    let (hightide_details: HighTideMetaData) = IHighTide.get_hightide(
+        contract_address=hightide_address_, hightide_id=[hightide_list]
+    );
+
     // Get hightide factors corresponding to a pair
     let (factors: HighTideFactors) = high_tide_factors.read(
-        season_id=season_id_, pair_id=[hightide_pair_list]
+        season_id=season_id_, pair_id=hightide_details.pair_id
     );
 
     // Find cumulative sum of multipliers to the hightide factors
@@ -1116,7 +1141,7 @@ func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     let (temp_4_64x61) = Math64x61_add(temp_3_64x61, multipliers_.a_3);
     let (denominator_64x61) = Math64x61_add(temp_4_64x61, multipliers_.a_4);
 
-    // if the denominator is 0, simply return 
+    // if the denominator is 0, simply return
     if (denominator_64x61 == 0) {
         return ();
     }
@@ -1125,13 +1150,14 @@ func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     let (funds_flow_64x61) = Math64x61_div(numerator_64x61, denominator_64x61);
 
     // Update funds flow for a pair
-    funds_flow_by_market.write(season_id_, [hightide_pair_list], funds_flow_64x61);
+    funds_flow_by_market.write(season_id_, hightide_details.pair_id, funds_flow_64x61);
 
     // Recursively calculate the flow for each pair_id
     return calculate_funds_flow_recurse(
         season_id_=season_id_,
         multipliers_=multipliers_,
-        hightide_pair_list_len=hightide_pair_list_len - 1,
-        hightide_pair_list=hightide_pair_list,
+        hightide_address_=hightide_address_,
+        hightide_list_len=hightide_list_len - 1,
+        hightide_list=hightide_list,
     );
 }

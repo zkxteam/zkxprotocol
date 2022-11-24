@@ -1314,6 +1314,40 @@ async def test_calculating_factors(adminAuth_factory):
         alice.contract_address,
         bob.contract_address
     ])
+    
+    a = await hightide.get_hightide_pairs_by_season_id(season_id).call()
+    print("hightide pairs", a.result)
+
+    a = await hightideCalc.calculate_fp(season_id, BTC_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("BTC_USD_ID fp value", a.result)
+    b = await hightideCalc.calculate_ft(season_id, BTC_USD_ID, user_stats.contract_address).call()
+    print("BTC_USD_ID ft value", b.result)
+    c = await hightideCalc.calculate_d(season_id, BTC_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("BTC_USD_ID d value", c.result)
+    d = await hightideCalc.calculate_p(season_id, BTC_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("BTC_USD_ID p value", d.result)
+    e = await rewardsCalculation.get_user_xp_value(season_id, alice.contract_address).call()
+    print("xp value", e.result)
+    f = await hightide.get_constants().call()
+    print("constants value", f.result)
+
+    a = await hightideCalc.calculate_fp(season_id, ETH_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("ETH_USD_ID fp value", a.result)
+    b = await hightideCalc.calculate_ft(season_id, ETH_USD_ID, user_stats.contract_address).call()
+    print("ETH_USD_ID ft value", b.result)
+    c = await hightideCalc.calculate_d(season_id, ETH_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("ETH_USD_ID d value", c.result)
+    d = await hightideCalc.calculate_p(season_id, ETH_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("ETH_USD_ID p value", d.result)
+
+    a = await hightideCalc.calculate_fp(season_id, TSLA_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("TSLA_USD_ID fp value", a.result)
+    b = await hightideCalc.calculate_ft(season_id, TSLA_USD_ID, user_stats.contract_address).call()
+    print("TSLA_USD_ID ft value", b.result)
+    c = await hightideCalc.calculate_d(season_id, TSLA_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("TSLA_USD_ID d value", c.result)
+    d = await hightideCalc.calculate_p(season_id, TSLA_USD_ID, alice.contract_address, user_stats.contract_address).call()
+    print("TSLA_USD_ID p value", d.result)
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,

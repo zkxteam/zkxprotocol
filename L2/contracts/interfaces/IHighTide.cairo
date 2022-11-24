@@ -26,11 +26,6 @@ namespace IHighTide {
     ) {
     }
 
-    func get_hightide_pairs_by_season_id(season_id: felt) -> (
-        hightide_pair_list_len: felt, hightide_pair_list: felt*
-    ) {
-    }
-
     func get_multipliers() -> (multipliers: Multipliers) {
     }
 
