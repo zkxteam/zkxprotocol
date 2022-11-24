@@ -40,7 +40,6 @@ from contracts.hightide.HighTide import (
     verify_token_balance_recurse,
     assign_hightide_to_season,
     populate_hightide_list_recurse,
-    get_hightide_pairs_by_season_id,
 )
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
