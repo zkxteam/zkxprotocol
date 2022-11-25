@@ -1314,9 +1314,6 @@ async def test_calculating_factors(adminAuth_factory):
         alice.contract_address,
         bob.contract_address
     ])
-    
-    a = await hightide.get_hightide_pairs_by_season_id(season_id).call()
-    print("hightide pairs", a.result)
 
     a = await hightideCalc.calculate_fp(season_id, BTC_USD_ID, alice.contract_address, user_stats.contract_address).call()
     print("BTC_USD_ID fp value", a.result)
