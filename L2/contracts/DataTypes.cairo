@@ -115,16 +115,16 @@ struct PriceData {
 // @notice struct for passing the order request to Account Contract
 struct OrderRequest {
     orderID: felt,
-    assetID: felt,
-    collateralID: felt,
+    marketID: felt,
     price: felt,
-    stopPrice: felt,
-    orderType: felt,
-    positionSize: felt,
-    direction: felt,
-    closeOrder: felt,
+    quantity: felt,
     leverage: felt,
-    liquidatorAddress: felt,
+    slippage: felt,
+    direction: felt,
+    orderType: felt,
+    timeInForce: felt,
+    postOnly: felt,
+    closeOrder: felt,
 }
 
 // @notice struct for storing the order data to Account Contract

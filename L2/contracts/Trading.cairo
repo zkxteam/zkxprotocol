@@ -97,13 +97,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 @external
 func execute_batch{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
-}(
-    size_: felt,
-    execution_price_: felt,
-    marketID_: felt,
-    request_list_len: felt,
-    request_list: MultipleOrder*,
-) -> () {
+}(size_: felt, marketID_: felt, request_list_len: felt, request_list: MultipleOrder*) -> () {
     alloc_locals;
 
     let (registry) = CommonLib.get_registry_address();
@@ -171,7 +165,6 @@ func execute_batch{
         0,
         0,
         marketID_,
-        execution_price_,
         request_list_len,
         request_list,
         0,
@@ -835,10 +828,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @return trader_stats_list_len - returns the length of the trader fee list so far
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     size_: felt,
-    assetID_: felt,
-    collateralID_: felt,
     marketID_: felt,
-    execution_price_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
     sum: felt,
@@ -864,21 +854,22 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Create a struct object for the order
     tempvar temp_order: MultipleOrder = MultipleOrder(
-        pub_key=[request_list_].pub_key,
+        user_address=[request_list_].user_address,
         sig_r=[request_list_].sig_r,
         sig_s=[request_list_].sig_s,
-        orderID=[request_list_].orderID,
-        assetID=[request_list_].assetID,
-        collateralID=[request_list_].collateralID,
-        price=[request_list_].price,
-        stopPrice=[request_list_].stopPrice,
-        orderType=[request_list_].orderType,
-        positionSize=[request_list_].positionSize,
-        direction=[request_list_].direction,
-        closeOrder=[request_list_].closeOrder,
-        leverage=[request_list_].leverage,
+        side=[request_list_].side,
         liquidatorAddress=[request_list_].liquidatorAddress,
-        side=[request_list_].side
+        orderID=[request_list_].orderID,
+        marketID=[request_list_].marketID,
+        price=[request_list_].price,
+        quantity=[request_list_].quantity,
+        leverage=[request_list_].leverage,
+        slippage=[request_list_].slippage,
+        direction=[request_list_].direction,
+        orderType=[request_list_].orderType,
+        timeInForce=[request_list_].timeInForce,
+        postOnly=[request_list_].postOnly,
+        closeOrder=[request_list_].closeOrder
         );
 
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
@@ -890,21 +881,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_not_zero(is_registered);
     }
 
+    // TODO: REmove it
     // Check if the price is fair
     check_order_price(order_=temp_order, execution_price_=execution_price_);
-
-    // Check if size is less than or equal to postionSize
-    let cmp_res = is_le(size_, temp_order.positionSize);
-
-    local order_size;
-
-    if (cmp_res == 1) {
-        // If yes, make the order_size to be size
-        assert order_size = size_;
-    } else {
-        // If no, make order_size to be the positionSize̦
-        assert order_size = temp_order.positionSize;
-    }
 
     local sum_temp;
 
@@ -1014,18 +993,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // If it's the first order in the array
     if (assetID_ == 0) {
-        // Check if the asset is tradable
-        let (asset: Asset) = IAsset.get_asset(
-            contract_address=asset_address_, id=temp_order.assetID
-        );
-        let (collateral: Asset) = IAsset.get_asset(
-            contract_address=asset_address_, id=temp_order.collateralID
-        );
         let (market: Market) = IMarkets.get_market(contract_address=market_address_, id=marketID_);
-
-        with_attr error_message("Trading: Collateral not valid") {
-            assert_not_zero(collateral.collateral);
-        }
 
         with_attr error_message("Trading: Market not tradable") {
             assert_not_zero(market.is_tradable);
