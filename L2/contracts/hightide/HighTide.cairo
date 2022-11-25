@@ -16,6 +16,7 @@ from starkware.cairo.common.uint256 import Uint256, uint256_add, uint256_lt
 from contracts.Constants import (
     HIGHTIDE_ACTIVE,
     HIGHTIDE_INITIATED,
+    HighTideCalc_INDEX,
     ManageHighTide_ACTION,
     Market_INDEX,
     Starkway_INDEX,
@@ -595,6 +596,40 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return ();
 }
 
+// @notice - This function is used to distribute rewards
+// @param hightide_id_ - id of hightide
+// @param trader_list_len - length of trader's list
+// @param trader_list - list of trader's
+@external
+func ditribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id_: felt, trader_list_len: felt, trader_list: felt*
+) {
+    alloc_locals;
+
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get HightideCalc contract address from Authorized Registry
+    let (hightide_calc_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=HighTideCalc_INDEX, version=version
+    );
+
+    let (local hightide_metadata: HighTideMetaData) = get_hightide(hightide_id_);
+
+    let (
+        reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
+    ) = get_hightide_reward_tokens(hightide_id_);
+
+    // Recursively ditribute rewards to all active traders for the specified hightide
+    return ditribute_rewards_recurse(
+        hightide_metadata_=hightide_metadata,
+        trader_list_len=trader_list_len,
+        trader_list=trader_list,
+        reward_tokens_list_len=reward_tokens_list_len,
+        reward_tokens_list=reward_tokens_list,
+    );
+}
+
 // ///////////
 // Internal //
 // ///////////
@@ -841,4 +876,51 @@ func populate_hightide_list_recurse{
     let (hightide_id) = hightide_by_season_id.read(season_id_, index_ + 1);
     assert hightide_list[index_] = hightide_id;
     return populate_hightide_list_recurse(season_id_, index_ + 1, hightide_list_len, hightide_list);
+}
+
+func ditribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_metadata_: HighTideMetaData,
+    trader_list_len: felt,
+    trader_list: felt*,
+    reward_tokens_list_len: felt,
+    reward_tokens_list: RewardToken*,
+) {
+    if (trader_list_len == 0) {
+        return ();
+    }
+
+    ditribute_rewards_per_trader_recurse(
+        hightide_metadata_=hightide_metadata_,
+        trader_address_=[trader_list],
+        reward_tokens_list_len=reward_tokens_list_len,
+        reward_tokens_list=reward_tokens_list,
+    );
+
+    return ditribute_rewards_recurse(
+        hightide_metadata_=hightide_metadata_,
+        trader_list_len=trader_list_len - 1,
+        trader_list=trader_list + 1,
+        reward_tokens_list_len=reward_tokens_list_len,
+        reward_tokens_list=reward_tokens_list,
+    );
+}
+
+func ditribute_rewards_per_trader_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    hightide_metadata_: HighTideMetaData,
+    trader_address_: felt,
+    reward_tokens_list_len: felt,
+    reward_tokens_list: RewardToken*,
+) {
+    if (reward_tokens_list_len == 0) {
+        return ();
+    }
+
+    return ditribute_rewards_per_trader_recurse(
+        hightide_metadata_=hightide_metadata_,
+        trader_address_=trader_address_,
+        reward_tokens_list_len=reward_tokens_list_len - 1,
+        reward_tokens_list=reward_tokens_list + RewardToken.SIZE,
+    );
 }
