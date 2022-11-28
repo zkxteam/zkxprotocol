@@ -72,6 +72,9 @@ const DELEVERAGING_ORDER = 4;
 const LONG = 1;
 const SHORT = 0;
 
+const MAKER = 0;
+const TAKER = 1;
+
 const WITHDRAWAL_INITIATED = 0;
 const WITHDRAWAL_SUCCEEDED = 1;
 

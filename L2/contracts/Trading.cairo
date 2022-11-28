@@ -21,11 +21,13 @@ from contracts.Constants import (
     LIQUIDATION_ORDER,
     LiquidityFund_INDEX,
     LONG,
+    MAKER,
     Market_INDEX,
     MARKET_ORDER,
     MarketPrices_INDEX,
     SHORT,
     STOP_ORDER,
+    TAKER,
     TradingFees_INDEX,
     TradingStats_INDEX,
 )
@@ -180,6 +182,7 @@ func execute_batch{
         0,
         0,
         trader_stats_list,
+        0,
     );
 
     // Check if every order has a counter order
@@ -844,6 +847,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     max_leverage_: felt,
     trader_stats_list_len_: felt,
     trader_stats_list_: TraderStats*,
+    running_weighted_sum: felt,
 ) -> (res: felt, trader_stats_list_len: felt) {
     alloc_locals;
 
@@ -885,20 +889,50 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Check if the price is fair
     check_order_price(order_=temp_order, execution_price_=execution_price_);
 
+    local order_size;
+    local executed_quantity;
+    assert order_size = temp_order.quantity;
+
     local sum_temp;
 
-    if (temp_order.direction == LONG) {
+    if (temp_order.side == MAKER) {
         assert sum_temp = sum + order_size;
+
+        // Check if size is less than or equal to postionSize
+        let cmp_res = is_le(size_, sum_temp);
+
+        if (cmp_res == 1) {
+            // If yes, make the order_size to be size
+            assert executed_quantity = order_size + size_ - sum_temp;
+        } else {
+            // If no, make order_size to be the positionSize̦
+            assert executed_quantity = order_size;
+        }
     } else {
         assert sum_temp = sum - order_size;
+
+        with_attr error_message("TRADING: Taker order size >= Maker order(s)") {
+            assert_le(sum_temp, 0);
+        }
+
+        assert executed_quantity = size_;
     }
 
+    local execution_price;
     local margin_amount;
     local borrowed_amount;
     local average_execution_price;
     local trader_stats_list_len;
     local trader_stats_list: TraderStats*;
+    local new_running_weighted_sum;
 
+    if (temp_order.side == MAKER) {
+        assert execution_price = temp_order.price;
+        assert new_running_weighted_sum = temp_order.price * executed_quantity;
+    } else {
+        let (new_execution_price: felt) = Math64x61_div(running_weighted_sum, size_);
+        assert execution_price = new_execution_price;
+    }
     // If the order is to be opened
     if (temp_order.closeOrder == FALSE) {
         let (
@@ -908,8 +942,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             trader_stats_list_len_temp: felt,
         ) = process_open_orders(
             order_=temp_order,
-            execution_price_=execution_price_,
-            order_size_=order_size,
+            execution_price_=execution_price,
+            order_size_=executed_quantity,
             market_id_=marketID_,
             trading_fees_address_=trading_fees_address_,
             liquidity_fund_address_=liquidity_fund_address_,
@@ -924,6 +958,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert average_execution_price = average_execution_price_temp;
         assert trader_stats_list_len = trader_stats_list_len_temp;
         assert trader_stats_list = trader_stats_list_ + TraderStats.SIZE;
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -935,8 +970,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             trader_stats_list_len_temp: felt,
         ) = process_close_orders(
             order_=temp_order,
-            execution_price_=execution_price_,
-            order_size_=order_size,
+            execution_price_=execution_price,
+            order_size_=executed_quantity,
             market_id_=marketID_,
             liquidity_fund_address_=liquidity_fund_address_,
             insurance_fund_address_=insurance_fund_address_,
@@ -992,7 +1027,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     );
 
     // If it's the first order in the array
-    if (assetID_ == 0) {
+    if (max_leverage_ == 0) {
         let (market: Market) = IMarkets.get_market(contract_address=market_address_, id=marketID_);
 
         with_attr error_message("Trading: Market not tradable") {
@@ -1025,21 +1060,11 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             asset.currently_allowed_leverage,
             trader_stats_list_len,
             trader_stats_list,
+            new_running_weighted_sum,
         );
     }
 
-    // Assert that the order has the same ticker and price as the first order
-    with_attr error_message("Trading: Asset Mismatch") {
-        assert assetID_ = temp_order.assetID;
-    }
-
-    with_attr error_message("Trading: Collateral Mismatch") {
-        assert collateralID_ = temp_order.collateralID;
-    }
-
-    with_attr error_message("Trading: Invalid Leverage") {
-        assert_le(temp_order.leverage, max_leverage_);
-    }
+    // Leverage Check
 
     // Recursive Call
     return check_and_execute(
@@ -1063,5 +1088,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         max_leverage_,
         trader_stats_list_len,
         trader_stats_list,
+        new_running_weighted_sum,
     );
 }
