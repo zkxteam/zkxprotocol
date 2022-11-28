@@ -895,6 +895,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     local sum_temp;
 
+    if (temp_order.side == TAKER) {
+        with_attr error_message("Trading: Post Only order cannot be a taker") {
+            assert temp_order.postOnly = 0;
+        }
+    }
+
     if (temp_order.side == MAKER) {
         assert sum_temp = sum + order_size;
 
@@ -902,6 +908,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let cmp_res = is_le(size_, sum_temp);
 
         if (cmp_res == 1) {
+            // F&K order cannot be executed partially
+            if (temp_order.timeInForce == 2) {
+                with_attr error_message("Trading: F&K should be executed fully") {
+                    assert 1 = 0;
+                }
+            }
             // If yes, make the order_size to be size
             assert executed_quantity = order_size + size_ - sum_temp;
         } else {
