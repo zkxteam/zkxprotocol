@@ -60,7 +60,6 @@ from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
 //############
 // Constants #
 //############
-const TWO_PERCENT = 46116860184273879;
 const LEVERAGE_ONE = 2305843009213693952;
 
 //#########
@@ -70,6 +69,15 @@ const LEVERAGE_ONE = 2305843009213693952;
 // Event emitted whenever a new market is added
 @event
 func trade_execution(address: felt, request: OrderRequest, market_id: felt, execution_price: felt) {
+}
+
+//##########
+// Storage #
+//##########
+
+// Stores public key associated with an account
+@storage_var
+func threshold_percentage() -> (res: felt) {
 }
 
 //##############
@@ -167,11 +175,15 @@ func execute_batch{
 
     let (trader_stats_list: TraderStats*) = alloc();
 
+    // check oracle price
+    let (lower_limit: felt, upper_limit: felt) = check_order_price(oracle_price_=oracle_price_);
+
     // Recursively loop through the orders in the batch
     let (trader_stats_list_len) = check_and_execute(
         size_=size_,
         market_id_=market_id_,
-        oracle_price_=oracle_price_,
+        lower_limit_=lower_limit,
+        upper_limit_=upper_limit,
         request_list_len_=request_list_len,
         request_list_=request_list,
         sum=0,
@@ -294,85 +306,15 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // Internal Function to check if the price is fair for an order
 // @param order_ - Order to check
 // @param execution_price_ - Price at which the order got matched
-func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_: MultipleOrder, execution_price_: felt
-) {
-    // Check if the execution_price is correct
-    // if (order_.orderType == STOP_ORDER) {
-    //     // if stop order
-    //     if (order_.direction == LONG) {
-    //         // if long stop order
-    //         // check that stop_price <= execution_price <= limit_price
-    //         with_attr error_message("Trading: Invalid stop-price long order") {
-    //             assert_le(order_.stopPrice, execution_price_);
-    //         }
-    //         tempvar range_check_ptr = range_check_ptr;
+func get_price_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    oracle_price_: felt
+) -> (lower_limit: felt, upper_limit: felt) {
+    let (current_threshold_percentage) = threshold_percentage.read();
+    let (threshold) = Math64x61_mul(order_.price, current_threshold_percentage);
 
-    // with_attr error_message("Trading: Invalid stop-limit-price long order") {
-    //             assert_le(execution_price_, order_.price);
-    //         }
-    //         tempvar range_check_ptr = range_check_ptr;
-    //     } else {
-    //         // if short stop order
-    //         // check that limit_price <= execution_price <= stop_price
-    //         with_attr error_message("Trading: Invalid stop-price short order") {
-    //             assert_le(order_.price, execution_price_);
-    //         }
-    //         tempvar range_check_ptr = range_check_ptr;
-
-    // with_attr error_message("Trading: Invalid stop-limit-price short order") {
-    //             assert_le(execution_price_, order_.stopPrice);
-    //         }
-    //         tempvar range_check_ptr = range_check_ptr;
-    //     }
-    //     tempvar range_check_ptr = range_check_ptr;
-    // } else {
-    //     tempvar range_check_ptr = range_check_ptr;
-    // }
-
-    if (order_.orderType == LIMIT_ORDER) {
-        // if it's a limit order
-        if (order_.direction == LONG) {
-            // if it's a long order
-            with_attr error_message("Trading: Bad long limit order") {
-                assert_le(execution_price_, order_.price);
-            }
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            // if it's a short order
-            with_attr error_message("Trading: Bad short limit order") {
-                assert_le(order_.price, execution_price_);
-            }
-            tempvar range_check_ptr = range_check_ptr;
-        }
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        tempvar range_check_ptr = range_check_ptr;
-    }
-
-    if (order_.orderType == MARKET_ORDER) {
-        // if it's a market order
-        // Calculate 2% of the order price
-        let (two_percent) = Math64x61_mul(order_.price, TWO_PERCENT);
-        if (order_.direction == LONG) {
-            // if it's a long order
-            tempvar upperLimit = order_.price + two_percent;
-
-            with_attr error_message("Trading: Market Order 2% above") {
-                assert_le(execution_price_, upperLimit);
-            }
-        } else {
-            // if it's a short order
-            tempvar lowerLimit = order_.price - two_percent;
-
-            with_attr error_message("Trading: Market Order 2% below") {
-                assert_le(lowerLimit, execution_price_);
-            }
-        }
-        tempvar range_check_ptr = range_check_ptr;
-    }
-
-    return ();
+    let (lower_limit: felt) = Math64x61_sub(oracle_price_, threshold);
+    let (upper_limit: felt) = Math64x61_add(oracle_price_, threshold);
+    return (lower_limit, upper_limit);
 }
 
 // @notice Intenal function that processes open orders
@@ -832,7 +774,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     size_: felt,
     marketID_: felt,
-    oracle_price_: felt,
+    lower_limit_: felt,
+    upper_limit_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
     sum: felt,
@@ -886,10 +829,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_not_zero(is_registered);
     }
 
-    // TODO: REmove it
-    // Check if the price is fair
-    check_order_price(order_=temp_order, execution_price_=execution_price_);
-
     local order_size;
     local executed_quantity;
     assert order_size = temp_order.quantity;
@@ -897,9 +836,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local sum_temp;
 
     if (temp_order.side == TAKER) {
-        with_attr error_message("Trading: Post Only order cannot be a taker") {
-            assert temp_order.postOnly = 0;
-        }
     }
 
     if (temp_order.side == MAKER) {
@@ -922,6 +858,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             assert executed_quantity = order_size;
         }
     } else {
+        with_attr error_message("Trading: Post Only order cannot be a taker") {
+            assert temp_order.postOnly = 0;
+        }
         assert sum_temp = sum - order_size;
 
         with_attr error_message("TRADING: Taker order size >= Maker order(s)") {
@@ -946,6 +885,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let (new_execution_price: felt) = Math64x61_div(running_weighted_sum, size_);
         assert execution_price = new_execution_price;
     }
+
+    // Price Check
+    with_attr error_message("Trading: Post Only order cannot be a taker") {
+        assert_in_range(execution_price, lower_limit_, upper_limit_);
+    }
+
     // If the order is to be opened
     if (temp_order.closeOrder == FALSE) {
         let (
@@ -1055,7 +1000,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         return check_and_execute(
             size_=size_,
             market_id_=market_id_,
-            oracle_price_=oracle_price_,
+            lower_limit_=lower_limit_,
+            upper_limit_=upper_limit_,
             request_list_len_=request_list_len_ - 1,
             request_list_=request_list_ + MultipleOrder.SIZE,
             sum=sum_temp,
@@ -1081,7 +1027,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return check_and_execute(
         size_=size_,
         marketID_=marketID_,
-        oracle_price_=oracle_price_,
+        lower_limit_=lower_limit_,
+        upper_limit_=upper_limit_,
         request_list_len_=request_list_len_ - 1,
         request_list_=request_list_ + MultipleOrder.SIZE,
         sum=sum_temp,
