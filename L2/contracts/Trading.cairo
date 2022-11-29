@@ -99,7 +99,13 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 @external
 func execute_batch{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
-}(size_: felt, marketID_: felt, request_list_len: felt, request_list: MultipleOrder*) -> () {
+}(
+    size_: felt,
+    market_id_: felt,
+    oracle_price_: felt,
+    request_list_len: felt,
+    request_list: MultipleOrder*,
+) -> () {
     alloc_locals;
 
     let (registry) = CommonLib.get_registry_address();
@@ -125,7 +131,7 @@ func execute_batch{
 
     // Get Market price for the corresponding market Id
     let (market_prices: MarketPrice) = IMarketPrices.get_market_price(
-        contract_address=market_prices_contract_address, id=marketID_
+        contract_address=market_prices_contract_address, id=market_id_
     );
 
     tempvar timestamp = market_prices.timestamp;
@@ -135,7 +141,7 @@ func execute_batch{
     // update market price
     if (status == FALSE) {
         IMarketPrices.update_market_price(
-            contract_address=market_prices_contract_address, id=marketID_, price=execution_price_
+            contract_address=market_prices_contract_address, id=market_id_, price=execution_price_
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -162,33 +168,27 @@ func execute_batch{
     let (trader_stats_list: TraderStats*) = alloc();
 
     // Recursively loop through the orders in the batch
-    let (result, trader_stats_list_len) = check_and_execute(
-        size_,
-        0,
-        0,
-        marketID_,
-        request_list_len,
-        request_list,
-        0,
-        account_registry_address,
-        asset_address,
-        market_address,
-        holding_address,
-        trading_fees_address,
-        fees_balance_address,
-        liquidate_address,
-        liquidity_fund_address,
-        insurance_fund_address,
-        0,
-        0,
-        trader_stats_list,
-        0,
+    let (trader_stats_list_len) = check_and_execute(
+        size_=size_,
+        market_id_=market_id_,
+        oracle_price_=oracle_price_,
+        request_list_len_=request_list_len,
+        request_list_=request_list,
+        sum=0,
+        account_registry_address_=account_registry_address,
+        asset_address_=asset_address,
+        market_address_=market_address,
+        holding_address_=holding_address,
+        trading_fees_address_=trading_fees_address,
+        fees_balance_address_=fees_balance_address,
+        liquidate_address_=liquidate_address,
+        liquidity_fund_address_=liquidity_fund_address,
+        insurance_fund_address_=insurance_fund_address,
+        max_leverage_=0,
+        trader_stats_list_len_=0,
+        trader_stats_list_=trader_stats_list,
+        running_weighted_sum=0,
     );
-
-    // Check if every order has a counter order
-    with_attr error_message("Trading: Net size is non-zero") {
-        assert result = 0;
-    }
 
     ITradingStats.record_trade_batch_stats(
         contract_address=trading_stats_address,
@@ -298,37 +298,37 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     order_: MultipleOrder, execution_price_: felt
 ) {
     // Check if the execution_price is correct
-    if (order_.orderType == STOP_ORDER) {
-        // if stop order
-        if (order_.direction == LONG) {
-            // if long stop order
-            // check that stop_price <= execution_price <= limit_price
-            with_attr error_message("Trading: Invalid stop-price long order") {
-                assert_le(order_.stopPrice, execution_price_);
-            }
-            tempvar range_check_ptr = range_check_ptr;
+    // if (order_.orderType == STOP_ORDER) {
+    //     // if stop order
+    //     if (order_.direction == LONG) {
+    //         // if long stop order
+    //         // check that stop_price <= execution_price <= limit_price
+    //         with_attr error_message("Trading: Invalid stop-price long order") {
+    //             assert_le(order_.stopPrice, execution_price_);
+    //         }
+    //         tempvar range_check_ptr = range_check_ptr;
 
-            with_attr error_message("Trading: Invalid stop-limit-price long order") {
-                assert_le(execution_price_, order_.price);
-            }
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            // if short stop order
-            // check that limit_price <= execution_price <= stop_price
-            with_attr error_message("Trading: Invalid stop-price short order") {
-                assert_le(order_.price, execution_price_);
-            }
-            tempvar range_check_ptr = range_check_ptr;
+    // with_attr error_message("Trading: Invalid stop-limit-price long order") {
+    //             assert_le(execution_price_, order_.price);
+    //         }
+    //         tempvar range_check_ptr = range_check_ptr;
+    //     } else {
+    //         // if short stop order
+    //         // check that limit_price <= execution_price <= stop_price
+    //         with_attr error_message("Trading: Invalid stop-price short order") {
+    //             assert_le(order_.price, execution_price_);
+    //         }
+    //         tempvar range_check_ptr = range_check_ptr;
 
-            with_attr error_message("Trading: Invalid stop-limit-price short order") {
-                assert_le(execution_price_, order_.stopPrice);
-            }
-            tempvar range_check_ptr = range_check_ptr;
-        }
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        tempvar range_check_ptr = range_check_ptr;
-    }
+    // with_attr error_message("Trading: Invalid stop-limit-price short order") {
+    //             assert_le(execution_price_, order_.stopPrice);
+    //         }
+    //         tempvar range_check_ptr = range_check_ptr;
+    //     }
+    //     tempvar range_check_ptr = range_check_ptr;
+    // } else {
+    //     tempvar range_check_ptr = range_check_ptr;
+    // }
 
     if (order_.orderType == LIMIT_ORDER) {
         // if it's a limit order
@@ -832,6 +832,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     size_: felt,
     marketID_: felt,
+    oracle_price_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
     sum: felt,
@@ -1052,27 +1053,25 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // Recursive call with the ticker and price to compare against
         return check_and_execute(
-            size_,
-            temp_order.assetID,
-            temp_order.collateralID,
-            marketID_,
-            execution_price_,
-            request_list_len_ - 1,
-            request_list_ + MultipleOrder.SIZE,
-            sum_temp,
-            account_registry_address_,
-            asset_address_,
-            market_address_,
-            holding_address_,
-            trading_fees_address_,
-            fees_balance_address_,
-            liquidate_address_,
-            liquidity_fund_address_,
-            insurance_fund_address_,
-            asset.currently_allowed_leverage,
-            trader_stats_list_len,
-            trader_stats_list,
-            new_running_weighted_sum,
+            size_=size_,
+            market_id_=market_id_,
+            oracle_price_=oracle_price_,
+            request_list_len_=request_list_len_ - 1,
+            request_list_=request_list_ + MultipleOrder.SIZE,
+            sum=sum_temp,
+            account_registry_address_=account_registry_address_,
+            asset_address_=asset_address_,
+            market_address_=market_address_,
+            holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
+            liquidate_address_=liquidate_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            max_leverage_=asset.currently_allowed_leverage,
+            trader_stats_list_len_=trader_stats_list_len,
+            trader_stats_list_=trader_stats_list,
+            running_weighted_sum=new_running_weighted_sum,
         );
     }
 
@@ -1080,26 +1079,24 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Recursive Call
     return check_and_execute(
-        size_,
-        assetID_,
-        collateralID_,
-        marketID_,
-        execution_price_,
-        request_list_len_ - 1,
-        request_list_ + MultipleOrder.SIZE,
-        sum_temp,
-        account_registry_address_,
-        asset_address_,
-        market_address_,
-        holding_address_,
-        trading_fees_address_,
-        fees_balance_address_,
-        liquidate_address_,
-        liquidity_fund_address_,
-        insurance_fund_address_,
-        max_leverage_,
-        trader_stats_list_len,
-        trader_stats_list,
-        new_running_weighted_sum,
+        size_=size_,
+        marketID_=marketID_,
+        oracle_price_=oracle_price_,
+        request_list_len_=request_list_len_ - 1,
+        request_list_=request_list_ + MultipleOrder.SIZE,
+        sum=sum_temp,
+        account_registry_address_=account_registry_address_,
+        asset_address_=asset_address_,
+        market_address_=market_address_,
+        holding_address_=holding_address_,
+        trading_fees_address_=trading_fees_address_,
+        fees_balance_address_=fees_balance_address_,
+        liquidate_address_=liquidate_address_,
+        liquidity_fund_address_=liquidity_fund_address_,
+        insurance_fund_address_=insurance_fund_address_,
+        max_leverage_=max_leverage_,
+        trader_stats_list_len_=trader_stats_list_len,
+        trader_stats_list_=trader_stats_list,
+        running_weighted_sum=new_running_weighted_sum,
     );
 }
