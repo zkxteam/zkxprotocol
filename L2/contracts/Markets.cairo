@@ -105,7 +105,7 @@ func market_id_exists(market_id: felt) -> (res: felt) {
 func market_mapping(asset_id: felt, collateral_id: felt) -> (res: felt) {
 }
 
-// Bool indicating if ticker-pair already exists
+// Bool indicating if asset & asset-collateral pair already exists
 @storage_var
 func market_pair_exists(asset: felt, asset_collateral: felt) -> (res: felt) {
 }
@@ -358,7 +358,7 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     market_id_by_index.write(last_market_id, 0);
     markets_array_len.write(curr_len - 1);
 
-    // Mark id & ticker as non-existing
+    // Mark market ID as non-existing
     market_id_exists.write(market_id_, FALSE);
     market_pair_exists.write(market_to_remove.asset, market_to_remove.asset_collateral, FALSE);
     market_mapping.write(

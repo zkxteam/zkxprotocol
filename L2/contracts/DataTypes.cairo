@@ -132,7 +132,7 @@ struct Signature {
 struct WithdrawalRequest {
     user_l1_address: felt,
     user_l2_address: felt,
-    ticker: felt,
+    asset_id: felt,
     amount: felt,
 }
 
@@ -183,18 +183,18 @@ struct MarketPrice {
 // Struct for message to consume for quoting fee in L1
 struct QuoteL1Message {
     user_l1_address: felt,
-    ticker: felt,
+    asset_id: felt,
     amount: felt,
     timestamp: felt,
     L1_fee_amount: felt,
-    L1_fee_ticker: felt,
+    L1_fee_asset_id: felt,
 }
 
 // struct to store deposit payload information (for L1->L2 interaction) + other useful data
 struct DepositData {
     user_L1_address: felt,
     user_L2_address: felt,
-    ticker: felt,
+    asset_id: felt,
     amount: felt,
     nonce: felt,
     message_hash: felt,

@@ -9,7 +9,7 @@ namespace IWithdrawalRequest {
     //////////////
 
     func add_withdrawal_request(
-        request_id_: felt, user_l1_address_: felt, ticker_: felt, amount_: felt
+        request_id_: felt, user_l1_address_: felt, asset_id_: felt, amount_: felt
     ) {
     }
 
