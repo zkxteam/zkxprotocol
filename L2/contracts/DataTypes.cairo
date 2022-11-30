@@ -209,21 +209,6 @@ struct CollateralPrice {
     price_in_usd: felt,
 }
 
-struct CoreFunctionCall {
-    index: felt,
-    version: felt,
-    nonce: felt,
-    function_selector: felt,
-    calldata_len: felt,
-    calldata: felt*,
-}
-
-struct CoreFunction {
-    index: felt,
-    version: felt,
-    function_selector: felt,
-}
-
 // Struct to store volume metadata
 struct VolumeMetaData {
     season_id: felt,

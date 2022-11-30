@@ -99,8 +99,8 @@ func find_top_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     );
 
     // Get all the tradable markets in the system
-    let (pair_list_len: felt, pair_list: Market*) = IMarkets.get_markets_by_state(
-        contract_address=markets_address, tradable_=1, archived_=0
+    let (pair_list_len: felt, pair_list: Market*) = IMarkets.get_all_markets_by_state(
+        contract_address=markets_address, is_tradable_=1, is_archived_=0
     );
 
     return find_top_stats_recurse(

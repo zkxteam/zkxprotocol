@@ -202,40 +202,6 @@ func get_ttl_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     return (currMarket.ttl,);
 }
 
-// @notice Getter function to get collateral asset from market_id
-// @param market_id - Market Id
-// @returns collateral_id - Collateral Id of the market
-@view
-func get_collateral_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt
-) -> (collateral_id: felt) {
-    let (currMarket) = market_by_id.read(market_id=market_id);
-    return (currMarket.asset_collateral,);
-}
-
-// @notice Getter function to get asset & collateral pair from market_id
-// @param market_id - Market Id
-// @returns asset_id - Asset Id of the market
-// @returns collateral_id - Collateral Id of the market
-@view
-func get_asset_collateral_from_market{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(market_id: felt) -> (asset_id: felt, collateral_id: felt) {
-    let (currMarket) = market_by_id.read(market_id=market_id);
-    return (currMarket.asset, currMarket.asset_collateral);
-}
-
-// @notice Getter function to get ttl of a market
-// @param market_id - Market Id
-// @returns ttl - ttl of the market
-@view
-func get_ttl_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt
-) -> (ttl: felt) {
-    let (currMarket) = market_by_id.read(market_id=market_id);
-    return (currMarket.ttl,);
-}
-
 // @notice View function to return markets by their state with ids in an array
 // @param tradable_ - tradable flag
 // @param archived_ - archived flag
