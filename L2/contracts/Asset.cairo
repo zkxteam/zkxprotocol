@@ -186,7 +186,6 @@ func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param new_asset - Asset struct variable with the required details
 @external
 func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id: felt, 
     new_asset: Asset, 
     icon_link_len: felt, 
     icon_link: felt*,
@@ -197,11 +196,10 @@ func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
     // Verify authority, state and input
     verify_asset_manager_authority();
-    verify_asset_id_exists(id, should_exist_=FALSE);
+    verify_asset_id_exists(new_asset.id, should_exist_=FALSE);
 
     with_attr error_message("Asset: problem with asset ID") {
-        assert_not_zero(id);
-        assert new_asset.id = id;
+        assert_not_zero(new_asset.id);
     }
     with_attr error_message("Asset: problem with asset core settings") {
         assert_bool(new_asset.is_collateral);
@@ -211,36 +209,36 @@ func add_asset{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
     // Save asset_id
     let (curr_len) = assets_array_len.read();
-    asset_id_by_index.write(curr_len, id);
-    asset_index_by_id.write(id, curr_len);
+    asset_id_by_index.write(curr_len, new_asset.id);
+    asset_index_by_id.write(new_asset.id, curr_len);
     assets_array_len.write(curr_len + 1);
 
     // Update id existence
-    asset_id_exists.write(id, TRUE);
+    asset_id_exists.write(new_asset.id, TRUE);
 
     // Save new_asset struct
-    asset_by_id.write(id, new_asset);
+    asset_by_id.write(new_asset.id, new_asset);
 
     // Save asset links
     StringLib.save_string(
         type=ICON_LINK_TYPE, 
-        id=id, 
+        id=new_asset.id, 
         string_len=icon_link_len,
         string=icon_link
     );
     StringLib.save_string(
         type=METADATA_LINK_TYPE, 
-        id=id, 
+        id=new_asset.id, 
         string_len=metadata_link_len,
         string=metadata_link
     );
 
     // Trigger asset update on L1
-    update_asset_on_L1(asset_id_=id, action_=ADD_ASSET);
+    update_asset_on_L1(asset_id_=new_asset.id, action_=ADD_ASSET);
 
     // Emit event
     let (caller_address) = get_caller_address();
-    asset_added.emit(asset_id=id, caller_address=caller_address);
+    asset_added.emit(asset_id=new_asset.id, caller_address=caller_address);
 
     return ();
 }
