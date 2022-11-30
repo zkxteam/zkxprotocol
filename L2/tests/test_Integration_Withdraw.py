@@ -424,11 +424,11 @@ async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
     await assert_revert(postman.starknet.send_message_to_l2(
         int(eth_test_utils.accounts[0].address, 16), # this is not authorised L1_ZKX_address
         withdrawal_request.contract_address,
-        get_selector_from_name('update_withdrawal_request'),
+        get_selector_from_name("update_withdrawal_request"),
         [3],
         0,
         nonce
-    ), "From address is not matching")
+    ), reverted_with="WithdrawalRequest: L1 contract mismatch")
 
     # restoring L1_ZKX_address on L2
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])

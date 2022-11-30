@@ -97,7 +97,7 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
             contract_address=registry, index=Trading_INDEX, version=version
         );
 
-        with_attr error_message("Caller is not authorized to update market price") {
+        with_attr error_message("MarketPrices: Unauthorized caller for updating market price") {
             assert caller = trading_contract_address;
         }
 
@@ -126,15 +126,15 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         contract_address=market_contract_address, market_id_=market_id_
     );
 
-    with_attr error_message("Price cannot be negative") {
+    with_attr error_message("MarketPrices: Price cannot be negative") {
         assert_nn(price_);
     }
 
-    with_attr error_message("Price should be within 64x61 range") {
+    with_attr error_message("MarketPrices: Price must be in 64x61 respresentation") {
         Math64x61_assert64x61(price_);
     }
 
-    with_attr error_message("Market does not exist") {
+    with_attr error_message("MarketPrices: Market does not exist") {
         assert_not_zero(market.asset);
     }
 

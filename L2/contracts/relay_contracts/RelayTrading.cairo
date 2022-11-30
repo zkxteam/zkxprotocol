@@ -2,20 +2,20 @@
 
 from contracts.interfaces.ITrading import ITrading
 from contracts.libraries.RelayLibrary import (
-record_call_details, 
-get_inner_contract, 
-initialize,
-get_current_version,
-get_caller_hash_status,
-get_call_counter,
-get_registry_address_at_relay,
-get_self_index,
-get_caller_hash_list,
-set_current_version,
-mark_caller_hash_paid,
-reset_call_counter,
-set_self_index,
-verify_caller_authority
+    record_call_details,
+    get_inner_contract,
+    initialize,
+    get_current_version,
+    get_caller_hash_status,
+    get_call_counter,
+    get_registry_address_at_relay,
+    get_self_index,
+    get_caller_hash_list,
+    set_current_version,
+    mark_caller_hash_paid,
+    reset_call_counter,
+    set_self_index,
+    verify_caller_authority,
 )
 
 from contracts.DataTypes import MultipleOrder
@@ -31,7 +31,6 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }
 
 // @notice - All the following are mirror functions for Trading.cairo - just record call details and forward call
-
 @external
 func execute_batch{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*

@@ -58,11 +58,11 @@ async def test_get_min_num_admins(adminAuth_factory):
 async def test_set_min_num_admins(adminAuth_factory):
     adminAuth, admin1, admin2, user1, user2, user3 = adminAuth_factory
     # cannot set negative number for min admins
-    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'set_min_num_admins', [-1%PRIME]), "Incorrect value for minimum number of admins - should be >=2")
+    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'set_min_num_admins', [-1%PRIME]), reverted_with="AdminAuth: Number of min admin should be >=2")
     # cannot set any number less than 2
-    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'set_min_num_admins', [1]))
+    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'set_min_num_admins', [1]), reverted_with="AdminAuth: Number of min admin should be >=2")
     # only admin can call this function
-    await assert_revert(signer3.send_transaction(user1, adminAuth.contract_address, 'set_min_num_admins', [2]))
+    await assert_revert(signer3.send_transaction(user1, adminAuth.contract_address, 'set_min_num_admins', [2]), reverted_with="AdminAuth: Unauthorized call for set_min_num_admins")
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'set_min_num_admins', [3])
 
@@ -105,8 +105,7 @@ async def test_update_admin_mapping_same_approval(adminAuth_factory):
     assert execution_info1.result.allowed == 0
 
     # if same admin gives another approval then transaction will revert
-    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address,
-                                                 'update_admin_mapping', [user2.contract_address, 0, 1]))
+    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [user2.contract_address, 0, 1]), reverted_with="AdminAuth: Both approvers cannot be the same")
 
     execution_info1 = await adminAuth.get_admin_mapping(user2.contract_address, 0).call()
     assert execution_info1.result.allowed == 0
@@ -118,7 +117,7 @@ async def test_update_admin_mapping_no_permission(adminAuth_factory):
 
     # non-admins cannot update admin mapping
     await assert_revert(signer3.send_transaction(user1, adminAuth.contract_address,
-                                                 'update_admin_mapping', [user1.contract_address, 0, 1]))
+                                                 'update_admin_mapping', [user1.contract_address, 0, 1]), reverted_with="AdminAuth: Unauthorized call for admin mapping updation")
 
 
 @pytest.mark.asyncio
@@ -168,9 +167,7 @@ async def test_remove_admin_mapping_admin(adminAuth_factory):
     assert result.result.res == 3
 
     # if same admin gives 2 calls for removal then transaction will revert
-    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address,
-                                                 'update_admin_mapping',
-                                                 [user1.contract_address, 0, 0]))
+    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address,'update_admin_mapping',[user1.contract_address, 0, 0]), reverted_with="AdminAuth: Admin cannot approve twice")
 
     await signer2.send_transaction(admin2, adminAuth.contract_address, 'update_admin_mapping', [user1.contract_address, 0, 0])
 
@@ -189,9 +186,7 @@ async def test_min_admin_threshold_breach(adminAuth_factory):
     assert result.result.res == 2
 
     # if removal results in less than min num of admins then transaction will revert
-    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address,
-                                                 'update_admin_mapping',
-                                                 [admin2.contract_address, 0, 0]))
+    await assert_revert(signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin2.contract_address, 0, 0]), reverted_with="AdminAuth: Minimum number of admins not satisfied")
 
 
 @pytest.mark.asyncio

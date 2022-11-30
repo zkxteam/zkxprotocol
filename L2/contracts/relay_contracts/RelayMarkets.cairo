@@ -15,7 +15,7 @@ from contracts.libraries.RelayLibrary import (
     mark_caller_hash_paid,
     reset_call_counter,
     set_self_index,
-    verify_caller_authority
+    verify_caller_authority,
 )
 
 from contracts.DataTypes import Market

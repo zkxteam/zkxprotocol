@@ -48,19 +48,21 @@ def str_to_felt(text):
     b_text = bytes(text, 'UTF-8')
     return int.from_bytes(b_text, "big")
 
+def felt_to_str(felt):
+    b_felt = felt.to_bytes(31, "big")
+    return b_felt.decode()
 
 def uint(a):
     return(a, 0)
 
-
-async def assert_revert(fun):
+async def assert_revert(fun, reverted_with=None):
     try:
         await fun
         assert False
     except StarkException as err:
         _, error = err.args
-        assert error['code'] == StarknetErrorCode.TRANSACTION_FAILED
-
+        if reverted_with is not None:
+            assert reverted_with in error['message']
 
 class Signer():
     """
@@ -193,7 +195,7 @@ async def assert_revert(fun, reverted_with=None):
             assert reverted_with in error['message']
 
 # following event assertion functions directly from oz test utils
-def assert_event_emitted(tx_exec_info, from_address, name, data, order=0):
+def assert_event_emitted(tx_exec_info, from_address, name, data=[], order=0):
     """Assert one single event is fired with correct data."""
     assert_events_emitted(tx_exec_info, [(order, from_address, name, data)])
 
@@ -299,3 +301,22 @@ def build_asset_properties(
         collateral, 
         token_decimal
     ]
+
+def print_parsed_positions(pos_array):
+    for i in range(len(pos_array)):
+        print("position #", i)
+        print("market_id: ", felt_to_str(pos_array[i].market_id))
+        print("direction: ", pos_array[i].direction)
+        print("execution price: ", from64x61(pos_array[i].avg_execution_price))
+        print("position size: ", from64x61(pos_array[i].position_size))
+        print("margin: ", from64x61(pos_array[i].margin_amount))
+        print("borrowed: ", from64x61(pos_array[i].borrowed_amount))
+        print("leverage: ", from64x61(pos_array[i].leverage))
+        print("\n")
+
+def print_parsed_collaterals(coll_array):
+    for i in range(len(coll_array)):
+        print("collateral #", i)
+        print("collateral_id: ", felt_to_str(coll_array[i].assetID))
+        print("balance: ", from64x61(coll_array[i].balance))
+        print("\n")

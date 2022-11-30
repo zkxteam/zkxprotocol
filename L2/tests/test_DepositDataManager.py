@@ -102,7 +102,7 @@ async def test_store_with_0_address(adminAuth_factory):
     await assert_revert(signer1.send_transaction(admin1,
                                                  deposit_data_manager.contract_address, 
                                                  'store_deposit_data', 
-                                                 [1, 0, 2, 3, 4, 5, 6]))
+                                                 [1, 0, 2, 3, 4, 5, 6]), reverted_with="DepositDataManager: User address cannot be 0")
 
 
 @pytest.mark.asyncio

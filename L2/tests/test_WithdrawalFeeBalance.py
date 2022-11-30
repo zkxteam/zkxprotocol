@@ -140,7 +140,7 @@ async def test_set_standard_fee(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_set_standard_fee_non_collateral_system(adminAuth_factory):
     adminAuth, admin1, admin2, alice, bob, dave, account_registry, withdrawFeeBalance = adminAuth_factory
-    await assert_revert(admin1_signer.send_transaction(admin1, withdrawFeeBalance.contract_address, 'set_standard_withdraw_fee', [0, ETH_ID]))
+    await assert_revert(admin1_signer.send_transaction(admin1, withdrawFeeBalance.contract_address, 'set_standard_withdraw_fee', [0, ETH_ID]), reverted_with="WithdrawalFeeBalance: Unregistered collateral passed")
 
 @pytest.mark.asyncio
 async def test_withdraw(adminAuth_factory):
@@ -165,10 +165,10 @@ async def test_withdraw(adminAuth_factory):
 async def test_withdraw_unauthorized(adminAuth_factory):
     adminAuth, admin1, admin2, alice, bob, dave, account_registry, withdrawFeeBalance = adminAuth_factory
 
-    await assert_revert(alice_signer.send_transaction(alice, withdrawFeeBalance.contract_address, 'withdraw', [USDC_ID, 10]))
+    await assert_revert(alice_signer.send_transaction(alice, withdrawFeeBalance.contract_address, 'withdraw', [USDC_ID, 10]), reverted_with="WithdrawalFeeBalance: Unauthorized call for withdraw")
 
 @pytest.mark.asyncio
 async def test_withdraw_more_than_available(adminAuth_factory):
     adminAuth, admin1, admin2, alice, bob, dave, account_registry, withdrawFeeBalance = adminAuth_factory
 
-    await assert_revert(admin1_signer.send_transaction(admin1, withdrawFeeBalance.contract_address, 'withdraw', [USDC_ID, 100]))
+    await assert_revert(admin1_signer.send_transaction(admin1, withdrawFeeBalance.contract_address, 'withdraw', [USDC_ID, 100]), reverted_with="WithdrawalFeeBalance: Insufficient balance to withdraw")

@@ -28,6 +28,7 @@ from contracts.Math_64x61 import (
 //############
 
 const NUM_8 = 18446744073709551616;
+const HOURS_8 = 28800;
 
 //##########
 // Storage #
@@ -79,11 +80,11 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @view
 func get_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt
+    market_id_: felt
 ) -> (abr: felt, price: felt, timestamp: felt) {
-    let (abr: felt) = abr_value.read(market_id=market_id);
-    let (price: felt) = last_mark_price.read(market_id=market_id);
-    let (timestamp) = last_updated.read(market_id=market_id);
+    let (abr: felt) = abr_value.read(market_id=market_id_);
+    let (price: felt) = last_mark_price.read(market_id=market_id_);
+    let (timestamp) = last_updated.read(market_id=market_id_);
     return (abr, price, timestamp);
 }
 
@@ -93,30 +94,30 @@ func get_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
 @external
 func modify_base_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_base_abr: felt
+    new_base_abr_: felt
 ) {
-    with_attr error_message("Caller does not have permission to update base abr value") {
+    with_attr error_message("ABR: Unauthorized") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    base_abr.write(new_base_abr);
+    base_abr.write(new_base_abr_);
 
     return ();
 }
 
 @external
 func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_bollinger_width: felt
+    new_bollinger_width_: felt
 ) {
-    with_attr error_message("Caller does not have permission to update bollinger width") {
+    with_attr error_message("ABR: Unauthorized") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    bollinger_width.write(new_bollinger_width);
+    bollinger_width.write(new_bollinger_width_);
 
     return ();
 }
@@ -129,30 +130,29 @@ func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // @returns res - ABR of the mark & index prices
 @external
 func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt, perp_index_len: felt, perp_index: felt*, perp_mark_len: felt, perp_mark: felt*
+    market_id_: felt, perp_index_len: felt, perp_index: felt*, perp_mark_len: felt, perp_mark: felt*
 ) -> (result: felt) {
     alloc_locals;
-
-    // # The nodes signatures check goes here##
-
     // Get the latest block
     let (block_timestamp) = get_block_timestamp();
 
     // Fetch the last updated time
-    let (last_call) = last_updated.read(market_id=market_id);
+    let (last_call) = last_updated.read(market_id=market_id_);
 
     // Minimum time before the second call
-    let min_time = last_call + 28800;
+    let min_time = last_call + HOURS_8;
     let is_eight_hours = is_le(block_timestamp, min_time);
 
     // If 8 hours have not passed yet
     if (is_eight_hours == 1) {
-        assert 1 = 0;
+        with_attr error_message("ABR: 8 hours not passed") {
+            assert 1 = 0;
+        }
     }
 
     if (perp_mark_len == perp_index_len) {
     } else {
-        with_attr error_message("Pass same number of data points for mark and index") {
+        with_attr error_message("ABR: arguments mismatch") {
             assert 1 = 0;
         }
     }
@@ -160,44 +160,24 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     // Reduce the array size by factor of 8
     let (index_prices: felt*) = alloc();
     let (mark_prices: felt*) = alloc();
-    let (
-        index_prices_len: felt, index_prices: felt*, mark_prices_len: felt, mark_prices: felt*
-    ) = reduce_values(
-        market_id,
-        perp_index_len,
-        perp_index,
-        perp_mark_len,
-        perp_mark,
-        0,
-        index_prices,
-        0,
-        mark_prices,
-        8,
-        0,
-        0,
-        0,
+    let (reduced_array_length: felt) = reduce_values(
+        market_id_, perp_index_len, perp_index, perp_mark, 0, index_prices, mark_prices, 8, 0, 0, 0
     );
 
     // Calculate the middle band
     let (avg_array: felt*) = alloc();
-    let (avg_array_len: felt, avg_array: felt*) = movavg(
-        mark_prices_len, mark_prices, mark_prices_len, mark_prices, 8, 0, avg_array, 0
-    );
+    movavg(reduced_array_length, mark_prices, reduced_array_length, mark_prices, 8, avg_array, 0);
 
     // Calculate the upper & lower band
     let (upper_array: felt*) = alloc();
     let (lower_array: felt*) = alloc();
     let (boll_width: felt) = bollinger_width.read();
-    let (
-        upper_array_len: felt, upper_array: felt*, lower_array_len: felt, lower_array: felt*
-    ) = calc_bollinger(
-        0,
+    calc_bollinger(
+        reduced_array_length,
         upper_array,
-        0,
         lower_array,
-        mark_prices_len,
+        reduced_array_length,
         mark_prices,
-        avg_array_len,
         avg_array,
         8,
         0,
@@ -206,43 +186,36 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
     // Calculate the diff b/w index and mark
     let (diff: felt*) = alloc();
-    let (diff_len: felt, diff: felt*) = calc_diff(
-        index_prices_len, index_prices, mark_prices_len, mark_prices, 0, diff, 0
-    );
+    calc_diff(reduced_array_length, index_prices, mark_prices, diff, 0);
 
     // Calculate the premium
     let (ABRdyn: felt*) = alloc();
-    let (ABRdyn_len: felt, ABRdyn: felt*) = movavg(diff_len, diff, diff_len, diff, 8, 0, ABRdyn, 0);
+    movavg(reduced_array_length, diff, reduced_array_length, diff, 8, ABRdyn, 0);
 
     // Add the jump to the premium price
     let (ABRdyn_jump: felt*) = alloc();
-    let (ABRdyn_jump_len: felt, ABRdyn_jump: felt*) = calc_jump(
-        mark_prices_len,
+    calc_jump(
+        reduced_array_length,
         mark_prices,
-        index_prices_len,
         index_prices,
-        upper_array_len,
         upper_array,
-        lower_array_len,
         lower_array,
-        ABRdyn_len,
         ABRdyn,
-        0,
         ABRdyn_jump,
         0,
     );
 
     // # Find the effective ABR rate
     let (base_abr_) = base_abr.read();
-    let (rate_sum) = find_abr(ABRdyn_jump_len, ABRdyn_jump, 0, base_abr_);
+    let (rate_sum) = find_abr(reduced_array_length, ABRdyn_jump, 0, base_abr_);
 
-    let (array_size) = Math64x61_fromIntFelt(ABRdyn_jump_len);
+    let (array_size) = Math64x61_fromIntFelt(reduced_array_length);
     let (rate) = Math64x61_div(rate_sum, array_size);
 
     // Store the result and the timestamp in their storage vars
     let (block_timestamp) = get_block_timestamp();
-    abr_value.write(market_id=market_id, value=rate);
-    last_updated.write(market_id=market_id, value=block_timestamp);
+    abr_value.write(market_id=market_id_, value=rate);
+    last_updated.write(market_id=market_id_, value=block_timestamp);
 
     return (rate,);
 }
@@ -252,239 +225,209 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 //#####################
 
 // @notice Function to calculate the difference between index and mark prices
-// @param index_prices_len - Size of the index prices array
-// @param index_prices - Index prices array
-// @param mark_prices_len - Size of the mark prices array
-// @param mark_prices - Mark prices array
-// @param diff_len - Current length of the diff array
-// @param diff - Current diff array
-// @param iterator - Iterator of the array
-// @returns diff_len - Length of the populated diff array
-// @returns diff - The populated diff array
+// @param array_len_ - Length of the index and mark prices array
+// @param index_prices_ - Index prices array
+// @param mark_prices_ - Mark prices array
+// @param diff_ - Current diff array
+// @param iterator_ - Iterator of the array
 func calc_diff{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    index_prices_len: felt,
-    index_prices: felt*,
-    mark_prices_len: felt,
-    mark_prices: felt*,
-    diff_len: felt,
-    diff: felt*,
-    iterator,
-) -> (diff_len: felt, diff: felt*) {
+    array_len_: felt, index_prices_: felt*, mark_prices_: felt*, diff_: felt*, iterator_: felt
+) {
     // If reached the end of the array, return
-    if (index_prices_len == 0) {
-        return (diff_len, diff);
+    if (array_len_ == 0) {
+        return ();
     }
 
     // Calculate difference between mark and index
-    let (diff_sub) = Math64x61_sub([mark_prices], [index_prices]);
+    let (diff_sub) = Math64x61_sub([mark_prices_], [index_prices_]);
 
     // Divide the diff by index price
-    let (diff_temp) = Math64x61_div(diff_sub, [index_prices]);
+    let (diff_temp) = Math64x61_div(diff_sub, [index_prices_]);
 
     // Store it in diff array
-    assert diff[iterator] = diff_temp;
+    assert diff_[iterator_] = diff_temp;
 
     // Recursively call the next array element
-    return calc_diff(
-        index_prices_len - 1,
-        index_prices + 1,
-        mark_prices_len - 1,
-        mark_prices + 1,
-        diff_len + 1,
-        diff,
-        iterator + 1,
-    );
+    return calc_diff(array_len_ - 1, index_prices_ + 1, mark_prices_ + 1, diff_, iterator_ + 1);
 }
 
 // @notice Function to calculate the sum of effective abr of a premium array
-// @param array_len - Length of the array
-// @param array - Array for which to calculate the abr
-// @param sum - Current sum of the array
+// @param array_len_ - Length of the array
+// @param array_ - Array for which to calculate the abr
+// @param sum_ - Current sum of the array
+// @param base_abr_ - Base ABR value
 // @returns sum - Final sum of the array
 func find_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    array_len: felt, array: felt*, sum: felt, base_abr: felt
+    array_len_: felt, array_: felt*, sum_: felt, base_abr_: felt
 ) -> (sum: felt) {
     // If reached the end of the array, return
-    if (array_len == 0) {
-        return (sum,);
+    if (array_len_ == 0) {
+        return (sum_,);
     }
 
     // Calculate the current sum
-    let (sum_div) = Math64x61_div([array], NUM_8);
-    let (sum_add) = Math64x61_add(sum_div, base_abr);
-    let (curr_sum) = Math64x61_add(sum_add, sum);
+    let (sum_div) = Math64x61_div([array_], NUM_8);
+    let (sum_add) = Math64x61_add(sum_div, base_abr_);
+    let (curr_sum) = Math64x61_add(sum_add, sum_);
 
     // Recursively call the next array element
-    return find_abr(array_len - 1, array + 1, curr_sum, base_abr);
+    return find_abr(array_len_ - 1, array_ + 1, curr_sum, base_abr_);
 }
 
 // @notice Function to calculate the sum of a given array window
-// @param array_len - Length of the array
-// @param array - Array for which to calculate the sum
-// @param window_size - Size of the window
-// @param sum - Current sum of the array
+// @param array_len_ - Length of the array
+// @param array_ - Array for which to calculate the sum
+// @param window_size_ - Size of the window
+// @param sum_ - Current sum of the array
 // @returns sum - Final sum of the array
 func find_window_sum{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    array_len: felt, array: felt*, window_size: felt, sum: felt
+    array_len_: felt, array_: felt*, window_size_: felt, sum_: felt
 ) -> (sum: felt) {
     // If reached the end of the array, return
-    if (window_size == 0) {
-        return (sum,);
+    if (window_size_ == 0) {
+        return (sum_,);
     }
 
     // Calculate the current sum
-    let (sum_temp) = Math64x61_add(sum, [array]);
+    let (sum_temp) = Math64x61_add(sum_, [array_]);
 
     // Recursively call the next array element
-    return find_window_sum(array_len, array + 1, window_size - 1, sum_temp);
+    return find_window_sum(array_len_, array_ + 1, window_size_ - 1, sum_temp);
 }
 
-// @notice Function to calculate the standard deviation
-// @param array_len - Length of the array
-// @param array - Array for which to calculate the std
-// @param mean - Mean of the window
-// @param window_size - Window size of the array
-// @param sum - Current sum of the stds
+// @notice Function to calculate the sum of standard deviation
+// @param array_len_ - Length of the array
+// @param array_ - Array for which to calculate the std
+// @param mean_ - Mean of the window
+// @param window_size_ - Window size of the array
+// @param sum_ - Current sum of the stds
 // @returns sum - Final sum of the stds
 func find_std_sum{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    array_len: felt, array: felt*, mean: felt, window_size: felt, sum: felt
+    array_len_: felt, array_: felt*, mean_: felt, window_size_: felt, sum_: felt
 ) -> (sum: felt) {
     // If reached the end of the array, return
-    if (window_size == 0) {
-        return (sum,);
+    if (window_size_ == 0) {
+        return (sum_,);
     }
 
     // Calculates the difference between the array element and the mean
-    let (diff) = Math64x61_sub([array], mean);
+    let (diff) = Math64x61_sub([array_], mean_);
 
     // Calculates the square root of the difference
     let (diff_sq) = Math64x61_mul(diff, diff);
 
     // Recursively call the next array element
-    return find_std_sum(array_len, array + 1, mean, window_size - 1, sum + diff_sq);
+    return find_std_sum(array_len_, array_ + 1, mean_, window_size_ - 1, sum_ + diff_sq);
 }
 
 // @notice Function to calculate the moving average
-// @param tail_window_len - Length of the tail window array
-// @param tail_window - Tail window array, start of a window
-// @param head_window_len - Length of the head window array
-// @param head_window - Head window array, end of a window
-// @param window_size - Window size of the array
-// @param avg_array_size - Current length of the average array
-// @param avg_array - Current average array
-// @param iterator - iterator for the arrays
-// @returns avg_array_size - Length of the populated average array
-// @returns avg_array - Populated average array
+// @param tail_window_len_ - Length of the tail window array
+// @param tail_window_ - Tail window array, start of a window
+// @param head_window_len_ - Length of the head window array
+// @param head_window_ - Head window array, end of a window
+// @param window_size_ - Window size of the array
+// @param avg_array_ - Current average array
+// @param iterator_- iterator for the arrays
 func movavg{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    tail_window_len: felt,
-    tail_window: felt*,
-    head_window_len: felt,
-    head_window: felt*,
-    window_size: felt,
-    avg_array_size: felt,
-    avg_array: felt*,
-    iterator: felt,
-) -> (avg_array_size: felt, avg_array: felt*) {
+    tail_window_len_: felt,
+    tail_window_: felt*,
+    head_window_len_: felt,
+    head_window_: felt*,
+    window_size_: felt,
+    avg_array_: felt*,
+    iterator_: felt,
+) {
     alloc_locals;
 
     // If reached the end of the array, return
-    if (head_window_len == 0) {
-        return (iterator, avg_array);
+    if (head_window_len_ == 0) {
+        return ();
     }
 
     // Check if the iterator is on the left boundary of the window
-    let is_boundary = is_le(iterator, window_size - 2);
+    let is_boundary = is_le(iterator_, window_size_ - 2);
 
     if (is_boundary == 1) {
         // Calculate the mean of the window
-        let (curr_window_size) = Math64x61_fromIntFelt(iterator + 1);
-        let (window_sum) = find_window_sum(tail_window_len, tail_window, iterator + 1, 0);
+        let (curr_window_size) = Math64x61_fromIntFelt(iterator_ + 1);
+        let (window_sum) = find_window_sum(tail_window_len_, tail_window_, iterator_ + 1, 0);
         let (mean_window) = Math64x61_div(window_sum, curr_window_size);
 
         // Store the mean in the avg_array
-        assert avg_array[iterator] = mean_window;
+        assert avg_array_[iterator_] = mean_window;
 
         // Recursively call the next array element
         return movavg(
-            tail_window_len,
-            tail_window,
-            head_window_len - 1,
-            head_window + 1,
-            window_size,
-            avg_array_size + 1,
-            avg_array,
-            iterator + 1,
+            tail_window_len_,
+            tail_window_,
+            head_window_len_ - 1,
+            head_window_ + 1,
+            window_size_,
+            avg_array_,
+            iterator_ + 1,
         );
     } else {
         // Calculate the mean of the window
-        let (curr_window_size) = Math64x61_fromIntFelt(window_size);
-        let (window_sum) = find_window_sum(tail_window_len, tail_window, window_size, 0);
+        let (curr_window_size) = Math64x61_fromIntFelt(window_size_);
+        let (window_sum) = find_window_sum(tail_window_len_, tail_window_, window_size_, 0);
         let (mean_window) = Math64x61_div(window_sum, curr_window_size);
 
         // Store the mean in the avg_array
-        assert avg_array[iterator] = mean_window;
+        assert avg_array_[iterator_] = mean_window;
 
         // Recursively call the next array element
         return movavg(
-            tail_window_len - 1,
-            tail_window + 1,
-            head_window_len - 1,
-            head_window + 1,
-            window_size,
-            avg_array_size + 1,
-            avg_array,
-            iterator + 1,
+            tail_window_len_ - 1,
+            tail_window_ + 1,
+            head_window_len_ - 1,
+            head_window_ + 1,
+            window_size_,
+            avg_array_,
+            iterator_ + 1,
         );
     }
 }
 
 // @notice Function to calculate the upper and lower bands
-// @param upper_array_len - Current length of the upper band
-// @param upper_array - Current upper band
-// @param lower_array_len - Current length of the lower band
-// @param lower_array - Current lower band
-// @param tail_window_len - Length of the tail window array
-// @param tail_window - Tail window array, start of a window
-// @param avg_array_len - Length of the average array
-// @param avg_array - Average Array
-// @param window_size - Window size of the array
-// @param iterator - iterator for the arrays
-// @returns upper_array_len - Length of the populated upper band
-// @returns upper_array - Populated upper band array
-// @returns lower_array_len - Length of the populated lower band
-// @returns lower_array - Populated lower band array
+// @param array_len_ - Length of upper and lower bands
+// @param upper_array_ - Current upper band
+// @param lower_array_ - Current lower band
+// @param tail_window_len_ - Length of the tail window array
+// @param tail_window_ - Tail window array, start of a window
+// @param avg_array_ - Average Array
+// @param window_size_ - Window size of the array
+// @param iterator_ - iterator for the arrays
+// @param boll_width_ - Width of the boll band
 func calc_bollinger{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    upper_array_len: felt,
-    upper_array: felt*,
-    lower_array_len: felt,
-    lower_array: felt*,
-    tail_window_len: felt,
-    tail_window: felt*,
-    avg_array_len: felt,
-    avg_array: felt*,
-    window_size: felt,
-    iterator: felt,
-    boll_width: felt,
-) -> (upper_array_len: felt, upper_array: felt*, lower_array_len: felt, lower_array: felt*) {
+    array_len_: felt,
+    upper_array_: felt*,
+    lower_array_: felt*,
+    tail_window_len_: felt,
+    tail_window_: felt*,
+    avg_array_: felt*,
+    window_size_: felt,
+    iterator_: felt,
+    boll_width_: felt,
+) {
     alloc_locals;
 
     // If reached the end of the array, return
-    if (avg_array_len == 0) {
-        return (iterator, upper_array, iterator, lower_array);
+    if (array_len_ == 0) {
+        return ();
     }
 
-    local mean = [avg_array];
+    local mean = [avg_array_];
 
     // Check if the iterator is on the left boundary of the window
-    let is_boundary = is_le(iterator, window_size - 2);
+    let is_boundary = is_le(iterator_, window_size_ - 2);
 
     if (is_boundary == 1) {
         // Calculate the std deviation of the window
-        let (curr_window_size) = Math64x61_fromIntFelt(iterator + 1);
-        let (std_deviation) = find_std_sum(tail_window_len, tail_window, mean, iterator + 1, 0);
+        let (curr_window_size) = Math64x61_fromIntFelt(iterator_ + 1);
+        let (std_deviation) = find_std_sum(tail_window_len_, tail_window_, mean, iterator_ + 1, 0);
 
         local curr_window;
-        if (iterator == 0) {
+        if (iterator_ == 0) {
             curr_window = 1;
         } else {
             curr_window = curr_window_size - Math64x61_ONE;
@@ -492,103 +435,89 @@ func calc_bollinger{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 
         let (std_temp) = Math64x61_div(std_deviation, curr_window);
         let (movstd) = Math64x61_sqrt(std_temp);
-        let (movstd_const) = Math64x61_mul(movstd, boll_width);
+        let (movstd_const) = Math64x61_mul(movstd, boll_width_);
 
         let (lower) = Math64x61_sub(mean, movstd_const);
         let (upper) = Math64x61_add(mean, movstd_const);
 
         // Store the result in lower and upper band arrays
-        assert lower_array[iterator] = lower;
-        assert upper_array[iterator] = upper;
+        assert lower_array_[iterator_] = lower;
+        assert upper_array_[iterator_] = upper;
 
         // Recursively call the next array element
         return calc_bollinger(
-            upper_array_len + 1,
-            upper_array,
-            lower_array_len + 1,
-            lower_array,
-            tail_window_len,
-            tail_window,
-            avg_array_len - 1,
-            avg_array + 1,
-            window_size,
-            iterator + 1,
-            boll_width,
+            array_len_ - 1,
+            upper_array_,
+            lower_array_,
+            tail_window_len_,
+            tail_window_,
+            avg_array_ + 1,
+            window_size_,
+            iterator_ + 1,
+            boll_width_,
         );
     } else {
         // Calculate the std deviation of the window
-        let (curr_window_size) = Math64x61_fromIntFelt(window_size);
-        let (std_deviation) = find_std_sum(tail_window_len, tail_window, mean, window_size, 0);
+        let (curr_window_size) = Math64x61_fromIntFelt(window_size_);
+        let (std_deviation) = find_std_sum(tail_window_len_, tail_window_, mean, window_size_, 0);
 
         let (curr_size) = Math64x61_sub(curr_window_size, Math64x61_ONE);
 
         let (std_temp) = Math64x61_div(std_deviation, curr_size);
         let (movstd) = Math64x61_sqrt(std_temp);
-        let (movstd_const) = Math64x61_mul(movstd, boll_width);
+        let (movstd_const) = Math64x61_mul(movstd, boll_width_);
 
         let (lower) = Math64x61_sub(mean, movstd_const);
         let (upper) = Math64x61_add(mean, movstd_const);
 
         // # Store the result in lower and upper band arrays
-        assert lower_array[iterator] = lower;
-        assert upper_array[iterator] = upper;
+        assert lower_array_[iterator_] = lower;
+        assert upper_array_[iterator_] = upper;
 
         // # Recursively call the next array element
         return calc_bollinger(
-            upper_array_len + 1,
-            upper_array,
-            lower_array_len + 1,
-            lower_array,
-            tail_window_len - 1,
-            tail_window + 1,
-            avg_array_len - 1,
-            avg_array + 1,
-            window_size,
-            iterator + 1,
-            boll_width,
+            array_len_ - 1,
+            upper_array_,
+            lower_array_,
+            tail_window_len_ - 1,
+            tail_window_ + 1,
+            avg_array_ + 1,
+            window_size_,
+            iterator_ + 1,
+            boll_width_,
         );
     }
 }
 
 // @notice Function to calculate the jump and ABRdyn
-// @param mark_prices_len - Size of the mark prices array
-// @param mark_prices - Mark prices array
-// @param index_prices_len - Size of the index prices array
-// @param index_prices - Index prices array
-// @param upper_array_len - Length of the upper band
-// @param upper_array -  Upper band array
-// @param lower_array_len - Length of the lower band
-// @param lower_array - Lower band array
-// @param ABRdyn_len - Length of the populated ABR array
-// @param ABRdyn - ABRdyn populated array
-// @param ABRdyn_jump_len - Current length of the populated ABR array
-// @param ABRdyn_jump - Current ABRdyn array
-// @param iterator - iterator for the arrays
+// @param array_len_ - Size of the mark prices and index prices array
+// @param mark_prices_ - Mark prices array
+// @param index_prices_ - Index prices array
+// @param upper_array_ -  Upper band array
+// @param lower_array_ - Lower band array
+// @param ABRdyn_ - ABRdyn populated array
+// @param ABRdyn_jump_ - Current ABRdyn array
+// @param iterator_ - iterator for the arrays
 func calc_jump{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    mark_prices_len: felt,
-    mark_prices: felt*,
-    index_prices_len: felt,
-    index_prices: felt*,
-    upper_array_len: felt,
-    upper_array: felt*,
-    lower_array_len: felt,
-    lower_array: felt*,
-    ABRdyn_len: felt,
-    ABRdyn: felt*,
-    ABRdyn_jump_len: felt,
-    ABRdyn_jump: felt*,
-    iterator: felt,
-) -> (ABRdyn_jump_len: felt, ABRdyn_jump: felt*) {
+    array_len_: felt,
+    mark_prices_: felt*,
+    index_prices_: felt*,
+    upper_array_: felt*,
+    lower_array_: felt*,
+    ABRdyn_: felt*,
+    ABRdyn_jump_: felt*,
+    iterator_: felt,
+) {
     alloc_locals;
 
     // If reached the end of the array, return
-    if (mark_prices_len == 0) {
-        return (iterator, ABRdyn_jump);
+    if (array_len_ == 0) {
+        return ();
     }
 
     // Calculate the diffrence between bands and the mark prices
-    let (upper_diff) = Math64x61_sub([mark_prices], [upper_array]);
-    let (lower_diff) = Math64x61_sub([lower_array], [mark_prices]);
+    let (upper_diff) = Math64x61_sub([mark_prices_], [upper_array_]);
+    let (lower_diff) = Math64x61_sub([lower_array_], [mark_prices_]);
 
     // Check if the upper or lower diff is positive
     let is_upper = is_le(upper_diff, 0);
@@ -611,7 +540,7 @@ func calc_jump{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
         // Add the jump to the premium
         if (is_jump_negative == 0) {
-            let (jump) = Math64x61_div(ln_jump, [index_prices]);
+            let (jump) = Math64x61_div(ln_jump, [index_prices_]);
             jump_value_upper = jump;
         } else {
             jump_value_upper = 0;
@@ -640,7 +569,7 @@ func calc_jump{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
         // Add the jump to the premium
         if (is_jump_negative == 0) {
-            let (jump) = Math64x61_div(ln_jump, [index_prices]);
+            let (jump) = Math64x61_div(ln_jump, [index_prices_]);
             jump_value_lower = jump;
         } else {
             jump_value_lower = 0;
@@ -651,65 +580,54 @@ func calc_jump{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    let (temp_jump) = Math64x61_add([ABRdyn], jump_value_upper);
+    let (temp_jump) = Math64x61_add([ABRdyn_], jump_value_upper);
     let (total_jump) = Math64x61_sub(temp_jump, jump_value_lower);
-    assert ABRdyn_jump[iterator] = total_jump;
+    assert ABRdyn_jump_[iterator_] = total_jump;
 
     // Recursively call the next array element
     return calc_jump(
-        mark_prices_len - 1,
-        mark_prices + 1,
-        index_prices_len - 1,
-        index_prices + 1,
-        upper_array_len - 1,
-        upper_array + 1,
-        lower_array_len - 1,
-        lower_array + 1,
-        ABRdyn_len - 1,
-        ABRdyn + 1,
-        ABRdyn_jump_len + 1,
-        ABRdyn_jump,
-        iterator + 1,
+        array_len_ - 1,
+        mark_prices_ + 1,
+        index_prices_ + 1,
+        upper_array_ + 1,
+        lower_array_ + 1,
+        ABRdyn_ + 1,
+        ABRdyn_jump_,
+        iterator_ + 1,
     );
 }
 
-// @notice Function to calculate the jump and ABRdyn
-// @param perp_index_len - Size of the perp index prices array
-// @param perp_index - Perp index prices array
-// @param perp_mark_len - Size of the perp mark prices array
-// @param perp_mark - Perp Mark prices array
-// @param index_prices_len - Current size of the index prices array
-// @param index_prices - Current index prices array
-// @param mark_prices_len - Current size of the mark prices array
-// @param mark_prices -  Current mark prices array
-// @param window - Size of the window (Not a sliding window mean)
-// @param iterator - Iterator of the array
-// @param index_sum - Stores the current sum of the index array
-// @param mark_sum - Stores the current sum of the mark array
-// @returns index_prices_len - Size of the populated index prices array
-// @returns index_prices - Populated index prices array
-// @returns mark_prices_len - Size of the populated mark prices array
-// @returns mark_prices -  Populated mark prices array
+// @notice Function to reduce the values from 480 -> 60
+// @param market_id_ - Market ID of the pair
+// @param perp_iterator_ - Iterator for perp_index and perp_mark arrays
+// @param perp_index_ -  Perp Index prices array
+// @param perp_mark_ - Perp Mark prices array
+// @param reduced_iterator_ - Iterator for index_prices and mark_prices arrays
+// @param index_prices_ - Current index prices array
+// @param mark_prices_ -  Current mark prices array
+// @param window_ - Size of the window (Not a sliding window mean)
+// @param window_iterator_ - Iterator for the window
+// @param index_sum_ - Stores the current sum of the index array
+// @param mark_sum_ - Stores the current sum of the mark array
+// @returns reduced_iterator - New length of the array
 func reduce_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt,
-    perp_index_len: felt,
-    perp_index: felt*,
-    perp_mark_len: felt,
-    perp_mark: felt*,
-    index_prices_len: felt,
-    index_prices: felt*,
-    mark_prices_len: felt,
-    mark_prices: felt*,
-    window: felt,
-    iterator: felt,
-    index_sum: felt,
-    mark_sum: felt,
-) -> (index_prices_len: felt, index_prices: felt*, mark_prices_len: felt, mark_prices: felt*) {
+    market_id_: felt,
+    perp_iterator_: felt,
+    perp_index_: felt*,
+    perp_mark_: felt*,
+    reduced_iterator_: felt,
+    index_prices_: felt*,
+    mark_prices_: felt*,
+    window_: felt,
+    window_iterator_: felt,
+    index_sum_: felt,
+    mark_sum_: felt,
+) -> (reduced_iterator: felt) {
     alloc_locals;
 
     // Store the last price in last_mark_price variable
-    if (perp_index_len == 1) {
-        last_mark_price.write(market_id=market_id, value=[perp_mark]);
+    if (perp_iterator_ == 1) {
+        last_mark_price.write(market_id=market_id_, value=[perp_mark_]);
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -720,8 +638,8 @@ func reduce_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     }
 
     // If reached the end of the array, return
-    if (perp_index_len == 0) {
-        return (index_prices_len, index_prices, mark_prices_len, mark_prices);
+    if (perp_iterator_ == 0) {
+        return (reduced_iterator_,);
     } else {
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -729,34 +647,32 @@ func reduce_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     }
 
     // Add the index and mark prices to their respective sums
-    let (curr_index_sum) = Math64x61_add(index_sum, [perp_index]);
-    let (curr_mark_sum) = Math64x61_add(mark_sum, [perp_mark]);
+    let (curr_index_sum) = Math64x61_add(index_sum_, [perp_index_]);
+    let (curr_mark_sum) = Math64x61_add(mark_sum_, [perp_mark_]);
 
     // If the iterator reaches the window
-    if (iterator == window - 1) {
+    if (window_iterator_ == window_ - 1) {
         // Calculate the 64x61 value of the window
-        let (window_size) = Math64x61_fromIntFelt(window);
+        let (window_size) = Math64x61_fromIntFelt(window_);
 
         // Calculate the mean value of index and mark prices
         let (index_mean) = Math64x61_div(curr_index_sum, window_size);
         let (mark_mean) = Math64x61_div(curr_mark_sum, window_size);
 
         // Store the value in index and mark arrays
-        assert index_prices[index_prices_len] = index_mean;
-        assert mark_prices[mark_prices_len] = mark_mean;
+        assert index_prices_[reduced_iterator_] = index_mean;
+        assert mark_prices_[reduced_iterator_] = mark_mean;
 
         // Recursively call the next array element
         return reduce_values(
-            market_id,
-            perp_index_len - 1,
-            perp_index + 1,
-            perp_mark_len - 1,
-            perp_mark + 1,
-            index_prices_len + 1,
-            index_prices,
-            mark_prices_len + 1,
-            mark_prices,
-            window,
+            market_id_,
+            perp_iterator_ - 1,
+            perp_index_ + 1,
+            perp_mark_ + 1,
+            reduced_iterator_ + 1,
+            index_prices_,
+            mark_prices_,
+            window_,
             0,
             0,
             0,
@@ -764,17 +680,15 @@ func reduce_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     } else {
         // Recursively call the next array element
         return reduce_values(
-            market_id,
-            perp_index_len - 1,
-            perp_index + 1,
-            perp_mark_len - 1,
-            perp_mark + 1,
-            index_prices_len,
-            index_prices,
-            mark_prices_len,
-            mark_prices,
-            window,
-            iterator + 1,
+            market_id_,
+            perp_iterator_ - 1,
+            perp_index_ + 1,
+            perp_mark_ + 1,
+            reduced_iterator_,
+            index_prices_,
+            mark_prices_,
+            window_,
+            window_iterator_ + 1,
             curr_index_sum,
             curr_mark_sum,
         );

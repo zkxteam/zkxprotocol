@@ -75,11 +75,11 @@ func increment_governance_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
     // Auth check
-    with_attr error_message("Caller is not authorized to manage governance tokens") {
+    with_attr error_message("FeeDiscount: Unauthorized call to manage governance tokens") {
         verify_caller_authority(registry, version, ManageGovernanceToken_ACTION);
     }
 
-    with_attr error_message("Value should be greater than 0") {
+    with_attr error_message("FeeDiscount: Value must be > 0") {
         assert_lt(0, value);
     }
 
@@ -101,17 +101,17 @@ func decrement_governance_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
     // Auth check
-    with_attr error_message("Caller is not authorized to manage fee details") {
+    with_attr error_message("FeeDiscount: Unauthorized call to manage fee details") {
         verify_caller_authority(registry, version, ManageGovernanceToken_ACTION);
     }
 
-    with_attr error_message("Value should be greater than 0") {
+    with_attr error_message("FeeDiscount: Value must be > 0") {
         assert_lt(0, value);
     }
 
     let number_of_tokens: felt = user_tokens.read(address=address);
 
-    with_attr error_message("Cannot have number of tokens as negative after removal") {
+    with_attr error_message("FeeDiscount: Insufficient balance") {
         assert_nn(number_of_tokens - value);
     }
 

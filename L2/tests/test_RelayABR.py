@@ -104,7 +104,7 @@ async def test_should_revert_if_called_before_8_hours(abr_factory):
     arguments = [1282193, 480] + btc_spot + [480]+btc_perp
 
     await assert_revert(
-        admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments))
+        admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments), reverted_with="ABR: 8 hours not passed")
 
 
 @pytest.mark.asyncio

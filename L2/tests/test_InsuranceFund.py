@@ -55,8 +55,18 @@ async def test_fund_reject(holding_factory):
     _, insurance, _, _ = holding_factory
 
     await assert_revert(signer3.send_transaction(
-        pytest.user1, insurance.contract_address, 'fund', [str_to_felt("USDC"), 100]))
+        pytest.user1, insurance.contract_address, 'fund', [str_to_felt("USDC"), 100]),
+        reverted_with="FundLib: Unauthorized call to transfer funds"
+    )
 
+@pytest.mark.asyncio
+async def test_defund_reject(holding_factory):
+    _, insurance, _, _ = holding_factory
+
+    await assert_revert(signer3.send_transaction(
+        pytest.user1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 100]),
+        reverted_with="FundLib: Unauthorized call to transfer funds"
+    )
 
 @pytest.mark.asyncio
 async def test_defund_admin(holding_factory):
@@ -67,16 +77,12 @@ async def test_defund_admin(holding_factory):
     execution_info = await insurance.balance(str_to_felt("USDC")).call()
     assert execution_info.result.amount == 0
 
+
 @pytest.mark.asyncio
 async def test_defund_more_than_available(holding_factory):
     _, insurance, admin1, _ = holding_factory
 
     await assert_revert(signer1.send_transaction(
-        admin1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 200]))
-
-@pytest.mark.asyncio
-async def test_defund_reject(holding_factory):
-    _, insurance, _, _ = holding_factory
-
-    await assert_revert(signer3.send_transaction(
-        pytest.user1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 100]))
+        admin1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 200]),
+        reverted_with="FundLib: Insufficient balance"    
+    )

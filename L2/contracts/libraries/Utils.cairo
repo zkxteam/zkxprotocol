@@ -1,6 +1,7 @@
 %lang starknet
 %builtins pedersen range_check ecdsa
 
+from starkware.cairo.common.bool import TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.hash_state import (
     hash_init,
@@ -11,7 +12,7 @@ from starkware.cairo.common.hash_state import (
 
 from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_info
-from contracts.Constants import AdminAuth_INDEX
+from contracts.Constants import AdminAuth_INDEX, MasterAdmin_ACTION
 from contracts.DataTypes import CoreFunctionCall, Signature
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -59,9 +60,36 @@ func verify_caller_authority{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AdminAuth_INDEX, version=current_version
     );
-    let (access) = IAdminAuth.get_admin_mapping(
+    let (is_authorized) = IAdminAuth.get_admin_mapping(
         contract_address=auth_address, address=caller, action=action
     );
-    assert access = 1;
+
+    with_attr error_message("Caller Check: Unauthorized caller") {
+        assert is_authorized = 1;
+    }
+    return ();
+}
+
+// @notice - Helper function to verify that caller is MasterAdmin or has necessary authority
+func verify_master_admin_or_authority{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    registry: felt, current_version: felt, action: felt
+) -> () {
+    let (caller) = get_caller_address();
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AdminAuth_INDEX, version=current_version
+    );
+    let (is_master_admin) = IAdminAuth.get_admin_mapping(
+        contract_address=auth_address, address=caller, action=MasterAdmin_ACTION
+    );
+    if (is_master_admin == TRUE) {
+        return ();
+    }
+    let (is_authorized) = IAdminAuth.get_admin_mapping(
+        contract_address=auth_address, address=caller, action=action
+    );
+
+    with_attr error_message("Caller Check: Unauthorized caller") {
+        assert is_authorized = 1;
+    }
     return ();
 }

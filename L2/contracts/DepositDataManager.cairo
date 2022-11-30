@@ -7,10 +7,10 @@ from starkware.cairo.common.math import assert_not_zero
 from contracts.Constants import MasterAdmin_ACTION
 from contracts.DataTypes import DepositData
 from contracts.libraries.CommonLibrary import (
-CommonLib,
-get_contract_version, 
-get_registry_address, 
-set_contract_version
+    CommonLib,
+    get_contract_version,
+    get_registry_address,
+    set_contract_version,
 )
 from contracts.libraries.Utils import verify_caller_authority
 
@@ -69,7 +69,9 @@ func store_deposit_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     // this function will not attempt to interpret the contents of DepositData - we only check that L2 address != 0
     // this function is not permissioned since submission of incorrect data will cost money to the attacker
     // and they will not be able to cancel the transaction anyways since cancellation message has to be sent by originator
-    assert_not_zero(data.user_L2_address);
+    with_attr error_message("DepositDataManager: User address cannot be 0") {
+        assert_not_zero(data.user_L2_address);
+    }
     let (current_num_deposits) = num_deposits.read(data.user_L2_address);
 
     L2_address_to_DepositData.write(data.user_L2_address, current_num_deposits, data);

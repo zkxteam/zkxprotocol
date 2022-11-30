@@ -51,7 +51,7 @@ func contract_registry(index: felt, version: felt) -> (address: felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     auth_address_: felt
 ) {
-    with_attr error_message("Registry address and version cannot be 0") {
+    with_attr error_message("AuthRegistry: AdminAuth contract address cannot be 0") {
         assert_not_zero(auth_address_);
     }
     contract_registry.write(index=AdminAuth_INDEX, version=1, value=auth_address_);
@@ -93,7 +93,7 @@ func update_contract_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         contract_address=auth_addr, address=caller, action=ManageAuthRegistry_ACTION
     );
 
-    with_attr error_message("Caller does not have permission to update contract registry") {
+    with_attr error_message("AuthRegistry: Unauthorized call for contract registry updation") {
         assert_not_zero(access);
     }
 
