@@ -271,36 +271,39 @@ def build_default_asset_properties(
     id,
     short_name,
     asset_version = 1,
-    tradable = 0,
-    collateral = 0,
+    is_tradable = 0,
+    is_collateral = 0,
     token_decimal = 18
 ):
-    return [
-        id, 
-        asset_version, 
-        short_name, 
-        tradable, 
-        collateral, 
-        token_decimal
-    ]
+    return build_asset_properties(
+        id=id,
+        asset_version=asset_version,
+        short_name=short_name,
+        is_tradable=is_tradable,
+        is_collateral=is_collateral,
+        token_decimal=token_decimal
+    )
 
 
 def build_asset_properties(
     id,
     asset_version,
     short_name,
-    tradable,
-    collateral,
+    is_tradable,
+    is_collateral,
     token_decimal
 ):
     return [
         id, 
         asset_version, 
         short_name, 
-        tradable, 
-        collateral, 
-        token_decimal
+        is_tradable, 
+        is_collateral, 
+        token_decimal,
+        [],
+        []
     ]
+
 
 def print_parsed_positions(pos_array):
     for i in range(len(pos_array)):

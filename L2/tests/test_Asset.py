@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted, to64x61
+from utils import str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted, build_default_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -17,16 +17,6 @@ def generate_asset_info():
     id = f"ETH_${counter}"
     name = f"Ethereum_${counter}"
     return str_to_felt(id), str_to_felt(name)
-
-def build_default_asset_properties(id, name):
-    return [
-        id, # id
-        1, # asset_version
-        name, # short_name
-        0, # tradable
-        0, # collateral
-        18 # token_decimal
-    ]
 
 
 @pytest.fixture(scope='module')
