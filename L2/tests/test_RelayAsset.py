@@ -24,22 +24,9 @@ def build_default_asset_properties(id, ticker, name):
         1, # asset_version
         ticker, # ticker
         name, # short_name
-        0, # tradable
-        0, # collateral
+        0, # is_tradable
+        0, # is_collateral
         18, # token_decimal
-        0, # metadata_id
-        to64x61(0.001), # tick_size
-        to64x61(0.01), # step_size
-        to64x61(0.1), # minimum_order_size
-        to64x61(1), # minimum_leverage
-        to64x61(10), # maximum_leverage
-        to64x61(3), # currently_allowed_leverage
-        to64x61(1), # maintenance_margin_fraction
-        to64x61(1), # initial_margin_fraction
-        to64x61(1), # incremental_initial_margin_fraction
-        to64x61(100), # incremental_position_size
-        to64x61(1000), # baseline_position_size
-        to64x61(10000) # maximum_position_size
     ]
 
 @pytest.fixture(scope='module')
@@ -118,23 +105,10 @@ async def test_adding_asset_by_admin(adminAuth_factory):
 
     assert fetched_asset.ticker == asset_ticker
     assert fetched_asset.short_name == asset_name
-    assert fetched_asset.tradable == 0
-    assert fetched_asset.collateral == 0
+    assert fetched_asset.is_tradable == 0
+    assert fetched_asset.is_collateral == 0
     assert fetched_asset.token_decimal == 18
-    assert fetched_asset.metadata_id == 0
     assert fetched_asset.asset_version == 1
-    assert fetched_asset.tick_size == to64x61(0.001)
-    assert fetched_asset.step_size == to64x61(0.01)
-    assert fetched_asset.minimum_order_size == to64x61(0.1)
-    assert fetched_asset.minimum_leverage == to64x61(1)
-    assert fetched_asset.maximum_leverage == to64x61(10)
-    assert fetched_asset.currently_allowed_leverage == to64x61(3)
-    assert fetched_asset.maintenance_margin_fraction == to64x61(1)
-    assert fetched_asset.initial_margin_fraction == to64x61(1)
-    assert fetched_asset.incremental_initial_margin_fraction == to64x61(1)
-    assert fetched_asset.incremental_position_size == to64x61(100)
-    assert fetched_asset.baseline_position_size == to64x61(1000)
-    assert fetched_asset.maximum_position_size == to64x61(10000)
 
     assets = await asset.return_all_assets().call()
     parsed_list = list(assets.result.array_list)[0]
@@ -143,22 +117,9 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     assert parsed_list.asset_version == 1
     assert parsed_list.ticker == asset_ticker
     assert parsed_list.short_name == asset_name
-    assert parsed_list.tradable == 0
-    assert parsed_list.collateral == 0
+    assert parsed_list.is_tradable == 0
+    assert parsed_list.is_collateral == 0
     assert parsed_list.token_decimal == 18
-    assert parsed_list.metadata_id == 0
-    assert parsed_list.tick_size == to64x61(0.001)
-    assert parsed_list.step_size == to64x61(0.01)
-    assert parsed_list.minimum_order_size == to64x61(0.1)
-    assert parsed_list.minimum_leverage == to64x61(1)
-    assert parsed_list.maximum_leverage == to64x61(10)
-    assert parsed_list.currently_allowed_leverage == to64x61(3)
-    assert parsed_list.maintenance_margin_fraction == to64x61(1)
-    assert parsed_list.initial_margin_fraction == to64x61(1)
-    assert parsed_list.incremental_initial_margin_fraction == to64x61(1)
-    assert parsed_list.incremental_position_size == to64x61(100)
-    assert parsed_list.baseline_position_size == to64x61(1000)
-    assert parsed_list.maximum_position_size == to64x61(10000)
 
 
 @pytest.mark.asyncio
@@ -198,9 +159,8 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
 
     assert fetched_asset.ticker == asset_ticker
     assert fetched_asset.short_name == new_asset_name
-    assert fetched_asset.tradable == new_tradable_status
-    assert fetched_asset.collateral == new_collateral
-    assert fetched_asset.metadata_id == new_metadata_id
+    assert fetched_asset.is_tradable == new_tradable_status
+    assert fetched_asset.is_collateral == new_collateral
     assert fetched_asset.asset_version == 1
 
 
@@ -268,22 +228,9 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
 
     assert fetched_asset.ticker == asset_ticker
     assert fetched_asset.short_name == asset_name
-    assert fetched_asset.tradable == 0
-    assert fetched_asset.collateral == 0
+    assert fetched_asset.is_tradable == 0
+    assert fetched_asset.is_collateral == 0
     assert fetched_asset.token_decimal == 18
-    assert fetched_asset.metadata_id == 0
-    assert fetched_asset.tick_size == new_tick_size
-    assert fetched_asset.step_size == new_step_size
-    assert fetched_asset.minimum_order_size == new_minimum_order_size
-    assert fetched_asset.minimum_leverage == new_minimum_leverage
-    assert fetched_asset.maximum_leverage == new_maximum_leverage
-    assert fetched_asset.currently_allowed_leverage == new_currently_allowed_leverage
-    assert fetched_asset.maintenance_margin_fraction == new_maintenance_margin_fraction
-    assert fetched_asset.initial_margin_fraction == new_initial_margin_fraction
-    assert fetched_asset.incremental_initial_margin_fraction == new_incremental_initial_margin_fraction
-    assert fetched_asset.incremental_position_size == new_incremental_position_size
-    assert fetched_asset.baseline_position_size == new_baseline_position_size
-    assert fetched_asset.maximum_position_size == new_maximum_position_size
     assert fetched_asset.asset_version == 2
 
     execution_info1 = await asset.get_version().call()
@@ -395,21 +342,8 @@ async def test_modifying_trade_settings_by_admin_twice(adminAuth_factory):
 
     assert fetched_asset.ticker == asset_ticker
     assert fetched_asset.short_name == asset_name
-    assert fetched_asset.tradable == 0
-    assert fetched_asset.collateral == 0
-    assert fetched_asset.metadata_id == 0
-    assert fetched_asset.tick_size == new_tick_size
-    assert fetched_asset.step_size == new_step_size
-    assert fetched_asset.minimum_order_size == new_minimum_order_size
-    assert fetched_asset.minimum_leverage == new_minimum_leverage
-    assert fetched_asset.maximum_leverage == new_maximum_leverage
-    assert fetched_asset.currently_allowed_leverage == new_currently_allowed_leverage
-    assert fetched_asset.maintenance_margin_fraction == new_maintenance_margin_fraction
-    assert fetched_asset.initial_margin_fraction == new_initial_margin_fraction
-    assert fetched_asset.incremental_initial_margin_fraction == new_incremental_initial_margin_fraction
-    assert fetched_asset.incremental_position_size == new_incremental_position_size
-    assert fetched_asset.baseline_position_size == new_baseline_position_size
-    assert fetched_asset.maximum_position_size == new_maximum_position_size
+    assert fetched_asset.is_tradable == 0
+    assert fetched_asset.is_collateral == 0
     assert fetched_asset.asset_version == 3
 
     execution_info1 = await asset.get_version().call()

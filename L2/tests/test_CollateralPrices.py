@@ -44,8 +44,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
         USDT_ID, # id
         1, # asset_version
         str_to_felt("USDT"), # short_name
-        1, # tradable
-        0, # collateral
+        1, # is_tradable
+        0, # is_collateral
         6 # token_decimal
     ]
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', USDT_properties)
@@ -54,8 +54,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
         USDC_ID, # id
         1, # asset_version
         str_to_felt("USDC"), # short_name
-        0, # tradable
-        1, # collateral
+        0, # is_tradable
+        1, # is_collateral
         6 # token_decimal
     ]
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)

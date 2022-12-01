@@ -31,8 +31,8 @@ def build_default_asset_properties(id, ticker, name):
         id,  # id
         0,  # asset_version
         name,  # short_name
-        0,  # tradable
-        0,  # collateral
+        0,  # is_tradable
+        0,  # is_collateral
         18,  # token_decimal
     ]
 

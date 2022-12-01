@@ -3,7 +3,9 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted, build_default_asset_properties
+from utils import str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted
+from utils_asset import build_default_asset_properties, encode_asset_id_name, DEFAULT_ASSET_ICON_LINK, DEFAULT_ASSET_METADATA_LINK
+from utils_links import encode_characters
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -16,7 +18,7 @@ def generate_asset_info():
     counter += 1
     id = f"ETH_${counter}"
     name = f"Ethereum_${counter}"
-    return str_to_felt(id), str_to_felt(name)
+    return encode_asset_id_name(id, name)
 
 
 @pytest.fixture(scope='module')
@@ -82,8 +84,8 @@ async def test_adding_asset_by_admin(adminAuth_factory):
 
     assert fetched_asset.id == asset_id
     assert fetched_asset.short_name == asset_name
-    assert fetched_asset.tradable == 0
-    assert fetched_asset.collateral == 0
+    assert fetched_asset.is_tradable == 0
+    assert fetched_asset.is_collateral == 0
     assert fetched_asset.token_decimal == 18
 
     assets = await asset.return_all_assets().call()
@@ -92,9 +94,17 @@ async def test_adding_asset_by_admin(adminAuth_factory):
     assert parsed_list.id == asset_id
     assert parsed_list.asset_version == 1
     assert parsed_list.short_name == asset_name
-    assert parsed_list.tradable == 0
-    assert parsed_list.collateral == 0
+    assert parsed_list.is_tradable == 0
+    assert parsed_list.is_collateral == 0
     assert parsed_list.token_decimal == 18
+
+    icon_call = await asset.get_icon_link(asset_id).call()
+    icon_link = list(icon_call.result.link)
+    assert icon_link == encode_characters(DEFAULT_ASSET_ICON_LINK)
+
+    metadata_call = await asset.get_metadata_link(asset_id).call()
+    metadata_link = list(metadata_call.result.link)
+    assert metadata_link == encode_characters(DEFAULT_ASSET_METADATA_LINK)
 
 
 @pytest.mark.asyncio
@@ -142,9 +152,9 @@ async def test_modifying_asset_by_admin(adminAuth_factory):
 
     assert fetched_asset.id == asset_id
     assert fetched_asset.short_name == new_asset_name
-    assert fetched_asset.tradable == new_tradable_status
-    assert fetched_asset.collateral == new_collateral
-    assert fetched_asset.asset_version == 1
+    assert fetched_asset.is_tradable == new_tradable_status
+    assert fetched_asset.is_collateral == new_collateral
+    assert fetched_asset.asset_version == 2
 
 
 @pytest.mark.asyncio
@@ -161,8 +171,7 @@ async def test_modifying_asset_by_unauthorized_user(adminAuth_factory):
             asset_name, 
             0, 
             1
-        ]),
-        reverted_with="Asset: Unauthorized caller for mananging assets"
+        ])
     )
 
 
@@ -420,7 +429,7 @@ async def test_add_3_then_remove_SECOND_asset(fresh_asset_contract):
 
     # Check re-added asset fetching by id
     re_added_asset = (await asset.get_asset(ID_TO_DELETE).call()).result.currAsset
-    assert re_added_asset.id == asset_id_1
+    assert re_added_asset.id == asset_id_2
     assert re_added_asset.short_name == asset_name_2
 
 @pytest.mark.asyncio

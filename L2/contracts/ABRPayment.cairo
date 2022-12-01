@@ -37,6 +37,7 @@ func abr_payment_called_user_position(market_id: felt, account_address: felt, ti
 // Constructor //
 /////////////////
 
+// @notice
 // @param registry_address_ - Address of the auth registry
 // @param contract_version_ Version of the contract
 @constructor
@@ -47,11 +48,11 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//////////////
-// External //
-//////////////
+////////////////////////
+// External Functions //
+////////////////////////
 
-// @notice Pay abr function, should be called by the Node
+// @notice Function to be called by the node
 // @param account_addresses_len_ - Length of the account_addresses array being passed
 // @param account_addresses_ - Account addresses array
 @external
@@ -90,9 +91,9 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     );
 }
 
-//////////////
-// Internal //
-//////////////
+////////////////////////
+// Internal Functions //
+////////////////////////
 
 // @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
 // @param account_address_ - Address of the user of whom the positions are passed
