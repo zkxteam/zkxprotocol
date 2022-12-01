@@ -67,34 +67,17 @@ namespace IMarkets {
     func get_market_id_from_assets(asset_id_: felt, collateral_id_: felt) -> (market_id: felt) {
     }
 
-    func get_asset_collateral_from_market(market_id_: felt) -> (
-        asset_id: felt, collateral_id: felt
-    ) {
-    }
-
     func get_maintenance_margin(market_id_: felt) -> (maintenance_margin: felt) {
     }
 
-    func get_ttl_from_market(market_id_: felt) -> (ttl: felt) {
+    func get_all_markets() -> (array_list_len: felt, array_list: Market*) {
     }
 
     func get_all_markets_by_state(is_tradable_: felt, is_archived_: felt) -> (
         array_list_len: felt, array_list: Market*
     ) {
-    }
-<<<<<<< HEAD
-}
-=======
-
-    func get_all_markets_by_state(is_tradable_: felt, is_archived_: felt) -> (
-        array_list_len: felt, array_list: Market*
-    ) {
-    }
-
-    func get_maintenance_margin(market_id_: felt) -> (maintenance_margin: felt) {
     }
 
     func get_metadata_link(market_id_: felt) -> (link_len: felt, link: felt*) {
     }
 }
->>>>>>> ZKX-864-Intermediate-Merge-Branch

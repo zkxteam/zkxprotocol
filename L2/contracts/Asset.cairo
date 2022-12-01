@@ -397,9 +397,6 @@ func update_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         string_len=link_len,
         string=link
     );
-    asset_icon_link_update.emit(asset_id);
-    return ();
-}
 
     // Bump asset version
     let (asset: Asset) = asset_by_id.read(asset_id);

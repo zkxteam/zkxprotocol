@@ -217,13 +217,26 @@ func get_ttl_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 }
 
 @view
+func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    array_list_len: felt, array_list: Market*
+) {
+    let (inner_address) = get_inner_contract();
+    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets(inner_address);
+    return (array_list_len, array_list);
+}
+
+@view
 func get_all_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     is_tradable_: felt, is_archived_: felt
 ) -> (
     array_list_len: felt, array_list: Market*
 ) {
     let (inner_address) = get_inner_contract();
-    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets(inner_address);
+    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets_by_state(
+        inner_address,
+        is_tradable_,
+        is_archived_
+    );
     return (array_list_len, array_list);
 }
 
