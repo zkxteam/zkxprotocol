@@ -11,7 +11,13 @@ from starkware.starknet.common.syscalls import (
     get_block_timestamp,
     get_caller_address,
 )
-from starkware.cairo.common.uint256 import Uint256, uint256_add, uint256_lt
+from starkware.cairo.common.uint256 import (
+    Uint256,
+    uint256_add,
+    uint256_lt,
+    uint256_mul,
+    uint256_unsigned_div_rem,
+)
 
 from contracts.Constants import (
     HIGHTIDE_ACTIVE,
@@ -31,11 +37,18 @@ from contracts.DataTypes import (
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
+from contracts.interfaces.IHighTideCalc import IHighTideCalc
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IStarkway import IStarkway
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
+from contracts.Math_64x61 import (
+    Math64x61_fromIntFelt,
+    Math64x61_mul,
+    Math64x61_toFelt,
+    Math64x61_toUint256,
+)
 
 // /////////
 // Events //
@@ -615,6 +628,11 @@ func ditribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     );
 
     let (local hightide_metadata: HighTideMetaData) = get_hightide(hightide_id_);
+    let (funds_flow_64x61) = IHighTideCalc.get_funds_flow_per_market(
+        contract_address=hightide_calc_address,
+        season_id_=hightide_metadata.season_id,
+        pair_id_=hightide_metadata.pair_id,
+    );
 
     let (
         reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
@@ -623,6 +641,8 @@ func ditribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Recursively ditribute rewards to all active traders for the specified hightide
     return ditribute_rewards_recurse(
         hightide_metadata_=hightide_metadata,
+        funds_flow_64x61_=funds_flow_64x61,
+        hightide_calc_address_=hightide_calc_address,
         trader_list_len=trader_list_len,
         trader_list=trader_list,
         reward_tokens_list_len=reward_tokens_list_len,
@@ -880,6 +900,8 @@ func populate_hightide_list_recurse{
 
 func ditribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     hightide_metadata_: HighTideMetaData,
+    funds_flow_64x61_: felt,
+    hightide_calc_address_: felt,
     trader_list_len: felt,
     trader_list: felt*,
     reward_tokens_list_len: felt,
@@ -889,15 +911,27 @@ func ditribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         return ();
     }
 
+    let (trader_score_64x61) = IHighTideCalc.get_trader_score_per_market(
+        contract_address=hightide_calc_address_,
+        season_id_=hightide_metadata_.season_id,
+        pair_id_=hightide_metadata_.pair_id,
+        trader_address_=[trader_list],
+    );
+
+    let (individual_reward_64x61) = Math64x61_mul(funds_flow_64x61_, trader_score_64x61);
+
     ditribute_rewards_per_trader_recurse(
         hightide_metadata_=hightide_metadata_,
         trader_address_=[trader_list],
+        individual_reward_64x61_=individual_reward_64x61,
         reward_tokens_list_len=reward_tokens_list_len,
         reward_tokens_list=reward_tokens_list,
     );
 
     return ditribute_rewards_recurse(
         hightide_metadata_=hightide_metadata_,
+        funds_flow_64x61_=funds_flow_64x61_,
+        hightide_calc_address_=hightide_calc_address_,
         trader_list_len=trader_list_len - 1,
         trader_list=trader_list + 1,
         reward_tokens_list_len=reward_tokens_list_len,
@@ -910,6 +944,7 @@ func ditribute_rewards_per_trader_recurse{
 }(
     hightide_metadata_: HighTideMetaData,
     trader_address_: felt,
+    individual_reward_64x61_: felt,
     reward_tokens_list_len: felt,
     reward_tokens_list: RewardToken*,
 ) {
@@ -917,9 +952,34 @@ func ditribute_rewards_per_trader_recurse{
         return ();
     }
 
+    // Convert individual reward from 64x61 to Uint256 format
+    // to convert, we will multiply and divide the reward which is in decimals with one followed by some zeros. Here, we considered one million.
+    // Ex: to convert 0.1234 -> ((0.1234) * (1000000))/ (1000000) -> we will convert numerator and denominator to Uint256 and then perform division
+    let (one_million_64x61: felt) = Math64x61_fromIntFelt(1000000);
+    let (trader_reward_64x61: felt) = Math64x61_mul(individual_reward_64x61_, one_million_64x61);
+
+    // Convert 64x61 value to felt value
+    let (one_million: felt) = Math64x61_toFelt(one_million_64x61);
+    let (trader_reward: felt) = Math64x61_toFelt(trader_reward_64x61);
+
+    // Convert felt value to Uint256 value
+    let (one_million_Uint256: Uint256) = Math64x61_toUint256(one_million);
+    let (trader_reward_Uint256: Uint256) = Math64x61_toUint256(trader_reward);
+
+    // Get the reward in Uint256
+    let (reward_Uint256, remainder_Uint256) = uint256_unsigned_div_rem(
+        trader_reward_Uint256, one_million_Uint256
+    );
+
+    // Calculate the individual reward for the corresponding reward token
+    let individual_reward_Uint256 = uint256_mul(reward_Uint256, [reward_tokens_list].no_of_tokens);
+
+    // Transfer the calculated reward amount to the trader
+
     return ditribute_rewards_per_trader_recurse(
         hightide_metadata_=hightide_metadata_,
         trader_address_=trader_address_,
+        individual_reward_64x61_=individual_reward_64x61_,
         reward_tokens_list_len=reward_tokens_list_len - 1,
         reward_tokens_list=reward_tokens_list + RewardToken.SIZE,
     );
