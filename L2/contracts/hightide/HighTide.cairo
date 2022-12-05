@@ -38,6 +38,7 @@ from contracts.DataTypes import (
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
 from contracts.interfaces.IHighTideCalc import IHighTideCalc
+from contracts.interfaces.ILiquidityPool import ILiquidityPool
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IStarkway import IStarkway
 from contracts.libraries.CommonLibrary import CommonLib
@@ -953,7 +954,8 @@ func ditribute_rewards_per_trader_recurse{
     }
 
     // Convert individual reward from 64x61 to Uint256 format
-    // to convert, we will multiply and divide the reward which is in decimals with one followed by some zeros. Here, we considered one million.
+    // to convert, we will multiply and divide the reward which is in decimals with one followed by some zeros. 
+    // Here, we considered one million.
     // Ex: to convert 0.1234 -> ((0.1234) * (1000000))/ (1000000) -> we will convert numerator and denominator to Uint256 and then perform division
     let (one_million_64x61: felt) = Math64x61_fromIntFelt(1000000);
     let (trader_reward_64x61: felt) = Math64x61_mul(individual_reward_64x61_, one_million_64x61);
@@ -972,10 +974,19 @@ func ditribute_rewards_per_trader_recurse{
     );
 
     // Calculate the individual reward for the corresponding reward token
-    let individual_reward_Uint256 = uint256_mul(reward_Uint256, [reward_tokens_list].no_of_tokens);
+    let (individual_reward_Uint256, carry_Uint256) = uint256_mul(
+        reward_Uint256, [reward_tokens_list].no_of_tokens
+    );
 
     // Transfer the calculated reward amount to the trader
+    ILiquidityPool.distribute_reward_tokens(
+        contract_address=hightide_metadata_.liquidity_pool_address,
+        trader_address_=trader_address_,
+        reward_amount_Uint256_=individual_reward_Uint256,
+        l1_token_address_=[reward_tokens_list].token_id,
+    );
 
+    // Iterate over the next reward token
     return ditribute_rewards_per_trader_recurse(
         hightide_metadata_=hightide_metadata_,
         trader_address_=trader_address_,
