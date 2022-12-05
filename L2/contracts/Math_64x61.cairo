@@ -83,8 +83,31 @@ func Math64x61_toFelt{range_check_ptr}(x: felt) -> (res: felt) {
 }
 
 // Converts a felt value to a uint256 value
-func Math64x61_toUint256(x: felt) -> (res: Uint256) {
-    let res = Uint256(low=x, high=0);
+func Math64x61_toUint256{range_check_ptr}(value: felt) -> (res: Uint256) {
+    // Note: the following code works because PRIME - 1 is divisible by 2**128.
+    const MAX_HIGH = (-1) / 2 ** 128;
+    const MAX_LOW = 0;
+
+    // Guess the low and high parts of the integer.
+    let low = [range_check_ptr];
+    let high = [range_check_ptr + 1];
+    let range_check_ptr = range_check_ptr + 2;
+
+    %{
+        from starkware.cairo.common.math_utils import assert_integer
+        assert ids.MAX_HIGH < 2**128 and ids.MAX_LOW < 2**128
+        assert PRIME - 1 == ids.MAX_HIGH * 2**128 + ids.MAX_LOW
+        assert_integer(ids.value)
+        ids.low = ids.value & ((1 << 128) - 1)
+        ids.high = ids.value >> 128
+    %}
+    assert value = high * (2 ** 128) + low;
+    if (high == MAX_HIGH) {
+        assert_le(low, MAX_LOW);
+    } else {
+        assert_le(high, MAX_HIGH - 1);
+    }
+    let res = Uint256(low=low, high=high);
     return (res,);
 }
 

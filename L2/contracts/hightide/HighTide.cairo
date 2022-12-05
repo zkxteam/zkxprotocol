@@ -961,11 +961,10 @@ func ditribute_rewards_per_trader_recurse{
     let (trader_reward_64x61: felt) = Math64x61_mul(individual_reward_64x61_, one_million_64x61);
 
     // Convert 64x61 value to felt value
-    let (one_million: felt) = Math64x61_toFelt(one_million_64x61);
     let (trader_reward: felt) = Math64x61_toFelt(trader_reward_64x61);
 
     // Convert felt value to Uint256 value
-    let (one_million_Uint256: Uint256) = Math64x61_toUint256(one_million);
+    let (one_million_Uint256: Uint256) = Math64x61_toUint256(1000000);
     let (trader_reward_Uint256: Uint256) = Math64x61_toUint256(trader_reward);
 
     // Calculate the individual reward for the corresponding reward token
