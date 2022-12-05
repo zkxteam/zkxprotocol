@@ -990,7 +990,7 @@ func distribute_rewards_per_trader_recurse{
 
     // Get the reward to be transferred
     let (reward_Uint256, remainder_Uint256) = uint256_unsigned_div_rem(
-        individual_reward_Uint256, quintillion_Uint256
+        individual_reward_Uint256, one_million_Uint256
     );
 
     // Transfer the calculated reward amount to the trader
