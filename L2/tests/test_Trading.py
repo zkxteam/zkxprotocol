@@ -8,6 +8,9 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals
+from utils_links import DEFAULT_LINK_1, prepare_starknet_string
+from utils_asset import AssetID, build_asset_properties
+from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -22,17 +25,11 @@ dave_signer = Signer(123456789987654326)
 maker_trading_fees = to64x61(0.0002 * 0.97)
 taker_trading_fees = to64x61(0.0005 * 0.97)
 
-BTC_ID = str_to_felt("32f0406jz7qj8")
-ETH_ID = str_to_felt("65ksgn23nv")
-USDC_ID = str_to_felt("fghj3am52qpzsib")
-UST_ID = str_to_felt("yjk45lvmasopq")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
 TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
-DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
-TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
 
 @pytest.fixture(scope='module')
@@ -159,31 +156,193 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [BTC_ID, 1, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [ETH_ID, 1, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 1, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [UST_ID, 1, str_to_felt("UST"), str_to_felt("UST"), 1, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [DOGE_ID, 1, str_to_felt("DOGE"), str_to_felt("DOGECOIN"), 0, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [TSLA_ID, 1, str_to_felt("TESLA"), str_to_felt("TESLA MOTORS"), 1, 0, 8, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    BTC_properties = build_asset_properties(
+        id=AssetID.BTC,
+        asset_version=1,
+        short_name=str_to_felt("BTC"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_properties)
+
+    ETH_properties = build_asset_properties(
+        id=AssetID.ETH,
+        asset_version=1,
+        short_name=str_to_felt("ETH"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=18
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', ETH_properties)
+    
+    USDC_properties = build_asset_properties(
+        id=AssetID.USDC,
+        asset_version=1,
+        short_name=str_to_felt("USDC"),
+        is_tradable=False,
+        is_collateral=True,
+        token_decimal=6
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
+    
+    UST_properties = build_asset_properties(
+        id=AssetID.UST,
+        asset_version=1,
+        short_name=str_to_felt("UST"),
+        is_tradable=True,
+        is_collateral=True,
+        token_decimal=6
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', UST_properties)
+
+    DOGE_properties = build_asset_properties(
+        id=AssetID.DOGE,
+        asset_version=1,
+        short_name=str_to_felt("DOGE"),
+        is_tradable=False,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', DOGE_properties)
+
+    TESLA_properties = build_asset_properties(
+        id=AssetID.TSLA,
+        asset_version=1,
+        short_name=str_to_felt("TESLA"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', TESLA_properties)
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [TSLA_USD_ID, TSLA_ID, USDC_ID, to64x61(10), 0, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [UST_USDC_ID, UST_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    BTC_USD_properties = MarketProperties(
+        id=BTC_USD_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+
+    BTC_UST_properties = MarketProperties(
+        id=BTC_UST_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.UST,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
+
+    ETH_USD_properties = MarketProperties(
+        id=ETH_USD_ID,
+        asset=AssetID.ETH,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
+
+    TSLA_USD_properties = MarketProperties(
+        id=TSLA_USD_ID,
+        asset=AssetID.TSLA,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=False,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', TSLA_USD_properties.to_params_list())
+
+    UST_USDC_properties = MarketProperties(
+        id=UST_USDC_ID,
+        asset=AssetID.UST,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', UST_USDC_properties.to_params_list())
 
     # Update collateral prices
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, to64x61(1)])
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [UST_ID, to64x61(1)])
+    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.USDC, to64x61(1)])
+    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.UST, to64x61(1)])
 
     # Fund the Holding contract
-    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [UST_ID, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
     # Fund the Liquidity fund contract
-    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
     return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate
 
@@ -196,8 +355,8 @@ async def test_revert_balance_low(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("fdfa34ghjds")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(10789)
     stopPrice1 = 0
     orderType1 = 0
@@ -209,8 +368,8 @@ async def test_revert_balance_low(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("rejhfyjkew")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(10789)
     stopPrice2 = 0
     orderType2 = 0
@@ -249,12 +408,12 @@ async def test_set_balance_for_testing(adminAuth_factory):
 
     alice_balance = to64x61(10000)
     bob_balance = to64x61(10000)
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [UST_ID, bob_balance])
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [AssetID.USDC, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.USDC, bob_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.UST, bob_balance])
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
 
     assert alice_curr_balance.result.res == alice_balance
     assert bob_curr_balance.result.res == bob_balance
@@ -275,8 +434,8 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("df54gdfa")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(1000)
     stopPrice1 = 0
     orderType1 = 0
@@ -288,8 +447,8 @@ async def test_revert_if_market_order_2percent_deviation(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("adsfgiu34hjjhks")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(1000)
     stopPrice2 = 0
     orderType2 = 0
@@ -331,8 +490,8 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("kvhn3m87yhfs")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(1000)
     stopPrice1 = 0
     orderType1 = 0
@@ -344,8 +503,8 @@ async def test_revert_if_bad_limit_order_long(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("3hf83hdfska")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(1000)
     stopPrice2 = 0
     orderType2 = 1
@@ -387,8 +546,8 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("fgkiu3iujsd78")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(1000)
     stopPrice1 = 0
     orderType1 = 1
@@ -399,8 +558,8 @@ async def test_revert_if_bad_limit_order_short(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("65duhhj438187i")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(1000)
     stopPrice2 = 0
     orderType2 = 1
@@ -441,8 +600,8 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("8721jhfkf93hk1")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(1078)
     stopPrice1 = 0
     orderType1 = 0
@@ -454,8 +613,8 @@ async def test_revert_if_order_mismatch(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("9fd1k31k5h7")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(1078)
     stopPrice2 = 0
     orderType2 = 0
@@ -497,8 +656,8 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
     marketID_1 = TSLA_USD_ID
 
     order_id_1 = str_to_felt("k3j43l1l34")
-    assetID_1 = TSLA_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.TSLA
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(1078)
     stopPrice1 = 0
     orderType1 = 0
@@ -510,8 +669,8 @@ async def test_revert_if_asset_not_tradable(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("45kj341kj4")
-    assetID_2 = TSLA_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.TSLA
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(1078)
     stopPrice2 = 0
     orderType2 = 0
@@ -553,8 +712,8 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("iu4n31kh123")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(1078)
     stopPrice1 = 0
     orderType1 = 0
@@ -566,8 +725,8 @@ async def test_revert_if_collateral_mismatch(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("932jh1mjdfsl")
-    assetID_2 = BTC_ID
-    collateralID_2 = UST_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.UST
     price2 = to64x61(1078)
     stopPrice2 = 0
     orderType2 = 0
@@ -609,8 +768,8 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("3jh1udkasd")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(1078)
     stopPrice1 = 0
     orderType1 = 0
@@ -622,8 +781,8 @@ async def test_revert_if_asset_mismatch(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("5jkhfdjkew")
-    assetID_2 = ETH_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.ETH
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(1078)
     stopPrice2 = 0
     orderType2 = 0
@@ -665,8 +824,8 @@ async def test_revert_wrong_signature(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("zxcds35yts")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(10789)
     stopPrice1 =0
     orderType1 = 0
@@ -678,8 +837,8 @@ async def test_revert_wrong_signature(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("mjuwoxzbcwq4")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(10789)
     stopPrice2 = 0
     orderType2 = 0
@@ -721,8 +880,8 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("32i7ashhj2")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -734,8 +893,8 @@ async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("mnjds87234")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
@@ -776,8 +935,8 @@ async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("bidjsf732hjsfd")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = to64x61(6000)
     orderType1 = 2
@@ -789,8 +948,8 @@ async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("iu32n3246dfsj")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = to64x61(4000)
     orderType2 = 2
@@ -819,10 +978,10 @@ async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory
     fees2 = await fixed_math.Math64x61_mul(amount2.result.res, taker_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size,
@@ -839,16 +998,16 @@ async def test_revert_stop_orders_execution_price_not_in_range(adminAuth_factory
 async def test_opening_and_closing_full_orders(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
-    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance_before = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance_before = await bob.get_balance(AssetID.USDC).call()
 
     ####### Opening of Orders #######
     size = to64x61(1)
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("sdj324hka8kaedf")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -860,8 +1019,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljerw")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
@@ -890,10 +1049,10 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     fees2 = await fixed_math.Math64x61_mul(amount2.result.res, taker_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size,
@@ -928,12 +1087,12 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
         leverage2
     ]
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
-    holdingBalance = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
+    holdingBalance = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_curr = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     print("Fee balance got: ", feeBalance_curr.result.fee)
     print("Alice fee: ", alice_total_fees.result.fee)
@@ -958,8 +1117,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     marketID_2 = BTC_USD_ID
 
     order_id_3 = str_to_felt("rlbrj32414hd")
-    assetID_3 = BTC_ID
-    collateralID_3 = USDC_ID
+    assetID_3 = AssetID.BTC
+    collateralID_3 = AssetID.USDC
     price3 = to64x61(6000)
     stopPrice3 = 0
     orderType3 = 0
@@ -971,8 +1130,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     liquidatorAddress3 = 0
 
     order_id_4 = str_to_felt("tew243sdf2334")
-    assetID_4 = BTC_ID
-    collateralID_4 = USDC_ID
+    assetID_4 = AssetID.BTC
+    collateralID_4 = AssetID.USDC
     price4 = to64x61(6000)
     stopPrice4 = 0
     orderType4 = 0
@@ -1034,10 +1193,10 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
 
     alice_curr_balance_after = await alice.get_balance(collateralID_3).call()
     bob_curr_balance_after = await bob.get_balance(collateralID_4).call()
-    holdingBalance_after = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_after = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_after = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_after = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_after = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_after = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_after = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_after = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     assert holdingBalance_after.result.amount == holdingBalance.result.amount - \
         amount1.result.res - amount2.result.res
@@ -1070,21 +1229,21 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     bob_balance = to64x61(50000)
     charlie_balance = to64x61(50000)
 
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
-    await admin2_signer.send_transaction(admin2, charlie.contract_address, 'set_balance', [USDC_ID, charlie_balance])
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [AssetID.USDC, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.USDC, bob_balance])
+    await admin2_signer.send_transaction(admin2, charlie.contract_address, 'set_balance', [AssetID.USDC, charlie_balance])
 
-    alice_curr_balance_before = await alice.get_balance(assetID_=USDC_ID).call()
-    bob_curr_balance_before = await bob.get_balance(assetID_=USDC_ID).call()
-    charlie_curr_balance_before = await charlie.get_balance(assetID_=USDC_ID).call()
+    alice_curr_balance_before = await alice.get_balance(assetID_=AssetID.USDC).call()
+    bob_curr_balance_before = await bob.get_balance(assetID_=AssetID.USDC).call()
+    charlie_curr_balance_before = await charlie.get_balance(assetID_=AssetID.USDC).call()
 
     ####### Opening of Orders #######
     size1 = to64x61(4)
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("32iga62jsgfds")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(9325.2432042)
     stopPrice1 = 0
     orderType1 = 0
@@ -1096,8 +1255,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("873h2kkjsffg")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(9325.03424)
     stopPrice2 = 0
     orderType2 = 0
@@ -1109,8 +1268,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     liquidatorAddress2 = 0
 
     order_id_3 = str_to_felt("dsfwr432")
-    assetID_3 = BTC_ID
-    collateralID_3 = USDC_ID
+    assetID_3 = AssetID.BTC
+    collateralID_3 = AssetID.USDC
     price3 = to64x61(9324.43)
     stopPrice3 = 0
     orderType3 = 0
@@ -1146,11 +1305,11 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     fees3 = await fixed_math.Math64x61_mul(amount3.result.res, maker_trading_fees).call()
     total_amount3 = amount3.result.res + fees3.result.res
 
-    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
-    charlie_total_fees_before = await feeBalance.get_user_fee(address=charlie.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
+    charlie_total_fees_before = await feeBalance.get_user_fee(address=charlie.contract_address, assetID_=AssetID.USDC).call()
 
     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size1,
@@ -1198,14 +1357,14 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         leverage3
     ]
 
-    alice_curr_balance = await alice.get_balance(assetID_=USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(assetID_=USDC_ID).call()
-    charlie_curr_balance = await charlie.get_balance(assetID_=USDC_ID).call()
-    holdingBalance = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
-    charlie_total_fees = await feeBalance.get_user_fee(address=charlie.contract_address, assetID_=USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(assetID_=AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(assetID_=AssetID.USDC).call()
+    charlie_curr_balance = await charlie.get_balance(assetID_=AssetID.USDC).call()
+    holdingBalance = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_curr = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
+    charlie_total_fees = await feeBalance.get_user_fee(address=charlie.contract_address, assetID_=AssetID.USDC).call()
 
     assert alice_curr_balance.result.res == alice_curr_balance_before.result.res - total_amount1
     assert from64x61(bob_curr_balance.result.res) == from64x61(bob_curr_balance_before.result.res - total_amount2)
@@ -1222,8 +1381,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     marketID_2 = BTC_USD_ID
 
     order_id_4 = str_to_felt("er8u324hj4hd")
-    assetID_4 = BTC_ID
-    collateralID_4 = USDC_ID
+    assetID_4 = AssetID.BTC
+    collateralID_4 = AssetID.USDC
     price4 = to64x61(12000.2432042)
     stopPrice4 = 0
     orderType4 = 0
@@ -1235,8 +1394,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     liquidatorAddress4 = 0
 
     order_id_5 = str_to_felt("5324k34")
-    assetID_5 = BTC_ID
-    collateralID_5 = USDC_ID
+    assetID_5 = AssetID.BTC
+    collateralID_5 = AssetID.USDC
     price5 = to64x61(12032.9803)
     stopPrice5 = 0
     orderType5 = 0
@@ -1248,8 +1407,8 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
     liquidatorAddress5 = 0
 
     order_id_6 = str_to_felt("3df324gds34")
-    assetID_6 = BTC_ID
-    collateralID_6 = USDC_ID
+    assetID_6 = AssetID.BTC
+    collateralID_6 = AssetID.USDC
     price6 = to64x61(12010.2610396)
     stopPrice6 = 0
     orderType6 = 0
@@ -1324,14 +1483,14 @@ async def test_three_orders_in_a_batch(adminAuth_factory):
         leverage6
     ]
 
-    alice_curr_balance_after = await alice.get_balance(assetID_=USDC_ID).call()
-    bob_curr_balance_after = await bob.get_balance(assetID_=USDC_ID).call()
-    charlie_curr_balance_after = await charlie.get_balance(assetID_=USDC_ID).call()
-    holdingBalance_after = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_after = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_after = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_after = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
-    charlie_total_fees_after = await feeBalance.get_user_fee(address=charlie.contract_address, assetID_=USDC_ID).call()
+    alice_curr_balance_after = await alice.get_balance(assetID_=AssetID.USDC).call()
+    bob_curr_balance_after = await bob.get_balance(assetID_=AssetID.USDC).call()
+    charlie_curr_balance_after = await charlie.get_balance(assetID_=AssetID.USDC).call()
+    holdingBalance_after = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_after = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_after = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_after = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
+    charlie_total_fees_after = await feeBalance.get_user_fee(address=charlie.contract_address, assetID_=AssetID.USDC).call()
 
     assert holdingBalance_after.result.amount == holdingBalance.result.amount - \
         amount1.result.res - amount2.result.res - amount3.result.res
@@ -1352,19 +1511,19 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
 
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [AssetID.USDC, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.USDC, bob_balance])
 
-    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance_before = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance_before = await bob.get_balance(AssetID.USDC).call()
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("iu21iosdf8453")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -1376,8 +1535,8 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljemn")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
@@ -1410,10 +1569,10 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     fees2 = await fixed_math.Math64x61_mul(amount_for_fee2.result.res, maker_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size1,
@@ -1448,12 +1607,12 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         leverage2
     ]
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
-    holdingBalance = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
+    holdingBalance = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_curr = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     assert from64x61(alice_curr_balance.result.res) == from64x61(alice_curr_balance_before.result.res - total_amount1)
     assert from64x61(bob_curr_balance.result.res) == from64x61(bob_curr_balance_before.result.res - total_amount2)
@@ -1467,8 +1626,8 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     marketID_2 = BTC_USD_ID
 
     order_id_3 = str_to_felt("dfs32423gdsga")
-    assetID_3 = BTC_ID
-    collateralID_3 = USDC_ID
+    assetID_3 = AssetID.BTC
+    collateralID_3 = AssetID.USDC
     price3 = to64x61(6000)
     stopPrice3 = 0
     orderType3 = 0
@@ -1480,8 +1639,8 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     liquidatorAddress3 = 0
 
     order_id_4 = str_to_felt("tew2hda334")
-    assetID_4 = BTC_ID
-    collateralID_4 = USDC_ID
+    assetID_4 = AssetID.BTC
+    collateralID_4 = AssetID.USDC
     price4 = to64x61(6000)
     stopPrice4 = 0
     orderType4 = 0
@@ -1586,10 +1745,10 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
         bob_curr_balance_after.result.res))
     print("Bob difference is", from64x61(
         bob_curr_balance.result.res) + from64x61(amount_returned3))
-    holdingBalance_after = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_after = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_after = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_after = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_after = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_after = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_after = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_after = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     assert holdingBalance_after.result.amount == holdingBalance.result.amount - \
         position_value_closed3.result.res - position_value_closed4.result.res
@@ -1608,19 +1767,19 @@ async def test_opening_full_stop_orders(adminAuth_factory):
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
 
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [AssetID.USDC, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.USDC, bob_balance])
 
-    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance_before = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance_before = await bob.get_balance(AssetID.USDC).call()
 
     ####### Opening of Orders #######
     size = to64x61(1)
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("ds32kjksdldsf")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = to64x61(6000)
     orderType1 = 2
@@ -1632,8 +1791,8 @@ async def test_opening_full_stop_orders(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("34kj1hkhadsf")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = to64x61(4000)
     orderType2 = 2
@@ -1662,10 +1821,10 @@ async def test_opening_full_stop_orders(adminAuth_factory):
     fees2 = await fixed_math.Math64x61_mul(amount2.result.res, taker_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size,
@@ -1702,12 +1861,12 @@ async def test_opening_full_stop_orders(adminAuth_factory):
         leverage2
     ]
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
-    holdingBalance = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
+    holdingBalance = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_curr = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     print("Fee balance got: ", feeBalance_curr.result.fee)
     print("Alice fee: ", alice_total_fees.result.fee)
@@ -1730,19 +1889,19 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     alice_balance = to64x61(100000)
     bob_balance = to64x61(100000)
 
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [AssetID.USDC, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.USDC, bob_balance])
 
-    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance_before = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance_before = await bob.get_balance(AssetID.USDC).call()
 
     ####### Open order partially #######
     size1 = to64x61(5)
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("gf8oiahkjhxcv")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -1754,8 +1913,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("324kjhkldfs832")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
@@ -1791,10 +1950,10 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     fees2 = await fixed_math.Math64x61_mul(amount_for_fee2.result.res, maker_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size1,
@@ -1829,12 +1988,12 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         leverage2
     ]
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
-    holdingBalance = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
+    holdingBalance = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_curr = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     print("Alice balance before trade:", from64x61(
         alice_curr_balance_before.result.res))
@@ -1857,8 +2016,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     marketID_2 = BTC_USD_ID
 
     order_id_3 = str_to_felt("35hsarfg")
-    assetID_3 = BTC_ID
-    collateralID_3 = USDC_ID
+    assetID_3 = AssetID.BTC
+    collateralID_3 = AssetID.USDC
     price3 = to64x61(6000)
     stopPrice3 = 0
     orderType3 = 0
@@ -1870,8 +2029,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     liquidatorAddress3 = 0
 
     order_id_4 = str_to_felt("t3242sfhzad334")
-    assetID_4 = BTC_ID
-    collateralID_4 = USDC_ID
+    assetID_4 = AssetID.BTC
+    collateralID_4 = AssetID.USDC
     price4 = to64x61(6000)
     stopPrice4 = 0
     orderType4 = 0
@@ -1971,10 +2130,10 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
 
     alice_curr_balance_after = await alice.get_balance(collateralID_3).call()
     bob_curr_balance_after = await bob.get_balance(collateralID_4).call()
-    holdingBalance_after = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_after = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_after = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_after = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_after = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_after = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_after = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_after = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     print("Alice balance before:", from64x61(alice_curr_balance.result.res))
     print("Alice balance after:", from64x61(
@@ -1999,15 +2158,15 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     assert from64x61(feeBalance_after.result.fee) == from64x61(feeBalance_curr.result.fee)
 
     # ####### Open order partially for the second time #######
-    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance_before = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance_before = await bob.get_balance(AssetID.USDC).call()
 
     size = to64x61(2.5)
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("yt56kjhxcv")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -2019,8 +2178,8 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("324kjh65fghdfs832")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
@@ -2053,10 +2212,10 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
     fees2 = await fixed_math.Math64x61_mul(amount_for_fee2.result.res, maker_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size,
@@ -2091,12 +2250,12 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
         leverage2
     ]
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
-    holdingBalance = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
+    holdingBalance = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_curr = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     assert from64x61(alice_curr_balance.result.res) == from64x61(alice_curr_balance_before.result.res - total_amount1)
     assert from64x61(bob_curr_balance.result.res) == from64x61(bob_curr_balance_before.result.res - total_amount2)
@@ -2110,16 +2269,16 @@ async def test_opening_and_closing_orders_with_leverage_partial_open_and_close(a
 async def test_opening_multiple_markets(adminAuth_factory):
     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
 
-    alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance_before = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance_before = await bob.get_balance(AssetID.USDC).call()
 
     ####### Opening of Orders #######
     size1 = to64x61(2)
     marketID_1 = ETH_USD_ID
 
     order_id_1 = str_to_felt("i21dsgsfsdf8453")
-    assetID_1 = ETH_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.ETH
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(1500)
     stopPrice1 = 0
     orderType1 = 0
@@ -2131,8 +2290,8 @@ async def test_opening_multiple_markets(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("jdsio3kllcx")
-    assetID_2 = ETH_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.ETH
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(1500)
     stopPrice2 = 0
     orderType2 = 0
@@ -2165,10 +2324,10 @@ async def test_opening_multiple_markets(adminAuth_factory):
     fees2 = await fixed_math.Math64x61_mul(amount_for_fee2.result.res, maker_trading_fees).call()
     total_amount2 = amount2.result.res + fees2.result.res
 
-    holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    holdingBalance_before = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_before = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
         size1,
@@ -2203,12 +2362,12 @@ async def test_opening_multiple_markets(adminAuth_factory):
         leverage2
     ]
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
-    holdingBalance = await holding.balance(asset_id_=USDC_ID).call()
-    feeBalance_curr = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
+    holdingBalance = await holding.balance(asset_id_=AssetID.USDC).call()
+    feeBalance_curr = await feeBalance.get_total_fee(assetID_=AssetID.USDC).call()
+    alice_total_fees = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=AssetID.USDC).call()
+    bob_total_fees = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=AssetID.USDC).call()
 
     assert from64x61(alice_curr_balance.result.res) == from64x61(alice_curr_balance_before.result.res - total_amount1)
     assert from64x61(bob_curr_balance.result.res) == from64x61(bob_curr_balance_before.result.res - total_amount2)
@@ -2252,8 +2411,8 @@ async def test_retrieval_of_net_positions_2(adminAuth_factory):
     bob_collaterals = await bob.return_array_collaterals().call()
     print_parsed_collaterals(bob_collaterals.result.array_list)
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
 
     print("Alice new balance", from64x61(alice_curr_balance.result.res))
     print("Bob new balance", from64x61(bob_curr_balance.result.res))
@@ -2271,11 +2430,11 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     alice_balance = to64x61(100)
     bob_balance = to64x61(800)
 
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [AssetID.USDC, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.USDC, bob_balance])
 
-    alice_curr_balance = await alice.get_balance(USDC_ID).call()
-    bob_curr_balance = await bob.get_balance(USDC_ID).call()
+    alice_curr_balance = await alice.get_balance(AssetID.USDC).call()
+    bob_curr_balance = await bob.get_balance(AssetID.USDC).call()
 
     print("Alice new balance", from64x61(alice_curr_balance.result.res))
     print("Bob new balance", from64x61(bob_curr_balance.result.res))
@@ -2300,8 +2459,8 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("343uosawhdft")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(200)
     stopPrice1 = 0
     orderType1 = 0
@@ -2313,8 +2472,8 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("dfsdsw34fds")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(200)
     stopPrice2 = 0
     orderType2 = 0
@@ -2367,8 +2526,8 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     marketID_2 = BTC_USD_ID
 
     order_id_3 = str_to_felt("rlbruidd")
-    assetID_3 = BTC_ID
-    collateralID_3 = USDC_ID
+    assetID_3 = AssetID.BTC
+    collateralID_3 = AssetID.USDC
     price3 = to64x61(100)
     stopPrice3 = 0
     orderType3 = 0
@@ -2380,8 +2539,8 @@ async def test_for_risk_while_opening_order(adminAuth_factory):
     liquidatorAddress3 = 0
 
     order_id_4 = str_to_felt("tew43d34")
-    assetID_4 = BTC_ID
-    collateralID_4 = USDC_ID
+    assetID_4 = AssetID.BTC
+    collateralID_4 = AssetID.USDC
     price4 = to64x61(100)
     stopPrice4 = 0
     orderType4 = 0
@@ -2419,16 +2578,16 @@ async def test_check_for_collision(adminAuth_factory):
 
     charlie_balance = to64x61(10000)
     bob_balance = to64x61(5000)
-    await admin1_signer.send_transaction(admin1, charlie.contract_address, 'set_balance', [USDC_ID, charlie_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    await admin1_signer.send_transaction(admin1, charlie.contract_address, 'set_balance', [AssetID.USDC, charlie_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.USDC, bob_balance])
 
     ####### Open order partially #######
     size1 = to64x61(3)
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("fdswq23ji3i4u2")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(250)
     stopPrice1 = 0
     orderType1 = 0
@@ -2440,8 +2599,8 @@ async def test_check_for_collision(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("93jfkdslasfvdsz")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(250)
     stopPrice2 = 0
     orderType2 = 0
@@ -2479,8 +2638,8 @@ async def test_check_for_collision(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("fdswq23ji3i4u2")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(250)
     stopPrice1 = 0
     orderType1 = 0
@@ -2492,8 +2651,8 @@ async def test_check_for_collision(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("93jfkdslasfvdsz")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(250)
     stopPrice2 = 0
     orderType2 = 0

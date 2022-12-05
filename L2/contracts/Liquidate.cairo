@@ -34,6 +34,34 @@ from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_div, Math64x61_mul, Math64x61_add, Math64x61_sub, Math64x61_ONE
 
+//////////////////
+// Test Helpers //
+//////////////////
+
+@storage_var
+func maintenance() -> (maintenance: felt) {
+}
+
+@storage_var
+func acc_value() -> (acc_value: felt) {
+}
+
+@view
+func return_maintenance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (_maintenance) = maintenance.read();
+    return (res=_maintenance);
+}
+
+@view
+func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (_acc_value) = acc_value.read();
+    return (res=_acc_value);
+}
+
 ////////////
 // Events //
 ////////////
@@ -299,6 +327,12 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
         // Add the collateral value to the total_account_value
         local total_account_value_collateral = total_account_value + user_balance;
+
+        ///////////////////
+        // TO BE REMOVED //
+        maintenance.write(total_maintenance_requirement);
+        acc_value.write(total_account_value_collateral);
+        ///////////////////
 
         // Check if the maintenance margin is not satisfied
         let is_liquidation = is_le(total_account_value_collateral, total_maintenance_requirement);
@@ -568,7 +602,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         least_collateral_ratio_position_asset_price=0,
     );
 
-    with_attr error_message("Liquidate: Total account balance will go below maintenance requirement with the Order") {
+    with_attr error_message("Liquidate: Position doesn't satisfy maintanence margin") {
         assert liq_result = FALSE;
     }
     return ();

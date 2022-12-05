@@ -5,7 +5,9 @@ import time
 import asyncio
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, build_asset_properties, str_to_felt, hash_order, assert_event_emitted, assert_events_emitted, to64x61, convertTo64x61, assert_revert
+from utils import Signer, str_to_felt, hash_order, assert_event_emitted, assert_events_emitted, to64x61, convertTo64x61, assert_revert
+from utils_links import DEFAULT_LINK_1, DEFAULT_LINK_2, prepare_starknet_string
+from utils_asset import build_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
 from starkware.starknet.business_logic.execution.objects import OrderedEvent
 from starkware.starknet.public.abi import get_selector_from_name
@@ -198,9 +200,8 @@ async def abr_factory(starknet_service: StarknetService):
     # Add BTC asset
     BTC_settings = build_asset_properties(
         id = BTC_ID,
-        asset_version = 0,
-        ticker = str_to_felt("BTC"),
         short_name = str_to_felt("Bitcoin"),
+        asset_version = 0,
         is_tradable = 1,
         is_collateral = 0,
         token_decimal = 8
@@ -210,9 +211,8 @@ async def abr_factory(starknet_service: StarknetService):
     # Add USDC asset
     USDC_settings = build_asset_properties(
         id = USDC_ID,
-        asset_version = 0,
-        ticker = str_to_felt("USDC"),
         short_name = str_to_felt("USDC"),
+        asset_version = 0,
         is_tradable = 0,
         is_collateral = 1,
         token_decimal = 6
@@ -228,8 +228,19 @@ async def abr_factory(starknet_service: StarknetService):
         1, # is_tradable
         0, # is_archived
         10, # ttl
-        1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000
-    ])
+        1, 
+        1, 
+        10, 
+        to64x61(1), 
+        to64x61(10), 
+        to64x61(10), 
+        1, 
+        1, 
+        1, 
+        100, 
+        1000, 
+        10000
+    ] + prepare_starknet_string(DEFAULT_LINK_1))
 
     # Fund the Holding contract
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])

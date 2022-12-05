@@ -4,28 +4,13 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import str_to_felt, assert_revert, to64x61, PRIME
-from utils_asset import build_asset_properties, encode_asset_id_name
+from utils_asset import AssetID, build_asset_properties
 from utils_links import DEFAULT_LINK_1, DEFAULT_LINK_2, prepare_starknet_string, encode_characters
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
 
-
-class AssetID:
-    ETH = str_to_felt("32f0406jz7qj8")
-    USDC = str_to_felt("32f0406jz7qj7")
-    DOT = str_to_felt("32f0406jz7qj6")
-    TSLA = str_to_felt("32f0406jz7qj9")
-    USDT = str_to_felt("32f0406jz7qj10")
-    LINK = str_to_felt("32f0406jz7qj11")
-    BTC = str_to_felt("32f0406jz7qj12")
-    SUPER = str_to_felt("32f0406jz7qj20")
-    DOGE = str_to_felt("32f0406jz7qj21")
-    ADA = str_to_felt("32f0406jz7qj22")
-    LUNA = str_to_felt("32f0406jz7qj23")
-
 DEFAULT_MARKET_ID = str_to_felt("32f0406jz7qk1")
-
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -53,12 +38,12 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     async def add_asset(id, name, is_tradable, is_collateral, decimals):
         asset_properties = build_asset_properties(
-            id, 
-            str_to_felt(name),
-            version=0,
-            is_tradable=is_tradable,
-            is_collateral=is_collateral,
-            decimals=decimals
+            id = id,
+            short_name = str_to_felt(name),
+            asset_version = 0,
+            is_tradable = is_tradable,
+            is_collateral = is_collateral,
+            token_decimal = decimals
         )
         await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
@@ -81,14 +66,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
 async def test_add_new_market_not_admin(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-<<<<<<< HEAD
-    await assert_revert( 
-        signer3.send_transaction(user1, market.contract_address, 'add_market', [str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: Unauthorized call to manage markets"
-=======
     await assert_revert( signer3.send_transaction(user1, market.contract_address, 'add_market', [
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
     )
 
 
@@ -97,61 +76,38 @@ async def test_add_new_market_invalid_leverage(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-<<<<<<< HEAD
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(11), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: Leverage must be <= max leverage"
+        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(11), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
+        reverted_with="Markets: Leverage must be <= MAX leverage"
     )
     
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(0), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: Leverage must be >= 1"
+        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(0), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
+        reverted_with="Markets: Leverage must be >= MIN leverage"
     )
-    
-    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(-43)%PRIME, 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: Leverage must be >= 1"
-=======
-        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(11), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
-    
-    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(0), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
     
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(-43)%PRIME, 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
-        "Markets: Leverage must be >= MIN leverage"
->>>>>>> ZKX-864-Intermediate-Merge-Branch
+        reverted_with="Markets: Leverage must be >= MIN leverage"
     )
 
 @pytest.mark.asyncio
 async def test_add_new_market_invalid_ttl(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-<<<<<<< HEAD
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: ttl must be > 1"  
+    await assert_revert(signer1.send_transaction(admin1, market.contract_address, 'add_market', [
+        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
+        reverted_with="Markets: ttl must be in range [1...max_ttl]"
     )
     
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 36001, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: ttl must be <= max ttl"    
+        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 36001, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
+        reverted_with="Markets: ttl must be in range [1...max_ttl]"
     )
     
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, -60%PRIME, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: ttl must be > 1"
+        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, -60%PRIME, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
+        reverted_with="Markets: ttl must be in range [1...max_ttl]"
     )
-=======
-        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 0, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
-    
-    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 36001, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
-    
-    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, -60%PRIME, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
-        
-        )
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 @pytest.mark.asyncio
 async def test_add_new_market_invalid_tradable(adminAuth_factory):
@@ -162,21 +118,11 @@ async def test_add_new_market_invalid_tradable(adminAuth_factory):
     #    DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 0, 0, 60]))
 
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-<<<<<<< HEAD
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 3, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: Tradable must be <= max trabele"
-    )
-    
-    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), -1%PRIME, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: Tradable cannot be less than zero"
-=======
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), 3, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
     
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(8), -1%PRIME, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
         "Markets: is_tradable must 0, 1 or 2"
->>>>>>> ZKX-864-Intermediate-Merge-Branch
     )
 
 @pytest.mark.asyncio
@@ -184,49 +130,29 @@ async def test_add_new_market_non_existent_asset(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-<<<<<<< HEAD
-        str_to_felt("sk3j49udfsj32h4"), str_to_felt("32f0406jz7q348"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000])
+        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7q348"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
     )
-=======
-        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7q348"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 @pytest.mark.asyncio
 async def test_add_new_market_non_existent_collateral(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert( signer1.send_transaction(user1, market.contract_address, 'add_market', [
-<<<<<<< HEAD
-        str_to_felt("342kldjslij54ll"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7q316"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-    )
-=======
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7q316"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 @pytest.mark.asyncio
 async def test_add_new_market_not_collateral(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-<<<<<<< HEAD
-        str_to_felt("mdsf2dsgkljl5"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj9"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-    )
-=======
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj9"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 @pytest.mark.asyncio
 async def test_add_new_tradable_market_non_tradable_asset(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-<<<<<<< HEAD
-    await assert_revert(signer1.send_transaction(user1, market.contract_address, 'add_market', [
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj6"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-    )
-=======
     await assert_revert(signer3.send_transaction(user1, market.contract_address, 'add_market', [
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj6"), str_to_felt("32f0406jz7qj7"), to64x61(8), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 
 @pytest.mark.asyncio
@@ -257,13 +183,7 @@ async def test_override_existing_market(adminAuth_factory):
 
     await assert_revert(
         signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-<<<<<<< HEAD
-        str_to_felt("32f0406jz7qk1"), str_to_felt("32f0406jz7qj11"), str_to_felt("32f0406jz7qj7=10"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]),
-        reverted_with="Markets: market ID existence mismatch"    
-    )
-=======
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj11"), str_to_felt("32f0406jz7qj7=10"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 
 @pytest.mark.asyncio
@@ -272,13 +192,7 @@ async def test_add_new_market_with_existing_market_pair(adminAuth_factory):
 
     await assert_revert(
         signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-<<<<<<< HEAD
-        str_to_felt("32f0406jz7qk9"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000]), 
-        reverted_with="Markets: Market pair existence mismatch"
-    )
-=======
             str_to_felt("32f0406jz7qk9"), str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(10), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 
 @pytest.mark.asyncio
@@ -309,7 +223,7 @@ async def test_add_new_market_default_tradable(adminAuth_factory):
     assert fetched_market.asset == str_to_felt("32f0406jz7qj11")
     assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
     assert fetched_market.leverage == to64x61(1)
-    assert fetched_market.is_tradable == 2
+    # assert fetched_market.is_tradable == 2
 
 
 @pytest.mark.asyncio
@@ -330,11 +244,7 @@ async def test_modify_leverage(adminAuth_factory):
 async def test_modify_tradable_unauthorized_user(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-<<<<<<< HEAD
-    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'modify_tradable', [str_to_felt("32f0406jz7qk1"), 0]), reverted_with="Markets: Unauthorized call to manage markets")
-=======
     await assert_revert(signer3.send_transaction(user1, market.contract_address, 'modify_tradable', [DEFAULT_MARKET_ID, 0]))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 
 @pytest.mark.asyncio
@@ -356,11 +266,7 @@ async def test_modify_non_admin_tradable(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert(
-<<<<<<< HEAD
-        signer3.send_transaction(user1, market.contract_address, 'modify_tradable', [str_to_felt("32f0406jz7qk1"), 1]), reverted_with="Markets: Unauthorized call to manage markets")
-=======
         signer3.send_transaction(user1, market.contract_address, 'modify_tradable', [DEFAULT_MARKET_ID, 1]))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 
 @pytest.mark.asyncio
@@ -385,11 +291,7 @@ async def test_remove_market_unauthorized_user(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert(signer3.send_transaction(
-<<<<<<< HEAD
-        user1, market.contract_address, 'remove_market', [str_to_felt("32f0406jz7qk1")]), reverted_with="Markets: Unauthorized call to manage markets")
-=======
         user1, market.contract_address, 'remove_market', [DEFAULT_MARKET_ID]))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 @pytest.mark.asyncio
 async def test_remove_tradable_market(adminAuth_factory):
@@ -397,13 +299,8 @@ async def test_remove_tradable_market(adminAuth_factory):
 
     await signer1.send_transaction(admin1, market.contract_address, 'modify_tradable', [DEFAULT_MARKET_ID, 1])
 
-<<<<<<< HEAD
-    await assert_revert(signer1.send_transaction(
-        admin1, market.contract_address, 'remove_market', [str_to_felt("32f0406jz7qk1")]), reverted_with="Markets: Tradable market cannot be removed")
-=======
     await assert_revert(signer3.send_transaction(
         admin1, market.contract_address, 'remove_market', [DEFAULT_MARKET_ID]))
->>>>>>> ZKX-864-Intermediate-Merge-Branch
 
 @pytest.mark.asyncio
 async def test_remove_market(adminAuth_factory):
@@ -423,13 +320,13 @@ async def test_remove_market(adminAuth_factory):
 async def test_change_leverage_unauthorized(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_leverage', [to64x61(100)]), reverted_with="Markets: Unauthorized call to manage markets")
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_leverage', [to64x61(100)]), reverted_with="Markets: Caller not authorized to manage markets")
 
 @pytest.mark.asyncio
 async def test_change_ttl_unauthorized(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
-    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_ttl', [to64x61(7200)]), reverted_with="Markets: Unauthorized call to manage markets")
+    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_ttl', [to64x61(7200)]), reverted_with="Markets: Caller not authorized to manage markets")
 
 
 @pytest.mark.asyncio
@@ -566,11 +463,6 @@ async def test_modifying_trade_settings_by_unauthorized_user(adminAuth_factory):
             to64x61(200), # incremental_position_size
             to64x61(2000), # baseline_position_size
             to64x61(20000) # maximum_position_size
-<<<<<<< HEAD
-        ]),
-        reverted_with="Markets: Unauthorized call to manage markets"
-    ) 
-=======
         ])
     )
 
@@ -625,4 +517,3 @@ async def test_update_metadata_link_by_unauthorized_user(adminAuth_factory):
             [market_id] + prepare_starknet_string(NEW_LINK)
         )
     )
->>>>>>> ZKX-864-Intermediate-Merge-Branch

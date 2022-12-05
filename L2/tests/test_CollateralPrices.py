@@ -4,6 +4,7 @@ from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from utils import str_to_felt, MAX_UINT256, assert_revert, to64x61, assert_event_emitted
+from utils_asset import build_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_signers import signer1, signer2
 
@@ -40,24 +41,24 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, collateral_prices.contract_address])
 
     # Add assets
-    USDT_properties = [
-        USDT_ID, # id
-        1, # asset_version
-        str_to_felt("USDT"), # short_name
-        1, # is_tradable
-        0, # is_collateral
-        6 # token_decimal
-    ]
+    USDT_properties = build_asset_properties(
+        id=USDT_ID,
+        short_name=str_to_felt("USDT"),
+        asset_version=1,
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=6
+    )
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', USDT_properties)
-    
-    USDC_properties = [
-        USDC_ID, # id
-        1, # asset_version
-        str_to_felt("USDC"), # short_name
-        0, # is_tradable
-        1, # is_collateral
-        6 # token_decimal
-    ]
+
+    USDC_properties = build_asset_properties(
+        id=USDC_ID,
+        short_name=str_to_felt("USDC"),
+        asset_version=1,
+        is_tradable=False,
+        is_collateral=True,
+        token_decimal=6
+    )
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
 
     return adminAuth, collateral_prices, admin1, admin2

@@ -25,14 +25,14 @@ PRIME_HALF = PRIME/2
 PI = 7244019458077122842
 TRANSACTION_VERSION=1
 
-def from64x61(num):
+def from64x61(num: int) -> int:
     res = num
     if num > PRIME_HALF:
         res = res - PRIME
     return res / SCALE
 
 
-def to64x61(num):
+def to64x61(num: int) -> int:
     res = num * SCALE
     if res > 2**125 or res <= -2**125:
         raise Exception("Number is out of valid range")
@@ -44,11 +44,11 @@ def convertTo64x61(nums):
         result.append(to64x61(n))
     return result
 
-def str_to_felt(text):
+def str_to_felt(text: str) -> int:
     b_text = text.encode('utf8', 'strict') 
     return int.from_bytes(b_text, "big")
 
-def felt_to_str(felt):
+def felt_to_str(felt: int) -> str:
     b_felt = felt.to_bytes(31, "big")
     return b_felt.decode('utf8', 'strict')
 
@@ -58,11 +58,11 @@ def uint(a):
 async def assert_revert(fun, reverted_with=None):
     try:
         await fun
-        assert False
+        assert False, f"Call didn't revert, expected: {reverted_with}"
     except StarkException as err:
         _, error = err.args
         if reverted_with is not None:
-            assert reverted_with in error['message']
+            assert reverted_with in error['message'], f"Error mismatch, expected: {reverted_with}, actual: {error['message']}"
 
 class Signer():
     """
@@ -183,16 +183,7 @@ def hash_order(order_id, ticker, collateral, price, stopPrice, orderType, positi
         leverage
     ]
     return compute_hash_on_elements(order)
-
-
-async def assert_revert(fun, reverted_with=None):
-    try:
-        await fun
-        assert False
-    except StarkException as err:
-        _, error = err.args
-        if reverted_with is not None:
-            assert reverted_with in error['message']
+    
 
 # following event assertion functions directly from oz test utils
 def assert_event_emitted(tx_exec_info, from_address, name, data=[], order=0):
@@ -229,7 +220,8 @@ def from_call_to_call_array(calls):
     call_array = []
     calldata = []
     for _, call in enumerate(calls):
-        assert len(call) == 3, "Invalid call parameters"
+        expected_length = 3
+        assert len(call) == expected_length, f"Invalid parameters length, expected: {expected_length}, actual: {len(call)}"
         entry = (
             int(call[0], 16),
             get_selector_from_name(call[1]),

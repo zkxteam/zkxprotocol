@@ -1061,11 +1061,11 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Assert that the order has the same ticker and price as the first order
-    with_attr error_message("Trading: asset ID is not same as opposite order's asset ID") {
+    with_attr error_message("Trading: Asset Mismatch") {
         assert assetID_ = temp_order.assetID;
     }
 
-    with_attr error_message("Trading: collateral ID is not same as opposite order's collateral ID") {
+    with_attr error_message("Trading: Collateral Mismatch") {
         assert collateralID_ = temp_order.collateralID;
     }
 

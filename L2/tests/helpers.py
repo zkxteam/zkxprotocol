@@ -29,7 +29,7 @@ class ContractType(Enum):
     ABRFund = "contracts/ABRFund.cairo"
     ABRPayment = "contracts/ABRPayment.cairo"
     MarketPrices = "contracts/MarketPrices.cairo"
-    Liquidate = "tests/testable/TestLiquidate.cairo"
+    Liquidate = "contracts/Liquidate.cairo"
     DepositDataManager = "contracts/DepositDataManager.cairo"
     WithdrawalFeeBalance = "contracts/WithdrawalFeeBalance.cairo"
     CollateralPrices = "contracts/CollateralPrices.cairo"
@@ -58,6 +58,7 @@ class ContractType(Enum):
     RelayMarkets = "contracts/relay_contracts/RelayMarkets.cairo"
     RelayFeeDiscount = "contracts/relay_contracts/RelayFeeDiscount.cairo"
     WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
+    
     # Test-helping contracts
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"

@@ -93,7 +93,7 @@ async def test_add_to_withdrawal_request(adminAuth_factory):
     res1 = fetched_withdrawal_request_1.result.withdrawal_request
 
     assert res1.user_l1_address == alice.contract_address
-    assert res1.ticker == collateral_id_1
+    assert res1.asset_id == collateral_id_1
     assert res1.amount == amount_1
     assert res1.user_l2_address == alice.contract_address
 
@@ -102,6 +102,6 @@ async def test_add_to_withdrawal_request(adminAuth_factory):
     res2 = fetched_withdrawal_request_2.result.withdrawal_request
 
     assert res2.user_l1_address == bob.contract_address
-    assert res2.ticker == collateral_id_2
+    assert res2.asset_id == collateral_id_2
     assert res2.amount == amount_2
     assert res2.user_l2_address == bob.contract_address
