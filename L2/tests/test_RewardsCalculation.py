@@ -172,10 +172,10 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
     execution_info = await hightide.get_multipliers().call()
     fetched_multipliers = execution_info.result.multipliers
 
-    assert fetched_multipliers.a1 == 1
-    assert fetched_multipliers.a2 == 2
-    assert fetched_multipliers.a3 == 3
-    assert fetched_multipliers.a4 == 4
+    assert fetched_multipliers.a_1 == 1
+    assert fetched_multipliers.a_2 == 2
+    assert fetched_multipliers.a_3 == 3
+    assert fetched_multipliers.a_4 == 4
 
     set_constants_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'set_constants', [
         1, 2, 3, 4, 5])
