@@ -3,8 +3,8 @@
 from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
-from starkware.starknet.common.syscalls import get_caller_address
-from starkware.cairo.common.uint256 import Uint256, uint256_le
+from starkware.starknet.common.syscalls import get_caller_address, get_contract_address
+from starkware.cairo.common.uint256 import Uint256, uint256_eq, uint256_le, uint256_sub
 
 from contracts.Constants import Hightide_INDEX, Starkway_INDEX
 from contracts.DataTypes import HighTideMetaData, RewardToken
@@ -90,6 +90,83 @@ func perform_return_or_burn{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         0,
         reward_tokens_list_len,
         reward_tokens_list,
+    );
+}
+
+// @notice - This function is used for distributing reward tokens
+@external
+func distribute_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    trader_address_: felt, reward_amount_Uint256_: Uint256, l1_token_address_: felt
+) {
+    alloc_locals;
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Starkway contract address
+    let (local starkway_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Starkway_INDEX, version=version
+    );
+
+    // Get Hightide contract address
+    let (local hightide_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Make sure this function is called from hightide contract
+    let (caller) = get_caller_address();
+    with_attr error_message("LiquidityPool: caller is not hightide contract") {
+        assert caller = hightide_contract_address;
+    }
+
+    let (native_token_l2_address: felt) = IStarkway.get_native_token_address(
+        contract_address=starkway_contract_address, token_id=l1_token_address_
+    );
+
+    let (liquidity_pool_address) = get_contract_address();
+    local reward_amount_Uint256: Uint256;
+    if (native_token_l2_address != 0) {
+        let current_balance_Uint256: Uint256 = IERC20.balanceOf(
+            native_token_l2_address, liquidity_pool_address
+        );
+
+        let zero_Uint256: Uint256 = Uint256(0, 0);
+        let (result) = uint256_le(current_balance_Uint256, reward_amount_Uint256_);
+        if (result == FALSE) {
+            IERC20.transfer(native_token_l2_address, trader_address_, reward_amount_Uint256_);
+            reward_amount_Uint256.low = 0;
+            reward_amount_Uint256.high = 0;
+            return ();
+        } else {
+            let (status) = uint256_eq(current_balance_Uint256, zero_Uint256);
+            if (status == FALSE) {
+                IERC20.transfer(native_token_l2_address, trader_address_, current_balance_Uint256);
+                let (remaining_reward) = uint256_sub(
+                    reward_amount_Uint256_, current_balance_Uint256
+                );
+                reward_amount_Uint256 = remaining_reward;
+            } else {
+                reward_amount_Uint256 = reward_amount_Uint256_;
+            }
+        }
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    let (
+        token_address_list_len: felt, token_address_list: felt*
+    ) = IStarkway.get_whitelisted_token_addresses(
+        contract_address=starkway_contract_address, token_id=l1_token_address_
+    );
+
+    return transfer_tokens_recurse(
+        trader_address_,
+        reward_amount_Uint256,
+        liquidity_pool_address,
+        0,
+        token_address_list_len,
+        token_address_list,
     );
 }
 
@@ -213,5 +290,49 @@ func transfer_or_burn_tokens_recurse{
         iterator_ + 1,
         contract_address_list_len,
         contract_address_list + 1,
+    );
+}
+
+func transfer_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    trader_address_: felt,
+    reward_amount_Uint256_: Uint256,
+    liquidity_pool_address_: felt,
+    iterator_: felt,
+    token_address_list_len: felt,
+    token_address_list: felt*,
+) {
+    alloc_locals;
+    if (iterator_ == token_address_list_len) {
+        return ();
+    }
+
+    let current_balance_Uint256: Uint256 = IERC20.balanceOf(
+        [token_address_list], liquidity_pool_address_
+    );
+
+    local reward_amount_Uint256: Uint256;
+    let zero_Uint256: Uint256 = Uint256(0, 0);
+    let (result) = uint256_le(current_balance_Uint256, reward_amount_Uint256_);
+    if (result == FALSE) {
+        IERC20.transfer([token_address_list], trader_address_, reward_amount_Uint256_);
+        reward_amount_Uint256 = Uint256(0, 0);
+        return ();
+    } else {
+        let (status) = uint256_eq(current_balance_Uint256, zero_Uint256);
+        if (status == FALSE) {
+            IERC20.transfer([token_address_list], trader_address_, current_balance_Uint256);
+            reward_amount_Uint256 = uint256_sub(reward_amount_Uint256_, current_balance_Uint256);
+        } else {
+            reward_amount_Uint256 = reward_amount_Uint256_;
+        }
+    }
+
+    return transfer_tokens_recurse(
+        trader_address_,
+        reward_amount_Uint256,
+        liquidity_pool_address_,
+        iterator_ + 1,
+        token_address_list_len,
+        token_address_list + 1,
     );
 }
