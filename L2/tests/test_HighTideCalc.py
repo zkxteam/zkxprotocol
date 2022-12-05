@@ -1315,6 +1315,23 @@ async def test_calculating_factors(adminAuth_factory):
         bob.contract_address
     ])
 
+    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
+        season_id,
+        TSLA_USD_ID,
+        2,
+        alice.contract_address,
+        bob.contract_address
+    ])
+
+    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
+        season_id,
+        TSLA_USD_ID,
+        2,
+        alice.contract_address,
+        bob.contract_address
+    ])
+
+
     a = await hightideCalc.calculate_fp(season_id, BTC_USD_ID, alice.contract_address, user_stats.contract_address).call()
     print("BTC_USD_ID fp value", a.result)
     b = await hightideCalc.calculate_ft(season_id, BTC_USD_ID, user_stats.contract_address).call()
@@ -1408,3 +1425,4 @@ async def test_calculating_factors(adminAuth_factory):
     print("alice_w_TSLA_USD_ID", from64x61(alice_w_TSLA_USD_ID.result.trader_score))
     bob_w_TSLA_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, TSLA_USD_ID, bob.contract_address).call()
     print("bob_w_TSLA_USD_ID", from64x61(bob_w_TSLA_USD_ID.result.trader_score))
+
