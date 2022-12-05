@@ -16,6 +16,8 @@ from starkware.starknet.core.os.transaction_hash.transaction_hash import (
     calculate_declare_transaction_hash
 )
 from starkware.starknet.business_logic.execution.objects import OrderedEvent
+import random  
+import string  
 
 MAX_UINT256 = (2**128 - 1, 2**128 - 1)
 
@@ -63,6 +65,9 @@ async def assert_revert(fun, reverted_with=None):
         _, error = err.args
         if reverted_with is not None:
             assert reverted_with in error['message']
+
+def random_string(length):  
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 class Signer():
     """
@@ -169,20 +174,8 @@ def hash_message(sender, to, selector, calldata, nonce):
     return compute_hash_on_elements(message)
 
 
-def hash_order(order_id, ticker, collateral, price, stopPrice, orderType, position, direction, closeOrder, leverage):
-    order = [
-        order_id,
-        ticker,
-        collateral,
-        price,
-        stopPrice,
-        orderType,
-        position,
-        direction,
-        closeOrder,
-        leverage
-    ]
-    return compute_hash_on_elements(order)
+def hash_order(order_details):
+    return compute_hash_on_elements(order_details)
 
 
 async def assert_revert(fun, reverted_with=None):
@@ -376,3 +369,116 @@ def print_parsed_collaterals(coll_array):
         print("collateral_id: ", felt_to_str(coll_array[i].assetID))
         print("balance: ", from64x61(coll_array[i].balance))
         print("\n")
+
+order_type = {
+  "market": 1,
+  "limit": 2
+}
+
+order_direction = {
+  "long": 1,
+  "short": 2,
+}
+
+order_time_in_force = {
+  "good_till_time": 1,
+  "fill_or_kill": 2,
+  "immediate_or_cancel": 3,
+}
+
+order_side = {
+   "maker": 1,
+   "taker": 2
+}
+
+class Order:
+    def __init__(
+        self, 
+        market_id,
+        price,
+        quantity,
+        leverage,
+        slippage,
+        direction,
+        order_type,
+        time_in_Force,
+        post_only,
+        close_order,
+    ):
+        # Checks for input
+        assert price > 0, "Invalid price"
+        assert quantity > 0, "Invalid quantity"
+        assert slippage > 0, "Invalid slippage"
+        assert direction in order_direction.valuse(), "Invalid direction"
+        assert order_type in order_type.values(), "Invalid order_type"
+        assert time_in_force in order_time_in_force.values(), "Invalid time_in_force"
+        assert post_only in (0,1), "Invalid post_only"
+        assert close_order in (0,1), "Invalid close_order"
+
+        # Assing values for the order
+        self.order_id = random_string(10)
+        self.market_id = market_id
+        self.quantity = quantity,
+        self.leverage = leverage,
+        self.slippage = slippage,
+        self.direction = direction,
+        self.order_type = order_type,
+        self.time_in_Force = time_in_Force,
+        self.post_only = post_only,
+        self.close_order = close_order
+
+class User:
+    def __init__(self, private_key, user_address):
+        self.signer = Signer(private_key)
+		self.user_address = user_address
+        self.orders = []
+
+    def create_order(
+        self, 
+        market_id,
+        price,
+        quantity = 1,
+        leverage = 1,
+        slippage = 1,
+        direction = order_direction["direction"],
+        order_type = order_type["market"],
+        time_in_force = order_time_in_force["good_till_time"],
+        post_only = False,
+        close_order = False,
+		liquidator_address = False,
+        side = order_side["marker"]
+    ):       
+        new_order = Order(
+            market_id,
+            price,
+            quantity,
+            leverage,
+            slippage,
+            direction,
+            order_type,
+            time_in_force,
+            post_only,
+            close_order
+        )
+        self.orders.push_back(new_order)
+
+		signed_order = signed_order(new_order)
+		return get_multiple_order_representation(order, signed_order, liquidator_address, side)
+
+    def get_signed_order(self, order):
+        hashed_order = hash_order(order.values())
+		return this.signer.sign(hashed_order)
+
+	def get_multiple_order_representation(self, order, signed_order, liquidator_address, side)
+        return [
+			self.user_address,
+			*signed_order,
+			side,
+			liquidator_address,
+			*order.values()
+		]
+	
+
+
+    
+
