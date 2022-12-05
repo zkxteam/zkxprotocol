@@ -53,7 +53,7 @@ async def test_store_and_query(adminAuth_factory):
     assert len(result) == 1
     assert result[0].user_L1_address == 1
     assert result[0].user_L2_address == admin2.contract_address
-    assert result[0].ticker == 2
+    assert result[0].asset_id == 2
     assert result[0].amount == 3
     assert result[0].nonce == 4
     assert result[0].message_hash == 5
@@ -72,7 +72,7 @@ async def test_store_and_query(adminAuth_factory):
     assert len(result) == 2
     assert result[0].user_L1_address == 1
     assert result[0].user_L2_address == admin2.contract_address
-    assert result[0].ticker == 2
+    assert result[0].asset_id == 2
     assert result[0].amount == 3
     assert result[0].nonce == 4
     assert result[0].message_hash == 5
@@ -80,7 +80,7 @@ async def test_store_and_query(adminAuth_factory):
 
     assert result[1].user_L1_address == 10
     assert result[1].user_L2_address == admin2.contract_address
-    assert result[1].ticker == 20
+    assert result[1].asset_id == 20
     assert result[1].amount == 30
     assert result[1].nonce == 40
     assert result[1].message_hash == 50

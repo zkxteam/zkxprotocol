@@ -278,7 +278,7 @@ async def test_removing_asset_by_admin(adminAuth_factory):
 
     await assert_revert(
         asset.get_asset(asset_id).call(),
-        reverted_with="Asset: Asset_id existence mismatch"
+        reverted_with="Asset: asset_id existence check failed"
     )
 
 
@@ -423,7 +423,7 @@ async def test_not_possible_to_add_same_id(adminAuth_factory):
     # Should fail because asset ID is already present
     await assert_revert(
         signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties_2),
-        reverted_with="Asset: Asset_id existence mismatch"
+        reverted_with="Asset: asset_id existence check failed"
     )
 
 @pytest.mark.asyncio
@@ -463,7 +463,7 @@ async def test_not_possible_to_remove_zero_asset_id(adminAuth_factory):
     # Should fail because zero asset_id can't be present
     await assert_revert(
         signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [0]),
-        reverted_with="Asset: Asset_id existence mismatch"
+        reverted_with="Asset: asset_id existence check failed"
     )
 
 @pytest.mark.asyncio
@@ -497,7 +497,7 @@ async def test_add_3_then_remove_FIRST_asset(fresh_asset_contract):
     # Check removed asset is not present
     await assert_revert(
         asset.get_asset(ID_TO_DELETE).call(),
-        reverted_with="Asset: Asset_id existence mismatch"
+        reverted_with="Asset: asset_id existence check failed"
     )
 
     # Check count is 2
@@ -561,7 +561,7 @@ async def test_add_3_then_remove_SECOND_asset(fresh_asset_contract):
     # Check removed asset is not present
     await assert_revert(
         asset.get_asset(ID_TO_DELETE).call(),
-        reverted_with="Asset: Asset_id existence mismatch"
+        reverted_with="Asset: asset_id existence check failed"
     )
 
     # Check count is 2
@@ -624,7 +624,7 @@ async def test_add_3_then_remove_THIRD_asset(fresh_asset_contract):
     # Check removed asset is not present
     await assert_revert(
         asset.get_asset(ID_TO_DELETE).call(),
-        reverted_with="Asset: Asset_id existence mismatch"
+        reverted_with="Asset: asset_id existence check failed"
     )
 
     # Check count is 2

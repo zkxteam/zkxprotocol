@@ -27,8 +27,8 @@ def build_default_asset_properties(
     id,
     short_name,
     asset_version = 1,
-    is_tradable = 0,
-    is_collateral = 0,
+    is_tradable = False,
+    is_collateral = False,
     token_decimal = 18,
     icon_link = DEFAULT_ASSET_ICON_LINK,
     metadata_link = DEFAULT_ASSET_METADATA_LINK

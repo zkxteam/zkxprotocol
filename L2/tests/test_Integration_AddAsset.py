@@ -4,6 +4,7 @@ import json
 import os
 from starkware.starknet.testing.starknet import Starknet
 from utils import str_to_felt, MAX_UINT256, assert_event_emitted
+from utils_asset import build_default_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
 from starkware.eth.eth_test_utils import EthTestUtils, eth_reverts
 from starkware.starknet.testing.contracts import MockStarknetMessaging
@@ -24,17 +25,6 @@ def generate_asset_info():
     id = f"ETH_${counter}"
     name = f"Ethereum_${counter}"
     return str_to_felt(id), str_to_felt(name)
-
-
-def build_default_asset_properties(id, ticker, name):
-    return [
-        id,  # id
-        0,  # asset_version
-        name,  # short_name
-        0,  # is_tradable
-        0,  # is_collateral
-        18,  # token_decimal
-    ]
 
 
 @pytest.fixture(scope='module')
@@ -104,7 +94,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
 async def test_add_asset_positive_flow(adminAuth_factory):
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
     asset_id, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(asset_id, asset_name)
+    asset_properties = build_default_asset_properties(id=asset_id, short_name=asset_name)
 
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
@@ -131,8 +121,8 @@ async def test_add_asset_positive_flow(adminAuth_factory):
     assert len(asset_list) == 0
 
     # no asset_id should exist for this ticker at this point
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_id)
-    assert stored_asset_id == 0
+    asset_existence_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert asset_existence_result == False
 
     # this call only goes through if the message from L2 has reached the message queue
     l1_zkx_contract.updateAssetListInL1.transact(asset_id)
@@ -141,8 +131,8 @@ async def test_add_asset_positive_flow(adminAuth_factory):
     assert len(asset_list) == 1
     assert asset_list[0] == asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_id)
-    assert stored_asset_id == asset_id
+    asset_existence_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert asset_existence_result == True
 
 
 @pytest.mark.asyncio
@@ -150,7 +140,7 @@ async def test_add_asset_incorrect_payload(adminAuth_factory):
 
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
     asset_id, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(asset_id, asset_name)
+    asset_properties = build_default_asset_properties(id=asset_id, short_name=asset_name)
     
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
@@ -165,10 +155,9 @@ async def test_add_asset_incorrect_payload(adminAuth_factory):
 
     await postman.flush()
 
-    incorrect_ticker = 12345
     incorrect_asset_id = 12345
-    stored_asset_id = l1_zkx_contract.assetID.call(incorrect_ticker)
-    assert stored_asset_id == 0
+    asset_existence_result = l1_zkx_contract.assetExists.call(incorrect_asset_id)
+    assert asset_existence_result == False
 
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list) == 1
@@ -185,7 +174,7 @@ async def test_add_asset_impersonator_ZKX_L1(adminAuth_factory):
 
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
     asset_id, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(asset_id, asset_name)
+    asset_properties = build_default_asset_properties(id=asset_id, short_name=asset_name)
 
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
@@ -227,5 +216,5 @@ async def test_add_asset_impersonator_ZKX_L1(adminAuth_factory):
     assert len(asset_list) == 2
     assert asset_list[1] == asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_id)
-    assert stored_asset_id == asset_id
+    asset_existence_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert asset_existence_result == True

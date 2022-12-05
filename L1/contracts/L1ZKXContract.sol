@@ -151,6 +151,12 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         return assetList;
     }
 
+    /// @dev Function to check if asset already exists
+    /// @return Bool value, true is exists, false otherwise
+    function assetExists(uint256 assetId_) external view returns (bool) {
+        return assetsById[assetId_].exists;
+    }
+
     /// @dev Function to get asset contract address by its ID
     /// @return Token contract address
     function tokenContractAddress(uint256 assetId_) external view returns (address) {

@@ -4,6 +4,7 @@ import json
 import os
 from starkware.starknet.testing.starknet import Starknet
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted, from64x61
+from utils_asset import build_default_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
 from starkware.eth.eth_test_utils import EthTestUtils, eth_reverts
 from starkware.starknet.testing.contracts import MockStarknetMessaging
@@ -17,31 +18,16 @@ from web3 import Web3
 
 counter = 0
 eth_test_utils = EthTestUtils()
-# Generates unique asset params (id, ticker and name) to avoid conflicts
-
+ETH_ID = 4543560
+ETH_NAME = str_to_felt("ETH")
 DUMMY_WITHDRAWAL_REQUEST_ADDRESS=12345
-ETH_TICKER=4543560
 
 def generate_asset_info():
     global counter
     counter += 1
     id = f"32f0406jz7qj8_${counter}"
-    ticker = ETH_TICKER
     name = f"Ethereum_${counter}"
-    return str_to_felt(id), ticker, str_to_felt(name)
-
-
-
-def build_default_asset_properties(id, ticker, name):
-    return [
-        id,  # id
-        0,  # asset_version
-        ETH_TICKER,  # ticker
-        name,  # short_name
-        0,  # is_tradable
-        0,  # is_collateral
-        18,  # token_decimal
-    ]
+    return str_to_felt(id), str_to_felt(name)
 
 
 @pytest.fixture(scope='module')
@@ -103,22 +89,19 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
 
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
+    asset_properties = build_default_asset_properties(id=ETH_ID, short_name=ETH_NAME)
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
         add_asset_tx,
         from_address=asset.contract_address,
         name="asset_added",
         data=[
-            asset_id,
-            asset_ticker,
+            ETH_ID,
             admin1.contract_address
         ]
     )
     await postman.flush()
-    l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, asset_id)
+    l1_zkx_contract.updateAssetListInL1.transact(ETH_ID)
     
     tx_exec_info = await signer1.send_transaction(admin1,
                                                   account_deployer.contract_address,
@@ -131,15 +114,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
     deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, int(eth_test_utils.accounts[0].address,16)).call()
     deployed_address=deployed_address.result.address
     return (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract,
-            token_contract, account_deployer, account_registry, asset_ticker, asset_id, deployed_address)
+            token_contract, account_deployer, account_registry, deployed_address)
 
 
 @pytest.mark.asyncio
 async def test_deposit_positive_flow(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address) = adminAuth_factory
-    
-
+    account_deployer, account_registry, deployed_address) = adminAuth_factory
 
     balance_before = l1_zkx_contract.balance
 
@@ -157,7 +138,7 @@ async def test_deposit_positive_flow(adminAuth_factory):
                                             contract_address=deployed_address,
                                             deploy_call_info=None)
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert result.result.res==0
 
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
@@ -169,17 +150,15 @@ async def test_deposit_positive_flow(adminAuth_factory):
 
     # call l1_handler (deposit) on L2
     await postman.flush()
-   
-  
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==2
 
     # cannot cancel a message which has been successfully consumed on L2
     with eth_reverts("NO_MESSAGE_TO_CANCEL"):
         l1_zkx_contract.depositCancelRequest(
             deployed_address,
-            asset_ticker,
+            ETH_ID,
             2*(10**18),
             nonce
         )
@@ -189,7 +168,7 @@ async def test_deposit_positive_flow(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_deposit_incorrect_L2_address(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address) = adminAuth_factory
+    account_deployer, account_registry, deployed_address) = adminAuth_factory
 
     incorrect_L2_address=12345
 
@@ -210,8 +189,8 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
                                             contract_address=deployed_address,
                                             deploy_call_info=None)
 
-    result = await new_account_contract.get_balance(asset_id).call()
-    assert from64x61(result.result.res)==2
+    result = await new_account_contract.get_balance(ETH_ID).call()
+    assert from64x61(result.result.res) == 2
 
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
             fromBlock=LATEST_BLOCK_ID
@@ -224,13 +203,13 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
     await assert_revert(postman.flush())
 
 
-    result = await new_account_contract.get_balance(asset_id).call()
-    assert from64x61(result.result.res)==2
+    result = await new_account_contract.get_balance(ETH_ID).call()
+    assert from64x61(result.result.res) == 2
 
     # check that message cancellation should go through since message was not consumed on L2
     l1_zkx_contract.depositCancelRequest.transact(
             incorrect_L2_address,
-            asset_ticker,
+            ETH_ID,
             2*(10**18),
             nonce
         )
@@ -245,7 +224,7 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
     
     assert message_cancel_event.args["sender"]==eth_test_utils.accounts[0].address
     assert message_cancel_event.args["l2Recipient"]==incorrect_L2_address
-    assert message_cancel_event.args["collateralId"]==asset_id
+    assert message_cancel_event.args["assetId"]==ETH_ID
     assert message_cancel_event.args["amount"]==2*(10**18)
     assert message_cancel_event.args["nonce"]==nonce
 
@@ -253,7 +232,7 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address) = adminAuth_factory
+    account_deployer, account_registry, deployed_address) = adminAuth_factory
 
     incorrect_L2_address=12345
 
@@ -276,7 +255,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
                                             contract_address=deployed_address,
                                             deploy_call_info=None)
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==2
 
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
@@ -293,7 +272,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
     await assert_revert(postman.flush())
 
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==2
 
     deposit_filter = l1_zkx_contract.w3_contract.events.LogDeposit.createFilter(
@@ -318,7 +297,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_deposit_incorrect_L1_address(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address) = adminAuth_factory
+    account_deployer, account_registry, deployed_address) = adminAuth_factory
 
     # restore correct L1_ZKX_Contract address in authorised registry on L2
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
@@ -336,7 +315,7 @@ async def test_deposit_incorrect_L1_address(adminAuth_factory):
                                             contract_address=deployed_address,
                                             deploy_call_info=None)
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==2
 
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
@@ -349,14 +328,13 @@ async def test_deposit_incorrect_L1_address(adminAuth_factory):
     # this should revert since it will call l1_handler on L2 and that function will revert
     await assert_revert(postman.flush())
 
-
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==2
 
     # check that message cancellation should go through since message was not consumed on L2
     l1_zkx_contract.depositCancelRequest.transact(
             deployed_address,
-            asset_ticker,
+            ETH_ID,
             2*(10**18),
             nonce
         ,transact_args={"from":eth_test_utils.accounts[1]})
@@ -370,7 +348,7 @@ async def test_deposit_incorrect_L1_address(adminAuth_factory):
     
     assert message_cancel_event.args["sender"]==eth_test_utils.accounts[1].address
     assert message_cancel_event.args["l2Recipient"]==deployed_address
-    assert message_cancel_event.args["collateralId"]==asset_id
+    assert message_cancel_event.args["assetId"]==ETH_ID
     assert message_cancel_event.args["amount"]==2*(10**18)
     assert message_cancel_event.args["nonce"]==nonce
 

@@ -4,6 +4,7 @@ import json
 import os
 from starkware.starknet.testing.starknet import Starknet
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted, from64x61
+from utils_asset import build_default_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
 from starkware.eth.eth_test_utils import EthTestUtils, eth_reverts
 from starkware.starknet.testing.contracts import MockStarknetMessaging
@@ -27,17 +28,6 @@ def generate_asset_info():
     id = f"ETH_${counter}"
     name = f"Ethereum_${counter}"
     return str_to_felt(id), str_to_felt(name)
-
-
-def build_default_asset_properties(id, name):
-    return [
-        id,  # id
-        0,  # asset_version
-        name,  # short_name
-        0,  # is_tradable
-        0,  # is_collateral
-        18,  # token_decimal
-    ]
 
 
 @pytest.fixture(scope='module')
@@ -249,7 +239,7 @@ async def test_deposit_incorrect_L2_address(adminAuth_factory):
     
     assert message_cancel_event.args["sender"]==eth_test_utils.accounts[0].address
     assert message_cancel_event.args["l2Recipient"]==incorrect_L2_address
-    assert message_cancel_event.args["collateralId"]==asset_id
+    assert message_cancel_event.args["assetId"]==asset_id
     assert message_cancel_event.args["amount"]==2*(10**18)
     assert message_cancel_event.args["nonce"]==nonce
 
@@ -275,7 +265,7 @@ async def test_deposit_impersonater_ZKX_L1(adminAuth_factory):
     # except that it is through a contract which has been removed as the registered L1_ZKX_contract in L2 authorised
     # registry - this can effectively be any contract impersonating as L1_ZKX_contract on L1
     # to be sure no token transfer needs to take place for an impersonating contract to send message to L2 to increase balance
-    l1_zkx_contract.depositToL1.transact(deployed_address, 1*(10**18))
+    l1_zkx_contract.depositToL1.transact(deployed_address, asset_id, 1*(10**18))
     
     token_balance=token_contract.balanceOf.call(eth_test_utils.accounts[0].address)
     assert token_balance==95*(10**18)
@@ -387,7 +377,7 @@ async def test_deposit_incorrect_L1_address(adminAuth_factory):
     
     assert message_cancel_event.args["sender"]==eth_test_utils.accounts[1].address
     assert message_cancel_event.args["l2Recipient"]==deployed_address
-    assert message_cancel_event.args["collateralId"]==asset_id
+    assert message_cancel_event.args["assetId"]==asset_id
     assert message_cancel_event.args["amount"]==2*(10**18)
     assert message_cancel_event.args["nonce"]==nonce
 
