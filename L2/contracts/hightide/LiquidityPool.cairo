@@ -133,8 +133,7 @@ func distribute_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         let (result) = uint256_le(current_balance_Uint256, reward_amount_Uint256_);
         if (result == FALSE) {
             IERC20.transfer(native_token_l2_address, trader_address_, reward_amount_Uint256_);
-            reward_amount_Uint256.low = 0;
-            reward_amount_Uint256.high = 0;
+            assert reward_amount_Uint256 = Uint256(0, 0);
             return ();
         } else {
             let (status) = uint256_eq(current_balance_Uint256, zero_Uint256);
@@ -143,9 +142,15 @@ func distribute_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
                 let (remaining_reward) = uint256_sub(
                     reward_amount_Uint256_, current_balance_Uint256
                 );
-                reward_amount_Uint256 = remaining_reward;
+                assert reward_amount_Uint256 = remaining_reward;
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
             } else {
-                reward_amount_Uint256 = reward_amount_Uint256_;
+                assert reward_amount_Uint256 = reward_amount_Uint256_;
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
             }
         }
     } else {
@@ -315,15 +320,22 @@ func transfer_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     let (result) = uint256_le(current_balance_Uint256, reward_amount_Uint256_);
     if (result == FALSE) {
         IERC20.transfer([token_address_list], trader_address_, reward_amount_Uint256_);
-        reward_amount_Uint256 = Uint256(0, 0);
+        assert reward_amount_Uint256 = Uint256(0, 0);
         return ();
     } else {
         let (status) = uint256_eq(current_balance_Uint256, zero_Uint256);
         if (status == FALSE) {
             IERC20.transfer([token_address_list], trader_address_, current_balance_Uint256);
-            reward_amount_Uint256 = uint256_sub(reward_amount_Uint256_, current_balance_Uint256);
+            let (remaining_reward) = uint256_sub(reward_amount_Uint256_, current_balance_Uint256);
+            assert reward_amount_Uint256 = remaining_reward;
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         } else {
-            reward_amount_Uint256 = reward_amount_Uint256_;
+            assert reward_amount_Uint256 = reward_amount_Uint256_;
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
     }
 
