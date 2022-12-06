@@ -125,10 +125,14 @@ func distribute_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     let (liquidity_pool_address) = get_contract_address();
     local reward_amount_Uint256: Uint256;
     if (native_token_l2_address != 0) {
+        // Fetch current balance of the token
         let current_balance_Uint256: Uint256 = IERC20.balanceOf(
             native_token_l2_address, liquidity_pool_address
         );
 
+        // if current balance can cover the reward amount then, we will transfer the reward and return
+        // if current balance can cover the reward amount partially, then we will transfer the balance available and
+        // goto the next whitelisted token
         let zero_Uint256: Uint256 = Uint256(0, 0);
         let (result) = uint256_le(current_balance_Uint256, reward_amount_Uint256_);
         if (result == FALSE) {
@@ -311,10 +315,14 @@ func transfer_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         return ();
     }
 
+    // Fetch current balance of the token
     let current_balance_Uint256: Uint256 = IERC20.balanceOf(
         [token_address_list], liquidity_pool_address_
     );
 
+    // if current balance can cover the reward amount then, we will transfer the reward and return
+    // if current balance can cover the reward amount partially, then we will transfer the balance available and
+    // goto the next whitelisted token
     local reward_amount_Uint256: Uint256;
     let zero_Uint256: Uint256 = Uint256(0, 0);
     let (result) = uint256_le(current_balance_Uint256, reward_amount_Uint256_);
@@ -339,6 +347,7 @@ func transfer_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         }
     }
 
+    // Recursively transfer tokens
     return transfer_tokens_recurse(
         trader_address_,
         reward_amount_Uint256,

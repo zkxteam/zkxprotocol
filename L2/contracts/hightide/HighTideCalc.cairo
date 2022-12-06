@@ -269,6 +269,8 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_list_len: felt, trader_list: felt*
 ) {
+    // To-do: Need to integrate signature infra for the authentication
+
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
@@ -325,6 +327,8 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_list_len: felt, trader_list: felt*
 ) {
+    // To-do: Need to integrate signature infra for the authentication
+
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
@@ -363,6 +367,9 @@ func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     season_id_: felt
 ) {
     alloc_locals;
+
+    // To-do: Need to integrate signature infra for the authentication
+
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
@@ -612,6 +619,7 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         user_address_=[trader_list],
     );
 
+    // Calculate w per market
     calculate_w_per_market(
         season_id_=season_id_,
         pair_id_=pair_id_,
@@ -621,6 +629,7 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         constants_=constants_,
     );
 
+    // Recursively call next trader to calculate w
     return calculate_w_recurse(
         season_id_=season_id_,
         pair_id_=pair_id_,
@@ -649,6 +658,7 @@ func calculate_w_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 ) {
     alloc_locals;
 
+    // Get fp value
     let (local fp_value: felt) = calculate_fp(
         season_id_=season_id_,
         pair_id_=pair_id_,
@@ -656,10 +666,12 @@ func calculate_w_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         user_stats_address_=user_stats_address_,
     );
 
+    // Get ft value
     let (local ft_value: felt) = calculate_ft(
         season_id_=season_id_, pair_id_=pair_id_, user_stats_address_=user_stats_address_
     );
 
+    // Get d value
     let (d_value: felt) = calculate_d(
         season_id_=season_id_,
         pair_id_=pair_id_,
@@ -667,6 +679,7 @@ func calculate_w_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         user_stats_address_=user_stats_address_,
     );
 
+    // Get p value
     let (p_value: felt) = calculate_p(
         season_id_=season_id_,
         pair_id_=pair_id_,
@@ -840,6 +853,7 @@ func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param p_value_64x61_ - p value for a pair corresponding to a trader
 // @param xp_value_ - xp value for a trader
 // @param constants_ - constants used for calculating trader's score
+// @return w - returns w value for a pair corresponding to a trader
 func calculate_w_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     fp_value_64x61_: felt,
     ft_value_64x61_: felt,
@@ -872,14 +886,17 @@ func calculate_w_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (w_value_64x61,);
 }
 
-// @dev - returns the maximum of the 2 function arguments
-func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(x: felt, y: felt) -> (
-    res: felt
-) {
-    if (is_le(x, y) == 1) {
-        return (y,);
+// @notice internal function to find maximum of two numbers
+// @param x_ - first number for the comparision
+// @param y_ - second number for the comparision
+// @return res - returns maximum of two numbers
+func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    x_: felt, y_: felt
+) -> (res: felt) {
+    if (is_le(x_, y_) == 1) {
+        return (y_,);
     }
-    return (x,);
+    return (x_,);
 }
 
 // @notice internal function to recursively calculate trader score
@@ -894,10 +911,12 @@ func calculate_trader_score_recurse{
         return ();
     }
 
+    // Calculate trader's score per market
     calculate_trader_score_per_market(
         season_id_=season_id_, pair_id_=pair_id_, trader_address_=[trader_list]
     );
 
+    // Recursively calculate trader's score
     return calculate_trader_score_recurse(
         season_id_=season_id_,
         pair_id_=pair_id_,
@@ -925,6 +944,7 @@ func calculate_trader_score_per_market{
 
     let (trader_score_64x61) = Math64x61_div(w_value_64x61, total_w_value_64x61);
 
+    // Update trader's score per market
     trader_score_by_market.write(season_id_, pair_id_, trader_address_, trader_score_64x61);
     return ();
 }

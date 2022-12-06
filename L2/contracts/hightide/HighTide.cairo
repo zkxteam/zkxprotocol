@@ -558,6 +558,8 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     hightide_id_: felt
 ) {
     alloc_locals;
+    // To-do: Need to integrate signature infra for the authentication
+
     verify_hightide_id_exists(hightide_id_);
 
     let (registry) = CommonLib.get_registry_address();
@@ -615,10 +617,11 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param trader_list_len - length of trader's list
 // @param trader_list - list of trader's
 @external
-func ditribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     hightide_id_: felt, trader_list_len: felt, trader_list: felt*
 ) {
     alloc_locals;
+    // To-do: Need to integrate signature infra for the authentication
 
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -628,6 +631,7 @@ func ditribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         contract_address=registry, index=HighTideCalc_INDEX, version=version
     );
 
+    // Get percentage of funds transferred from liquidity pool to reward pool
     let (local hightide_metadata: HighTideMetaData) = get_hightide(hightide_id_);
     let (funds_flow_64x61) = IHighTideCalc.get_funds_flow_per_market(
         contract_address=hightide_calc_address,
@@ -635,12 +639,13 @@ func ditribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         pair_id_=hightide_metadata.pair_id,
     );
 
+    // Get reward tokens associated with the hightide
     let (
         reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
     ) = get_hightide_reward_tokens(hightide_id_);
 
-    // Recursively ditribute rewards to all active traders for the specified hightide
-    return ditribute_rewards_recurse(
+    // Recursively distribute rewards to all active traders for the specified hightide
+    return distribute_rewards_recurse(
         hightide_metadata_=hightide_metadata,
         funds_flow_64x61_=funds_flow_64x61,
         hightide_calc_address_=hightide_calc_address,
@@ -899,7 +904,7 @@ func populate_hightide_list_recurse{
     return populate_hightide_list_recurse(season_id_, index_ + 1, hightide_list_len, hightide_list);
 }
 
-func ditribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func distribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     hightide_metadata_: HighTideMetaData,
     funds_flow_64x61_: felt,
     hightide_calc_address_: felt,
@@ -912,6 +917,7 @@ func ditribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         return ();
     }
 
+    // Get trader's score (w) per market
     let (trader_score_64x61) = IHighTideCalc.get_trader_score_per_market(
         contract_address=hightide_calc_address_,
         season_id_=hightide_metadata_.season_id,
@@ -919,9 +925,11 @@ func ditribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         trader_address_=[trader_list],
     );
 
+    // Calculate individual reward (r) = R (funds flow) * w (trader's score)
     let (individual_reward_64x61) = Math64x61_mul(funds_flow_64x61_, trader_score_64x61);
 
-    ditribute_rewards_per_trader_recurse(
+    // Send reward from all the listed reward tokens of hightide
+    distribute_rewards_per_trader_recurse(
         hightide_metadata_=hightide_metadata_,
         trader_address_=[trader_list],
         individual_reward_64x61_=individual_reward_64x61,
@@ -929,7 +937,8 @@ func ditribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         reward_tokens_list=reward_tokens_list,
     );
 
-    return ditribute_rewards_recurse(
+    // Iterate over next trader to distribute reward
+    return distribute_rewards_recurse(
         hightide_metadata_=hightide_metadata_,
         funds_flow_64x61_=funds_flow_64x61_,
         hightide_calc_address_=hightide_calc_address_,
@@ -940,7 +949,7 @@ func ditribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     );
 }
 
-func ditribute_rewards_per_trader_recurse{
+func distribute_rewards_per_trader_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
     hightide_metadata_: HighTideMetaData,
@@ -986,7 +995,7 @@ func ditribute_rewards_per_trader_recurse{
     );
 
     // Iterate over the next reward token
-    return ditribute_rewards_per_trader_recurse(
+    return distribute_rewards_per_trader_recurse(
         hightide_metadata_=hightide_metadata_,
         trader_address_=trader_address_,
         individual_reward_64x61_=individual_reward_64x61_,
