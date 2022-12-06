@@ -57,6 +57,18 @@ const NUM_1_64x61 = 2305843009213693952;
 func high_tide_factors_set(season_id: felt, pair_id: felt, factors: HighTideFactors) {
 }
 
+// Event emitted whenever funds flow by market is calculated
+@event
+func funds_flow_by_market_set(season_id: felt, pair_id: felt, funds_flow: felt) {
+}
+
+// Event emitted whenever trader's score by market is calculated
+@event
+func trader_score_by_market_set(
+    season_id: felt, pair_id: felt, trader_address: felt, trader_score: felt
+) {
+}
+
 // //////////
 // Storage //
 // //////////
@@ -946,6 +958,14 @@ func calculate_trader_score_per_market{
 
     // Update trader's score per market
     trader_score_by_market.write(season_id_, pair_id_, trader_address_, trader_score_64x61);
+
+    // Emit event
+    trader_score_by_market_set.emit(
+        season_id=season_id_,
+        pair_id=pair_id_,
+        trader_address=trader_address_,
+        trader_score=trader_score_64x61,
+    );
     return ();
 }
 
@@ -1098,6 +1118,11 @@ func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
 
     // Update funds flow for a pair
     funds_flow_by_market.write(season_id_, hightide_details.pair_id, funds_flow_64x61);
+
+    // Emit event
+    funds_flow_by_market_set.emit(
+        season_id=season_id_, pair_id=hightide_details.pair_id, funds_flow=funds_flow_64x61
+    );
 
     // Recursively calculate the flow for each pair_id
     return calculate_funds_flow_recurse(

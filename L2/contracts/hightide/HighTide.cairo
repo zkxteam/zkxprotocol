@@ -105,6 +105,13 @@ func hightide_activated(caller: felt, hightide_id: felt) {
 func assigned_hightide_to_season(hightide_id: felt, season_id: felt) {
 }
 
+// Event emitted whenever trader's reward for a market is ditributed
+@event
+func distributed_trader_reward(
+    season_id: felt, pair_id: felt, trader_address: felt, l1_token_address: felt, reward: Uint256
+) {
+}
+
 // //////////
 // Storage //
 // //////////
@@ -992,6 +999,15 @@ func distribute_rewards_per_trader_recurse{
         trader_address_=trader_address_,
         reward_amount_Uint256_=reward_Uint256,
         l1_token_address_=[reward_tokens_list].token_id,
+    );
+
+    // Emit event
+    distributed_trader_reward.emit(
+        season_id=hightide_metadata_.season_id,
+        pair_id=hightide_metadata_.pair_id,
+        trader_address=trader_address_,
+        l1_token_address=[reward_tokens_list].token_id,
+        reward=reward_Uint256,
     );
 
     // Iterate over the next reward token

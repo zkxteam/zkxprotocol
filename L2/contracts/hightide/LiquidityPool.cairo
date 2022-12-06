@@ -4,7 +4,7 @@ from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address, get_contract_address
-from starkware.cairo.common.uint256 import Uint256, uint256_eq, uint256_le, uint256_sub
+from starkware.cairo.common.uint256 import Uint256, uint256_eq, uint256_le, uint256_lt, uint256_sub
 
 from contracts.Constants import Hightide_INDEX, Starkway_INDEX
 from contracts.DataTypes import HighTideMetaData, RewardToken
@@ -134,7 +134,7 @@ func distribute_reward_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         // if current balance can cover the reward amount partially, then we will transfer the balance available and
         // goto the next whitelisted token
         let zero_Uint256: Uint256 = Uint256(0, 0);
-        let (result) = uint256_le(current_balance_Uint256, reward_amount_Uint256_);
+        let (result) = uint256_lt(current_balance_Uint256, reward_amount_Uint256_);
         if (result == FALSE) {
             IERC20.transfer(native_token_l2_address, trader_address_, reward_amount_Uint256_);
             assert reward_amount_Uint256 = Uint256(0, 0);
@@ -325,7 +325,7 @@ func transfer_tokens_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     // goto the next whitelisted token
     local reward_amount_Uint256: Uint256;
     let zero_Uint256: Uint256 = Uint256(0, 0);
-    let (result) = uint256_le(current_balance_Uint256, reward_amount_Uint256_);
+    let (result) = uint256_lt(current_balance_Uint256, reward_amount_Uint256_);
     if (result == FALSE) {
         IERC20.transfer([token_address_list], trader_address_, reward_amount_Uint256_);
         assert reward_amount_Uint256 = Uint256(0, 0);
