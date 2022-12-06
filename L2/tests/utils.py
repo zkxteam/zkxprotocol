@@ -370,7 +370,7 @@ def print_parsed_collaterals(coll_array):
         print("balance: ", from64x61(coll_array[i].balance))
         print("\n")
 
-order_type = {
+order_types = {
   "market": 1,
   "limit": 2
 }
@@ -401,20 +401,11 @@ class Order:
         slippage,
         direction,
         order_type,
-        time_in_Force,
+        time_in_force,
         post_only,
         close_order,
     ):
-        # Checks for input
-        assert price > 0, "Invalid price"
-        assert quantity > 0, "Invalid quantity"
-        assert slippage > 0, "Invalid slippage"
-        assert direction in order_direction.valuse(), "Invalid direction"
-        assert order_type in order_type.values(), "Invalid order_type"
-        assert time_in_force in order_time_in_force.values(), "Invalid time_in_force"
-        assert post_only in (0,1), "Invalid post_only"
-        assert close_order in (0,1), "Invalid close_order"
-
+       
         # Assing values for the order
         self.order_id = random_string(10)
         self.market_id = market_id
@@ -423,60 +414,132 @@ class Order:
         self.slippage = slippage,
         self.direction = direction,
         self.order_type = order_type,
-        self.time_in_Force = time_in_Force,
+        self.time_in_force = time_in_force,
         self.post_only = post_only,
         self.close_order = close_order
 
-class User:
-    def __init__(self, private_key, user_address):
-        self.signer = Signer(private_key)
-		self.user_address = user_address
-        self.orders = []
+class OrderExecutor:
+	def execute_batch(self, size, market_id, oracle_price, request_list):
+		pass
 
-    def create_order(
-        self, 
-        market_id,
+class MultipleOrder:
+	def __init__(
+		self, 
+		user_address, 
+		sig_r, 
+		sig_s, 
+		order_id,
+		market_id,
         price,
-        quantity = 1,
-        leverage = 1,
-        slippage = 1,
-        direction = order_direction["direction"],
-        order_type = order_type["market"],
-        time_in_force = order_time_in_force["good_till_time"],
-        post_only = False,
-        close_order = False,
-		liquidator_address = False,
-        side = order_side["marker"]
-    ):       
-        new_order = Order(
-            market_id,
-            price,
-            quantity,
-            leverage,
-            slippage,
-            direction,
-            order_type,
-            time_in_force,
-            post_only,
-            close_order
-        )
-        self.orders.push_back(new_order)
+        quantity,
+        leverage,
+        slippage,
+		direction,
+        order_type,
+        time_in_force,
+        post_only,
+        close_order,
+		liquidator_address,
+        side
+	):
+		self.multiple_order = {
+			"user_address": user_address,
+			"sig_r": sig_r, 
+			"sig_s": sig_s, 
+			"liquidator_address": liquidator_address, 
+			"order_id": order_id,
+			"market_id": market_id,
+			"price": price,
+			"quantity": quantity,
+			"leverage": leverage,
+			"slippage": slippage,
+			"direction": direction,
+			"order_type": order_type,
+			"time_in_force": time_in_force,
+			"post_only": post_only,
+			"close_order": close_order,
+			"side": side
+		}
 
-		signed_order = signed_order(new_order)
-		return get_multiple_order_representation(order, signed_order, liquidator_address, side)
+	def get_multiple_order(self):
+		return self.multiple_order
 
-    def get_signed_order(self, order):
-        hashed_order = hash_order(order.values())
-		return this.signer.sign(hashed_order)
 
-	def get_multiple_order_representation(self, order, signed_order, liquidator_address, side)
-        return [
+class User:
+	def __init__(self, private_key, user_address):
+		self.signer = Signer(private_key)
+		self.user_address = user_address
+		self.orders = []
+
+	def get_signed_order(self, order):
+		hashed_order = hash_order(order.values())
+		return self.signer.sign(hashed_order)
+
+	def get_multiple_order_representation(self, order, signed_order, liquidator_address, side):
+		return [
 			self.user_address,
 			*signed_order,
 			side,
 			liquidator_address,
 			*order.values()
 		]
+	
+	def create_order(
+        self, 
+        market_id,
+        price,
+        quantity = 1,
+        leverage = 1,
+        slippage = 1,
+		direction = order_direction["long"],
+        order_type = order_types["market"],
+        time_in_force = order_time_in_force["good_till_time"],
+        post_only = False,
+        close_order = False,
+		liquidator_address = False,
+        side = order_side["maker"]
+    ):       
+		# Checks for input
+		assert price > 0, "Invalid price"
+		assert quantity > 0, "Invalid quantity"
+		assert slippage > 0, "Invalid slippage"
+		assert direction in order_direction.values(), "Invalid direction"
+		assert order_type in order_types.values(), "Invalid order_type"
+		assert time_in_force in order_time_in_force.values(), "Invalid time_in_force"
+		assert post_only in (0,1), "Invalid post_only"
+		assert close_order in (0,1), "Invalid close_order"
+
+		new_order = {
+			"order_id": str_to_felt(random_string(12)),
+            "market_id": market_id,
+            "price": price,
+            "quantity": quantity,
+            "leverage": leverage,
+            "slippage": slippage,
+            "direction": direction,
+            "order_type": order_type,
+            "time_in_force": time_in_force,
+            "post_only": post_only,
+            "close_order": close_order
+		}
+		self.orders.append(new_order)
+
+		signed_order = self.get_signed_order(new_order)
+		return self.get_multiple_order_representation(new_order, signed_order, liquidator_address, side)
+
+
+alice = User(123456, "0x123234324")
+bob = User(73879, "0x1234589402")
+order_long = alice.create_order(market_id=32423, price=1, quantity=123213)
+order_short = bob.create_order(market_id=32423, price=1, quantity=123213, direction=order_direction["short"], side=order_side["taker"])
+
+print(order_long)
+print(order_short)
+multiple_order_long = MultipleOrder(*order_long)
+multiple_order_short = MultipleOrder(*order_short)
+print(multiple_order_long.get_multiple_order())
+print(multiple_order_short.get_multiple_order())
+	
 	
 
 
