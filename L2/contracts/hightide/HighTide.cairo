@@ -971,16 +971,16 @@ func distribute_rewards_per_trader_recurse{
 
     // Convert individual reward from 64x61 to Uint256 format
     // to convert, we will multiply and divide the reward which is in decimals with one followed by some zeros.
-    // Here, we considered one million.
-    // Ex: to convert 0.1234 -> ((0.1234) * (1000000))/ (1000000) -> we will convert numerator and denominator to Uint256 and then perform division
-    let (one_million_64x61: felt) = Math64x61_fromIntFelt(1000000);
-    let (trader_reward_64x61: felt) = Math64x61_mul(individual_reward_64x61_, one_million_64x61);
+    // Here, we considered one followed by 18 zeros.
+    // Ex: to convert 0.1234 -> ((0.1234) * (1000000000000000000))/ (1000000000000000000) -> we will convert numerator and denominator to Uint256 and then perform division
+    let (quintillion_64x61: felt) = Math64x61_fromIntFelt(1000000000000000000);
+    let (trader_reward_64x61: felt) = Math64x61_mul(individual_reward_64x61_, quintillion_64x61);
 
     // Convert 64x61 value to felt value
     let (trader_reward: felt) = Math64x61_toFelt(trader_reward_64x61);
 
     // Convert felt value to Uint256 value
-    let (one_million_Uint256: Uint256) = Math64x61_toUint256(1000000);
+    let (quintillion_Uint256: Uint256) = Math64x61_toUint256(1000000000000000000);
     let (trader_reward_Uint256: Uint256) = Math64x61_toUint256(trader_reward);
 
     // Calculate the individual reward for the corresponding reward token
@@ -990,7 +990,7 @@ func distribute_rewards_per_trader_recurse{
 
     // Get the reward to be transferred
     let (reward_Uint256, remainder_Uint256) = uint256_unsigned_div_rem(
-        individual_reward_Uint256, one_million_Uint256
+        individual_reward_Uint256, quintillion_Uint256
     );
 
     // Transfer the calculated reward amount to the trader
