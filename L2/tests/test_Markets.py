@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import str_to_felt, assert_revert, to64x61, PRIME
+from utils import ContractIndex, ManagerAction, str_to_felt, assert_revert, to64x61, PRIME
 from utils_asset import AssetID, build_asset_properties
 from utils_links import DEFAULT_LINK_1, DEFAULT_LINK_2, prepare_starknet_string, encode_characters
 from helpers import StarknetService, ContractType, AccountFactory
@@ -31,11 +31,16 @@ async def adminAuth_factory(starknet_service: StarknetService):
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
     market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
+    # Give permissions
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAssets, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageMarkets, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAuthRegistry, True])
 
+    # Add contracts to registry
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Asset, 1, asset.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Market, 1, market.contract_address])
+
+    # Add assets
     async def add_asset(id, name, is_tradable, is_collateral, decimals):
         asset_properties = build_asset_properties(
             id = id,
@@ -47,17 +52,17 @@ async def adminAuth_factory(starknet_service: StarknetService):
         )
         await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    await add_asset(AssetID.ETH, "Ethereum", 1, 0, 18)
-    await add_asset(AssetID.USDC, "USDCoin", 0, 1, 6)
-    await add_asset(AssetID.DOT, "Polkadot", 1, 0, 10)
-    await add_asset(AssetID.TSLA, "Tesla", 0, 0, 10)
-    await add_asset(AssetID.USDT, "USDTether", 0, 1, 10)
-    await add_asset(AssetID.LINK, "Chainlink", 1, 0, 10)
-    await add_asset(AssetID.BTC, "Bitcoin", 1, 0, 10)
-    await add_asset(AssetID.SUPER, "Super", 1, 0, 10)
-    await add_asset(AssetID.DOGE, "Doge", 1, 1, 18)
-    await add_asset(AssetID.ADA, "Cardano", 1, 0, 10)
-    await add_asset(AssetID.LUNA, "Luna", 1, 0, 10)
+    await add_asset(AssetID.ETH, "Ethereum", True, False, 18)
+    await add_asset(AssetID.USDC, "USDCoin", False, True, 6)
+    await add_asset(AssetID.DOT, "Polkadot", True, False, 10)
+    await add_asset(AssetID.TSLA, "Tesla", False, False, 10)
+    await add_asset(AssetID.USDT, "USDTether", False, True, 10)
+    await add_asset(AssetID.LINK, "Chainlink", True, False, 10)
+    await add_asset(AssetID.BTC, "Bitcoin", True, False, 10)
+    await add_asset(AssetID.SUPER, "Super", True, False, 10)
+    await add_asset(AssetID.DOGE, "Doge", True, True, 18)
+    await add_asset(AssetID.ADA, "Cardano", True, False, 10)
+    await add_asset(AssetID.LUNA, "Luna", True, False, 10)
 
     return adminAuth, asset, market, admin1, admin2, user1
 
@@ -448,7 +453,7 @@ async def test_modifying_trade_settings_by_unauthorized_user(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     market_id = str_to_felt("2dsyfdj289fdw")
-    assert_revert(lambda: 
+    await assert_revert(
         signer3.send_transaction(user1, market.contract_address, 'modify_trade_settings', [
             market_id, 
             to64x61(2), # tick_size 
@@ -509,7 +514,7 @@ async def test_update_metadata_link_by_unauthorized_user(adminAuth_factory):
     market_id = str_to_felt("2dsyfdj289fdw")
     NEW_LINK = DEFAULT_LINK_2
 
-    assert_revert(lambda: 
+    await assert_revert(
         signer3.send_transaction(
             user1, 
             market.contract_address, 
