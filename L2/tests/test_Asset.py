@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted
+from utils import ContractIndex, ManagerAction, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted
 from utils_asset import build_default_asset_properties, encode_asset_id_name, DEFAULT_ASSET_ICON_LINK, DEFAULT_ASSET_METADATA_LINK
 from utils_links import encode_characters
 from helpers import StarknetService, ContractType, AccountFactory
@@ -40,7 +40,12 @@ async def adminAuth_factory(starknet_service: StarknetService):
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
+    # Give permissions
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAssets, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAuthRegistry, True])
+    
+    # Add contract to registry
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Asset, 1, asset.contract_address])
 
     return adminAuth, registry, asset, admin1, admin2, user1
 
@@ -165,7 +170,7 @@ async def test_modifying_asset_by_unauthorized_user(adminAuth_factory):
 
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    assert_revert(lambda: 
+    await assert_revert( 
         signer3.send_transaction(user1, asset.contract_address, 'modify_core_settings', [
             asset_id, 
             asset_name, 
@@ -208,7 +213,7 @@ async def test_removing_asset_by_unauthorized_user(adminAuth_factory):
 
     await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
 
-    assert_revert(lambda:
+    await assert_revert(
         signer3.send_transaction(user1, asset.contract_address, 'remove_asset', [asset_id]),
         reverted_with="Asset: caller not authorized to manage assets"
     )

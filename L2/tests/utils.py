@@ -25,6 +25,49 @@ PRIME_HALF = PRIME/2
 PI = 7244019458077122842
 TRANSACTION_VERSION=1
 
+class ContractIndex:
+    AdminAuth = 0
+    Asset = 1
+    Market = 2
+    FeeDiscount = 3
+    TradingFees = 4
+    Trading = 5
+    FeeBalance = 6
+    Holding = 7
+    EmergencyFund = 8
+    LiquidityFund = 9
+    InsuranceFund = 10
+    Liquidate = 11
+    L1_ZKX_Address = 12
+    CollateralPrices = 13
+    AccountRegistry = 14
+    WithdrawalFeeBalance = 15
+    WithdrawalRequest = 16
+    ABR = 17
+    ABRFund = 18
+    ABRPayment = 19
+    AccountDeployer = 20
+    MarketPrices = 21
+    PubkeyWhitelister = 22
+    SigRequirementsManager = 23
+    Hightide = 24
+    TradingStats = 25
+    UserStats = 26
+    Starkway = 27
+    Settings = 28
+
+class ManagerAction:
+    MasterAdmin = 0
+    ManageAssets = 1
+    ManageMarkets = 2
+    ManageAuthRegistry = 3
+    ManageFeeDetails = 4
+    ManageFunds = 5
+    ManageGovernanceToken = 6
+    ManageCollateralPrices = 7
+    ManageHighTide = 8
+    ManageSettings = 9
+
 def from64x61(num: int) -> int:
     res = num
     if num > PRIME_HALF:
@@ -183,7 +226,7 @@ def hash_order(order_id, ticker, collateral, price, stopPrice, orderType, positi
         leverage
     ]
     return compute_hash_on_elements(order)
-    
+
 
 # following event assertion functions directly from oz test utils
 def assert_event_emitted(tx_exec_info, from_address, name, data=[], order=0):

@@ -149,7 +149,7 @@ func get_icon_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 @view
 func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id: felt
-) -> (metadata_link_len: felt, metadata_link: felt*) {
+) -> (link_len: felt, link: felt*) {
     let (inner_address) = get_inner_contract();
     let (link_len, link) = IAsset.get_metadata_link(inner_address, id);
     return (link_len, link);
