@@ -419,84 +419,212 @@ class Order:
         self.close_order = close_order
 
 class OrderExecutor:
-	def execute_batch(self, size, market_id, oracle_price, request_list):
-		pass
-
-class MultipleOrder:
-	def __init__(
-		self, 
-		user_address, 
-		sig_r, 
-		sig_s, 
-		order_id,
-		market_id,
-        price,
-        quantity,
-        leverage,
-        slippage,
-		direction,
-        order_type,
-        time_in_force,
-        post_only,
-        close_order,
-		liquidator_address,
-        side
-	):
-		self.multiple_order = {
-			"user_address": user_address,
-			"sig_r": sig_r, 
-			"sig_s": sig_s, 
-			"liquidator_address": liquidator_address, 
-			"order_id": order_id,
-			"market_id": market_id,
-			"price": price,
-			"quantity": quantity,
-			"leverage": leverage,
-			"slippage": slippage,
-			"direction": direction,
-			"order_type": order_type,
-			"time_in_force": time_in_force,
-			"post_only": post_only,
-			"close_order": close_order,
-			"side": side
-		}
-
-	def get_multiple_order(self):
-		return self.multiple_order
+    def __init__(self):
+        self.maker_trading_fees = 0.0002 * 0.97
+        self.taker_trading_fees = 0.0005 * 0.97
 
 
+	def execute_batch(self, quantity_locked=1, market_id=str_to_felt("BTC-USDC"), oracle_price=1000, request_list, user_list):
+		# Store the quantity executed so far
+        quantity_executed = 0
+
+        # For each order iterate
+		for i in range(request_list.length):
+            # Portion that'll be executed in the current order
+            portion_being_executed = 0
+            # Get the portion executed for the current order_id
+            current_portion_executed = user_list[i].get_portion_executed()
+            # Portion that is remaining to be executed
+            portion_remaining = request_list[i].quantity - current_portion_executed
+
+            # If the order is fully executed, assert error
+            assert portion_remaining >= 0, "Order already executed"
+
+            # Fee rate
+            fee_rate = maker_trading_fees if request_list[i]["side"] == 1 else taker_trading_fees
+            # If it's a maker order
+
+            # Execution Price
+            execution_price = 0
+			if request_list[i].side == order_side["maker"]:
+                execution_price = request_list[i].price
+                portion_that_can_be_executed = quantity_locked - portion_executed
+                portion_being_executed = min(portion_that_can_be_executed, portion_remaining)
+
+                quantity_executed += portion_being_executed
+            # If it's a taker order
+            else:
+                assert portion_remaining <= quantity_executed, "Invalid batch passed"
+                portion_being_executed = quantity_executed
+
+            user_list[i].execute_order(request_list[i], execution_price, portion_being_executed, fee_rate)
+
+        
 class User:
 	def __init__(self, private_key, user_address):
 		self.signer = Signer(private_key)
 		self.user_address = user_address
 		self.orders = []
 
+    def get_portion_executed(self, order_id):
+        try:
+            return self.portion_executed[order_id]
+        except KeyError:
+            return 0
+
+    def execute_order(self, order, execution_price, portion_being_executed, fee_rate):
+        # Values to be populated for position object
+        average_execution_price = 0
+        current_position_size = 0
+        current_margin_amount = 0
+        current_borrowed_amount = 0
+        current_leverage = 0
+
+        # Required direction
+        current_direction = order["direction"] if order["close_order"] == 0 else abs(order["direction"] - 1)
+        
+        # Get the user position
+        position = get_position(user, order["market_id"], order["direction"])
+
+        # If it's an open order
+        if order["close_order"] == 0:
+            # The position size is 0 or 
+            if position == 0 or position["position_size"] == 0:
+                # If the position size is 0, the average execution price is the execution price
+                average_execution_price = execution_price
+            else:
+                # Update margin & borrowed to current object
+                current_borrowed_amount = position["margin_amount"]
+                current_margin_amount = position["borrowed_amount"]
+                
+                # Find the total value of the existing position
+                total_position_value = position["position_size"]*position["avg_execution_price"]
+                # Find the value of the incoming order
+                incoming_order_value = portion_being_executed*execution_price
+                # Find the cumalatice size and value
+                cumulative_position_size = position["position_size"] + portion_being_executed
+                cumulative_position_value = total_position_value + incoming_order_value
+                
+                # Calculate the new average execution price of the position
+                average_execution_price = cumulative_position_value/cumulative_position_size
+
+            # Order value with leverage
+            leveraged_position_value = portion_being_executed * execution_price
+            # Order value wo leverage
+            order_value_wo_leverage = leveraged_position_value/order["leverage"]
+
+            # Amount that needs to be borrowed
+            amount_to_be_borrowed = leveraged_position_value - order_value_wo_leverage
+
+            # Update the current margin and borrowed amounts
+            current_margin_amount += position_value_wo_leverage
+            current_borrowed_amount += amount_to_be_borrowed
+
+            # Calculate the fee for the order
+            fees = fee_rate*leveraged_position_value
+
+            # Balance that the user must stake/pay
+            balance_to_be_deducted = position_value_wo_leverage + fees
+
+            #Deduct balance from user
+        # For closing orders
+        else:
+            assert position["position_size"] >=0, "The parentPosition size cannot be 0"
+            current_margin_amount = position["margin_amount"]
+            current_borrowed_amount = position["borrowed_amount"]
+            average_execution_price = position["avg_execution_price"]
+
+            # Diff is the difference between average execution price and current price
+            diff = 0
+            # Using 2*avg_execution_price - execution_price to simplify the calculations
+            actual_execution_price = 0
+            # Current order is short order
+            if order["direction"] == 1:
+                # Actual execution price is same as execution price
+                actual_execution_price = execution_price
+                diff = execution_price - position["avg_execution_price"]
+            else:   
+                diff = position["avg_execution_price"] - execution_price
+                # Actual execution price is 2*avg_execution_price - execution_price
+                actual_execution_price =  position["avg_execution_price"] + diff
+            
+            # Calculate the profit and loss for the user
+            pnl = portion_being_executed * diff
+            # Value of the position after factoring in the pnl
+            net_account_value = current_margin_amount + pnl
+
+            # Value of asset at current price w leverage
+            leveraged_amount_out = portion_being_executed * actual_execution_price
+
+            # Calculate the amount that needs to be returned to the user
+            percent_of_position = portion_being_executed/position["position_size"]
+            borrowed_amount_to_be_returned = current_borrowed_amount*percent_of_position
+            margin_amount_to_be_reduced = current_margin_amount*percent_of_position
+
+            # If it's a deleveraging_order
+            if order["order_type"] == 4:
+                current_borrowed_amount -= leveraged_amount_out
+            else:
+                current_borrowed_amount -= borrowed_amount_to_be_returned
+                current_margin_amount -= margin_amount_to_be_reduced
+
+            # Transfer funds        
+        updated_position = {
+            avg_execution_price : average_execution_price,
+            position_size: current_position_size,
+            margin_amount: current_margin_amount,
+            borrowed_amount: current_borrowed_amount,
+            leverage: current_leverage
+        }
+
+        self.positions["market_id"]["direction"] = update_position
+
+    def get_position(self, order):
+        try:
+            return self.positions["market_id"]["direction"]
+        except KeyError:
+            return 0
+
 	def get_signed_order(self, order):
 		hashed_order = hash_order(order.values())
 		return self.signer.sign(hashed_order)
 
 	def get_multiple_order_representation(self, order, signed_order, liquidator_address, side):
-		return [
-			self.user_address,
-			*signed_order,
-			side,
-			liquidator_address,
-			*order.values()
-		]
+		multiple_order = {
+			"user_address": self.user_address,
+			"sig_r": signed_order[0], 
+			"sig_s": signed_order[1], 
+			"liquidator_address": liquidator_address, 
+			"order_id": order["order_id"],
+			"market_id": order["market_id"],
+			"price": order["price"],
+			"quantity": order["quantity"],
+			"leverage": order["leverage"],
+			"slippage": order["slippage"],
+			"direction": order["direction"],
+			"order_type": order["order_type"],
+			"time_in_force": order["time_in_force"],
+			"post_only": order["post_only"],
+			"close_order": order["close_order"],
+			"side": side
+		}
+
+		return multiple_order
+
 	
 	def create_order(
         self, 
-        market_id,
-        price,
+        market_id = str_to_felt("BTC-USDC"),
+        price = 1000,
         quantity = 1,
         leverage = 1,
         slippage = 1,
 		direction = order_direction["long"],
         order_type = order_types["market"],
         time_in_force = order_time_in_force["good_till_time"],
-        post_only = False,
-        close_order = False,
-		liquidator_address = False,
+        post_only = 0,
+        close_order = 0,
+		liquidator_address = 0,
         side = order_side["maker"]
     ):       
 		# Checks for input
@@ -530,15 +658,17 @@ class User:
 
 alice = User(123456, "0x123234324")
 bob = User(73879, "0x1234589402")
-order_long = alice.create_order(market_id=32423, price=1, quantity=123213)
-order_short = bob.create_order(market_id=32423, price=1, quantity=123213, direction=order_direction["short"], side=order_side["taker"])
+order_long = alice.create_order()
+order_short = bob.create_order(direction=order_direction["short"], side=order_side["taker"])
 
+request_list = [order_long, order_short]
 print(order_long)
 print(order_short)
-multiple_order_long = MultipleOrder(*order_long)
-multiple_order_short = MultipleOrder(*order_short)
-print(multiple_order_long.get_multiple_order())
-print(multiple_order_short.get_multiple_order())
+print(request_list)
+# multiple_order_long = MultipleOrder(*order_long)
+# multiple_order_short = MultipleOrder(*order_short)
+# print(multiple_order_long.get_multiple_order())
+# print(multiple_order_short.get_multiple_order())
 	
 	
 

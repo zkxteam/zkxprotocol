@@ -550,9 +550,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
 
     // Calculate the amount that needs to be returned to liquidity fund
-    let (percent_of_order) = Math64x61_div(order_size_, parent_position.position_size);
-    let (value_to_be_returned) = Math64x61_mul(borrowed_amount, percent_of_order);
-    let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order);
+    let (percent_of_position) = Math64x61_div(order_size_, parent_position.position_size);
+    let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, percent_of_position);
+    let (margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_position);
     local margin_amount_open_64x61;
 
     // Calculate new values for margin and borrowed amounts
@@ -561,7 +561,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         margin_amount_close = margin_amount;
         margin_amount_open_64x61 = 0;
     } else {
-        borrowed_amount_close = borrowed_amount - value_to_be_returned;
+        borrowed_amount_close = borrowed_amount - borrowed_amount_to_be_returned;
         margin_amount_close = margin_amount - margin_to_be_reduced;
         margin_amount_open_64x61 = margin_to_be_reduced;
     }
@@ -598,7 +598,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             ILiquidityFund.deposit(
                 contract_address=liquidity_fund_address_,
                 asset_id_=order_.collateralID,
-                amount=value_to_be_returned,
+                amount=borrowed_amount_to_be_returned,
                 position_id_=order_.orderID,
             );
             tempvar syscall_ptr = syscall_ptr;
@@ -617,7 +617,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             IAccountManager.transfer_from(
                 contract_address=order_.pub_key,
                 assetID_=order_.collateralID,
-                amount=leveraged_amount_out - value_to_be_returned,
+                amount=leveraged_amount_out - borrowed_amount_to_be_returned,
             );
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -627,7 +627,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             IAccountManager.transfer(
                 contract_address=order_.pub_key,
                 assetID_=order_.collateralID,
-                amount=leveraged_amount_out - value_to_be_returned,
+                amount=leveraged_amount_out - borrowed_amount_to_be_returned,
             );
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -647,7 +647,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             ILiquidityFund.deposit(
                 contract_address=liquidity_fund_address_,
                 asset_id_=order_.collateralID,
-                amount=value_to_be_returned,
+                amount=borrowed_amount_to_be_returned,
                 position_id_=order_.orderID,
             );
 
