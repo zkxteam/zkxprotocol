@@ -87,21 +87,22 @@ struct Discount {
 
 // Struct to pass orders+signatures in a batch in the execute_batch fn
 struct MultipleOrder {
-    pub_key: felt,
+    user_address: felt,
     sig_r: felt,
     sig_s: felt,
-    orderID: felt,
-    assetID: felt,
-    collateralID: felt,
-    price: felt,
-    stopPrice: felt,
-    orderType: felt,
-    positionSize: felt,
-    direction: felt,
-    closeOrder: felt,
-    leverage: felt,
-    liquidatorAddress: felt,
     side: felt,
+    liquidator_address: felt,
+    order_id: felt,
+    market_id: felt,
+    direction: felt,
+    price: felt,
+    quantity: felt,
+    leverage: felt,
+    slippage: felt,
+    order_type: felt,
+    time_in_force: felt,
+    post_only: felt,
+    close_order: felt,
 }
 
 // @notice struct to pass price data to the contract
@@ -114,17 +115,17 @@ struct PriceData {
 
 // @notice struct for passing the order request to Account Contract
 struct OrderRequest {
-    orderID: felt,
-    marketID: felt,
+    order_id: felt,
+    market_id: felt,
+    direction: felt,
     price: felt,
     quantity: felt,
     leverage: felt,
     slippage: felt,
-    direction: felt,
-    orderType: felt,
-    timeInForce: felt,
-    postOnly: felt,
-    closeOrder: felt,
+    order_type: felt,
+    time_in_force: felt,
+    post_only: felt,
+    close_order: felt,
 }
 
 // @notice struct for storing the order data to Account Contract

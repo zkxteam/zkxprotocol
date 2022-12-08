@@ -131,12 +131,12 @@ func balance(assetID: felt) -> (res: felt) {
 
 // Mapping of marketID, direction to PositionDetails struct
 @storage_var
-func position_mapping(marketID: felt, direction: felt) -> (res: PositionDetails) {
+func position_mapping(market_id: felt, direction: felt) -> (res: PositionDetails) {
 }
 
 // Mapping of orderID to portionExecuted of that order
 @storage_var
-func portion_executed(orderID: felt) -> (res: felt) {
+func portion_executed(order_id: felt) -> (res: felt) {
 }
 
 // Mapping of orderID to the timestamp of last updated value
@@ -310,6 +310,14 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return (res=res);
 }
 
+@view
+func get_portion_executed{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt, direction_: felt
+) -> (res: felt) {
+    let (res) = portion_executed(market_id=market_id, direction=direction);
+    return (res=res);
+}
+
 // @notice view function to get order details
 // @param orderID_ - ID of an order
 // @return res - Order details corresponding to an order
@@ -317,7 +325,7 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func get_position_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, direction_: felt
 ) -> (res: PositionDetails) {
-    let (res) = position_mapping.read(marketID=market_id_, direction=direction_);
+    let (res) = position_mapping.read(market_id=market_id_, direction=direction_);
     return (res=res);
 }
 
@@ -644,11 +652,11 @@ func execute_order{
 
     // Get the details of the position
     let (position_details: PositionDetails) = position_mapping.read(
-        marketID=market_id, direction=request.direction
+        market_id=market_id, direction=request.direction
     );
 
     // Get the portion executed details if already exists
-    let (order_portion_executed) = portion_executed.read(orderID=request.orderID);
+    let (order_portion_executed) = portion_executed.read(order_id=request.orderID);
     let (new_position_executed) = Math64x61_add(order_portion_executed, size);
 
     // Return if the position size after the executing the current order is more than the order's positionSize
@@ -657,7 +665,7 @@ func execute_order{
     }
 
     // Update the portion executed
-    portion_executed.write(orderID=request.orderID, value=new_position_executed);
+    portion_executed.write(order_id=request.orderID, value=new_position_executed);
 
     // closeOrder == 0 -> Open a new position
     // closeOrder == 1 -> Close a position
@@ -695,7 +703,7 @@ func execute_order{
 
         // Write to the mapping
         position_mapping.write(
-            marketID=market_id, direction=request.direction, value=updated_position
+            market_id=market_id, direction=request.direction, value=updated_position
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -712,7 +720,7 @@ func execute_order{
 
         // Get the parent position details
         let (parent_position_details) = position_mapping.read(
-            marketID=market_id, direction=parent_direction
+            market_id=market_id, direction=parent_direction
         );
         let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size);
 
@@ -830,7 +838,7 @@ func execute_order{
 
         // Write to the mapping
         position_mapping.write(
-            marketID=market_id, direction=parent_direction, value=updated_position
+            market_id=market_id, direction=parent_direction, value=updated_position
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1110,12 +1118,12 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
-        marketID=curr_market_id, direction=LONG
+        market_id=curr_market_id, direction=LONG
     );
 
     // Get Short position
     let (short_position: PositionDetails) = position_mapping.read(
-        marketID=curr_market_id, direction=SHORT
+        market_id=curr_market_id, direction=SHORT
     );
 
     local is_long;
@@ -1182,12 +1190,12 @@ func populate_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
-        marketID=curr_market_id, direction=LONG
+        market_id=curr_market_id, direction=LONG
     );
 
     // Get Short position
     let (short_position: PositionDetails) = position_mapping.read(
-        marketID=curr_market_id, direction=SHORT
+        market_id=curr_market_id, direction=SHORT
     );
 
     // Calculate the net position
