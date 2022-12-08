@@ -737,7 +737,7 @@ position_bob = bob.get_position(
     str_to_felt("BTC-USDC"), order_direction["short"])
 print(position_alice)
 print(position_bob)
-
+print(to64x61(100))
 # multiple_order_long = MultipleOrder(*order_long)
 # multiple_order_short = MultipleOrder(*order_short)
 # print(multiple_order_long.get_multiple_order())
