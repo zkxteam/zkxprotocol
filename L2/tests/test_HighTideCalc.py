@@ -384,6 +384,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
         to64x61(0.3)
     ])
 
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'set_multipliers', [
+        to64x61(1), 
+        to64x61(1), 
+        to64x61(1), 
+        to64x61(1), 
+    ])
+
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'activate_high_tide', [1])
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'activate_high_tide', [2])
 
