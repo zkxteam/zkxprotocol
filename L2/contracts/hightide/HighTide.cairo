@@ -497,7 +497,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Get Market from the corresponding market id
     let (market: Market) = IMarkets.get_market(
-        contract_address=market_contract_address, id=pair_id_
+        contract_address=market_contract_address, market_id_=pair_id_
     );
 
     with_attr error_message("HighTide: Listed market pair does not exist") {

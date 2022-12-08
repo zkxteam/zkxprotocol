@@ -3,13 +3,10 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
+from utils import ContractIndex, ManagerAction, assert_revert
 from helpers import StarknetService, ContractType, AccountFactory
-
-signer1 = Signer(123456789987654321)
-signer2 = Signer(123456789987654322)
-
-L1_dummy_address = 0x01234567899876543210
+from dummy_addresses import L1_dummy_address
+from dummy_signers import signer1, signer2
 
 
 @pytest.fixture(scope='module')
@@ -30,10 +27,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
+    # Give necessary permissions
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageMarkets, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAuthRegistry, True])
 
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
+    # Add contracts to registry
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.AccountDeployer, 1, admin1.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.AccountRegistry, 1, account_registry.contract_address])
 
     return adminAuth, account_registry, admin1, admin2
 
@@ -159,14 +159,4 @@ async def test_get_account_registry(adminAuth_factory):
 
     fetched_account_registry_6 = await account_registry.get_account_registry(0, 6).call()
     assert fetched_account_registry_6.result.account_registry == [0x98765, 0x12345, 0x67891, 0x23565, 0x98383, 0x31231]
-
-
-
     
-
-
-
-
-    
-
-

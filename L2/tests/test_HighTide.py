@@ -10,13 +10,13 @@ from starkware.starknet.core.os.class_hash import compute_class_hash
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, to64x61, PRIME, assert_event_emitted, assert_events_emitted
+from utils_links import DEFAULT_LINK_1, DEFAULT_LINK_2, prepare_starknet_string
+from utils_asset import AssetID, build_asset_properties
+from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
 
-BTC_ID = str_to_felt("32f0406jz7qj8")
-USDC_ID = str_to_felt("fghj3am52qpzsib") 
-UST_ID = str_to_felt("yjk45lvmasopq") 
 BTC_USDC_ID = str_to_felt("gecn2j0cm45sz")
 BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 class_hash=0
@@ -73,13 +73,84 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [27, 1, starkway.contract_address])
 
     # Add assets
-    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [BTC_ID, 1, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 1, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', [UST_ID, 1, str_to_felt("UST"), str_to_felt("UST"), 1, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    BTC_properties = build_asset_properties(
+        id=AssetID.BTC,
+        asset_version=1,
+        short_name=str_to_felt("BTC"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_properties)
+
+    USDC_properties = build_asset_properties(
+        id=AssetID.USDC,
+        asset_version=1,
+        short_name=str_to_felt("USDC"),
+        is_tradable=False,
+        is_collateral=True,
+        token_decimal=6
+    )
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
+
+    UST_properties = build_asset_properties(
+        id=AssetID.UST,
+        asset_version=1,
+        short_name=str_to_felt("UST"),
+        is_tradable=True,
+        is_collateral=True,
+        token_decimal=6
+    )
+    await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', UST_properties)
 
     # Add markets
-    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USDC_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await signer1.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    BTC_USDC_properties = MarketProperties(
+        id=BTC_USDC_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000,
+        metadata_link=DEFAULT_LINK_1
+    )
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', BTC_USDC_properties.to_params_list())
+
+    BTC_UST_properties = MarketProperties(
+        id=BTC_UST_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.UST,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000,
+        metadata_link=DEFAULT_LINK_2
+    )
+    await signer1.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
 
     # Deploy ERC20 contracts
     native_erc20_usdc = await starknet_service.deploy(ContractType.ERC20, [str_to_felt("USDC"), str_to_felt("USDC"), 6, 100, 0, starkway.contract_address, admin1.contract_address])

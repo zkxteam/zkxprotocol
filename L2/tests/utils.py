@@ -25,14 +25,57 @@ PRIME_HALF = PRIME/2
 PI = 7244019458077122842
 TRANSACTION_VERSION=1
 
-def from64x61(num):
+class ContractIndex:
+    AdminAuth = 0
+    Asset = 1
+    Market = 2
+    FeeDiscount = 3
+    TradingFees = 4
+    Trading = 5
+    FeeBalance = 6
+    Holding = 7
+    EmergencyFund = 8
+    LiquidityFund = 9
+    InsuranceFund = 10
+    Liquidate = 11
+    L1_ZKX_Address = 12
+    CollateralPrices = 13
+    AccountRegistry = 14
+    WithdrawalFeeBalance = 15
+    WithdrawalRequest = 16
+    ABR = 17
+    ABRFund = 18
+    ABRPayment = 19
+    AccountDeployer = 20
+    MarketPrices = 21
+    PubkeyWhitelister = 22
+    SigRequirementsManager = 23
+    Hightide = 24
+    TradingStats = 25
+    UserStats = 26
+    Starkway = 27
+    Settings = 28
+
+class ManagerAction:
+    MasterAdmin = 0
+    ManageAssets = 1
+    ManageMarkets = 2
+    ManageAuthRegistry = 3
+    ManageFeeDetails = 4
+    ManageFunds = 5
+    ManageGovernanceToken = 6
+    ManageCollateralPrices = 7
+    ManageHighTide = 8
+    ManageSettings = 9
+
+def from64x61(num: int) -> int:
     res = num
     if num > PRIME_HALF:
         res = res - PRIME
     return res / SCALE
 
 
-def to64x61(num):
+def to64x61(num: int) -> int:
     res = num * SCALE
     if res > 2**125 or res <= -2**125:
         raise Exception("Number is out of valid range")
@@ -44,13 +87,13 @@ def convertTo64x61(nums):
         result.append(to64x61(n))
     return result
 
-def str_to_felt(text):
-    b_text = bytes(text, 'UTF-8')
+def str_to_felt(text: str) -> int:
+    b_text = text.encode('utf8', 'strict') 
     return int.from_bytes(b_text, "big")
 
-def felt_to_str(felt):
+def felt_to_str(felt: int) -> str:
     b_felt = felt.to_bytes(31, "big")
-    return b_felt.decode()
+    return b_felt.decode('utf8', 'strict')
 
 def uint(a):
     return(a, 0)
@@ -58,11 +101,11 @@ def uint(a):
 async def assert_revert(fun, reverted_with=None):
     try:
         await fun
-        assert False
+        assert False, f"Call didn't revert, expected: {reverted_with}"
     except StarkException as err:
         _, error = err.args
         if reverted_with is not None:
-            assert reverted_with in error['message']
+            assert reverted_with in error['message'], f"Error mismatch, expected: {reverted_with}, actual: {error['message']}"
 
 class Signer():
     """
@@ -185,15 +228,6 @@ def hash_order(order_id, ticker, collateral, price, stopPrice, orderType, positi
     return compute_hash_on_elements(order)
 
 
-async def assert_revert(fun, reverted_with=None):
-    try:
-        await fun
-        assert False
-    except StarkException as err:
-        _, error = err.args
-        if reverted_with is not None:
-            assert reverted_with in error['message']
-
 # following event assertion functions directly from oz test utils
 def assert_event_emitted(tx_exec_info, from_address, name, data=[], order=0):
     """Assert one single event is fired with correct data."""
@@ -229,7 +263,8 @@ def from_call_to_call_array(calls):
     call_array = []
     calldata = []
     for _, call in enumerate(calls):
-        assert len(call) == 3, "Invalid call parameters"
+        expected_length = 3
+        assert len(call) == expected_length, f"Invalid parameters length, expected: {expected_length}, actual: {len(call)}"
         entry = (
             int(call[0], 16),
             get_selector_from_name(call[1]),
@@ -266,97 +301,6 @@ def get_raw_invoke(sender, calls):
     call_array, calldata = from_call_to_call_array(calls)
     raw_invocation = sender.__execute__(call_array, calldata)
     return raw_invocation
-
-def build_default_asset_properties(
-    id,
-    ticker,
-    short_name,
-    asset_version = 1,
-    tradable = 0,
-    collateral = 0,
-    token_decimal = 18,
-    metadata_id = 0,
-    tick_size = to64x61(0.01),
-    step_size = to64x61(0.1),
-    minimum_order_size = to64x61(1),
-    minimum_leverage = to64x61(1),
-    maximum_leverage = to64x61(10),
-    currently_allowed_leverage = to64x61(3),
-    maintenance_margin_fraction = to64x61(1),
-    initial_margin_fraction = to64x61(1),
-    incremental_initial_margin_fraction = to64x61(1),
-    incremental_position_size = to64x61(100),
-    baseline_position_size = to64x61(1000),
-    maximum_position_size = to64x61(10000)
-):
-    return [
-        id, 
-        asset_version, 
-        ticker, 
-        short_name, 
-        tradable, 
-        collateral, 
-        token_decimal, 
-        metadata_id, 
-        tick_size, 
-        step_size, 
-        minimum_order_size,
-        minimum_leverage,
-        maximum_leverage,
-        currently_allowed_leverage,
-        maintenance_margin_fraction,
-        initial_margin_fraction,
-        incremental_initial_margin_fraction,
-        incremental_position_size,
-        baseline_position_size,
-        maximum_position_size
-    ]
-
-
-def build_asset_properties(
-    id,
-    asset_version,
-    ticker,
-    short_name,
-    tradable,
-    collateral,
-    token_decimal,
-    metadata_id,
-    tick_size,
-    step_size,
-    minimum_order_size,
-    minimum_leverage,
-    maximum_leverage,
-    currently_allowed_leverage,
-    maintenance_margin_fraction,
-    initial_margin_fraction,
-    incremental_initial_margin_fraction,
-    incremental_position_size,
-    baseline_position_size,
-    maximum_position_size
-):
-    return [
-        id, 
-        asset_version, 
-        ticker, 
-        short_name, 
-        tradable, 
-        collateral, 
-        token_decimal, 
-        metadata_id, 
-        tick_size, 
-        step_size, 
-        minimum_order_size,
-        minimum_leverage,
-        maximum_leverage,
-        currently_allowed_leverage,
-        maintenance_margin_fraction,
-        initial_margin_fraction,
-        incremental_initial_margin_fraction,
-        incremental_position_size,
-        baseline_position_size,
-        maximum_position_size
-    ]
 
 def print_parsed_positions(pos_array):
     for i in range(len(pos_array)):

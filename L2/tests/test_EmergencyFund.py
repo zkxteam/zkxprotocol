@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
+from utils import ContractIndex, ManagerAction, str_to_felt, MAX_UINT256, assert_revert
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3, signer4
@@ -38,13 +38,16 @@ async def emergencyFund_factory(starknet_service: StarknetService):
     insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
     emergencyFund = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
     
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 5, 1])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidity.contract_address])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insurance.contract_address])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [7, 1, holding.contract_address])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [8, 1, emergencyFund.contract_address])
+    # Give necessary permissions 
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAssets, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAuthRegistry, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageFunds, True])
+
+    # Add contracts to registry
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.LiquidityFund, 1, liquidity.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.InsuranceFund, 1, insurance.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Holding, 1, holding.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.EmergencyFund, 1, emergencyFund.contract_address])
 
     return emergencyFund, holding, admin1, admin2, insurance, liquidity
 
