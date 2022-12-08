@@ -312,9 +312,9 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @view
 func get_portion_executed{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt, direction_: felt
+    order_id_: felt
 ) -> (res: felt) {
-    let (res) = portion_executed(market_id=market_id, direction=direction);
+    let (res) = portion_executed.read(order_id=order_id_);
     return (res=res);
 }
 
@@ -645,10 +645,10 @@ func execute_order{
     let (hash) = hash_order(&request);
 
     // Check for hash collision
-    order_hash_check(request.orderID, hash);
+    order_hash_check(request.order_id, hash);
 
     // check if signed by the user/liquidator
-    is_valid_signature_order(hash, signature, request.liquidatorAddress);
+    is_valid_signature_order(hash, signature, request.liquidator_address);
 
     // Get the details of the position
     let (position_details: PositionDetails) = position_mapping.read(
@@ -656,20 +656,20 @@ func execute_order{
     );
 
     // Get the portion executed details if already exists
-    let (order_portion_executed) = portion_executed.read(order_id=request.orderID);
+    let (order_portion_executed) = portion_executed.read(order_id=request.order_id);
     let (new_position_executed) = Math64x61_add(order_portion_executed, size);
 
     // Return if the position size after the executing the current order is more than the order's positionSize
     with_attr error_message("AccountManager: New position size larger than order") {
-        assert_le(new_position_executed, request.positionSize);
+        assert_le(new_position_executed, request.quantity);
     }
 
     // Update the portion executed
-    portion_executed.write(order_id=request.orderID, value=new_position_executed);
+    portion_executed.write(order_id=request.order_id, value=new_position_executed);
 
     // closeOrder == 0 -> Open a new position
     // closeOrder == 1 -> Close a position
-    if (request.closeOrder == 0) {
+    if (request.close_order == 0) {
         if (position_details.position_size == 0) {
             add_to_market_array(market_id);
             tempvar syscall_ptr = syscall_ptr;
@@ -738,7 +738,7 @@ func execute_order{
         local new_leverage;
 
         // Check if it's liq/delveraging order
-        let is_liq = is_le(2, request.orderType);
+        let is_liq = is_le(2, request.order_type);
 
         if (is_liq == 1) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
@@ -779,7 +779,7 @@ func execute_order{
             deleveragable_or_liquidatable_position.write(value=updated_liquidatable_position);
 
             // If it's a deleveraging order, calculate the new leverage
-            if (request.orderType == DELEVERAGING_ORDER) {
+            if (request.order_type == DELEVERAGING_ORDER) {
                 with_attr error_message("AccountManager: Position not marked as deleveragable") {
                     assert liq_position.liquidatable = FALSE;
                 }
@@ -1224,7 +1224,7 @@ func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res
     let hash_ptr = pedersen_ptr;
     with hash_ptr {
         let (hash_state_ptr) = hash_init();
-        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 10);
+        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 12);
         let (res) = hash_finalize(hash_state_ptr);
         let pedersen_ptr = hash_ptr;
         return (res=res);

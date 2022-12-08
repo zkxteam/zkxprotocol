@@ -1054,6 +1054,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         time_in_force=temp_order.time_in_force,
         post_only=temp_order.post_only,
         close_order=temp_order.close_order,
+        liquidator_address=temp_order.liquidator_address,
     );
 
     // Create a temporary signature object

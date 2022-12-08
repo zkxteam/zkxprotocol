@@ -126,6 +126,7 @@ struct OrderRequest {
     time_in_force: felt,
     post_only: felt,
     close_order: felt,
+    liquidator_address: felt,
 }
 
 // @notice struct for storing the order data to Account Contract
