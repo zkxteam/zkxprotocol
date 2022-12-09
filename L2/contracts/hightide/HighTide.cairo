@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero, split_felt
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import (
     deploy,
@@ -48,7 +48,6 @@ from contracts.Math_64x61 import (
     Math64x61_fromIntFelt,
     Math64x61_mul,
     Math64x61_toFelt,
-    Math64x61_toUint256,
 )
 
 // /////////
@@ -980,8 +979,11 @@ func distribute_rewards_per_trader_recurse{
     let (trader_reward: felt) = Math64x61_toFelt(trader_reward_64x61);
 
     // Convert felt value to Uint256 value
-    let (quintillion_Uint256: Uint256) = Math64x61_toUint256(1000000000000000000);
-    let (trader_reward_Uint256: Uint256) = Math64x61_toUint256(trader_reward);
+    let (quintillion_high: felt, quintillion_low: felt) = split_felt(1000000000000000000);
+    let (quintillion_Uint256: Uint256) = Uint256(low=quintillion_low, high=quintillion_high);
+
+    let (reward_high: felt, reward_low: felt) = split_felt(trader_reward);
+    let (trader_reward_Uint256: Uint256) = Uint256(low=reward_low, high=reward_high);
 
     // Calculate the individual reward for the corresponding reward token
     let (individual_reward_Uint256, carry_Uint256) = uint256_mul(
