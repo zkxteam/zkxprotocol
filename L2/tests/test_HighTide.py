@@ -190,10 +190,10 @@ async def test_set_multipliers_authorized_admin(adminAuth_factory):
     execution_info = await hightide.get_multipliers().call()
     fetched_multipliers = execution_info.result.multipliers
 
-    assert fetched_multipliers.a1 == 1
-    assert fetched_multipliers.a2 == 2
-    assert fetched_multipliers.a3 == 3
-    assert fetched_multipliers.a4 == 4
+    assert fetched_multipliers.a_1 == 1
+    assert fetched_multipliers.a_2 == 2
+    assert fetched_multipliers.a_3 == 3
+    assert fetched_multipliers.a_4 == 4
 
 @pytest.mark.asyncio
 async def test_set_constants_unauthorized_user(adminAuth_factory):
@@ -485,6 +485,11 @@ async def test_activate_hightide_with_sufficient_native_tokens(adminAuth_factory
         ]
     )
 
+    execution_info = await hightide.get_hightides_by_season_id(season_id).call()
+    hightide_list = execution_info.result.hightide_list
+    assert hightide_list[0] == hightide_id
+
+
 # Hightide activation fails becuase, hightide is already activated
 @pytest.mark.asyncio
 async def test_activate_hightide_which_is_already_activated(adminAuth_factory):
@@ -610,6 +615,9 @@ async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_fac
         ]
     )
 
+    execution_info = await hightide.get_hightides_by_season_id(season_id).call()
+    hightide_list = execution_info.result.hightide_list
+    assert hightide_list[0] == hightide_id
 
 # Hightide activation fails becuase of insufficient native tokens
 @pytest.mark.asyncio
@@ -685,3 +693,8 @@ async def test_activate_hightide_with_sufficient_non_native_tokens(adminAuth_fac
             [1, hightide.contract_address, 'assigned_hightide_to_season', [hightide_id, season_id]],
         ]
     )
+
+    execution_info = await hightide.get_hightides_by_season_id(season_id).call()
+    hightide_list = execution_info.result.hightide_list
+    assert hightide_list[0] == hightide_id - 1
+    assert hightide_list[1] == hightide_id

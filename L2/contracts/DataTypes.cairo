@@ -225,10 +225,10 @@ struct TradingSeason {
 
 // Struct to store multipliers used to calculate total reward to be split between traders
 struct Multipliers {
-    a1: felt,
-    a2: felt,
-    a3: felt,
-    a4: felt,
+    a_1: felt,
+    a_2: felt,
+    a_3: felt,
+    a_4: felt,
 }
 
 // Struct to store constants used to calculate individual trader score
@@ -293,4 +293,11 @@ struct CoreFunction {
     index: felt,
     version: felt,
     function_selector: felt,
+}
+
+// Strcut to store fp, d and p values for a trader per pair
+struct TraderScoreFactors {
+    f_p_64x61: felt,
+    d_64x61: felt,
+    p_64x61: felt,
 }

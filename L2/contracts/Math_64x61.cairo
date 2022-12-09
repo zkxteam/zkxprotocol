@@ -76,6 +76,12 @@ func Math64x61_toDecimalFelt{range_check_ptr}(x: felt, decimals: felt) -> (res: 
     return (res,);
 }
 
+// Converts a fixed point value to a felt, truncating the fractional component
+func Math64x61_toFelt{range_check_ptr}(x: felt) -> (res: felt) {
+    let (res, _) = signed_div_rem(x, Math64x61_FRACT_PART, Math64x61_BOUND);
+    return (res,);
+}
+
 //##################
 // Math operations #
 //##################
