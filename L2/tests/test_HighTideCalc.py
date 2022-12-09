@@ -373,8 +373,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await admin1_signer.send_transaction(admin1, hightide.contract_address,'set_liquidity_pool_contract_class_hash',[class_hash])
 
-    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [ETH_USD_ID, 1, admin1.contract_address, 1, 2, USDC_ID, 1000, 0, UST_ID, 500, 0])
-    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [TSLA_USD_ID, 1, admin1.contract_address, 1, 2, USDC_ID, 1000, 0, UST_ID, 500, 0])
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [ETH_USD_ID, 1, admin1.contract_address, 1, 2, AssetID.USDC, 1000, 0, AssetID.UST, 500, 0])
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [TSLA_USD_ID, 1, admin1.contract_address, 1, 2, AssetID.USDC, 1000, 0, AssetID.UST, 500, 0])
 
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'set_constants', [
         to64x61(0.8), 
