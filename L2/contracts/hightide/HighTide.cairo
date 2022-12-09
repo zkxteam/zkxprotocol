@@ -44,12 +44,7 @@ from contracts.interfaces.IStarkway import IStarkway
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import (
-    Math64x61_fromIntFelt,
-    Math64x61_mul,
-    Math64x61_toFelt,
-    Math64x61_toUint256,
-)
+from contracts.Math_64x61 import Math64x61_fromIntFelt, Math64x61_mul, Math64x61_toFelt
 
 // /////////
 // Events //

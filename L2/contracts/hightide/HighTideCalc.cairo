@@ -17,7 +17,6 @@ from contracts.DataTypes import (
     HighTideMetaData,
     Market,
     Multipliers,
-    TraderScoreFactors,
     TradingSeason,
     VolumeMetaData,
 )
@@ -77,13 +76,6 @@ func trader_score_by_market_set(
 // Stores high tide factors for
 @storage_var
 func high_tide_factors(season_id: felt, pair_id: felt) -> (factors: HighTideFactors) {
-}
-
-// Stores factors to calculate individual trader's score
-@storage_var
-func trader_score_factors(season_id: felt, pair_id: felt, trader_address: felt) -> (
-    factors: TraderScoreFactors
-) {
 }
 
 // Stores the w values for a trader per pair in a season
