@@ -63,17 +63,17 @@ const POSITION_TO_BE_DELEVERAGED = 2;
 const POSITION_TO_BE_LIQUIDATED = 3;
 const POSITION_LIQUIDATED = 4;
 
-const MARKET_ORDER = 0;
-const LIMIT_ORDER = 1;
-const STOP_ORDER = 2;
-const LIQUIDATION_ORDER = 3;
-const DELEVERAGING_ORDER = 4;
+const MARKET_ORDER = 1;
+const LIMIT_ORDER = 2;
+const STOP_ORDER = 3;
+const LIQUIDATION_ORDER = 4;
+const DELEVERAGING_ORDER = 5;
 
 const LONG = 1;
-const SHORT = 0;
+const SHORT = 2;
 
-const MAKER = 0;
-const TAKER = 1;
+const MAKER = 1;
+const TAKER = 2;
 
 const WITHDRAWAL_INITIATED = 0;
 const WITHDRAWAL_SUCCEEDED = 1;

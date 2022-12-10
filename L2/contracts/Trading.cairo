@@ -149,7 +149,7 @@ func execute_batch{
     );
 
     // Recursively loop through the orders in the batch
-    let (trader_stats_list_len, average_execution_price) = check_and_execute(
+    let (trader_stats_list_len, taker_execution_price) = check_and_execute(
         quantity_locked_=quantity_locked_,
         market_id_=market_id_,
         collateral_id_=collateral_id,
@@ -173,7 +173,7 @@ func execute_batch{
         trader_stats_list_len_=0,
         trader_stats_list_=trader_stats_list,
         running_weighted_sum=0,
-        average_execution_price=0,
+        taker_execution_price=0,
     );
 
     // /// Set Market Price /////
@@ -193,7 +193,7 @@ func execute_batch{
     // update market price
     if (status == FALSE) {
         IMarketPrices.update_market_price(
-            contract_address=market_prices_address, id=market_id_, price=average_execution_price
+            contract_address=market_prices_address, id=market_id_, price=taker_execution_price
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -208,17 +208,17 @@ func execute_batch{
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     tempvar range_check_ptr = range_check_ptr;
 
-    // Record TradingStats
-    ITradingStats.record_trade_batch_stats(
-        contract_address=trading_stats_address,
-        pair_id_=market_id_,
-        order_size_64x61_=quantity_locked_,
-        execution_price_64x61_=average_execution_price,
-        request_list_len=request_list_len,
-        request_list=request_list,
-        trader_stats_list_len=trader_stats_list_len,
-        trader_stats_list=trader_stats_list,
-    );
+    // // Record TradingStats
+    // ITradingStats.record_trade_batch_stats(
+    //     contract_address=trading_stats_address,
+    //     pair_id_=market_id_,
+    //     order_size_64x61_=quantity_locked_,
+    //     execution_price_64x61_=taker_execution_price,
+    //     request_list_len=request_list_len,
+    //     request_list=request_list,
+    //     trader_stats_list_len=trader_stats_list_len,
+    //     trader_stats_list=trader_stats_list,
+    // );
 
     return ();
 }
@@ -430,20 +430,22 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     let (total_amount_felt) = Math64x61_add(total_position_value, fees);
     tempvar total_amount = total_amount_felt;
 
-    // Check if the position can be opened
-    ILiquidate.check_order_can_be_opened(
-        contract_address=liquidate_address_,
-        order=order_,
-        size=order_size_,
-        execution_price=execution_price_,
-    );
+    // // Check if the position can be opened
+    // ILiquidate.check_order_can_be_opened(
+    //     contract_address=liquidate_address_,
+    //     order=order_,
+    //     size=order_size_,
+    //     execution_price=execution_price_,
+    // );
 
     let (user_balance) = IAccountManager.get_balance(
         contract_address=order_.user_address, assetID_=collateral_id_
     );
+    local user_address;
+    assert user_address = order_.user_address;
 
     // User must be able to pay the amount
-    with_attr error_message("Trading: Low Balance") {
+    with_attr error_message("Trading: Low Balance- {user_address}") {
         assert_le(total_amount, user_balance);
     }
 
@@ -618,7 +620,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     assert [trader_stats_list_] = element;
 
     // Check if the position is to be liquidated
-    let not_liquidation = is_le(order_.order_type, 2);
+    let not_liquidation = is_le(order_.order_type, 3);
 
     // Deduct funds from holding contract
     IHolding.withdraw(
@@ -827,8 +829,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     trader_stats_list_len_: felt,
     trader_stats_list_: TraderStats*,
     running_weighted_sum: felt,
-    average_execution_price: felt,
-) -> (trader_stats_list_len: felt, average_execution_price: felt) {
+    taker_execution_price: felt,
+) -> (trader_stats_list_len: felt, taker_execution_price: felt) {
     alloc_locals;
 
     local execution_price;
@@ -843,7 +845,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Check if the list is empty, if yes return 1
     if (request_list_len_ == 0) {
-        return (trader_stats_list_len_, average_execution_price);
+        return (trader_stats_list_len_, taker_execution_price);
     }
 
     // Create a struct object for the order
@@ -921,6 +923,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // Reset the variable
         assert current_quantity_executed = 0;
 
+        // Reset the variable
+        assert new_running_weighted_sum = 0;
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -977,10 +982,10 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    // Price Check
-    with_attr error_message("Trading: Execution price not in range") {
-        assert_in_range(execution_price, lower_limit_, upper_limit_);
-    }
+    // // Price Check
+    // with_attr error_message("Trading: Execution price not in range") {
+    //     assert_in_range(execution_price, lower_limit_, upper_limit_);
+    // }
 
     // If the order is to be opened
     if (temp_order.close_order == FALSE) {
@@ -1106,7 +1111,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // Leverage check maximum
         with_attr error_message("Trading: Leverage must be <= to the maximum allowed leverage") {
-            assert_le(temp_order.leverage, market.currently_allowed_leverage);
+            assert_le(temp_order.leverage, market.maximum_leverage);
         }
 
         // Recursive call with the ticker and price to compare against
@@ -1134,7 +1139,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             trader_stats_list_len_=trader_stats_list_len,
             trader_stats_list_=trader_stats_list,
             running_weighted_sum=new_running_weighted_sum,
-            average_execution_price=execution_price,
+            taker_execution_price=0,
         );
     }
 
@@ -1197,6 +1202,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         trader_stats_list_len_=trader_stats_list_len,
         trader_stats_list_=trader_stats_list,
         running_weighted_sum=new_running_weighted_sum,
-        average_execution_price=execution_price,
+        taker_execution_price=execution_price,
     );
 }

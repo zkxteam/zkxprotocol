@@ -738,7 +738,7 @@ func execute_order{
         local new_leverage;
 
         // Check if it's liq/delveraging order
-        let is_liq = is_le(2, request.order_type);
+        let is_liq = is_le(3, request.order_type);
 
         if (is_liq == 1) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
@@ -1224,7 +1224,7 @@ func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res
     let hash_ptr = pedersen_ptr;
     with hash_ptr {
         let (hash_state_ptr) = hash_init();
-        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 12);
+        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 11);
         let (res) = hash_finalize(hash_state_ptr);
         let pedersen_ptr = hash_ptr;
         return (res=res);
