@@ -667,9 +667,9 @@ func execute_order{
     // Update the portion executed
     portion_executed.write(order_id=request.order_id, value=new_position_executed);
 
-    // closeOrder == 0 -> Open a new position
-    // closeOrder == 1 -> Close a position
-    if (request.close_order == 0) {
+    // closeOrder == 1 -> Open a new position
+    // closeOrder == 2 -> Close a position
+    if (request.close_order == 1) {
         if (position_details.position_size == 0) {
             add_to_market_array(market_id);
             tempvar syscall_ptr = syscall_ptr;

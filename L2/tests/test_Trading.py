@@ -7,7 +7,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals, User, order_time_in_force, order_direction, order_types, order_side, OrderExecutor
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals, User, order_time_in_force, order_direction, order_types, order_side, close_order, OrderExecutor
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -18,6 +18,8 @@ alice_signer = Signer(123456789987654323)
 bob_signer = Signer(123456789987654324)
 charlie_signer = Signer(123456789987654325)
 dave_signer = Signer(123456789987654326)
+eduard_signer = Signer(123456789987654327)
+
 
 maker_trading_fees = to64x61(0.0002 * 0.97)
 taker_trading_fees = to64x61(0.0005 * 0.97)
@@ -72,7 +74,14 @@ async def adminAuth_factory(starknet_service: StarknetService):
     Bob = User(123456789987654324, bob.contract_address)
 
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
+    print(charlie.contract_address)
+    Charlie = User(123456789987654325, charlie.contract_address)
+
     dave = await account_factory.deploy_account(dave_signer.public_key)
+
+    eduard = await account_factory.deploy_ZKX_account(eduard_signer.public_key)
+    print(eduard.contract_address)
+    Eduard = User(123456789987654327, eduard.contract_address)
 
     timestamp = int(time.time())
     starknet_service.starknet.state.state.block_info = BlockInfo(
@@ -124,7 +133,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [alice.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [bob.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [charlie.contract_address])
-    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [dave.contract_address])
 
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
@@ -189,20 +197,20 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
 
-    return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, Alice, Bob, python_executor
+    return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, marketPrices, Alice, Bob, Charlie, Eduard, python_executor
 
 
 async def set_balance(admin_signer, admin, user, asset_id, new_balance):
     await admin_signer.send_transaction(admin, user.contract_address, "set_balance", [asset_id, new_balance])
 
 
-async def execute_batch(zkx_node_signer, zkx_node, trading, quantity_locked, market_id, oracle_price, order_list):
+async def execute_batch(zkx_node_signer, zkx_node, trading, quantity_locked, market_id, oracle_price, order_list_len, order_list):
     # Send execute_batch transaction
     await zkx_node_signer.send_transaction(zkx_node, trading.contract_address, "execute_batch", [
         quantity_locked,
         market_id,
         oracle_price,
-        len(order_list),
+        order_list_len,
         *order_list
     ])
 
@@ -221,7 +229,7 @@ async def execute_batch_reverted(zkx_node_signer, zkx_node, trading, quantity_lo
 
 @pytest.mark.asyncio
 async def test_revert_balance_low_user_1(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, Alice, Bob, python_executor = adminAuth_factory
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
 
     # Insuffiecient balance for the alice
     alice_balance = to64x61(100)
@@ -246,12 +254,12 @@ async def test_revert_balance_low_user_1(adminAuth_factory):
     orders = [*list(alice_long.values()), *list(bob_short.values())]
 
     # Check for the error
-    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Low Balance- {alice.contract_address}")
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Low Balance {alice.contract_address}")
 
 
 @pytest.mark.asyncio
 async def test_revert_balance_low_user_2(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, Alice, Bob, python_executor = adminAuth_factory
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
 
     # Insuffiecient balance for the alice
     alice_balance = to64x61(10000)
@@ -276,56 +284,344 @@ async def test_revert_balance_low_user_2(adminAuth_factory):
     orders = [*list(alice_long.values()), *list(bob_short.values())]
 
     # Check for the error
-    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Low Balance- {bob.contract_address}")
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Low Balance {bob.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_leverage_more_than_allowed_user_1(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(1)
+    market_id_1 = BTC_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1), leverage=to64x61(10.1))
+    bob_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+        1), direction=order_direction["short"], side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Leverage must be <= to the maximum allowed leverage- {alice.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_leverage_more_than_allowed_user_2(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Edaurd, python_executor = adminAuth_factory
+
+    # Sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(1)
+    market_id_1 = BTC_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1))
+    bob_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+        1), direction=order_direction["short"], side=order_side["taker"], leverage=to64x61(10.1))
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Leverage must be <= to the maximum allowed leverage- {bob.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_wrong_market_passed(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(1)
+    market_id_1 = BTC_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1))
+    bob_short = Bob.create_order(market_id=ETH_USD_ID, quantity=to64x61(
+        1), direction=order_direction["short"], side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: All orders in a batch must be from the same market- {bob.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_taker_direction_wrong(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(1)
+    market_id_1 = BTC_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1))
+    bob_short = Bob.create_order(market_id=ETH_USD_ID, quantity=to64x61(
+        1), side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Taker order must be in opposite direction of Maker order(s)- {bob.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_maker_direction_wrong(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(1)
+    market_id_1 = BTC_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1.5))
+    bob_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+        1.5), direction=order_direction["short"])
+    charlie_short = Charlie.create_order(
+        market_id=market_id_1, quantity=to64x61(3), direction=order_direction["short"], side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *
+              list(charlie_short.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=3, order_list=orders, error_message=f"Trading: All Maker orders must be in the same direction- {charlie.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_quantity_low_user_1(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, edaurd, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Set sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(0.0005)
+    market_id_1 = BTC_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(0.0005))
+    bob_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+        1), direction=order_direction["short"], side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Quantity must be >= to the minimum order size- {alice.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_quantity_low_user_2(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Set sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(0.0005)
+    market_id_1 = BTC_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1))
+    bob_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+        0.0005), direction=order_direction["short"], side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Quantity must be >= to the minimum order size- {bob.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_market_untradable(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Set sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(1)
+    market_id_1 = TSLA_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1))
+    bob_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+        1), direction=order_direction["short"], side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Market is not tradable")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_leverage_below_1(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Set sufficient balance for alice and bob
+    alice_balance = to64x61(10000)
+    bob_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(1)
+    market_id_1 = TSLA_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1), leverage=to64x61(0.05))
+    bob_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+        1), direction=order_direction["short"], side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(bob_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Leverage must be >= 1- {alice.contract_address}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_unregistered_user(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
+
+    # Set sufficient balance for alice and eduard
+    alice_balance = to64x61(10000)
+    eduard_balance = to64x61(10000)
+
+    # Set balance
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+    await set_balance(admin_signer=admin1_signer, admin=admin1, user=eduard, asset_id=USDC_ID, new_balance=eduard_balance)
+
+    # Batch params
+    quantity_locked_1 = to64x61(1)
+    market_id_1 = BTC_USD_ID
+    oracle_price_1 = to64x61(1000)
+
+    # Generate orders
+    alice_long = Alice.create_order(
+        market_id=market_id_1, quantity=to64x61(1), leverage=to64x61(1))
+    eduard_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+        1), direction=order_direction["short"], side=order_side["taker"])
+
+    # Collate orders
+    orders = [*list(alice_long.values()), *list(eduard_short.values())]
+
+    # Check for the error
+    await execute_batch_reverted(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders, error_message=f"Trading: Leverage must be >= 1- {alice.contract_address}")
 
 # @pytest.mark.asyncio
 # async def test_opening_and_closing_full_orders(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, Alice, Bob, python_executor = adminAuth_factory
+#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, _, Alice, Bob, Charlie, Eduard, python_executor = adminAuth_factory
 
+#     # Sufficient balance for users
 #     alice_balance = to64x61(10000)
 #     bob_balance = to64x61(10000)
-#     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-#     await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
 
-#     alice_curr_balance_before = await alice.get_balance(USDC_ID).call()
-#     bob_curr_balance_before = await bob.get_balance(USDC_ID).call()
+#     # Set balance
+#     await set_balance(admin_signer=admin1_signer, admin=admin1, user=alice, asset_id=USDC_ID, new_balance=alice_balance)
+#     await set_balance(admin_signer=admin1_signer, admin=admin1, user=bob, asset_id=USDC_ID, new_balance=bob_balance)
 
-#     ####### Opening of Orders #######
+#     # Batch params for OPEN orders
 #     quantity_locked_1 = to64x61(3)
 #     market_id_1 = BTC_USD_ID
 #     oracle_price_1 = to64x61(1000)
-#     order_long = Alice.create_order(
-#         market_id=market_id_1, quantity=to64x61(3), leverage=to64x61(10))
-#     order_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+
+#     # Generate orders
+#     alice_long_open = Alice.create_order(
+#         market_id=market_id_1, quantity=to64x61(3), leverage=to64x61(1))
+#     bob_short_open = Bob.create_order(market_id=market_id_1, quantity=to64x61(
 #         3), direction=order_direction["short"], side=order_side["taker"])
 
-#     print("Alice..", order_long)
-#     print("Bob...", order_short)
+#     print("Alice..", alice_long_open)
+#     print("Bob...", bob_short_open)
 
-#     # amount1 = await fixed_math.Math64x61_mul(execution_price1, size).call()
-#     # fees1 = await fixed_math.Math64x61_mul(amount1.result.res, maker_trading_fees).call()
-#     # total_amount1 = amount1.result.res + fees1.result.res
+#     # Collate orders
+#     orders = [*list(alice_long_open.values()), *list(bob_short_open.values())]
 
-#     # amount2 = await fixed_math.Math64x61_mul(execution_price1, size).call()
-#     # fees2 = await fixed_math.Math64x61_mul(amount2.result.res, taker_trading_fees).call()
-#     # total_amount2 = amount2.result.res + fees2.result.res
+#     # Execute the order
+#     await execute_batch(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders)
 
-#     # holdingBalance_before = await holding.balance(asset_id_=USDC_ID).call()
-#     # feeBalance_before = await feeBalance.get_total_fee(assetID_=USDC_ID).call()
-#     # alice_total_fees_before = await feeBalance.get_user_fee(address=alice.contract_address, assetID_=USDC_ID).call()
-#     # bob_total_fees_before = await feeBalance.get_user_fee(address=bob.contract_address, assetID_=USDC_ID).call()
-
-#     params = [
-#         quantity_locked_1,
-#         market_id_1,
-#         oracle_price_1,
-#         2,
-#         *list(order_long.values()),
-#         *list(order_short.values())
-#     ]
-#     print(params)
-#     res = await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", params)
-
+#     # Check the user state
 #     orderState1 = await alice.get_position_data(market_id_=market_id_1, direction_=order_direction["long"]).call()
 #     res1 = list(orderState1.result.res)
 #     print(res1)
@@ -338,62 +634,83 @@ async def test_revert_balance_low_user_2(adminAuth_factory):
 #     print("in decimal")
 #     print([from64x61(x) for x in res2])
 
-#     order_long = Alice.create_order(
-#         market_id=market_id_1, quantity=to64x61(2.1), price=to64x61(1200), leverage=to64x61(10))
-#     order_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
-#         3), direction=order_direction["short"], side=order_side["taker"])
+#     # Batch params for CLOSE orders
+#     quantity_locked_1 = to64x61(3)
+#     market_id_1 = BTC_USD_ID
+#     oracle_price_1 = to64x61(1000)
 
-#     params = [
-#         to64x61(2.05),
-#         market_id_1,
-#         to64x61(1200),
-#         2,
-#         *list(order_long.values()),
-#         *list(order_short.values())
-#     ]
-#     print(params)
-#     await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", params)
+#     # Generate orders
+#     alice_short_close = Alice.create_order(
+#         market_id=market_id_1, direction=order_direction["short"], quantity=to64x61(3), close_order=close_order["close"])
+#     bob_long_close = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+#         3), direction=order_direction["long"], side=order_side["taker"], close_order=close_order["close"])
 
-#     orderState1 = await alice.get_position_data(market_id_=market_id_1, direction_=order_direction["long"]).call()
-#     res1 = list(orderState1.result.res)
-#     print(res1)
-#     print("in decimal")
-#     print([from64x61(x) for x in res1])
+#     print("Alice..", alice_long_open)
+#     print("Bob...", bob_short_open)
 
-#     orderState2 = await bob.get_position_data(market_id_=market_id_1, direction_=order_direction["short"]).call()
-#     res2 = list(orderState2.result.res)
-#     print(res2)
-#     print("in decimal")
-#     print([from64x61(x) for x in res2])
+#     # Collate orders
+#     orders = [*list(alice_short_close.values()),
+#               *list(bob_long_close.values())]
 
-#     #
-#     order_long = Alice.create_order(
-#         market_id=market_id_1, quantity=to64x61(0.05), price=to64x61(1200), leverage=to64x61(10))
-#     order_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
-#         0.05), direction=order_direction["short"], side=order_side["taker"])
+#     # Execute the order
+#     await execute_batch(zkx_node_signer=dave_signer, zkx_node=dave, trading=trading, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, order_list_len=2, order_list=orders)
 
-#     params = [
-#         to64x61(0.05),
-#         market_id_1,
-#         to64x61(1300),
-#         2,
-#         *list(order_long.values()),
-#         *list(order_short.values())
-#     ]
-#     print(params)
-#     await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", params)
+#     # order_long = Alice.create_order(
+    #     market_id=market_id_1, quantity=to64x61(2.1), price=to64x61(1200), leverage=to64x61(10))
+    # order_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+    #     3), direction=order_direction["short"], side=order_side["taker"])
 
-#     orderState1 = await alice.get_position_data(market_id_=market_id_1, direction_=order_direction["long"]).call()
-#     res1 = list(orderState1.result.res)
-#     print(res1)
-#     print("in decimal")
-#     print([from64x61(x) for x in res1])
+    # params = [
+    #     to64x61(2.05),
+    #     market_id_1,
+    #     to64x61(1200),
+    #     2,
+    #     *list(order_long.values()),
+    #     *list(order_short.values())
+    # ]
+    # print(params)
+    # await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", params)
 
-#     orderState2 = await bob.get_position_data(market_id_=market_id_1, direction_=order_direction["short"]).call()
-#     res2 = list(orderState2.result.res)
-#     print(res2)
-#     print("in decimal")
-#     print([from64x61(x) for x in res2])
+    # orderState1 = await alice.get_position_data(market_id_=market_id_1, direction_=order_direction["long"]).call()
+    # res1 = list(orderState1.result.res)
+    # print(res1)
+    # print("in decimal")
+    # print([from64x61(x) for x in res1])
+
+    # orderState2 = await bob.get_position_data(market_id_=market_id_1, direction_=order_direction["short"]).call()
+    # res2 = list(orderState2.result.res)
+    # print(res2)
+    # print("in decimal")
+    # print([from64x61(x) for x in res2])
+
+    # #
+    # order_long = Alice.create_order(
+    #     market_id=market_id_1, quantity=to64x61(0.05), price=to64x61(1200), leverage=to64x61(10))
+    # order_short = Bob.create_order(market_id=market_id_1, quantity=to64x61(
+    #     0.05), direction=order_direction["short"], side=order_side["taker"])
+
+    # params = [
+    #     to64x61(0.05),
+    #     market_id_1,
+    #     to64x61(1300),
+    #     2,
+    #     *list(order_long.values()),
+    #     *list(order_short.values())
+    # ]
+    # print(params)
+    # await dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", params)
+
+    # orderState1 = await alice.get_position_data(market_id_=market_id_1, direction_=order_direction["long"]).call()
+    # res1 = list(orderState1.result.res)
+    # print(res1)
+    # print("in decimal")
+    # print([from64x61(x) for x in res1])
+
+    # orderState2 = await bob.get_position_data(market_id_=market_id_1, direction_=order_direction["short"]).call()
+    # res2 = list(orderState2.result.res)
+    # print(res2)
+    # print("in decimal")
+    # print([from64x61(x) for x in res2])
 
 
 # @pytest.mark.asyncio
@@ -863,62 +1180,6 @@ async def test_revert_balance_low_user_2(adminAuth_factory):
 #         bob.contract_address, signed_message1[0], signed_message1[
 #             1], order_id_2, assetID_2, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress1, 0,
 #     ]))
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_leverage_more_than_allowed(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _ = adminAuth_factory
-
-#     ####### Opening of Orders #######
-#     size = to64x61(1)
-#     marketID_1 = BTC_USD_ID
-
-#     order_id_1 = str_to_felt("32i7ashhj2")
-#     assetID_1 = BTC_ID
-#     collateralID_1 = USDC_ID
-#     price1 = to64x61(5000)
-#     stopPrice1 = 0
-#     orderType1 = 0
-#     position1 = to64x61(1)
-#     direction1 = 0
-#     closeOrder1 = 0
-#     parentOrder1 = 0
-#     leverage1 = to64x61(11)
-#     liquidatorAddress1 = 0
-
-#     order_id_2 = str_to_felt("mnjds87234")
-#     assetID_2 = BTC_ID
-#     collateralID_2 = USDC_ID
-#     price2 = to64x61(5000)
-#     stopPrice2 = 0
-#     orderType2 = 0
-#     position2 = to64x61(1)
-#     direction2 = 1
-#     closeOrder2 = 0
-#     parentOrder2 = 0
-#     leverage2 = to64x61(3)
-#     liquidatorAddress2 = 0
-
-#     execution_price1 = to64x61(5000)
-
-#     hash_computed1 = hash_order(order_id_1, assetID_1, collateralID_1,
-#                                 price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1)
-#     hash_computed2 = hash_order(order_id_2, assetID_2, collateralID_2,
-#                                 price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2)
-
-#     signed_message1 = alice_signer.sign(hash_computed1)
-#     signed_message2 = bob_signer.sign(hash_computed2)
-
-#     await assert_revert(dave_signer.send_transaction(dave, trading.contract_address, "execute_batch", [
-#         size,
-#         execution_price1,
-#         marketID_1,
-#         2,
-#         alice.contract_address, signed_message1[0], signed_message1[
-#             1], order_id_1, assetID_1, collateralID_1, price1, stopPrice1, orderType1, position1, direction1, closeOrder1, leverage1, liquidatorAddress1, 1,
-#         bob.contract_address, signed_message2[0], signed_message2[
-#             1], order_id_2, assetID_1, collateralID_2, price2, stopPrice2, orderType2, position2, direction2, closeOrder2, leverage2, liquidatorAddress2, 0,
-#     ]), reverted_with="Trading: Invalid Leverage")
 
 
 # @pytest.mark.asyncio

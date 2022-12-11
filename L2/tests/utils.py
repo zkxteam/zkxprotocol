@@ -404,11 +404,19 @@ order_side = {
     "taker": 2
 }
 
+close_order = {
+    "open": 1,
+    "close": 2
+}
+
 
 class OrderExecutor:
     def __init__(self):
         self.maker_trading_fees = 0.0002 * 0.97
         self.taker_trading_fees = 0.0005 * 0.97
+
+    def execute_batch_new(self, request_list, user_list, quantity_locked=1, market_id=str_to_felt("BTC-USDC"), oracle_price=1000):
+        return
 
     def execute_batch(self, request_list, user_list, quantity_locked=1, market_id=str_to_felt("BTC-USDC"), oracle_price=1000):
         # Store the quantity executed so far
@@ -482,6 +490,12 @@ class User:
         except KeyError:
             return 0
 
+    def charge_user(self, amount, asset_id=str_to_felt("USDC")):
+        try:
+            self.balance[asset_id] -= amount
+        except KeyError:
+            return 0
+
     def execute_order(self, order, execution_price, portion_being_executed, fee_rate):
         # Required direction
         current_direction = order["direction"] if order["close_order"] == 0 else abs(
@@ -496,8 +510,7 @@ class User:
         current_position_size = position["position_size"]
         current_borrowed_amount = position["borrowed_amount"]
         current_leverage = 0
-        print("Margin before", current_margin_amount)
-        print("Borrowed before", current_borrowed_amount)
+
         # If it's an open order
         if order["close_order"] == 0:
             # The position size is 0 or
@@ -519,28 +532,16 @@ class User:
                 average_execution_price = cumulative_position_value/cumulative_position_size
             # Order value with leverage
             leveraged_position_value = portion_being_executed * execution_price
-            print("leveraged position value", leveraged_position_value)
             # Order value wo leverage
             order_value_wo_leverage = leveraged_position_value / \
                 order["leverage"]
-            print("order wo leverage", order_value_wo_leverage)
 
             # Amount that needs to be borrowed
             amount_to_be_borrowed = leveraged_position_value - order_value_wo_leverage
-            print("amount to be borrowed", amount_to_be_borrowed)
-
-            print("Current Margin:", current_margin_amount,
-                  order_value_wo_leverage)
-            print("Current Borrowed:", current_borrowed_amount,
-                  amount_to_be_borrowed)
 
             # Update the current margin and borrowed amounts
             current_margin_amount += order_value_wo_leverage
             current_borrowed_amount += amount_to_be_borrowed
-
-            print("Current Margin After:", current_margin_amount)
-            print("Current Borrowed After:", current_borrowed_amount)
-            print("\n")
 
             # Calculate the fee for the order
             fees = fee_rate*leveraged_position_value
@@ -553,6 +554,7 @@ class User:
                                 current_borrowed_amount)/current_margin_amount
 
             # Deduct balance from user
+            self.charge_user(balance_to_be_deducted)
         # For closing orders
         else:
             assert position["position_size"] >= 0, "The parentPosition size cannot be 0"
@@ -657,7 +659,7 @@ class User:
         order_type=order_types["market"],
         time_in_force=order_time_in_force["good_till_time"],
         post_only=0,
-        close_order=0,
+        close_order=close_order["open"],
         liquidator_address=0,
         side=order_side["maker"]
     ):
@@ -669,7 +671,7 @@ class User:
         assert order_type in order_types.values(), "Invalid order_type"
         assert time_in_force in order_time_in_force.values(), "Invalid time_in_force"
         assert post_only in (0, 1), "Invalid post_only"
-        assert close_order in (0, 1), "Invalid close_order"
+        assert close_order in (1, 2), "Invalid close_order"
 
         new_order = {
             "order_id": str_to_felt(random_string(12)),
@@ -741,32 +743,32 @@ class User:
         return multiple_order_format
 
 
-alice = User(123456, "0x123234324")
-bob = User(73879, "0x1234589402")
-order_long = alice.create_order_decimals(
-    quantity=3, leverage=10)
-order_short = alice.create_order_decimals(
-    quantity=3, direction=order_direction["short"], side=order_side["taker"])
+# alice = User(123456, "0x123234324")
+# bob = User(73879, "0x1234589402")
+# order_long = alice.create_order_decimals(
+#     quantity=3, leverage=10)
+# order_short = alice.create_order_decimals(
+#     quantity=3, direction=order_direction["short"], side=order_side["taker"])
 
-print("Alice..", order_long)
-print("Bob...", order_short)
-request_list = [order_long, order_short]
+# print("Alice..", order_long)
+# print("Bob...", order_short)
+# request_list = [order_long, order_short]
 
 # alice.set_balance(100, str_to_felt("USDC"))
 # print(alice.get_balance(str_to_felt("USDC")))
 
-executoor = OrderExecutor()
-executoor.execute_batch(
-    request_list, [alice, bob], 3, str_to_felt("BTC-USDC"), 1000)
-print("/n")
+# executoor = OrderExecutor()
 # executoor.execute_batch(
 #     request_list, [alice, bob], 3, str_to_felt("BTC-USDC"), 1000)
-position_alice = alice.get_position(
-    str_to_felt("BTC-USDC"), order_direction["long"])
-position_bob = bob.get_position(
-    str_to_felt("BTC-USDC"), order_direction["short"])
-print(position_alice)
-print(position_bob)
+# print("/n")
+# executoor.execute_batch(
+#     request_list, [alice, bob], 3, str_to_felt("BTC-USDC"), 1000)
+# position_alice = alice.get_position(
+#     str_to_felt("BTC-USDC"), order_direction["long"])
+# position_bob = bob.get_position(
+#     str_to_felt("BTC-USDC"), order_direction["short"])
+# print(position_alice)
+# print(position_bob)
 # print(to64x61(100))
 # # multiple_order_long = MultipleOrder(*order_long)
 # multiple_order_short = MultipleOrder(*order_short)

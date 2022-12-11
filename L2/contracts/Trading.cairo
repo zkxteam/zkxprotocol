@@ -438,14 +438,16 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     //     execution_price=execution_price_,
     // );
 
-    let (user_balance) = IAccountManager.get_balance(
-        contract_address=order_.user_address, assetID_=collateral_id_
-    );
+    // Error messages need local variables to be passed in params
     local user_address;
     assert user_address = order_.user_address;
 
+    let (user_balance) = IAccountManager.get_balance(
+        contract_address=order_.user_address, assetID_=collateral_id_
+    );
+
     // User must be able to pay the amount
-    with_attr error_message("Trading: Low Balance- {user_address}") {
+    with_attr error_message("Trading: Low Balance {user_address}") {
         assert_le(total_amount, user_balance);
     }
 
@@ -868,11 +870,15 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         close_order=[request_list_].close_order
         );
 
+    // Error messages require local variables to be passed in params
+    local user_address;
+    assert user_address = temp_order.user_address;
+
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
     let (is_registered) = IAccountRegistry.is_registered_user(
         contract_address=account_registry_address_, address_=temp_order.user_address
     );
-    with_attr error_message("Trading: User account not registered") {
+    with_attr error_message("Trading: User account not registered- {user_address}") {
         assert_not_zero(is_registered);
     }
 
@@ -988,7 +994,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // }
 
     // If the order is to be opened
-    if (temp_order.close_order == FALSE) {
+    if (temp_order.close_order == 1) {
         let (
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
@@ -1084,13 +1090,16 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         execution_price=average_execution_price,
     );
 
+    local user_address_1;
+    assert user_address_1 = temp_order.user_address;
     // Market Check
-    with_attr error_message("Trading: All orders in a batch must be from the same market") {
+    with_attr error_message(
+            "Trading: All orders in a batch must be from the same market- {user_address_1}") {
         assert temp_order.market_id = market_id_;
     }
 
     // Leverage check minimum
-    with_attr error_message("Trading: Leverage must be >= 1") {
+    with_attr error_message("Trading: Leverage must be >= 1- {user_address}") {
         assert_le(LEVERAGE_ONE, temp_order.leverage);
     }
 
@@ -1105,12 +1114,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         }
 
         // Size check
-        with_attr error_message("Trading: Quantity must be >= to the minimum order size") {
+        with_attr error_message(
+                "Trading: Quantity must be >= to the minimum order size- {user_address}") {
             assert_le(market.minimum_order_size, temp_order.quantity);
         }
 
         // Leverage check maximum
-        with_attr error_message("Trading: Leverage must be <= to the maximum allowed leverage") {
+        with_attr error_message(
+                "Trading: Leverage must be <= to the maximum allowed leverage- {user_address}") {
             assert_le(temp_order.leverage, market.maximum_leverage);
         }
 
@@ -1144,27 +1155,24 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Leverage check maximum
-    with_attr error_message("Trading: Leverage must be <= to the maximum allowed leverage") {
+    with_attr error_message(
+            "Trading: Leverage must be <= to the maximum allowed leverage- {user_address}") {
         assert_le(temp_order.leverage, max_leverage_);
-    }
-
-    // Market Check
-    with_attr error_message("Trading: All orders in a batch must be from the same market") {
-        assert temp_order.market_id = market_id_;
     }
 
     // Direction Check
     if (request_list_len_ == 1) {
         tempvar direction_check = maker_direction_ - temp_order.direction;
         with_attr error_message(
-                "Trading: Taker order must be in opposite direction of Maker order(s)") {
+                "Trading: Taker order must be in opposite direction of Maker order(s)- {user_address}") {
             assert_not_zero(direction_check);
         }
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
-        with_attr error_message("Trading: All Maker orders must be in the same direction") {
+        with_attr error_message(
+                "Trading: All Maker orders must be in the same direction- {user_address}") {
             assert maker_direction_ = temp_order.direction;
         }
         tempvar syscall_ptr = syscall_ptr;
