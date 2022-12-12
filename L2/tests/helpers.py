@@ -58,6 +58,7 @@ class ContractType(Enum):
     RelayMarkets = "contracts/relay_contracts/RelayMarkets.cairo"
     RelayFeeDiscount = "contracts/relay_contracts/RelayFeeDiscount.cairo"
     WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
+    ZKXDeployer = "contracts/ZKXDeployer.cairo"
     
     # Test-helping contracts
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
