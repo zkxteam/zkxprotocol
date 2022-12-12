@@ -79,17 +79,17 @@ func get_registry_len{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func get_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     starting_index_: felt, num_accounts_: felt
 ) -> (account_registry_len: felt, account_registry: felt*) {
-    with_attr error_message("Starting index cannot be negative") {
+    with_attr error_message("AccountRegistry: Starting index cannot be negative") {
         assert_nn(starting_index_);
     }
 
-    with_attr error_message("Number of accounts cannot be negative or zero") {
+    with_attr error_message("AccountRegistry: Number of accounts cannot be negative or zero") {
         assert_lt(0, num_accounts_);
     }
 
     let ending_index = starting_index_ + num_accounts_;
     let (reg_len) = account_registry_len.read();
-    with_attr error_message("Cannot retrieve the specified num of accounts") {
+    with_attr error_message("AccountRegistry: Cannot retrieve the specified num of accounts") {
         assert_le(ending_index, reg_len);
     }
 
@@ -114,11 +114,11 @@ func add_to_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     let (account_deployer_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AccountDeployer_INDEX, version=version
     );
-    with_attr error_message("Caller is not authorized to add account to registry") {
+    with_attr error_message("AccountRegistry: Unauthorized caller for add_to_account_registry") {
         assert caller = account_deployer_address;
     }
 
-    with_attr error_message("Address cannot be zero") {
+    with_attr error_message("AccountRegistry: Address cannot be 0") {
         assert_not_zero(address_);
     }
 
@@ -145,28 +145,28 @@ func add_to_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 func remove_from_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     id_: felt
 ) -> () {
-    with_attr error_message("Caller is not Master Admin") {
+    with_attr error_message(
+            "AccountRegistry: Unathorized caller for remove_from_account_registry") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    with_attr error_message("id_ cannot be negative") {
+    with_attr error_message("AccountRegistry: 0 passed as ID for removal") {
         assert_nn(id_);
     }
 
     let (reg_len) = account_registry_len.read();
-    with_attr error_message(
-            "id_ cannot be greater than or equal to the length of the registry array") {
+    with_attr error_message("AccountRegistry: id greater than account registry len") {
         assert_lt(id_, reg_len);
     }
 
-    with_attr error_message("The registry array is empty") {
+    with_attr error_message("AccountRegistry: Registry is empty") {
         assert_not_zero(reg_len);
     }
 
     let (account_address) = account_registry.read(index=id_);
-    with_attr error_message("Account address does not exists in that index") {
+    with_attr error_message("AccountRegistry: Account address doesn't exist at the index") {
         assert_not_zero(account_address);
     }
 

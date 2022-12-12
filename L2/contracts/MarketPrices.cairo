@@ -20,27 +20,27 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted whenever update_market_price() is called
 @event
 func update_market_price_called(market_id: felt, price: felt) {
 }
 
-//##########
-// Storage #
-//##########
+/////////////
+// Storage //
+/////////////
 
 // Mapping between market ID and Market Prices
 @storage_var
 func market_prices(id: felt) -> (res: MarketPrice) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
 
 // @notice Constructor for the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -53,9 +53,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+//////////
+// View //
+//////////
 
 // @notice function to get market price
 // @param market_id_ - Id of the market pair
@@ -67,9 +67,9 @@ func get_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (market_price=res);
 }
 
-//#####################
-// External Functions #
-//#####################
+//////////////
+// External //
+//////////////
 
 // @notice function to update market price
 // @param market_id_ - Id of the market
@@ -97,7 +97,7 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
             contract_address=registry, index=Trading_INDEX, version=version
         );
 
-        with_attr error_message("Caller is not authorized to update market price") {
+        with_attr error_message("MarketPrices: Unauthorized caller for updating market price") {
             assert caller = trading_contract_address;
         }
 
@@ -123,18 +123,18 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // Get Market from the corresponding Id
     let (market: Market) = IMarkets.get_market(
-        contract_address=market_contract_address, id=market_id_
+        contract_address=market_contract_address, market_id_=market_id_
     );
 
-    with_attr error_message("Price cannot be negative") {
+    with_attr error_message("MarketPrices: Price cannot be negative") {
         assert_nn(price_);
     }
 
-    with_attr error_message("Price should be within 64x61 range") {
+    with_attr error_message("MarketPrices: Price must be in 64x61 respresentation") {
         Math64x61_assert64x61(price_);
     }
 
-    with_attr error_message("Market does not exist") {
+    with_attr error_message("MarketPrices: Market does not exist") {
         assert_not_zero(market.asset);
     }
 

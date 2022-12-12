@@ -38,7 +38,7 @@ namespace FundLib {
     func initialize{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         registry_address_: felt, contract_version_: felt
     ) {
-        with_attr error_message("Registry address and version cannot be 0") {
+        with_attr error_message("FundLib: Registry address and version cannot be 0") {
             assert_not_zero(registry_address_);
             assert_not_zero(contract_version_);
         }
@@ -103,7 +103,7 @@ namespace FundLib {
             contract_address=auth_address, address=caller, action=ManageFunds_ACTION
         );
 
-        with_attr error_message("Amount cannot be 0 or negative") {
+        with_attr error_message("FundLib: Amount must be > 0") {
             assert_lt(0, amount_);
         }
 
@@ -115,7 +115,7 @@ namespace FundLib {
                 contract_address=registry, index=EmergencyFund_INDEX, version=version
             );
 
-            with_attr error_message("Caller is not authorized to do the transfer") {
+            with_attr error_message("FundLib: Unauthorized call to transfer funds") {
                 assert caller = emergency_address;
             }
 
@@ -145,12 +145,12 @@ namespace FundLib {
             contract_address=auth_address, address=caller, action=ManageFunds_ACTION
         );
 
-        with_attr error_message("Amount cannot be 0 or negative") {
+        with_attr error_message("FundLib: Amount must > 0") {
             assert_lt(0, amount_);
         }
 
         let current_amount: felt = FundLib_balance_by_id.read(id=asset_id_);
-        with_attr error_message("Amount to be deducted is more than asset's balance") {
+        with_attr error_message("FundLib: Insufficient balance") {
             assert_le(amount_, current_amount);
         }
         let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -160,7 +160,7 @@ namespace FundLib {
                 contract_address=registry, index=EmergencyFund_INDEX, version=version
             );
 
-            with_attr error_message("Caller is not authorized to do the transfer") {
+            with_attr error_message("FundLib: Unauthorized call to transfer funds") {
                 assert caller = emergency_address;
             }
 
@@ -187,11 +187,11 @@ namespace FundLib {
             contract_address=registry, index=index_, version=version
         );
 
-        with_attr error_message("Caller is not authorized to perform deposit") {
+        with_attr error_message("FundLib: Unauthorized call to deposit") {
             assert caller = contract_address;
         }
 
-        with_attr error_message("Amount cannot be 0 or negative") {
+        with_attr error_message("FundLib: Amount must be > 0") {
             assert_lt(0, amount_);
         }
 
@@ -218,16 +218,16 @@ namespace FundLib {
             contract_address=registry, index=index_, version=version
         );
 
-        with_attr error_message("Caller is not authorized to perform withdraw") {
+        with_attr error_message("FundLib: Unauthorized call to withdraw funds") {
             assert caller = contract_address;
         }
 
-        with_attr error_message("Amount cannot be 0 or negative") {
+        with_attr error_message("FundLib: Amount must be > 0") {
             assert_lt(0, amount_);
         }
 
         let current_amount: felt = FundLib_balance_by_id.read(id=id_);
-        with_attr error_message("Amount to be deducted is more than asset's balance") {
+        with_attr error_message("FundLib: Insufficient balance") {
             assert_le(amount_, current_amount);
         }
         let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -243,7 +243,7 @@ namespace FundLib {
     func fund_abr_or_emergency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         id_: felt, amount_: felt
     ) {
-        with_attr error_message("Not authorized to manage funds") {
+        with_attr error_message("FundLib: Unauthorized call to manage funds") {
             let (registry) = FundLib_registry_address.read();
             let (version) = FundLib_contract_version.read();
             verify_caller_authority(registry, version, ManageFunds_ACTION);
@@ -267,18 +267,18 @@ namespace FundLib {
     func defund_abr_or_emergency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         id_: felt, amount_: felt
     ) {
-        with_attr error_message("Not authorized to manage funds") {
+        with_attr error_message("FundLib: Unauthorized call to manage funds") {
             let (registry) = FundLib_registry_address.read();
             let (version) = FundLib_contract_version.read();
             verify_caller_authority(registry, version, ManageFunds_ACTION);
         }
 
-        with_attr error_message("Amount cannot be 0 or negative") {
+        with_attr error_message("FundLib: Amount must be > 0") {
             assert_lt(0, amount_);
         }
 
         let current_amount: felt = FundLib_balance_by_id.read(id=id_);
-        with_attr error_message("Amount to be deducted is more than asset's balance") {
+        with_attr error_message("FundLib: Insufficient balance") {
             assert_le(amount_, current_amount);
         }
         let updated_amount: felt = Math64x61_sub(current_amount, amount_);

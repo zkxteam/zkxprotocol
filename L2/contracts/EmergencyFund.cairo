@@ -117,11 +117,11 @@ func fund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
-    with_attr error_message("Caller is not authorized to manage funds") {
+    with_attr error_message("EmergencyFund: Unauthorized call to fund holding") {
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("Amount cannot be 0 or negative") {
+    with_attr error_message("EmergencyFund: Amount must be > 0") {
         assert_lt(0, amount_);
     }
 
@@ -131,7 +131,7 @@ func fund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     );
 
     let current_amount: felt = FundLib.balance(asset_id_);
-    with_attr error_message("Amount to be deducted is more than asset's balance") {
+    with_attr error_message("EmergencyFund: Insufficient balance") {
         assert_le(amount_, current_amount);
     }
     let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -155,11 +155,11 @@ func fund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
-    with_attr error_message("Caller is not authorized to manage funds") {
+    with_attr error_message("EmergencyFund: Unauthorized call to fund liquidity") {
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("Amount cannot be 0 or negative") {
+    with_attr error_message("EmergencyFund: Amount must > 0") {
         assert_lt(0, amount_);
     }
 
@@ -169,7 +169,7 @@ func fund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     );
 
     let current_amount: felt = FundLib.balance(asset_id_);
-    with_attr error_message("Amount to be deducted is more than asset's balance") {
+    with_attr error_message("EmergencyFund: Insufficient funds") {
         assert_le(amount_, current_amount);
     }
     let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -193,11 +193,11 @@ func fund_insurance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
-    with_attr error_message("Caller is not authorized to manage funds") {
+    with_attr error_message("EmergencyFund: Unauthorized call to fund insurance") {
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("Amount cannot be 0 or negative") {
+    with_attr error_message("EmergencyFund: Amount must be > 0") {
         assert_lt(0, amount_);
     }
 
@@ -207,7 +207,7 @@ func fund_insurance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     );
 
     let current_amount: felt = FundLib.balance(asset_id_);
-    with_attr error_message("Amount to be deducted is more than asset's balance") {
+    with_attr error_message("EmergencyFund: Insufficient funds") {
         assert_le(amount_, current_amount);
     }
     let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -231,11 +231,11 @@ func defund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
-    with_attr error_message("Caller is not authorized to manage funds") {
+    with_attr error_message("EmergencyFund: Unauthorized call to defund holding") {
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("Amount cannot be 0 or negative") {
+    with_attr error_message("EmergencyFund: Amount must be > 0") {
         assert_lt(0, amount_);
     }
 
@@ -265,11 +265,11 @@ func defund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
-    with_attr error_message("Caller is not authorized to manage funds") {
+    with_attr error_message("EmergencyFund: Unauthorized call to defund liquidity") {
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("Amount cannot be 0 or negative") {
+    with_attr error_message("EmergencyFund: Amount must be > 0") {
         assert_lt(0, amount_);
     }
 
@@ -299,11 +299,11 @@ func defund_insurance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
-    with_attr error_message("Caller is not authorized to manage funds") {
+    with_attr error_message("EmergencyFund: Unauthorized call to defund") {
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("Amount cannot be 0 or negative") {
+    with_attr error_message("EmergencyFund: Amount must > 0") {
         assert_lt(0, amount_);
     }
 

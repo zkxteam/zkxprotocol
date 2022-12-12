@@ -26,6 +26,11 @@ const PubkeyWhitelister_INDEX = 22;
 const SigRequirementsManager_INDEX = 23;
 const Hightide_INDEX = 24;
 const TradingStats_INDEX = 25;
+const UserStats_INDEX = 26;
+const Starkway_INDEX = 27;
+const Settings_INDEX = 28;
+const RewardsCalculation_INDEX = 29;
+const HighTideCalc_INDEX = 30;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
@@ -53,6 +58,7 @@ const ManageFunds_ACTION = 5;
 const ManageGovernanceToken_ACTION = 6;
 const ManageCollateralPrices_ACTION = 7;
 const ManageHighTide_ACTION = 8;
+const ManageSettings_ACTION = 9;
 
 const POSITION_OPENED = 1;
 const POSITION_TO_BE_DELEVERAGED = 2;
@@ -70,3 +76,6 @@ const SHORT = 0;
 
 const WITHDRAWAL_INITIATED = 0;
 const WITHDRAWAL_SUCCEEDED = 1;
+
+const HIGHTIDE_INITIATED = 0;
+const HIGHTIDE_ACTIVE = 1;

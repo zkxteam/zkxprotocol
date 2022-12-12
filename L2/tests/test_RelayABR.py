@@ -6,13 +6,10 @@ import calculate_abr
 from starkware.starknet.testing.starknet import Starknet
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, from64x61, to64x61, assert_revert, convertTo64x61
+from utils import Signer, from64x61, to64x61, assert_revert, convertTo64x61, ContractIndex
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
-
-
-admin1_signer = Signer(123456789987654321)
-admin2_signer = Signer(123456789987654322)
+from dummy_signers import signer1, signer2, signer3
 
 
 @pytest.fixture(scope='module')
@@ -22,27 +19,26 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def abr_factory(starknet_service: StarknetService):
-
     # Deploy admins
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, 0, 1)
-    admin1 = await account_factory.deploy_account(admin1_signer.public_key)
-    admin2 = await account_factory.deploy_account(admin2_signer.public_key)
-    
+    admin1 = await starknet_service.deploy(ContractType.Account, [signer1.public_key])
+    admin2 = await starknet_service.deploy(ContractType.Account, [signer2.public_key])
+
     # Deploy infrastructure
-    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
+    adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, 0x0])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     abr = await starknet_service.deploy(ContractType.ABR, [registry.contract_address, 1])
     
-    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [17, 1, abr.contract_address])
+    # Deploy accounts
+    account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
+    alice = await account_factory.deploy_ZKX_account(signer3.public_key)
 
     # Deploy RelayABR contract
     relay_abr = await starknet_service.deploy(ContractType.RelayABR, [
         registry.contract_address, 
         1,
-        17  # abr index
+        ContractIndex.ABR
     ])
-
+  
     timestamp = int(time.time())
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
@@ -59,30 +55,47 @@ async def abr_factory(starknet_service: StarknetService):
     eth_perp_spot_64x61 = convertTo64x61(ABR_data.eth_perp_spot)
     eth_perp_64x61 = convertTo64x61(ABR_data.eth_perp)
 
-    return starknet_service.starknet, relay_abr, admin1, btc_perp_spot_64x61, btc_perp_64x61, eth_perp_spot_64x61, eth_perp_64x61
+    return starknet_service.starknet, abr, admin1, alice, btc_perp_spot_64x61, btc_perp_64x61, eth_perp_spot_64x61, eth_perp_64x61,admin2
 
 
 @pytest.mark.asyncio
 async def test_should_revert_if_wrong_number_of_arguments_passed_for_BTC(abr_factory):
-    _, abr, admin1, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, _, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     arguments = [1282193, 479] + btc_spot + [480]+btc_perp
 
-    await assert_revert(
-        admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments))
+    await assert_revert(signer1.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments))
 
 
 @pytest.mark.asyncio
-async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
-    _, abr, admin1, btc_spot, btc_perp, _, _ = abr_factory
+async def test_should_revert_if_non_admin_changed_bollinger_width(abr_factory):
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
-    arguments = [1282193, 480] + btc_spot + [480]+btc_perp
+    new_boll_width = to64x61(1.5)
+
+    await assert_revert(signer2.send_transaction(admin2, abr.contract_address, 'modify_bollinger_width', [new_boll_width]), reverted_with="ABR: Unauthorized")
+
+
+@ pytest.mark.asyncio
+async def test_should_revert_if_non_admin_changed_base_abr(abr_factory):
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _, admin2 = abr_factory
+
+    new_base_abr = to64x61(0.000025)
+    await assert_revert(
+        signer2.send_transaction(admin2, abr.contract_address, 'modify_base_abr', [new_base_abr]), reverted_with="ABR: Unauthorized")
+
+
+@ pytest.mark.asyncio
+async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
+    _, abr, admin1, _, btc_spot, btc_perp, eth_spot, eth_perp, admin2 = abr_factory
+
+    arguments = [1282193, 480] + btc_spot + [480] + btc_perp
 
     abr_python = calculate_abr.calculate_abr(
         ABR_data.btc_perp_spot, ABR_data.btc_perp, 0.0000125, 2.0)
     print("python rate", abr_python)
 
-    abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
+    abr_cairo = await signer1.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
     print("cairo rate", from64x61(abr_cairo.call_info.retdata[1]))
 
     abr_value = await abr.get_abr_value(1282193).call()
@@ -91,25 +104,24 @@ async def test_should_calculate_correct_abr_ratio_for_BTC(abr_factory):
     print("The last price is:",
           from64x61(abr_value.result.price))
     print("The last timestamp is:",
-          from64x61(abr_value.result.timestamp))
-
+          abr_value.result.timestamp)
     assert abr_python == pytest.approx(
         from64x61(abr_cairo.call_info.retdata[1]), abs=1e-6)
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_should_revert_if_called_before_8_hours(abr_factory):
-    _, abr, admin1, btc_spot, btc_perp, _, _ = abr_factory
+    _, abr, admin1, _, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     arguments = [1282193, 480] + btc_spot + [480]+btc_perp
 
     await assert_revert(
-        admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments))
+        signer1.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments), reverted_with="ABR: 8 hours not passed")
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_should_pass_if_called_after_8_hours(abr_factory):
-    starknet, abr, admin1, btc_spot, btc_perp, _, _ = abr_factory
+    starknet, abr, admin1, _, btc_spot, btc_perp, _, _, admin2 = abr_factory
 
     timestamp = int(time.time()) + 28810
 
@@ -125,7 +137,7 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
         ABR_data.btc_perp_spot, ABR_data.btc_perp, 0.0000125, 2.0)
     print("python rate", abr_python)
 
-    abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
+    abr_cairo = await signer1.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
     print("cairo rate", from64x61(abr_cairo.call_info.retdata[1]))
 
     abr_value = await abr.get_abr_value(1282193).call()
@@ -134,32 +146,48 @@ async def test_should_pass_if_called_after_8_hours(abr_factory):
     print("The last price is:",
           from64x61(abr_value.result.price))
     print("The last timestamp is:",
-          from64x61(abr_value.result.timestamp))
+          abr_value.result.timestamp)
 
     assert abr_python == pytest.approx(
         from64x61(abr_cairo.call_info.retdata[1]), abs=1e-6)
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
+async def test_should_pass_if_admin_changed_base_abr(abr_factory):
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _, admin2 = abr_factory
+
+    new_base_abr = to64x61(0.000025)
+    await signer1.send_transaction(admin1, abr.contract_address, 'modify_base_abr', [new_base_abr])
+
+
+@ pytest.mark.asyncio
+async def test_should_pass_if_admin_changed_bollinger_width(abr_factory):
+    _, abr, admin1, alice, btc_spot, btc_perp, _, _, admin2 = abr_factory
+
+    new_boll_width = to64x61(1.5)
+    await signer1.send_transaction(admin1, abr.contract_address, 'modify_bollinger_width', [new_boll_width])
+
+
+@ pytest.mark.asyncio
 async def test_should_calculate_correct_abr_ratio_for_ETH(abr_factory):
-    _, abr, admin1, _, _, eth_spot, eth_perp = abr_factory
+    _, abr, admin1, _, _, _, eth_spot, eth_perp, admin2 = abr_factory
 
     arguments = [1282198, 480] + eth_spot + [480] + eth_perp
 
     abr_python = calculate_abr.calculate_abr(
-        ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.0000125, 2.0)
+        ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 1.5)
     print("python rate", abr_python)
 
-    abr_cairo = await admin1_signer.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
+    abr_cairo = await signer1.send_transaction(admin1, abr.contract_address, 'calculate_abr', arguments)
     print("cairo rate", from64x61(abr_cairo.call_info.retdata[1]))
 
-    abr_value = await abr.get_abr_value(92391239).call()
+    abr_value = await abr.get_abr_value(1282198).call()
     print("abr value of the market is:",
           from64x61(abr_value.result.abr))
     print("The last price is:",
           from64x61(abr_value.result.price))
     print("The last timestamp is:",
-          from64x61(abr_value.result.timestamp))
+          abr_value.result.timestamp)
 
     assert abr_python == pytest.approx(
         from64x61(abr_cairo.call_info.retdata[1]), abs=1e-6)

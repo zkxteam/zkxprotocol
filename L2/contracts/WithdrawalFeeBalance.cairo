@@ -1,5 +1,6 @@
 %lang starknet
 
+from starkware.cairo.common.bool import TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
@@ -106,15 +107,16 @@ func set_standard_withdraw_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not Master Admin") {
+    with_attr error_message(
+            "WithdrawalFeeBalance: Unauthorized call for withdset_standard_withdraw_fee") {
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
     // Update standard fee
-    with_attr error_message("Fee should not be negative") {
+    with_attr error_message("WithdrawalFeeBalance: Fee should be non-negative") {
         assert_nn(fee_);
     }
-    with_attr error_message("Amount should be in 64x61 representation") {
+    with_attr error_message("WithdrawalFeeBalance: Amount must be in 64x61 representation") {
         Math64x61_assert64x61(fee_);
     }
     standard_withdraw_fee.write(value=fee_);
@@ -124,8 +126,8 @@ func set_standard_withdraw_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         contract_address=registry, index=Asset_INDEX, version=version
     );
     let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
-    with_attr error_message("Standard fee should be a collateral in the system") {
-        assert_not_zero(asset.collateral);
+    with_attr error_message("WithdrawalFeeBalance: Unregistered collateral passed") {
+        assert asset.is_collateral = TRUE;
     }
     standard_withdraw_fee_collateral_id.write(value=collateral_id_);
 
@@ -156,15 +158,15 @@ func update_withdrawal_fee_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
         contract_address=account_registry_address, address_=caller
     );
 
-    with_attr error_message("Called account contract is not registered") {
+    with_attr error_message("WithdrawalFeeBalance: User address not registered") {
         assert_not_zero(present);
     }
 
-    with_attr error_message("Fee should be non negative") {
+    with_attr error_message("WithdrawalFeeBalance: Fee should be non-negative") {
         assert_nn(fee_to_add_);
     }
 
-    with_attr error_message("Amount should be in 64x61 representation") {
+    with_attr error_message("WithdrawalFeeBalance: Amount must be in 64x61 representation") {
         Math64x61_assert64x61(fee_to_add_);
     }
 
@@ -174,7 +176,7 @@ func update_withdrawal_fee_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     );
     let new_total_fee_per_asset: felt = current_total_fee_per_asset + fee_to_add_;
 
-    with_attr error_message("Total fee must be in 64x61 range") {
+    with_attr error_message("WithdrawalFeeBalance: Total fee must be in 64x61 representation") {
         Math64x61_assert64x61(new_total_fee_per_asset);
     }
 
@@ -199,15 +201,15 @@ func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not Master Admin") {
+    with_attr error_message("WithdrawalFeeBalance: Unauthorized call for withdraw") {
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    with_attr error_message("Amount to be withdrawn should be greater than 0") {
+    with_attr error_message("WithdrawalFeeBalance: Amount to withdraw should be non-zero") {
         assert_lt(0, amount_to_withdraw_);
     }
 
-    with_attr error_message("Amount should be in 64x61 representation") {
+    with_attr error_message("WithdrawalFeeBalance: Amount must be in 64x61 representation") {
         Math64x61_assert64x61(amount_to_withdraw_);
     }
 
@@ -215,7 +217,7 @@ func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let current_total_fee_per_asset: felt = total_withdrawal_fee_per_asset.read(
         collateral_id=collateral_id_
     );
-    with_attr error_message("Amount to withdraw is more than balance available") {
+    with_attr error_message("WithdrawalFeeBalance: Insufficient balance to withdraw") {
         assert_le(amount_to_withdraw_, current_total_fee_per_asset);
     }
     let new_total_fee_per_asset: felt = current_total_fee_per_asset - amount_to_withdraw_;

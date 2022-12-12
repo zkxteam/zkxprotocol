@@ -79,15 +79,15 @@ func update_collateral_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
-    with_attr error_message("Caller is not authorized to update collateral prices") {
+    with_attr error_message("CollateralPrices: Unauthorized call to update collateral prices") {
         verify_caller_authority(registry, version, ManageCollateralPrices_ACTION);
     }
 
-    with_attr error_message("Price cannot be negative") {
+    with_attr error_message("CollateralPrices: Price cannot be negative") {
         assert_nn(price_);
     }
 
-    with_attr error_message("Price should within 64x61 range") {
+    with_attr error_message("CollateralPrices: Price should be within 64x61 range") {
         Math64x61_assert64x61(price_);
     }
 
@@ -101,8 +101,8 @@ func update_collateral_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         contract_address=asset_contract_address, id=collateral_id_
     );
 
-    with_attr error_message("Asset does not exist") {
-        assert_not_zero(asset.ticker);
+    with_attr error_message("CollateralPrices: Asset does not exist") {
+        assert_not_zero(asset.id);
     }
 
     // Calculate the timestamp

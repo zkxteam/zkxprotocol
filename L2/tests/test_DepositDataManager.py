@@ -53,7 +53,7 @@ async def test_store_and_query(adminAuth_factory):
     assert len(result) == 1
     assert result[0].user_L1_address == 1
     assert result[0].user_L2_address == admin2.contract_address
-    assert result[0].ticker == 2
+    assert result[0].asset_id == 2
     assert result[0].amount == 3
     assert result[0].nonce == 4
     assert result[0].message_hash == 5
@@ -72,7 +72,7 @@ async def test_store_and_query(adminAuth_factory):
     assert len(result) == 2
     assert result[0].user_L1_address == 1
     assert result[0].user_L2_address == admin2.contract_address
-    assert result[0].ticker == 2
+    assert result[0].asset_id == 2
     assert result[0].amount == 3
     assert result[0].nonce == 4
     assert result[0].message_hash == 5
@@ -80,7 +80,7 @@ async def test_store_and_query(adminAuth_factory):
 
     assert result[1].user_L1_address == 10
     assert result[1].user_L2_address == admin2.contract_address
-    assert result[1].ticker == 20
+    assert result[1].asset_id == 20
     assert result[1].amount == 30
     assert result[1].nonce == 40
     assert result[1].message_hash == 50
@@ -102,7 +102,7 @@ async def test_store_with_0_address(adminAuth_factory):
     await assert_revert(signer1.send_transaction(admin1,
                                                  deposit_data_manager.contract_address, 
                                                  'store_deposit_data', 
-                                                 [1, 0, 2, 3, 4, 5, 6]))
+                                                 [1, 0, 2, 3, 4, 5, 6]), reverted_with="DepositDataManager: User address cannot be 0")
 
 
 @pytest.mark.asyncio

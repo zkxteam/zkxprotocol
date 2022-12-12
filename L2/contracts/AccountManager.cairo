@@ -76,9 +76,9 @@ from contracts.Math_64x61 import (
     Math64x61_sub,
 )
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted whenever collateral is transferred from account by trading
 @event
@@ -115,9 +115,9 @@ func liquidate_deleverage(market_id: felt, direction: felt, amount_to_be_sold: f
 func deposited(asset_id: felt, amount: felt) {
 }
 
-//##########
-// Storage #
-//##########
+/////////////
+// Storage //
+/////////////
 
 // Stores public key associated with an account
 @storage_var
@@ -204,15 +204,15 @@ func withdrawal_history_array_len() -> (len: felt) {
 func order_id_mapping(order_id: felt) -> (hash: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     public_key_: felt, L1_address_: felt, registry_address_: felt, version_: felt
 ) {
-    with_attr error_message("Public key and L1 address cannot be 0") {
+    with_attr error_message("AccountManager: Public key and L1 address cannot be 0") {
         assert_not_zero(public_key_);
         assert_not_zero(L1_address_);
     }
@@ -224,9 +224,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+////////////////////
+// View Functions //
+////////////////////
 
 // @notice view function to get public key
 // @return res - public key of an account
@@ -384,9 +384,9 @@ func timestamp_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return (is_eight_hours,);
 }
 
-//#############
-// L1 Handler #
-//#############
+////////////////
+// L1 Handler //
+////////////////
 
 // @notice Function to handle deposit from L1ZKX contract
 // @param from_address - The address from where deposit function is called from
@@ -406,11 +406,11 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         contract_address=registry, index=L1_ZKX_Address_INDEX, version=version
     );
     // Make sure the message was sent by the intended L1 contract
-    with_attr error_message("Message must be sent by approved ZKX address") {
+    with_attr error_message("AccountManager: Unauthorized caller for deposit") {
         assert from_address = L1_ZKX_contract_address;
     }
     let (stored_L1_address) = L1_address.read();
-    with_attr error_message("Only the user can initiate deposits") {
+    with_attr error_message("AccountManager: L1 address mismatch for deposit") {
         assert stored_L1_address = user;
     }
     // Get asset contract address
@@ -442,9 +442,9 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+////////////////////////
+// External Functions //
+////////////////////////
 
 // @notice External function called by the Trading Contract
 // @param assetID_ - asset ID of the collateral that needs to be transferred
@@ -463,7 +463,7 @@ func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         contract_address=registry, index=Trading_INDEX, version=version
     );
 
-    with_attr error_message("Caller is not authorized to do transferFrom in account contract.") {
+    with_attr error_message("AccountManager: Unauthorized caller for transfer_from") {
         assert caller = trading_address;
     }
 
@@ -490,7 +490,7 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
     );
 
-    with_attr error_message("Caller is not authorized to do transferFrom in account contract.") {
+    with_attr error_message("AccountManager: Unauthorized caller for transfer_from_abr") {
         assert caller = abr_payment_address;
     }
 
@@ -522,7 +522,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     let (abr_payment_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=ABR_PAYMENT_INDEX, version=version
     );
-    with_attr error_message("Caller is not authorized to do transfer in account contract.") {
+    with_attr error_message("AccountManager: Unauthorized caller for transfer_abr") {
         assert caller = abr_payment_address;
     }
 
@@ -584,12 +584,11 @@ func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
     );
-    with_attr error_message(
-            "Trading contract is not authorized to do transfer in account contract.") {
+    with_attr error_message("AccountManager: Unauthorized caller for transfer") {
         assert caller = trading_address;
     }
 
-    with_attr error_message("Amount supplied shouldn't be negative in account contract.") {
+    with_attr error_message("AccountManager: Amount cannot be negative") {
         assert_nn(amount);
     }
 
@@ -630,8 +629,7 @@ func execute_order{
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
     );
-    with_attr error_message(
-            "Trading contract is not authorized to execute order in account contract.") {
+    with_attr error_message("AccountManager: Unauthorized caller for execute_order") {
         assert caller = trading_address;
     }
 
@@ -654,8 +652,7 @@ func execute_order{
     let (new_position_executed) = Math64x61_add(order_portion_executed, size);
 
     // Return if the position size after the executing the current order is more than the order's positionSize
-    with_attr error_message(
-            "portion executed + size should be less than position in account contract.") {
+    with_attr error_message("AccountManager: New position size larger than order") {
         assert_le(new_position_executed, request.positionSize);
     }
 
@@ -720,12 +717,12 @@ func execute_order{
         let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size);
 
         // Assert that the parent position is open
-        with_attr error_message("The parent position size is 0") {
+        with_attr error_message("AccountManager: Parent Position is not open") {
             assert_not_zero(parent_position_details.position_size);
         }
 
         // Assert that the size amount can be closed from the parent position
-        with_attr error_message("The size of close order is more than the portionExecuted") {
+        with_attr error_message("AccountManager: Cannot close more thant the positionSize") {
             assert_nn(new_position_size);
         }
 
@@ -739,13 +736,13 @@ func execute_order{
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
             let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read();
 
-            with_attr error_message("The position not marked to be deleveraged/liquidated") {
+            with_attr error_message(
+                    "AccountManager: Position not marked as liquidatable/deleveragable") {
                 assert liq_position.market_id = market_id;
                 assert liq_position.direction = parent_direction;
             }
 
-            with_attr error_message(
-                    "The size of order should be less than or equal to the marked one") {
+            with_attr error_message("AccountManager: Order size larger than marked one") {
                 assert_le(size, liq_position.amount_to_be_sold);
             }
 
@@ -775,7 +772,7 @@ func execute_order{
 
             // If it's a deleveraging order, calculate the new leverage
             if (request.orderType == DELEVERAGING_ORDER) {
-                with_attr error_message("Not marked as deleveragable") {
+                with_attr error_message("AccountManager: Position not marked as deleveragable") {
                     assert liq_position.liquidatable = FALSE;
                 }
                 let total_value = margin_amount + borrowed_amount;
@@ -785,7 +782,7 @@ func execute_order{
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             } else {
-                with_attr error_message("Not marked as liquidatable") {
+                with_attr error_message("AccountManager: Position not marked as liquidatable") {
                     assert liq_position.liquidatable = TRUE;
                 }
 
@@ -857,7 +854,7 @@ func update_withdrawal_history{
     let (withdrawal_request_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=WithdrawalRequest_INDEX, version=version
     );
-    with_attr error_message("Caller is not authorized to update withdrawal history") {
+    with_attr error_message("AccountManager: Unauthorized caller for withdrawal history updation") {
         assert caller = withdrawal_request_address;
     }
     let (arr_len) = withdrawal_history_array_len.read();
@@ -917,11 +914,11 @@ func withdraw{
     is_valid_signature(hash, 2, signature_);
     let (arr_len) = withdrawal_history_array_len.read();
     let (result) = check_for_withdrawal_replay(request_id_, arr_len);
-    with_attr error_message("Same withdrawal request exists") {
+    with_attr error_message("AccountManager: Withdrawal replay detected") {
         assert_nn(result);
     }
     // Make sure 'amount' is positive.
-    with_attr error_message("Withdrawal amount requested cannot be negative") {
+    with_attr error_message("AccountManager: Amount cannot be negative") {
         assert_nn(amount_);
     }
     // get L2 Account contract address
@@ -935,8 +932,7 @@ func withdraw{
     );
     // Compute current balance
     let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id);
-    with_attr error_message(
-            "Fee amount should be less than or equal to the fee collateral balance") {
+    with_attr error_message("AccountManager: Insufficient balance to pay fees") {
         assert_le(standard_fee, fee_collateral_balance);
     }
     tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee;
@@ -949,8 +945,7 @@ func withdraw{
     );
     // Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_);
-    with_attr error_message(
-            "Withdrawal amount requested should be less than or equal to the current balance") {
+    with_attr error_message("AccountManager: Insufficient balance to withdraw") {
         assert_le(amount_, current_balance);
     }
     tempvar new_balance = current_balance - amount_;
@@ -962,8 +957,7 @@ func withdraw{
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     );
-    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
-    tempvar ticker = asset.ticker;
+    let (local asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
     // Convert amount from Math64x61 format to felt
     let (amount_in_felt) = Math64x61_toDecimalFelt(amount_, decimals=asset.token_decimal);
     // Get the L1 wallet address of the user
@@ -976,7 +970,7 @@ func withdraw{
         contract_address=withdrawal_request_address,
         request_id_=request_id_,
         user_l1_address_=user_l1_address,
-        ticker_=ticker,
+        asset_id_=asset.id,
         amount_=amount_in_felt,
     );
     // Create a withdrawal history object
@@ -1016,7 +1010,7 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         contract_address=registry, index=Liquidate_INDEX, version=version
     );
 
-    with_attr error_message("Only liquidate contract is allowed to call for liquidation") {
+    with_attr error_message("AccountManager: Unauthorized caller for liquidate_position") {
         assert caller = liquidate_address;
     }
 
@@ -1046,9 +1040,9 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+////////////////////////
+// Internal Functions //
+////////////////////////
 
 // @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
 // @param withdrawal_list_len_ - Stores the current length of the populated withdrawals array
@@ -1242,7 +1236,7 @@ func order_hash_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         return ();
     }
 
-    with_attr error_message("hash mismatch") {
+    with_attr error_message("AccountManager: Hash mismatch") {
         assert existing_hash = order_hash;
     }
     return ();

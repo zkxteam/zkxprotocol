@@ -1,9 +1,6 @@
 import pytest
 import asyncio
-from starkware.starknet.testing.starknet import Starknet
-from starkware.starkware_utils.error_handling import StarkException
-from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, from64x61, to64x61
+from utils import ContractIndex, ManagerAction, assert_revert, to64x61
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -34,15 +31,15 @@ async def adminAuth_factory(starknet_service: StarknetService):
     account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
     user1 = await account_factory.deploy_ZKX_account(signer3.public_key)
 
-    non_discount = 2305843009213693952 - to64x61(0.03)
-    fee = to64x61(0.0002)
-    val = await fixed_math.Math64x61_mul(non_discount, fee).call()
+    # Give necessary permissions to admin1
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAuthRegistry, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageFeeDetails, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageGovernanceToken, True])
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 6, 1])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [3, 1, feeDiscount.contract_address])
-
+    # Add contracts to registry
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.FeeDiscount, 1, feeDiscount.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.TradingFees, 1, fees.contract_address])
+    
     await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 100])
 
     return adminAuth, fees, admin1, admin2, user1, feeDiscount
@@ -167,14 +164,20 @@ async def test_update_base_fee_tier_to_higher_value(adminAuth_factory):
 
     base_fee_maker3 = to64x61(0.0001)
     base_fee_taker3 = to64x61(0.00035)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [5, 5000, base_fee_maker3, base_fee_taker3]))
+    await assert_revert(
+        signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [5, 5000, base_fee_maker3, base_fee_taker3]),
+        reverted_with="TradingFees: Invalid tier"
+    )
 
 @pytest.mark.asyncio
 async def test_update_discount_tier_to_higher_value(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
     discount3 = to64x61(0.1)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [5, 5000, discount3]))
+    await assert_revert(
+        signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [5, 5000, discount3]),
+        reverted_with="TradingFees: Invalid tier"    
+    )
 
 @pytest.mark.asyncio
 async def test_update_base_fee_tier_with_incorrect_tier_and_details(adminAuth_factory):
@@ -182,47 +185,47 @@ async def test_update_base_fee_tier_with_incorrect_tier_and_details(adminAuth_fa
 
     base_fee_maker3 = to64x61(0.0002)
     base_fee_taker3 = to64x61(0.00035)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [4, 5000, base_fee_maker3, base_fee_taker3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [4, 5000, base_fee_maker3, base_fee_taker3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting lower tiers")
 
     base_fee_maker3 = to64x61(0.00008)
     base_fee_taker3 = to64x61(0.00035)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [4, 5000, base_fee_maker3, base_fee_taker3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [4, 5000, base_fee_maker3, base_fee_taker3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting lower tiers")
 
     base_fee_maker3 = to64x61(0.0001)
     base_fee_taker3 = to64x61(0.0004)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 5000, base_fee_maker3, base_fee_taker3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 5000, base_fee_maker3, base_fee_taker3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")
 
     base_fee_maker3 = to64x61(0.00015)
     base_fee_taker3 = to64x61(0.00035)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 5000, base_fee_maker3, base_fee_taker3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 5000, base_fee_maker3, base_fee_taker3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")
 
     base_fee_maker1 = to64x61(0.0002)
     base_fee_taker1 = to64x61(0.0005)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [0, 0, base_fee_maker1, base_fee_taker1]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [0, 0, base_fee_maker1, base_fee_taker1]), reverted_with="TradingFees: Tier and fee details must be > 0")
 
     base_fee_maker1 = to64x61(0.00015)
     base_fee_taker1 = to64x61(0.0005)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")
 
     base_fee_maker1 = to64x61(0.0002)
     base_fee_taker1 = to64x61(0.0004)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")
 
 @pytest.mark.asyncio
 async def test_update_discount_tier_with_incorrect_tier_and_details(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
     discount3 = to64x61(0.09)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [4, 5000, discount3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [4, 5000, discount3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting lower tiers")
 
     discount3 = to64x61(0.02)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 5000, discount3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 5000, discount3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting lower tiers")
 
     discount3 = to64x61(0.11)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 5000, discount3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 5000, discount3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")
 
     discount3 = to64x61(0.11)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [0, 5000, discount3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [0, 5000, discount3]), reverted_with="TradingFees: Tier and discount must be > 0")
 
     discount3 = to64x61(0.05)
-    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [1, 5000, discount3]))
+    await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [1, 5000, discount3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")

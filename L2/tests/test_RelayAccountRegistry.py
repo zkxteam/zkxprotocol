@@ -3,7 +3,7 @@ import asyncio
 from starkware.starknet.testing.starknet import Starknet
 from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert
+from utils import ContractIndex, ManagerAction, str_to_felt, assert_revert
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -13,11 +13,9 @@ from dummy_signers import signer1, signer2, signer3
 def event_loop():
     return asyncio.new_event_loop()
 
-# give admin1 permission to modify registry
-# add underling contract to registry
-# deploy relay registry addr, version, index (using what was added in registry)
-
-AccountRegistry_INDEX=14
+# 1. Give admin1 permission to modify registry
+# 2. Add underling contract to registry
+# 3. Deploy relay registry addr, version, index (using what was added in registry)
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
@@ -33,25 +31,24 @@ async def adminAuth_factory(starknet_service: StarknetService):
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address,2,1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address,3,1])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageMarkets, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAuthRegistry, True])
 
-    # account registry contract has to be in index to be acceible by relay
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [AccountRegistry_INDEX,1, account_registry.contract_address])
+    # Account registry contract has to be in index to be acceible by relay
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.AccountRegistry, 1, account_registry.contract_address])
     
     relay_account_registry = await starknet_service.deploy(ContractType.RelayAccountRegistry, [
         registry.contract_address,
         1,
-        AccountRegistry_INDEX
+        ContractIndex.AccountRegistry
     ])
 
-    # spoof account deployer contract since add_to_account_registry only accepts calls from account deployer contract
-
+    # Spoof account deployer contract since add_to_account_registry only accepts calls from account deployer contract
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20,1, relay_account_registry.contract_address])
 
-    # give relay master admin access for priviledged access
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address, 0, 1])
-    await signer2.send_transaction(admin2, adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address, 0, 1])
+    # Give relay master admin access for priviledged access
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address, ManagerAction.MasterAdmin, True])
+    await signer2.send_transaction(admin2, adminAuth.contract_address, 'update_admin_mapping', [relay_account_registry.contract_address, ManagerAction.MasterAdmin, True])
 
     return adminAuth, account_registry, relay_account_registry, admin1, admin2, admin3, registry
 
@@ -90,15 +87,15 @@ async def test_add_address_to_account_registry(adminAuth_factory):
     assert call_counter.result.count == 2 # for 2 add transactions
     assert hash_status.result.res == 1 # 2nd transaction seen i.e. status is 1
 
-    # verify contents of hash list for this caller
+    # Verify contents of hash list for this caller
     assert hash_list.result.hash_list[0]== hash_transaction_1 
     assert hash_list.result.hash_list[1]== hash_transaction_2
 
-    # verify object returned by relay
+    # Verify object returned by relay
     assert fetched_account_registry1.result.account_registry[0] == str_to_felt("123")
     assert fetched_account_registry1.result.account_registry[1] == str_to_felt("456")
 
-    # verify by calling underlying contract directly
+    # Verify by calling underlying contract directly
     assert fetched_account_registry.result.account_registry[0] == str_to_felt("123")
     assert fetched_account_registry.result.account_registry[1] == str_to_felt("456")
 
@@ -137,8 +134,7 @@ async def test_remove_address_from_account_registry(adminAuth_factory):
     relay_fetched_account_registry = await relay_account_registry.get_account_registry(0, array_length_after.result.len).call()
     print(fetched_account_registry.result.account_registry)
 
-    # verify through relay and direct to underlying contract
-
+    # Verify through relay and direct to underlying contract
     assert fetched_account_registry.result.account_registry[0] == str_to_felt("456")
     assert relay_fetched_account_registry.result.account_registry[0] == str_to_felt("456")
 
@@ -187,7 +183,7 @@ async def test_authorized_actions_in_relay(adminAuth_factory):
     assert call_counter.result.count == 0 # counter should be 0 after resetting
 
     index = await relay_account_registry.get_self_index().call()
-    assert index.result.index == AccountRegistry_INDEX
+    assert index.result.index == ContractIndex.AccountRegistry
 
     # user with master admin access only can do priviledged actions - signer3 is not authorized
     await assert_revert(signer3.send_transaction(admin3, relay_account_registry.contract_address, 'set_self_index', [100]))
@@ -214,3 +210,4 @@ async def test_authorized_actions_in_relay(adminAuth_factory):
     version = await relay_account_registry.get_current_version().call()
 
     assert version.result.res == 2
+    

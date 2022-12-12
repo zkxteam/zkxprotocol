@@ -29,7 +29,7 @@ class ContractType(Enum):
     ABRFund = "contracts/ABRFund.cairo"
     ABRPayment = "contracts/ABRPayment.cairo"
     MarketPrices = "contracts/MarketPrices.cairo"
-    Liquidate = "tests/testable/TestLiquidate.cairo"
+    Liquidate = "contracts/Liquidate.cairo"
     DepositDataManager = "contracts/DepositDataManager.cairo"
     WithdrawalFeeBalance = "contracts/WithdrawalFeeBalance.cairo"
     CollateralPrices = "contracts/CollateralPrices.cairo"
@@ -37,8 +37,13 @@ class ContractType(Enum):
     SigRequirementsManager = "contracts/signature_infra/SigRequirementsManager.cairo"
     PubkeyWhitelister = "contracts/signature_infra/PubkeyWhitelister.cairo"
     HighTide = "contracts/hightide/HighTide.cairo"
+    HighTideCalc = "contracts/hightide/HighTideCalc.cairo"
+    RewardsCalculation = "contracts/hightide/RewardsCalculation.cairo"
     TradingStats = "contracts/hightide/TradingStats.cairo"
-    
+    LiquidityPool = "contracts/hightide/LiquidityPool.cairo"
+    UserStats = "contracts/hightide/UserStats.cairo"
+    Settings = "contracts/Settings.cairo"
+
     # Relay contracts
     RelayABR = "contracts/relay_contracts/RelayABR.cairo"
     RelayABRPayment = "contracts/relay_contracts/RelayABRPayment.cairo"
@@ -59,6 +64,9 @@ class ContractType(Enum):
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
     TestAsset = "tests/contracts/Asset.cairo"
+    TestHighTide = "tests/testable/TestHighTide.cairo"
+    Starkway = "tests/testable/StarkwayProxy.cairo"
+    ERC20 = "tests/testable/TestERC20Mintable.cairo"
 
 class OptimizedStarknetState(StarknetState):
 
@@ -72,13 +80,13 @@ class ContractsHolder:
     def __init__(self):
         self.contract_classes = {}
 
-    def prepare(self):
-        for type in ContractType:
+    def get_contract_class(self, type: ContractType) -> ContractClass:
+        if self.contract_classes.get(type) is None:
             compiled_class = compile_starknet_files(files=[type.value])
             self.contract_classes[type] = compiled_class
-
-    def get_contract_class(self, type: ContractType) -> ContractClass:
-        return self.contract_classes[type]
+            return compiled_class
+        else:
+            return self.contract_classes[type]
 
 class StarknetService:
 

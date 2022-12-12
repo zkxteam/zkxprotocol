@@ -4,6 +4,7 @@ import json
 import os
 from starkware.starknet.testing.starknet import Starknet
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted
+from utils_asset import build_default_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
 from starkware.eth.eth_test_utils import EthTestUtils, eth_reverts
 from starkware.starknet.testing.contracts import MockStarknetMessaging
@@ -16,7 +17,7 @@ from dummy_signers import signer1, signer2, signer3
 
 counter = 0
 eth_test_utils = EthTestUtils()
-# Generates unique asset params (id, ticker and name) to avoid conflicts
+# Generates unique asset params (id and name) to avoid conflicts
 
 DUMMY_WITHDRAWAL_REQUEST_ADDRESS=12345
 
@@ -24,34 +25,8 @@ def generate_asset_info():
     global counter
     counter += 1
     id = f"32f0406jz7qj8_${counter}"
-    ticker = f"ETH_${counter}"
     name = f"Ethereum_${counter}"
-    return str_to_felt(id), str_to_felt(ticker), str_to_felt(name)
-
-
-def build_default_asset_properties(id, ticker, name):
-    return [
-        id,  # id
-        0,  # asset_version
-        ticker,  # ticker
-        name,  # short_name
-        0,  # tradable
-        0,  # collateral
-        18,  # token_decimal
-        0,  # metadata_id
-        1,  # tick_size
-        1,  # step_size
-        10,  # minimum_order_size
-        1,  # minimum_leverage
-        5,  # maximum_leverage
-        3,  # currently_allowed_leverage
-        1,  # maintenance_margin_fraction
-        1,  # initial_margin_fraction
-        1,  # incremental_initial_margin_fraction
-        100,  # incremental_position_size
-        1000,  # baseline_position_size
-        10000  # maximum_position_size
-    ]
+    return str_to_felt(id), str_to_felt(name)
 
 
 @pytest.fixture(scope='module')
@@ -120,9 +95,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
 @pytest.mark.asyncio
 async def test_remove_asset_positive_flow(adminAuth_factory):
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
+    asset_id, asset_name = generate_asset_info()
+    asset_properties = build_default_asset_properties(id=asset_id, short_name=asset_name)
 
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
@@ -131,7 +105,6 @@ async def test_remove_asset_positive_flow(adminAuth_factory):
         name="asset_added",
         data=[
             asset_id,
-            asset_ticker,
             admin1.contract_address
         ]
     )
@@ -149,49 +122,47 @@ async def test_remove_asset_positive_flow(adminAuth_factory):
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==0
 
-    # no asset_id should exist for this ticker at this point
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==0
+    # no asset should exist for this ID at this point
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == False
 
     # this call only goes through if the message from L2 has reached the message queue
-    l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, asset_id)
+    l1_zkx_contract.updateAssetListInL1.transact(asset_id)
 
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==1
-    assert asset_list[0]==asset_ticker
+    assert asset_list[0]==asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==asset_id
-
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == True
 
     asset_on_L2 = await asset.get_asset(asset_id).call()
 
     await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [asset_id])
-
-    await assert_revert(asset.get_asset(asset_id).call(), 'asset_id existence mismatch')
+    await assert_revert(asset.get_asset(asset_id).call(), "Asset: asset_id existence check failed")
     
 
     await postman.flush()
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==1
-    assert asset_list[0]==asset_ticker
+    assert asset_list[0]==asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==asset_id
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == True
 
-    l1_zkx_contract.removeAssetFromList.transact(asset_ticker, asset_id)
+    l1_zkx_contract.removeAssetFromList.transact(asset_id)
 
     
     # asset list should be empty
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==0
 
-    # no asset_id should exist for this ticker at this point
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==0
+    # no asset should exist for this asset ID at this point
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == False
 
     with eth_reverts("Nothing to remove"):
-        l1_zkx_contract.removeAssetFromList.transact(asset_ticker, asset_id)
+        l1_zkx_contract.removeAssetFromList.transact(asset_id)
 
 
 
@@ -199,9 +170,8 @@ async def test_remove_asset_positive_flow(adminAuth_factory):
 async def test_remove_asset_incorrect_payload(adminAuth_factory):
 
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
+    asset_id, asset_name = generate_asset_info()
+    asset_properties = build_default_asset_properties(id=asset_id, short_name=asset_name)
 
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
@@ -210,7 +180,6 @@ async def test_remove_asset_incorrect_payload(adminAuth_factory):
         name="asset_added",
         data=[
             asset_id,
-            asset_ticker,
             admin1.contract_address
         ]
     )
@@ -228,62 +197,57 @@ async def test_remove_asset_incorrect_payload(adminAuth_factory):
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==0
 
-    # no asset_id should exist for this ticker at this point
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==0
+    # no asset should exist for this asset ID at this point
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == False
 
     # this call only goes through if the message from L2 has reached the message queue
-    l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, asset_id)
+    l1_zkx_contract.updateAssetListInL1.transact(asset_id)
 
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==1
-    assert asset_list[0]==asset_ticker
+    assert asset_list[0]==asset_id
 
     asset_on_L2 = await asset.get_asset(asset_id).call()
 
     await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [asset_id])
 
-    await assert_revert(asset.get_asset(asset_id).call(), 'asset_id existence mismatch')
+    await assert_revert(asset.get_asset(asset_id).call(), "Asset: asset_id existence check failed")
 
     await postman.flush()
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==1
-    assert asset_list[0]==asset_ticker
+    assert asset_list[0]==asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==asset_id
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == True
 
     with eth_reverts("Failed to remove non-existing asset"):
-        l1_zkx_contract.removeAssetFromList.transact(asset_ticker+1, asset_id)
-
-    with eth_reverts("INVALID_MESSAGE_TO_CONSUME"):
-        l1_zkx_contract.removeAssetFromList.transact(asset_ticker, asset_id+1)
+        l1_zkx_contract.removeAssetFromList.transact(asset_id + 1)
 
     asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==1
-    assert asset_list[0]==asset_ticker
+    assert len(asset_list) == 1
+    assert asset_list[0] == asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==asset_id
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == True
 
-    l1_zkx_contract.removeAssetFromList.transact(asset_ticker, asset_id)
+    l1_zkx_contract.removeAssetFromList.transact(asset_id)
 
     # asset list should be empty
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==0
 
-    # no asset_id should exist for this ticker at this point
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==0
+    # no asset should exist for this asset ID at this point
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == False
 
 @pytest.mark.asyncio
 async def test_remove_asset_impersonator_ZKX_L1(adminAuth_factory):
 
     adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, account_deployer, account_registry = adminAuth_factory
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
-
+    asset_id, asset_name = generate_asset_info()
+    asset_properties = build_default_asset_properties(id=asset_id, short_name=asset_name)
     
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
@@ -292,21 +256,20 @@ async def test_remove_asset_impersonator_ZKX_L1(adminAuth_factory):
         name="asset_added",
         data=[
             asset_id,
-            asset_ticker,
             admin1.contract_address
         ]
     )
 
     await postman.flush()
 
-    l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, asset_id)
+    l1_zkx_contract.updateAssetListInL1.transact(asset_id)
     
     asset_list = l1_zkx_contract.getAssetList.call()
     assert len(asset_list)==1
-    assert asset_list[0]==asset_ticker
+    assert asset_list[0]==asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==asset_id
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == True
 
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, 12345])
     await signer1.send_transaction(admin1, asset.contract_address, 'remove_asset', [asset_id])
@@ -316,11 +279,11 @@ async def test_remove_asset_impersonator_ZKX_L1(adminAuth_factory):
     # this call will revert since the L!_ZKX contract has been removed as authorised from L2
     # hence the message hash will not match in starknet core when trying to retrieve a message from L2 due to incorrect recipient
     with eth_reverts("INVALID_MESSAGE_TO_CONSUME"):
-        l1_zkx_contract.removeAssetFromList.transact(asset_ticker, asset_id)
+        l1_zkx_contract.removeAssetFromList.transact(asset_id)
     
     asset_list = l1_zkx_contract.getAssetList.call()
-    assert len(asset_list)==1
-    assert asset_list[0]==asset_ticker
+    assert len(asset_list) == 1
+    assert asset_list[0] == asset_id
 
-    stored_asset_id = l1_zkx_contract.assetID.call(asset_ticker)
-    assert stored_asset_id==asset_id
+    existence_check_result = l1_zkx_contract.assetExists.call(asset_id)
+    assert existence_check_result == True

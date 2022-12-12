@@ -64,7 +64,7 @@ async def test_add_token(adminAuth_factory):
 async def test_add_token_unauthorized(adminAuth_factory):
     adminAuth, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await assert_revert(signer2.send_transaction(admin2, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 10]))
+    await assert_revert(signer2.send_transaction(admin2, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 10]), reverted_with="FeeDiscount: Unauthorized call to manage governance tokens")
 
 @pytest.mark.asyncio
 async def test_remove_token(adminAuth_factory):
@@ -91,10 +91,10 @@ async def test_remove_token(adminAuth_factory):
 async def test_remove_token_unauthorized(adminAuth_factory):
     adminAuth, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await assert_revert(signer2.send_transaction(admin2, feeDiscount.contract_address, 'decrement_governance_tokens', [user1.contract_address, 10]))
+    await assert_revert(signer2.send_transaction(admin2, feeDiscount.contract_address, 'decrement_governance_tokens', [user1.contract_address, 10]),reverted_with="FeeDiscount: Unauthorized call to manage fee details")
 
 @pytest.mark.asyncio
 async def test_remove_token_more_than_balance(adminAuth_factory):
     adminAuth, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    await assert_revert(signer1.send_transaction(admin1, feeDiscount.contract_address, 'decrement_governance_tokens', [user1.contract_address, 20]))
+    await assert_revert(signer1.send_transaction(admin1, feeDiscount.contract_address, 'decrement_governance_tokens', [user1.contract_address, 20]), reverted_with="FeeDiscount: Insufficient balance")

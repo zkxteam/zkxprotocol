@@ -1,9 +1,9 @@
 %lang starknet
 
+from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import assert_in_range, assert_le, assert_not_zero
-from starkware.cairo.common.math import abs_value
+from starkware.cairo.common.math import abs_value, assert_in_range, assert_le, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_block_timestamp
@@ -34,9 +34,10 @@ from contracts.DataTypes import (
     Market,
     MarketPrice,
     MultipleOrder,
-    PositionDetails,
     OrderRequest,
+    PositionDetails,
     Signature,
+    TraderStats,
 )
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
@@ -52,26 +53,26 @@ from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.CommonLibrary import CommonLib
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_ONE
 
-//############
-// Constants #
-//############
+///////////////
+// Constants //
+///////////////
+
 const TWO_PERCENT = 46116860184273879;
-const LEVERAGE_ONE = 2305843009213693952;
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted whenever a new market is added
 @event
 func trade_execution(address: felt, request: OrderRequest, market_id: felt, execution_price: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -84,9 +85,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+//////////////
+// External //
+//////////////
 
 // @notice Function to execute multiple orders in a batch
 // @param size_ - Size of the order to be executed
@@ -117,7 +118,7 @@ func execute_batch{
     );
 
     // Get Market from the corresponding Id
-    let (market: Market) = IMarkets.get_market(contract_address=market_address, id=marketID_);
+    let (market: Market) = IMarkets.get_market(contract_address=market_address, market_id_=marketID_);
 
     tempvar ttl = market.ttl;
 
@@ -162,8 +163,10 @@ func execute_batch{
         trading_stats_address: felt,
     ) = get_registry_addresses();
 
+    let (trader_stats_list: TraderStats*) = alloc();
+
     // Recursively loop through the orders in the batch
-    let (result) = check_and_execute(
+    let (result, trader_stats_list_len) = check_and_execute(
         size_,
         0,
         0,
@@ -182,10 +185,12 @@ func execute_batch{
         liquidity_fund_address,
         insurance_fund_address,
         0,
+        0,
+        trader_stats_list,
     );
 
     // Check if every order has a counter order
-    with_attr error_message("check and execute returned non zero integer.") {
+    with_attr error_message("Trading: Net size is non-zero") {
         assert result = 0;
     }
 
@@ -196,13 +201,16 @@ func execute_batch{
         execution_price_64x61_=execution_price_,
         request_list_len=request_list_len,
         request_list=request_list,
+        trader_stats_list_len=trader_stats_list_len,
+        trader_stats_list=trader_stats_list,
     );
+
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+//////////////
+// Internal //
+//////////////
 
 // @notice Internal function to retrieve contract addresses from the Auth Registry
 // @returns account_registry_address - Address of the Account Registry contract
@@ -210,9 +218,10 @@ func execute_batch{
 // @returns holding_address - Address of the Holding contract
 // @returns trading_fees_address - Address of the Trading contract
 // @returns fees_balance_address - Address of the Fee Balance contract
-// @returns liquidate_address - Address of the Liquidate contract
 // @returns liquidity_fund_address - Address of the Liquidity Fund contract
 // @returns insurance_fund_address - Address of the Insurance Fund contract
+// @returns liquidate_address - Address of the Liquidate contract
+// @returns trading_stats_address - Address of the Trading stats contract
 func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     account_registry_address: felt,
     asset_address: felt,
@@ -298,28 +307,24 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         if (order_.direction == LONG) {
             // if long stop order
             // check that stop_price <= execution_price <= limit_price
-            with_attr error_message(
-                    "Stop price should be less than or equal to the execution price for long orders") {
+            with_attr error_message("Trading: Invalid stop-price long order") {
                 assert_le(order_.stopPrice, execution_price_);
             }
             tempvar range_check_ptr = range_check_ptr;
 
-            with_attr error_message(
-                    "Execution price should be less than or equal to the order price for long orders") {
+            with_attr error_message("Trading: Invalid stop-limit-price long order") {
                 assert_le(execution_price_, order_.price);
             }
             tempvar range_check_ptr = range_check_ptr;
         } else {
             // if short stop order
             // check that limit_price <= execution_price <= stop_price
-            with_attr error_message(
-                    "Order price should be less than or equal to the execution price for short orders") {
+            with_attr error_message("Trading: Invalid stop-price short order") {
                 assert_le(order_.price, execution_price_);
             }
             tempvar range_check_ptr = range_check_ptr;
 
-            with_attr error_message(
-                    "Execution price should be less than or equal to the stop price for short orders") {
+            with_attr error_message("Trading: Invalid stop-limit-price short order") {
                 assert_le(execution_price_, order_.stopPrice);
             }
             tempvar range_check_ptr = range_check_ptr;
@@ -333,15 +338,13 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // if it's a limit order
         if (order_.direction == LONG) {
             // if it's a long order
-            with_attr error_message(
-                    "limit-long order execution price should be less than limit price.") {
+            with_attr error_message("Trading: Bad long limit order") {
                 assert_le(execution_price_, order_.price);
             }
             tempvar range_check_ptr = range_check_ptr;
         } else {
             // if it's a short order
-            with_attr error_message(
-                    "limit-short order limit price should be less than execution price.") {
+            with_attr error_message("Trading: Bad short limit order") {
                 assert_le(order_.price, execution_price_);
             }
             tempvar range_check_ptr = range_check_ptr;
@@ -359,14 +362,14 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             // if it's a long order
             tempvar upperLimit = order_.price + two_percent;
 
-            with_attr error_message("Execution price is 2% above the user defined price") {
+            with_attr error_message("Trading: Market Order 2% above") {
                 assert_le(execution_price_, upperLimit);
             }
         } else {
             // if it's a short order
             tempvar lowerLimit = order_.price - two_percent;
 
-            with_attr error_message("Execution price is 2% below the user defined price") {
+            with_attr error_message("Trading: Market Order 2% below") {
                 assert_le(lowerLimit, execution_price_);
             }
         }
@@ -386,9 +389,12 @@ func check_order_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param liquidate_address_ - Address of the Liquidate contract
 // @param fees_balance_address_ - Address of the Fee Balance contract
 // @param holding_address_ - Address of the Holding contract
+// @param trader_stats_list_len_ - length of the trader fee list
+// @param trader_stats_list_ - traders fee list
 // @returns average_execution_price_open - Average Execution Price for the order
 // @returns margin_amount_open - Margin amount for the order
 // @returns borrowed_amount_open - Borrowed amount for the order
+// @returns trader_stats_list_len - length of the trader fee list
 func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder,
     execution_price_: felt,
@@ -399,7 +405,14 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     liquidate_address_: felt,
     fees_balance_address_: felt,
     holding_address_: felt,
-) -> (average_execution_price_open: felt, margin_amount_open: felt, borrowed_amount_open: felt) {
+    trader_stats_list_len_: felt,
+    trader_stats_list_: TraderStats*,
+) -> (
+    average_execution_price_open: felt,
+    margin_amount_open: felt,
+    borrowed_amount_open: felt,
+    trader_stats_list_len: felt,
+) {
     alloc_locals;
 
     local margin_amount_open;
@@ -431,7 +444,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         let cumulative_order_size = position_details.position_size + order_size_;
         let (price) = Math64x61_div(cumulative_order_value, cumulative_order_size);
 
-        assert average_execution_price_open = execution_price_;
+        assert average_execution_price_open = price;
         tempvar range_check_ptr = range_check_ptr;
     }
 
@@ -454,8 +467,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     tempvar total_amount = total_position_value + fees;
 
     // User must be able to pay the amount
-    with_attr error_message(
-            "User balance is less than value of the position in trading contract.") {
+    with_attr error_message("Trading: Low Balance") {
         assert_le(total_amount, user_balance);
     }
 
@@ -480,8 +492,14 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         fee_to_add=fees,
     );
 
+    let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
+
+    // Update Trader stats
+    let element: TraderStats = TraderStats(order_.pub_key, fees, order_volume_64x61, 0, 0, 0);
+    assert [trader_stats_list_] = element;
+
     // Deduct the amount from liquidity funds if order is leveraged
-    let is_non_leveraged = is_le(order_.leverage, LEVERAGE_ONE);
+    let is_non_leveraged = is_le(order_.leverage, Math64x61_ONE);
 
     if (is_non_leveraged == FALSE) {
         ILiquidityFund.withdraw(
@@ -507,7 +525,12 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         amount=leveraged_position_value,
     );
 
-    return (average_execution_price_open, margin_amount_open, borrowed_amount_open);
+    return (
+        average_execution_price_open,
+        margin_amount_open,
+        borrowed_amount_open,
+        trader_stats_list_len_ + 1,
+    );
 }
 
 // @notice Intenal function that processes close orders including Liquidation & Deleveraging
@@ -530,7 +553,14 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     liquidity_fund_address_: felt,
     insurance_fund_address_: felt,
     holding_address_: felt,
-) -> (margin_amount_close: felt, borrowed_amount_close: felt, average_execution_price_close: felt) {
+    trader_stats_list_len_: felt,
+    trader_stats_list_: TraderStats*,
+) -> (
+    margin_amount_close: felt,
+    borrowed_amount_close: felt,
+    average_execution_price_close: felt,
+    trader_stats_list_len: felt,
+) {
     alloc_locals;
 
     local margin_amount_close;
@@ -575,7 +605,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     // Calculate pnl and net account value
-    let (pnl) = Math64x61_mul(parent_position.position_size, diff);
+    let (pnl) = Math64x61_mul(order_size_, diff);
     net_acc_value = margin_amount + pnl;
 
     // Total value of the asset at current price
@@ -585,15 +615,28 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (percent_of_order) = Math64x61_div(order_size_, parent_position.position_size);
     let (value_to_be_returned) = Math64x61_mul(borrowed_amount, percent_of_order);
     let (margin_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_order);
+    local margin_amount_open_64x61;
 
     // Calculate new values for margin and borrowed amounts
     if (order_.orderType == DELEVERAGING_ORDER) {
         borrowed_amount_close = borrowed_amount - leveraged_amount_out;
         margin_amount_close = margin_amount;
+        margin_amount_open_64x61 = 0;
     } else {
         borrowed_amount_close = borrowed_amount - value_to_be_returned;
         margin_amount_close = margin_amount - margin_to_be_reduced;
+        margin_amount_open_64x61 = margin_to_be_reduced;
     }
+
+    let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
+
+    // Update trader stats.
+    // If close order is a deleveraging order, margin won't be reduced. So, we will record 0.
+    // Else, we will record margin_to_be_reduced
+    let element: TraderStats = TraderStats(
+        order_.pub_key, 0, order_volume_64x61, 1, pnl, margin_amount_open_64x61
+    );
+    assert [trader_stats_list_] = element;
 
     // Check if the position is to be liquidated
     let not_liquidation = is_le(order_.orderType, 2);
@@ -608,8 +651,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         );
 
         // If no leverage is used
-        // to64x61(1) == 2305843009213693952
-        if (order_.leverage == LEVERAGE_ONE) {
+        if (order_.leverage == Math64x61_ONE) {
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -758,7 +800,12 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    return (average_execution_price_close, margin_amount_close, borrowed_amount_close);
+    return (
+        average_execution_price_close,
+        margin_amount_close,
+        borrowed_amount_close,
+        trader_stats_list_len_ + 1,
+    );
 }
 
 // @notice Internal function called by execute_batch
@@ -766,7 +813,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param assetID_ - Asset ID of the batch to be set by the first order
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
 // @param marketID_ - Market ID of the batch to be set by the first order
-// @param ticker_ - The ticker of each order in the batch
 // @param execution_price_ - Price at which the orders must be executed
 // @param request_list_len_ - No of orders in the batch
 // @param request_list_ - The batch of the orders
@@ -781,6 +827,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param liquidity_fund_address_ - Address of the Liquidity Fund contract
 // @param insurance_fund_address_ - Address of the Insurance Fund contract
 // @param max_leverage_ - Maximum Leverage for the market set by the first order
+// @param trader_stats_list_len_ - length of the trader fee list
+// @param trader_stats_list_ - This list contains trader addresses along with fee charged
+// @return res - returns the net sum of the orders do far
+// @return trader_stats_list_len - returns the length of the trader fee list so far
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     size_: felt,
     assetID_: felt,
@@ -800,12 +850,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     liquidity_fund_address_: felt,
     insurance_fund_address_: felt,
     max_leverage_: felt,
-) -> (res: felt) {
+    trader_stats_list_len_: felt,
+    trader_stats_list_: TraderStats*,
+) -> (res: felt, trader_stats_list_len: felt) {
     alloc_locals;
 
     // Check if the list is empty, if yes return 1
     if (request_list_len_ == 0) {
-        return (sum,);
+        return (sum, trader_stats_list_len_);
     }
 
     // Create a struct object for the order
@@ -832,7 +884,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         contract_address=account_registry_address_, address_=temp_order.pub_key
     );
 
-    with_attr error_message("User account not registered") {
+    with_attr error_message("Trading: User account not registered") {
         assert_not_zero(is_registered);
     }
 
@@ -863,11 +915,16 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local margin_amount;
     local borrowed_amount;
     local average_execution_price;
+    local trader_stats_list_len;
+    local trader_stats_list: TraderStats*;
 
     // If the order is to be opened
     if (temp_order.closeOrder == FALSE) {
         let (
-            average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt
+            average_execution_price_temp: felt,
+            margin_amount_temp: felt,
+            borrowed_amount_temp: felt,
+            trader_stats_list_len_temp: felt,
         ) = process_open_orders(
             order_=temp_order,
             execution_price_=execution_price_,
@@ -878,13 +935,23 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidate_address_=liquidate_address_,
             fees_balance_address_=fees_balance_address_,
             holding_address_=holding_address_,
+            trader_stats_list_len_=trader_stats_list_len_,
+            trader_stats_list_=trader_stats_list_,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
+        assert trader_stats_list_len = trader_stats_list_len_temp;
+        assert trader_stats_list = trader_stats_list_ + TraderStats.SIZE;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
         let (
-            average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt
+            average_execution_price_temp: felt,
+            margin_amount_temp: felt,
+            borrowed_amount_temp: felt,
+            trader_stats_list_len_temp: felt,
         ) = process_close_orders(
             order_=temp_order,
             execution_price_=execution_price_,
@@ -893,10 +960,17 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidity_fund_address_=liquidity_fund_address_,
             insurance_fund_address_=insurance_fund_address_,
             holding_address_=holding_address_,
+            trader_stats_list_len_=trader_stats_list_len_,
+            trader_stats_list_=trader_stats_list_,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
+        assert trader_stats_list_len = trader_stats_list_len_temp;
+        assert trader_stats_list = trader_stats_list_ + TraderStats.SIZE;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Create a temporary order object
@@ -945,26 +1019,23 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let (collateral: Asset) = IAsset.get_asset(
             contract_address=asset_address_, id=temp_order.collateralID
         );
-        let (market: Market) = IMarkets.get_market(contract_address=market_address_, id=marketID_);
+        let (market: Market) = IMarkets.get_market(contract_address=market_address_, market_id_=marketID_);
 
-        with_attr error_message("asset is non tradable in trading contract.") {
-            assert_not_zero(asset.tradable);
+        with_attr error_message("Trading: asset is not tradable") {
+            assert asset.is_tradable = TRUE;
+        }
+        with_attr error_message("Trading: Collateral not valid") {
+            assert collateral.is_collateral = TRUE;
         }
 
-        with_attr error_message("asset is non collaterable in trading contract.") {
-            assert_not_zero(collateral.collateral);
+        with_attr error_message("Trading: Market not tradable") {
+            assert market.is_tradable = TRUE;
         }
 
-        with_attr error_message("market is non tradable in trading contract.") {
-            assert_not_zero(market.is_tradable);
+        with_attr error_message("Trading: Invalid Leverage") {
+            assert_le(temp_order.leverage, market.currently_allowed_leverage);
         }
 
-        with_attr error_message(
-                "leverage is not less than currently allowed leverage of the asset") {
-            assert_le(temp_order.leverage, asset.currently_allowed_leverage);
-        }
-
-        // Recursive call with the ticker and price to compare against
         return check_and_execute(
             size_,
             temp_order.assetID,
@@ -983,22 +1054,22 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidate_address_,
             liquidity_fund_address_,
             insurance_fund_address_,
-            asset.currently_allowed_leverage,
+            market.currently_allowed_leverage,
+            trader_stats_list_len,
+            trader_stats_list,
         );
     }
 
     // Assert that the order has the same ticker and price as the first order
-    with_attr error_message(
-            "assetID is not same as opposite order's assetID in trading contract.") {
+    with_attr error_message("Trading: Asset Mismatch") {
         assert assetID_ = temp_order.assetID;
     }
 
-    with_attr error_message(
-            "collateralID is not same as opposite order's collateralID in trading contract.") {
+    with_attr error_message("Trading: Collateral Mismatch") {
         assert collateralID_ = temp_order.collateralID;
     }
 
-    with_attr error_message("leverage is not less than currently allowed leverage of the asset") {
+    with_attr error_message("Trading: Leverage too high") {
         assert_le(temp_order.leverage, max_leverage_);
     }
 
@@ -1022,5 +1093,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         liquidity_fund_address_,
         insurance_fund_address_,
         max_leverage_,
+        trader_stats_list_len,
+        trader_stats_list,
     );
 }
