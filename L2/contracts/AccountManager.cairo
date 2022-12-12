@@ -724,11 +724,6 @@ func execute_order{
         );
         let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size);
 
-        // Assert that the parent position is open
-        with_attr error_message("AccountManager: Parent Position is not open") {
-            assert_not_zero(parent_position_details.position_size);
-        }
-
         // Assert that the size amount can be closed from the parent position
         with_attr error_message("AccountManager: Cannot close more thant the positionSize") {
             assert_nn(new_position_size);

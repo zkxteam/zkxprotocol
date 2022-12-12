@@ -898,7 +898,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         }
 
         // There must only be a single Taker order; hence they must be the last order in the batch
-        with_attr error_message("Trading: Maker order must be the last order in the list") {
+        with_attr error_message("Trading: Taker order must be the last order in the list") {
             request_list_len_ = 1;
         }
 
