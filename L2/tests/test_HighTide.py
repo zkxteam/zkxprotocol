@@ -366,21 +366,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
-    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'set_constants', [
-        to64x61(0.8), 
-        to64x61(0.15), 
-        to64x61(0.05), 
-        to64x61(3), 
-        to64x61(0.3)
-    ])
-
-    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'set_multipliers', [
-        to64x61(1), 
-        to64x61(1), 
-        to64x61(1), 
-        to64x61(1), 
-    ])
-
     await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [AssetID.USDC, to64x61(100000)])
     await admin1_signer.send_transaction(admin1, bob.contract_address, 'set_balance', [AssetID.USDC, to64x61(100000)])
 
@@ -391,11 +376,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # add native token l2 address
     await admin1_signer.send_transaction(admin1, starkway.contract_address, 'add_native_token_l2_address',[USDC_L1_address, native_erc20_usdc.contract_address])
     await admin1_signer.send_transaction(admin1, starkway.contract_address, 'add_native_token_l2_address',[UST_L1_address, native_erc20_ust.contract_address])
-
-    print("hightide:", hightide.contract_address)
-    print("hightideCalc:", hightideCalc.contract_address)
-    print("Trading:", trading.contract_address)
-    print("TradingStats:", trading_stats.contract_address)
 
     return adminAuth, admin1, admin2, eduard, alice, bob, charlie, dave, native_erc20_usdc, native_erc20_ust, starkway, starknet_service, trading, hightide, hightideCalc, rewardsCalculation
 
@@ -1594,6 +1574,21 @@ async def test_calculating_factors(adminAuth_factory):
     top_stats = await hightideCalc.find_top_stats(season_id).call()
     print(top_stats.result)
 
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'set_constants', [
+        to64x61(0.8), 
+        to64x61(0.15), 
+        to64x61(0.05), 
+        to64x61(3), 
+        to64x61(0.3)
+    ])
+
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'set_multipliers', [
+        to64x61(1), 
+        to64x61(1), 
+        to64x61(1), 
+        to64x61(1), 
+    ])
+
     set_factors_tx = await dave_signer.send_transaction(dave, hightideCalc.contract_address, "calculate_high_tide_factors", [
         season_id,
     ])
@@ -1641,56 +1636,30 @@ async def test_calculating_factors(adminAuth_factory):
         season_id
     ])
 
-    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
-        season_id,
-        ETH_USD_ID,
-        2,
-        alice.contract_address,
-        bob.contract_address,
-    ])
-
-    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
-        season_id,
-        ETH_USD_ID,
-        2,
-        alice.contract_address,
-        bob.contract_address,
-    ])
-
-    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
-        season_id,
-        TSLA_USD_ID,
-        3,
-        alice.contract_address,
-        bob.contract_address,
-        charlie.contract_address,
-    ])
-
-    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
-        season_id,
-        TSLA_USD_ID,
-        3,
-        alice.contract_address,
-        bob.contract_address,
-        charlie.contract_address,
-    ])
-
     # funds flow per market comparision
     funds_flow_BTC_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, BTC_USD_ID).call()
     assert from64x61(funds_flow_BTC_USD_ID.result.funds_flow) == 0
     funds_flow_ETH_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, ETH_USD_ID).call()
-    # assert from64x61(funds_flow_ETH_USD_ID.result.funds_flow) == 0.42719298245614035
+    assert from64x61(funds_flow_ETH_USD_ID.result.funds_flow) == 0.42719298245614035
     funds_flow_TSLA_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, TSLA_USD_ID).call()
     assert from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) == 0.5296052631578947
 
-    # Trader score is zero for all traders becuase, BTC_USD_ID is not listed under hightide
-    alice_w_BTC_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, BTC_USD_ID, alice.contract_address).call()
-    assert from64x61(alice_w_BTC_USD_ID.result.trader_score) == 0
-    bob_w_BTC_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, BTC_USD_ID, bob.contract_address).call()
-    assert from64x61(bob_w_BTC_USD_ID.result.trader_score) == 0
-    charlie_w_BTC_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, BTC_USD_ID, charlie.contract_address).call()
-    assert from64x61(charlie_w_BTC_USD_ID.result.trader_score) == 0
-    
+    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
+        season_id,
+        ETH_USD_ID,
+        2,
+        alice.contract_address,
+        bob.contract_address,
+    ])
+
+    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
+        season_id,
+        ETH_USD_ID,
+        2,
+        alice.contract_address,
+        bob.contract_address,
+    ])
+
     # Here, Trader score for charlie is zero. Becuase, he didn't trade ETH_USD_ID
     alice_w_ETH_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, ETH_USD_ID, alice.contract_address).call()
     assert from64x61(alice_w_ETH_USD_ID.result.trader_score) == 0.4479042456318879
@@ -1698,6 +1667,24 @@ async def test_calculating_factors(adminAuth_factory):
     assert from64x61(bob_w_ETH_USD_ID.result.trader_score) == 0.5520957543681121
     charlie_w_ETH_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, ETH_USD_ID, charlie.contract_address).call()
     assert from64x61(charlie_w_ETH_USD_ID.result.trader_score) == 0
+
+    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
+        season_id,
+        TSLA_USD_ID,
+        3,
+        alice.contract_address,
+        bob.contract_address,
+        charlie.contract_address,
+    ])
+
+    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
+        season_id,
+        TSLA_USD_ID,
+        3,
+        alice.contract_address,
+        bob.contract_address,
+        charlie.contract_address,
+    ])
     
     # Get the trader score for all traders
     alice_w_TSLA_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, TSLA_USD_ID, alice.contract_address).call()
@@ -1712,7 +1699,8 @@ async def test_calculating_factors(adminAuth_factory):
 async def test_distribute_rewards(adminAuth_factory):
     adminAuth, admin1, admin2, eduard, alice, bob, charlie, dave, native_erc20_usdc, native_erc20_ust, starkway, starknet_service, trading, hightide, hightideCalc, rewardsCalculation = adminAuth_factory
 
-    execution_info = await hightide.get_hightides_by_season_id(3).call()
+    season_id = 3
+    execution_info = await hightide.get_hightides_by_season_id(season_id).call()
     hightide_list = execution_info.result.hightide_list
 
     # 1. Get 1st hightide metadata
@@ -1744,6 +1732,13 @@ async def test_distribute_rewards(adminAuth_factory):
         bob.contract_address,
     ])
 
+    # Get R value of ETH_USD market
+    funds_flow_ETH_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, ETH_USD_ID).call()
+    assert from64x61(funds_flow_ETH_USD_ID.result.funds_flow) == 0.42719298245614035
+
+    # Get token rewards for ETH_USD market
+    fetched_rewards = await hightide.get_hightide_reward_tokens(hightide_list[0]).call()
+
     # a. Get Alice native and non native USDC and UST balance's for ETH
     alice_eth_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(alice.contract_address).call()
     print("ETH alice whitelisted_usdc_balance",alice_eth_whitelisted_usdc_balance.result.balance)
@@ -1757,6 +1752,28 @@ async def test_distribute_rewards(adminAuth_factory):
     alice_eth_native_ust_balance = await native_erc20_ust.balanceOf(alice.contract_address).call()
     print("ETH alice native_ust_balance",alice_eth_native_ust_balance.result.balance)
 
+    # Get w value of ETH_USD market
+    alice_w_ETH_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, ETH_USD_ID, alice.contract_address).call()
+    assert from64x61(alice_w_ETH_USD_ID.result.trader_score) == 0.4479042456318879
+
+    alice_usdc_reward_for_ETH_USDC_pair = (from64x61(funds_flow_ETH_USD_ID.result.funds_flow) * 
+                                            from64x61(alice_w_ETH_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low)
+    
+    alice_ust_reward_for_ETH_USDC_pair = (from64x61(funds_flow_ETH_USD_ID.result.funds_flow) * 
+                                            from64x61(alice_w_ETH_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low)
+
+    alice_usdc_balance = ( alice_eth_whitelisted_usdc_balance.result.balance.low + 
+                        alice_eth_native_usdc_balance.result.balance.low)
+    
+    assert alice_usdc_balance == int(alice_usdc_reward_for_ETH_USDC_pair)
+
+    alice_ust_balance = ( alice_eth_whitelisted_ust_balance.result.balance.low + 
+                        alice_eth_native_ust_balance.result.balance.low)
+    
+    assert alice_ust_balance == int(alice_ust_reward_for_ETH_USDC_pair)
+
     # b. Get bob native and non native USDC and UST balance's for ETH
     bob_eth_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(bob.contract_address).call()
     print("ETH bob whitelisted_usdc_balance",bob_eth_whitelisted_usdc_balance.result.balance)
@@ -1769,6 +1786,28 @@ async def test_distribute_rewards(adminAuth_factory):
 
     bob_eth_native_ust_balance = await native_erc20_ust.balanceOf(bob.contract_address).call()
     print("ETH bob native_ust_balance",bob_eth_native_ust_balance.result.balance)
+
+    # Get w value of ETH_USD market
+    bob_w_ETH_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, ETH_USD_ID, bob.contract_address).call()
+    assert from64x61(bob_w_ETH_USD_ID.result.trader_score) == 0.5520957543681121
+
+    bob_usdc_reward_for_ETH_USDC_pair = (from64x61(funds_flow_ETH_USD_ID.result.funds_flow) * 
+                                            from64x61(bob_w_ETH_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low)
+    
+    bob_ust_reward_for_ETH_USDC_pair = (from64x61(funds_flow_ETH_USD_ID.result.funds_flow) * 
+                                            from64x61(bob_w_ETH_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low)
+
+    bob_usdc_balance = ( bob_eth_whitelisted_usdc_balance.result.balance.low + 
+                        bob_eth_native_usdc_balance.result.balance.low)
+    
+    assert bob_usdc_balance == int(bob_usdc_reward_for_ETH_USDC_pair)
+
+    bob_ust_balance = ( bob_eth_whitelisted_ust_balance.result.balance.low + 
+                        bob_eth_native_ust_balance.result.balance.low)
+    
+    assert bob_ust_balance == int(bob_ust_reward_for_ETH_USDC_pair)
 
     # 1. Get 2nd hightide metadata
     TSLA_execution_info = await hightide.get_hightide(hightide_list[1]).call()
@@ -1800,41 +1839,114 @@ async def test_distribute_rewards(adminAuth_factory):
         charlie.contract_address,
     ])
 
+    # Get R value of TSLA_USD market
+    funds_flow_TSLA_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, TSLA_USD_ID).call()
+    assert from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) == 0.5296052631578947
+
+    # Get token rewards for TSLA_USD market
+    fetched_rewards = await hightide.get_hightide_reward_tokens(hightide_list[1]).call()
+
     # a. Get Alice native and non native USDC and UST balance's for TSLA
     alice_tsla_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(alice.contract_address).call()
-    print("tsla alice whitelisted_usdc_balance",alice_tsla_whitelisted_usdc_balance.result.balance)
+    print("TSLA alice whitelisted_usdc_balance",alice_tsla_whitelisted_usdc_balance.result.balance)
 
     alice_tsla_whitelisted_ust_balance = await whitelisted_ust.balanceOf(alice.contract_address).call()
-    print("tsla alice whitelisted_ust_balance",alice_tsla_whitelisted_ust_balance.result.balance)
+    print("TSLA alice whitelisted_ust_balance",alice_tsla_whitelisted_ust_balance.result.balance)
 
     alice_tsla_native_usdc_balance = await native_erc20_usdc.balanceOf(alice.contract_address).call()
-    print("tsla alice native_usdc_balance",alice_tsla_native_usdc_balance.result.balance)
+    print("TSLA alice native_usdc_balance",alice_tsla_native_usdc_balance.result.balance)
 
     alice_tsla_native_ust_balance = await native_erc20_ust.balanceOf(alice.contract_address).call()
-    print("tsla alice native_ust_balance",alice_tsla_native_ust_balance.result.balance)
+    print("TSLA alice native_ust_balance",alice_tsla_native_ust_balance.result.balance)
+
+    # Get w value of TSLA_USD_ID market
+    alice_w_TSLA_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, TSLA_USD_ID, alice.contract_address).call()
+    assert from64x61(alice_w_TSLA_USD_ID.result.trader_score) == 0.3060977266932676
+
+    alice_usdc_reward_for_TSLA_USDC_pair = (from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) * 
+                                            from64x61(alice_w_TSLA_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low)
+    
+    alice_ust_reward_for_TSLA_USDC_pair = (from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) * 
+                                            from64x61(alice_w_TSLA_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low)
+
+    alice_usdc_balance = ( alice_tsla_whitelisted_usdc_balance.result.balance.low + 
+                        alice_tsla_native_usdc_balance.result.balance.low)
+    
+    assert alice_usdc_balance == int(alice_usdc_reward_for_TSLA_USDC_pair) + int(alice_usdc_reward_for_ETH_USDC_pair)
+
+    alice_ust_balance = ( alice_tsla_whitelisted_ust_balance.result.balance.low + 
+                        alice_tsla_native_ust_balance.result.balance.low)
+    
+    assert alice_ust_balance == int(alice_ust_reward_for_TSLA_USDC_pair) + int(alice_ust_reward_for_ETH_USDC_pair)
 
     # b. Get bob native and non native USDC and UST balance's for TSLA
     bob_tsla_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(bob.contract_address).call()
-    print("tsla bob whitelisted_usdc_balance",bob_tsla_whitelisted_usdc_balance.result.balance)
+    print("TSLA bob whitelisted_usdc_balance",bob_tsla_whitelisted_usdc_balance.result.balance)
 
     bob_tsla_whitelisted_ust_balance = await whitelisted_ust.balanceOf(bob.contract_address).call()
-    print("tsla bob whitelisted_ust_balance",bob_tsla_whitelisted_ust_balance.result.balance)
+    print("TSLA bob whitelisted_ust_balance",bob_tsla_whitelisted_ust_balance.result.balance)
 
     bob_tsla_native_usdc_balance = await native_erc20_usdc.balanceOf(bob.contract_address).call()
-    print("tsla bob native_usdc_balance",bob_tsla_native_usdc_balance.result.balance)
+    print("TSLA bob native_usdc_balance",bob_tsla_native_usdc_balance.result.balance)
 
     bob_tsla_native_ust_balance = await native_erc20_ust.balanceOf(bob.contract_address).call()
-    print("tsla bob native_ust_balance",bob_tsla_native_ust_balance.result.balance)
+    print("TSLA bob native_ust_balance",bob_tsla_native_ust_balance.result.balance)
+
+    # Get w value of TSLA_USD_ID market
+    bob_w_TSLA_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, TSLA_USD_ID, bob.contract_address).call()
+    assert from64x61(bob_w_TSLA_USD_ID.result.trader_score) == 0.37100273218642876
+
+    bob_usdc_reward_for_TSLA_USDC_pair = (from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) * 
+                                            from64x61(bob_w_TSLA_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low)
+    
+    bob_ust_reward_for_TSLA_USDC_pair = (from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) * 
+                                            from64x61(bob_w_TSLA_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low)
+
+    bob_usdc_balance = ( bob_tsla_whitelisted_usdc_balance.result.balance.low + 
+                        bob_tsla_native_usdc_balance.result.balance.low)
+    
+    assert bob_usdc_balance == int(bob_usdc_reward_for_TSLA_USDC_pair) + int(bob_usdc_reward_for_ETH_USDC_pair)
+
+    bob_ust_balance = ( bob_tsla_whitelisted_ust_balance.result.balance.low + 
+                        bob_tsla_native_ust_balance.result.balance.low)
+    
+    assert bob_ust_balance == int(bob_ust_reward_for_TSLA_USDC_pair) + int(bob_ust_reward_for_ETH_USDC_pair)
 
     # c. Get charlie native and non native USDC and UST balance's for TSLA
     charlie_tsla_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(charlie.contract_address).call()
-    print("tsla charlie whitelisted_usdc_balance",charlie_tsla_whitelisted_usdc_balance.result.balance)
+    print("TSLA charlie whitelisted_usdc_balance",charlie_tsla_whitelisted_usdc_balance.result.balance)
 
     charlie_tsla_whitelisted_ust_balance = await whitelisted_ust.balanceOf(charlie.contract_address).call()
-    print("tsla charlie whitelisted_ust_balance",charlie_tsla_whitelisted_ust_balance.result.balance)
+    print("TSLA charlie whitelisted_ust_balance",charlie_tsla_whitelisted_ust_balance.result.balance)
 
     charlie_tsla_native_usdc_balance = await native_erc20_usdc.balanceOf(charlie.contract_address).call()
-    print("tsla charlie native_usdc_balance",charlie_tsla_native_usdc_balance.result.balance)
+    print("TSLA charlie native_usdc_balance",charlie_tsla_native_usdc_balance.result.balance)
 
     charlie_tsla_native_ust_balance = await native_erc20_ust.balanceOf(charlie.contract_address).call()
-    print("tsla charlie native_ust_balance",charlie_tsla_native_ust_balance.result.balance)
+    print("TSLA charlie native_ust_balance",charlie_tsla_native_ust_balance.result.balance)
+
+    # Get w value of TSLA_USD_ID market
+    charlie_w_TSLA_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, TSLA_USD_ID, charlie.contract_address).call()
+    assert from64x61(charlie_w_TSLA_USD_ID.result.trader_score) == 0.3228995411203036
+
+    charlie_usdc_reward_for_TSLA_USDC_pair = (from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) * 
+                                            from64x61(charlie_w_TSLA_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low)
+    
+    charlie_ust_reward_for_TSLA_USDC_pair = (from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) * 
+                                            from64x61(charlie_w_TSLA_USD_ID.result.trader_score) *
+                                            fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low)
+
+    charlie_usdc_balance = ( charlie_tsla_whitelisted_usdc_balance.result.balance.low + 
+                        charlie_tsla_native_usdc_balance.result.balance.low)
+    
+    assert charlie_usdc_balance == int(charlie_usdc_reward_for_TSLA_USDC_pair) 
+
+    charlie_ust_balance = ( charlie_tsla_whitelisted_ust_balance.result.balance.low + 
+                        charlie_tsla_native_ust_balance.result.balance.low)
+    
+    assert charlie_ust_balance == int(charlie_ust_reward_for_TSLA_USDC_pair)
