@@ -4,9 +4,9 @@ from contracts.DataTypes import Market
 
 @contract_interface
 namespace IMarkets {
-    ////////////////////////
+    // //////////////////////
     // External functions //
-    ////////////////////////
+    // //////////////////////
 
     func add_market(new_market_: Market, metadata_link_len: felt, metadata_link: felt*) {
     }
@@ -36,7 +36,7 @@ namespace IMarkets {
         incremental_initial_margin_fraction_: felt,
         incremental_position_size_: felt,
         baseline_position_size_: felt,
-        maximum_position_size_: felt
+        maximum_position_size_: felt,
     ) {
     }
 
@@ -49,9 +49,9 @@ namespace IMarkets {
     func update_metadata_link(market_id_: felt, link_len: felt, link: felt*) {
     }
 
-    ////////////////////
+    // //////////////////
     // View functions //
-    ////////////////////
+    // //////////////////
 
     func get_asset_collateral_from_market(market_id_: felt) -> (
         asset_id: felt, collateral_id: felt
