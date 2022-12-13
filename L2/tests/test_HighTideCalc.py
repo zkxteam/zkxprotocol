@@ -1510,14 +1510,21 @@ async def test_opening_closing_orders_day_4(adminAuth_factory):
 async def test_calculating_factors(adminAuth_factory):
     starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, hightideCalc, user_stats, rewardsCalculation = adminAuth_factory
 
-    # increment to a later date 
+    season_id = 1
+    execution_info = await hightide.get_season(season_id).call()
+    fetched_trading_season = execution_info.result.trading_season
+
+    num_trading_days = fetched_trading_season.num_trading_days
+
+    timestamp = fetched_trading_season.start_timestamp + (num_trading_days*24*60*60) + 1
+
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
-        block_timestamp=timestamp6, 
-        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        block_number=1, block_timestamp=timestamp, gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
         starknet_version = STARKNET_VERSION
     )
+
+    await admin1_signer.send_transaction(admin1, hightide.contract_address,"end_trade_season",[season_id])
 
     markets = await hightide.get_hightides_by_season_id(1).call()
     print(markets.result)
@@ -1555,21 +1562,6 @@ async def test_calculating_factors(adminAuth_factory):
         ]
     )
 
-    season_id = 1
-    execution_info = await hightide.get_season(season_id).call()
-    fetched_trading_season = execution_info.result.trading_season
-
-    num_trading_days = fetched_trading_season.num_trading_days
-
-    timestamp = fetched_trading_season.start_timestamp + (num_trading_days*24*60*60) + 1
-
-    starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp, gas_price=starknet_service.starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
-    )
-
-    await admin1_signer.send_transaction(admin1, hightide.contract_address,"end_trade_season",[season_id])
     await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address,"set_user_xp_values",
             [
                 season_id,
