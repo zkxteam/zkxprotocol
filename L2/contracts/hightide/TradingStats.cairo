@@ -4,7 +4,13 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import unsigned_div_rem, assert_le, assert_in_range, assert_lt
+from starkware.cairo.common.math import (
+    unsigned_div_rem,
+    assert_le,
+    assert_in_range,
+    assert_lt,
+    assert_nn,
+)
 from starkware.cairo.common.math_cmp import is_nn, is_le
 
 from contracts.Constants import Hightide_INDEX, Trading_INDEX, UserStats_INDEX
@@ -224,6 +230,39 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     return (average_volume,);
 }
 
+// @notice View function to get the list of traders in a pair
+// @param season_id_ - id of the season
+// @param pair_id_ - id of the market pair
+// @param starting_index_ - Index from which to fetch the array
+// @param num_traders_ - Number of traders to fetch from the array
+// @return trader_list_len - length of trader's list
+// @return trader_list - list of trader's
+@view
+func get_traders_in_pair{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, pair_id_: felt, starting_index_: felt, num_traders_: felt
+) -> (trader_list_len: felt, trader_list: felt*) {
+    alloc_locals;
+
+    with_attr error_message("TradingStats: Starting index cannot be negative") {
+        assert_nn(starting_index_);
+    }
+
+    with_attr error_message("TradingStats: Number of traders cannot be negative or zero") {
+        assert_lt(0, num_traders_);
+    }
+
+    let ending_index = starting_index_ + num_traders_;
+    let (trader_list_len) = num_traders.read(season_id_, pair_id_);
+    with_attr error_message("TradingStats: Cannot retrieve the specified num of traders") {
+        assert_le(ending_index, trader_list_len);
+    }
+
+    let (trader_list: felt*) = alloc();
+    return populate_trader_list_recurse(
+        season_id_, pair_id_, 0, starting_index_, ending_index, trader_list
+    );
+}
+
 //#####################
 // External Functions #
 //#####################
@@ -276,8 +315,8 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     IUserStats.record_trader_stats(
         contract_address=user_stats_address,
-        season_id=season_id_,
-        pair_id=pair_id_,
+        season_id_=season_id_,
+        pair_id_=pair_id_,
         trader_stats_list_len=trader_stats_list_len,
         trader_stats_list=trader_stats_list,
     );
@@ -525,4 +564,24 @@ func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         assert number_of_days = season.num_trading_days;
     }
     return number_of_days;
+}
+
+// @dev - This function populates trader list for a pair in the season
+func populate_trader_list_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt,
+    pair_id_: felt,
+    iterator_: felt,
+    starting_index_: felt,
+    ending_index_: felt,
+    trader_list_: felt*,
+) -> (trader_list_len: felt, trader_list: felt*) {
+    if (starting_index_ == ending_index_) {
+        return (iterator_, trader_list_);
+    }
+
+    let (trader_address) = traders_in_pair.read(season_id_, pair_id_, iterator_);
+    assert trader_list_[iterator_] = trader_address;
+    return populate_trader_list_recurse(
+        season_id_, pair_id_, iterator_ + 1, starting_index_ + 1, ending_index_, trader_list_
+    );
 }

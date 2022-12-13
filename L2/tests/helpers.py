@@ -29,7 +29,7 @@ class ContractType(Enum):
     ABRFund = "contracts/ABRFund.cairo"
     ABRPayment = "contracts/ABRPayment.cairo"
     MarketPrices = "contracts/MarketPrices.cairo"
-    Liquidate = "tests/testable/TestLiquidate.cairo"
+    Liquidate = "contracts/Liquidate.cairo"
     DepositDataManager = "contracts/DepositDataManager.cairo"
     WithdrawalFeeBalance = "contracts/WithdrawalFeeBalance.cairo"
     CollateralPrices = "contracts/CollateralPrices.cairo"
@@ -59,6 +59,8 @@ class ContractType(Enum):
     RelayMarkets = "contracts/relay_contracts/RelayMarkets.cairo"
     RelayFeeDiscount = "contracts/relay_contracts/RelayFeeDiscount.cairo"
     WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
+    ZKXDeployer = "contracts/ZKXDeployer.cairo"
+    
     # Test-helping contracts
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
@@ -79,13 +81,13 @@ class ContractsHolder:
     def __init__(self):
         self.contract_classes = {}
 
-    def prepare(self):
-        for type in ContractType:
+    def get_contract_class(self, type: ContractType) -> ContractClass:
+        if self.contract_classes.get(type) is None:
             compiled_class = compile_starknet_files(files=[type.value])
             self.contract_classes[type] = compiled_class
-
-    def get_contract_class(self, type: ContractType) -> ContractClass:
-        return self.contract_classes[type]
+            return compiled_class
+        else:
+            return self.contract_classes[type]
 
 class StarknetService:
 

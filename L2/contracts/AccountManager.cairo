@@ -76,9 +76,9 @@ from contracts.Math_64x61 import (
     Math64x61_sub,
 )
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted whenever collateral is transferred from account by trading
 @event
@@ -115,9 +115,9 @@ func liquidate_deleverage(market_id: felt, direction: felt, amount_to_be_sold: f
 func deposited(asset_id: felt, amount: felt) {
 }
 
-//##########
-// Storage #
-//##########
+/////////////
+// Storage //
+/////////////
 
 // Stores public key associated with an account
 @storage_var
@@ -204,9 +204,9 @@ func withdrawal_history_array_len() -> (len: felt) {
 func order_id_mapping(order_id: felt) -> (hash: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -224,9 +224,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+////////////////////
+// View Functions //
+////////////////////
 
 // @notice view function to get public key
 // @return res - public key of an account
@@ -392,9 +392,9 @@ func timestamp_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return (is_eight_hours,);
 }
 
-//#############
-// L1 Handler #
-//#############
+////////////////
+// L1 Handler //
+////////////////
 
 // @notice Function to handle deposit from L1ZKX contract
 // @param from_address - The address from where deposit function is called from
@@ -450,9 +450,9 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+////////////////////////
+// External Functions //
+////////////////////////
 
 // @notice External function called by the Trading Contract
 // @param assetID_ - asset ID of the collateral that needs to be transferred
@@ -960,8 +960,7 @@ func withdraw{
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     );
-    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
-    tempvar ticker = asset.ticker;
+    let (local asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
     // Convert amount from Math64x61 format to felt
     let (amount_in_felt) = Math64x61_toDecimalFelt(amount_, decimals=asset.token_decimal);
     // Get the L1 wallet address of the user
@@ -974,7 +973,7 @@ func withdraw{
         contract_address=withdrawal_request_address,
         request_id_=request_id_,
         user_l1_address_=user_l1_address,
-        ticker_=ticker,
+        asset_id_=asset.id,
         amount_=amount_in_felt,
     );
     // Create a withdrawal history object
@@ -1044,9 +1043,9 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+////////////////////////
+// Internal Functions //
+////////////////////////
 
 // @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
 // @param withdrawal_list_len_ - Stores the current length of the populated withdrawals array

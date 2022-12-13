@@ -24,6 +24,11 @@ namespace ITradingStats {
     func get_total_days_traded(season_id_: felt, pair_id_: felt) -> (res: felt) {
     }
 
+    func get_traders_in_pair(season_id_: felt, pair_id_: felt) -> (
+        trader_list_len: felt, trader_list: felt*
+    ) {
+    }
+
     // external functions
     func record_trade_batch_stats(
         pair_id_: felt,

@@ -63,9 +63,9 @@ from contracts.Math_64x61 import Math64x61_add, Math64x61_div, Math64x61_mul, Ma
 const LEVERAGE_ONE = 2305843009213693952;
 const HUNDRED = 230584300921369395200;
 
-//#########
-// Events #
-//#########
+// //////////
+// Events //
+// //////////
 
 // Event emitted whenever a new market is added
 @event
@@ -96,9 +96,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+// ////////////
+// External //
+// ////////////
 
 // @notice Function to execute multiple orders in a batch
 // @param quantity_locked_ - Size of the order to be executed
@@ -223,9 +223,9 @@ func execute_batch{
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// ////////////
+// Internal //
+// ////////////
 
 // @notice Internal function to retrieve contract addresses from the Auth Registry
 // @returns account_registry_address - Address of the Account Registry contract
@@ -471,7 +471,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert [trader_stats_list_] = element;
 
     // Deduct the amount from liquidity funds if order is leveraged
-    let is_non_leveraged = is_le(order_.leverage, LEVERAGE_ONE);
+    let is_non_leveraged = is_le(order_.leverage, Math64x61_ONE);
 
     if (is_non_leveraged == FALSE) {
         ILiquidityFund.withdraw(
@@ -1125,7 +1125,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             assert_le(temp_order.leverage, market.maximum_leverage);
         }
 
-        // Recursive call with the ticker and price to compare against
         return check_and_execute(
             quantity_locked_=quantity_locked_,
             market_id_=market_id_,

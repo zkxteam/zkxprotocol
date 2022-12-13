@@ -5,6 +5,7 @@ import os
 from starkware.starknet.testing.starknet import Starknet
 from starkware.cairo.common.hash_state import compute_hash_on_elements
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, assert_event_emitted, from64x61, to64x61
+from utils_asset import build_default_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
 from starkware.eth.eth_test_utils import EthTestUtils, eth_reverts
 from starkware.starknet.testing.contracts import MockStarknetMessaging
@@ -20,44 +21,16 @@ from web3 import Web3
 
 counter = 0
 eth_test_utils = EthTestUtils()
-# Generates unique asset params (id, ticker and name) to avoid conflicts
-
+ETH_ID = 4543560
+ETH_NAME = str_to_felt("ETH")
 DUMMY_WITHDRAWAL_REQUEST_ADDRESS=12345
-ETH_TICKER=4543560
 
 def generate_asset_info():
     global counter
     counter += 1
     id = f"32f0406jz7qj8_${counter}"
-    ticker = ETH_TICKER
     name = f"Ethereum_${counter}"
-    return str_to_felt(id), ticker, str_to_felt(name)
-
-
-
-def build_default_asset_properties(id, ticker, name):
-    return [
-        id,  # id
-        0,  # asset_version
-        ETH_TICKER,  # ticker
-        name,  # short_name
-        0,  # tradable
-        1,  # collateral
-        18,  # token_decimal
-        0,  # metadata_id
-        1,  # tick_size
-        1,  # step_size
-        10,  # minimum_order_size
-        1,  # minimum_leverage
-        5,  # maximum_leverage
-        3,  # currently_allowed_leverage
-        1,  # maintenance_margin_fraction
-        1,  # initial_margin_fraction
-        1,  # incremental_initial_margin_fraction
-        100,  # incremental_position_size
-        1000,  # baseline_position_size
-        10000  # maximum_position_size
-    ]
+    return str_to_felt(id), str_to_felt(name)
 
 
 @pytest.fixture(scope='module')
@@ -128,22 +101,19 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
 
     # adding asset in setup since it is required by all tests
-    asset_id, asset_ticker, asset_name = generate_asset_info()
-    asset_properties = build_default_asset_properties(
-        asset_id, asset_ticker, asset_name)
+    asset_properties = build_default_asset_properties(id=ETH_ID, short_name=ETH_NAME, is_collateral=True)
     add_asset_tx = await signer1.send_transaction(admin1, asset.contract_address, 'add_asset', asset_properties)
     assert_event_emitted(
         add_asset_tx,
         from_address=asset.contract_address,
         name="asset_added",
         data=[
-            asset_id,
-            asset_ticker,
+            ETH_ID,
             admin1.contract_address
         ]
     )
     await postman.flush()
-    l1_zkx_contract.updateAssetListInL1.transact(asset_ticker, asset_id)
+    l1_zkx_contract.updateAssetListInL1.transact(ETH_ID)
     
     tx_exec_info = await signer1.send_transaction(admin1,
                                                   account_deployer.contract_address,
@@ -157,18 +127,18 @@ async def adminAuth_factory(starknet_service: StarknetService):
     deployed_address=deployed_address.result.address
 
     await signer1.send_transaction(admin1, withdrawal_fee_balance.contract_address, 'set_standard_withdraw_fee',[
-        to64x61(1), # here fee needs to be in not just 64x61 format but also without decimal part which is inferred from asset_id
-        asset_id
+        to64x61(1), # here fee needs to be in not just 64x61 format but also without decimal part which is inferred from ETH_ID
+        ETH_ID
     ])
 
     return (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract,
-            token_contract, account_deployer, account_registry, asset_ticker, asset_id, deployed_address, withdrawal_request)
+            token_contract, account_deployer, account_registry, deployed_address, withdrawal_request)
 
 
 @pytest.mark.asyncio
 async def test_withdraw_positive_flow(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address, withdrawal_request) = adminAuth_factory
+    account_deployer, account_registry, deployed_address, withdrawal_request) = adminAuth_factory
     
     balance_zkx_before = l1_zkx_contract.balance
     
@@ -187,7 +157,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
                                             contract_address=deployed_address,
                                             deploy_call_info=None)
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert result.result.res==0
 
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
@@ -200,11 +170,11 @@ async def test_withdraw_positive_flow(adminAuth_factory):
    
     
     # balance should be updated after message is sent to L2 and L1_handler is called
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==6
 
     request_id=1
-    collateral_id=asset_id
+    collateral_id=ETH_ID
     amount = to64x61(2) # here amount needs to be not just 64x61 but also without decimal part
     withdrawal_request_msg_hash = compute_hash_on_elements([request_id, collateral_id, amount])
 
@@ -214,7 +184,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     await signer1.send_transaction(admin1, deployed_address, 'withdraw', [
         request_id, collateral_id, amount, signature[0], signature[1], admin1.contract_address])
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==3  # previous balance - withdraw amount - fee (1)
 
     # should not be able to consume/withdraw message before it reaches L1
@@ -244,7 +214,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     
     result=result.result.withdrawal_list[0]
     assert result.request_id == request_id
-    assert result.collateral_id == asset_id
+    assert result.collateral_id == ETH_ID
     assert result.status == 0
 
     result = await withdrawal_request.get_withdrawal_request_data(request_id).call()
@@ -252,7 +222,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     result=result.result.withdrawal_request
 
     assert result.user_l2_address == deployed_address
-    assert result.ticker == asset_ticker
+    assert result.asset_id == ETH_ID
     assert result.amount == 2*(10**18)
 
     await postman.flush()
@@ -261,21 +231,21 @@ async def test_withdraw_positive_flow(adminAuth_factory):
    
     result=result.result.withdrawal_list[0]
     assert result.request_id == request_id
-    assert result.collateral_id == asset_id
+    assert result.collateral_id == ETH_ID
     assert result.status == 1
 
     result = await withdrawal_request.get_withdrawal_request_data(request_id).call()
     result=result.result.withdrawal_request
 
     assert result.user_l2_address == 0
-    assert result.ticker == 0
+    assert result.asset_id == 0
     assert result.amount == 0
 
 
 @pytest.mark.asyncio
 async def test_withdraw_incorrect_payload(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address, withdrawal_request) = adminAuth_factory
+    account_deployer, account_registry, deployed_address, withdrawal_request) = adminAuth_factory
 
     abi = get_contract_class(
         source="tests/testable/TestAccountManager.cairo").abi
@@ -285,7 +255,7 @@ async def test_withdraw_incorrect_payload(adminAuth_factory):
                                             deploy_call_info=None)
 
     request_id=2
-    collateral_id=asset_id
+    collateral_id=ETH_ID
     amount = to64x61(2)
     withdrawal_request_msg_hash = compute_hash_on_elements([request_id, collateral_id, amount])
     signature = signer3.sign(withdrawal_request_msg_hash)
@@ -317,11 +287,11 @@ async def test_withdraw_incorrect_payload(adminAuth_factory):
                                       3*(10**18), # incorrect amount
                                       request_id)
 
-    # this shows that call cannot go through withdraw method even with ETH_TICKER
+    # this shows that call cannot go through withdraw method even with ETH asset ID
     # since there is no token address for ETH
     with eth_reverts("Withdrawal failed: token address not set"):
         l1_zkx_contract.withdraw.transact(eth_test_utils.accounts[0].address,
-                                      ETH_TICKER, 
+                                      ETH_ID, 
                                       2*(10**18), # here amount is being given as uint256 not as 64x61 value
                                       request_id)  
     # correct payload will result in message consumption - proving that message is there waiting to be consumed
@@ -338,7 +308,7 @@ async def test_withdraw_incorrect_payload(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address, withdrawal_request) = adminAuth_factory
+    account_deployer, account_registry, deployed_address, withdrawal_request) = adminAuth_factory
 
     balance_zkx_before = l1_zkx_contract.balance
     
@@ -357,7 +327,7 @@ async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
     # registry - this can effectively be any contract impersonating as L1_ZKX_contract on L1
     
     request_id=3
-    collateral_id=asset_id
+    collateral_id=ETH_ID
     amount = to64x61(2)
     withdrawal_request_msg_hash = compute_hash_on_elements([request_id, collateral_id, amount])
     signature = signer3.sign(withdrawal_request_msg_hash)
@@ -372,7 +342,7 @@ async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
                                             contract_address=deployed_address,
                                             deploy_call_info=None)
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==3
 
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
@@ -416,7 +386,7 @@ async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_withdraw_positive_flow_sponsored(adminAuth_factory):
     (adminAuth, registry, asset, admin1, admin2, postman, l1_zkx_contract, token_contract, 
-    account_deployer, account_registry, asset_ticker, asset_id, deployed_address, withdrawal_request) = adminAuth_factory
+    account_deployer, account_registry, deployed_address, withdrawal_request) = adminAuth_factory
     
 
     balance_zkx_before = l1_zkx_contract.balance
@@ -435,7 +405,7 @@ async def test_withdraw_positive_flow_sponsored(adminAuth_factory):
                                             contract_address=deployed_address,
                                             deploy_call_info=None)
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==3
 
     message_to_l2_filter = postman.mock_starknet_messaging_contract.w3_contract.events.LogMessageToL2.createFilter(
@@ -448,10 +418,10 @@ async def test_withdraw_positive_flow_sponsored(adminAuth_factory):
    
     
     # balance should be updated after message is sent to L2 and L1_handler is called
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==9
     request_id=4
-    collateral_id=asset_id
+    collateral_id=ETH_ID
     amount = to64x61(2) # here amount needs to be not just 64x61 but also without decimal part
     withdrawal_request_msg_hash = compute_hash_on_elements([request_id, collateral_id, amount])
     signature = signer3.sign(withdrawal_request_msg_hash)
@@ -459,7 +429,7 @@ async def test_withdraw_positive_flow_sponsored(adminAuth_factory):
     await signer1.send_transaction(admin1, deployed_address, 'withdraw', [
         request_id, collateral_id, amount, signature[0], signature[1], admin1.contract_address])
 
-    result = await new_account_contract.get_balance(asset_id).call()
+    result = await new_account_contract.get_balance(ETH_ID).call()
     assert from64x61(result.result.res)==6  # previous balance - withdraw amount - fee (1)
 
     await postman.flush()
