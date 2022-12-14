@@ -58,6 +58,9 @@ market_to_asset_mapping = {
     TSLA_USD_ID: AssetID.USDC
 }
 
+market_to_collateral_mapping = {
+    BTC_USD_ID: }
+
 
 class OrderExecutor:
     def __init__(self):
@@ -311,6 +314,78 @@ class OrderExecutor:
                                        margin_amount=margin_amount, borrowed_amount=borrowed_amount, market_id=market_id)
 
         return
+
+
+class Liquidator:
+    def __init__(self):
+        self.maintenance_margin = 0.075
+
+    def check_for_liquidation(self, user, prices_array):
+        positions = user.get_positions()
+
+        if len(positions) == 0:
+            print("Liquidator: Empty positions array")
+            return
+
+        if len(positions) != len(prices_array):
+            print("Liquidator: Invalid prices array")
+
+        least_collateral_ratio = 0
+        least_collateral_ratio_position = 0
+        least_collateral_ratio_position_collateral_price = 0
+        least_collateral_ratio_position_asset_price = 0
+        total_account_value = 0
+        total_maintenance_requirement = 0
+
+        for i in range(len(positions)):
+            maintenance_position = positions[i].avg_execution_price * \
+                positions[i].position_size
+            maintenance_requirement = self.maintenance_margin * maintenance_position
+            maintenance_requirement_usd = maintenance_requirement * \
+                prices_array[i].collateral_price
+
+            # Calculate pnl to check if it is the least collateralized position
+            price_diff = 0
+            if positions[i].direction == 1:
+                price_diff = prices_array["asset_price"] - \
+                    positions[i].avg_execution_price
+            else:
+                price_diff = positions[i].avg_execution_price - \
+                    prices_array["asset_price"]
+
+            pnl = price_diff*positions[i].position_size
+
+            # Calculate the value of the current account margin in usd
+            position_value = maintenance_position - \
+                positions[i].borrowed_amount + pnl
+            net_position_value_usd = position_value * \
+                prices_array[i].collateral_price
+
+            # Margin ratio calculation
+            collateral_ratio = (positions[i].margin_amount + pnl)/(
+                positions[i].position_size, prices_array[i].asset_price)
+
+            if collateral_ratio < least_collateral_ratio:
+                least_collateral_ratio = collateral_ratio
+                least_collateral_ratio_position = positions[i]
+                least_collateral_ratio_position_collateral_price = prices_array[i].collateral_price
+                least_collateral_ratio_position_asset_price = prices_array[i].asset_price
+
+            total_maintenance_requirement += maintenance_requirement_usd
+            total_account_value += net_position_value_usd
+
+        collaterals_array = user.get_collaterals()
+        user_balance = self.find_collateral_balance(
+            prices=prices_array,
+            collaterals=collaterals_array
+        )
+
+        total_account_value_collateral = total_account_value + user_balance
+
+        if total_account_value_collateral < total_maintenance_requirement:
+            # Deleverage check
+            # Liquidate position
+            pass
 
 
 class User:
