@@ -1,5 +1,6 @@
 %lang starknet
 
+from starkware.cairo.common.bool import TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_caller_address
@@ -126,7 +127,7 @@ func set_standard_withdraw_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     );
     let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
     with_attr error_message("WithdrawalFeeBalance: Unregistered collateral passed") {
-        assert_not_zero(asset.collateral);
+        assert asset.is_collateral = TRUE;
     }
     standard_withdraw_fee_collateral_id.write(value=collateral_id_);
 

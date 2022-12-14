@@ -9,7 +9,7 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IFeeDiscount import IFeeDiscount
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
-from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_mul
+from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_mul, Math64x61_ONE
 
 //##########
 // Structs #
@@ -164,8 +164,7 @@ func get_user_fee_and_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     }
 
     // Calculate fee after the discount
-    // 64x61(1) = 2305843009213693952
-    let non_discount = 2305843009213693952 - discount;
+    let non_discount = Math64x61_ONE - discount;
     let fee: felt = Math64x61_mul(base_fee, non_discount);
 
     return (fee=fee);

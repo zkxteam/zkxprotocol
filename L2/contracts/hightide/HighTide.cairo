@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero, split_felt
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import (
     deploy,
@@ -11,11 +11,18 @@ from starkware.starknet.common.syscalls import (
     get_block_timestamp,
     get_caller_address,
 )
-from starkware.cairo.common.uint256 import Uint256, uint256_add, uint256_lt
+from starkware.cairo.common.uint256 import (
+    Uint256,
+    uint256_add,
+    uint256_lt,
+    uint256_mul,
+    uint256_unsigned_div_rem,
+)
 
 from contracts.Constants import (
     HIGHTIDE_ACTIVE,
     HIGHTIDE_INITIATED,
+    HighTideCalc_INDEX,
     ManageHighTide_ACTION,
     Market_INDEX,
     Starkway_INDEX,
@@ -30,11 +37,14 @@ from contracts.DataTypes import (
 )
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
+from contracts.interfaces.IHighTideCalc import IHighTideCalc
+from contracts.interfaces.ILiquidityPool import ILiquidityPool
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IStarkway import IStarkway
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
+from contracts.Math_64x61 import Math64x61_fromIntFelt, Math64x61_mul, Math64x61_toFelt
 
 // /////////
 // Events //
@@ -88,6 +98,13 @@ func hightide_activated(caller: felt, hightide_id: felt) {
 // Event is emitted when an hightide is assigned to a season
 @event
 func assigned_hightide_to_season(hightide_id: felt, season_id: felt) {
+}
+
+// Event emitted whenever trader's reward for a market is ditributed
+@event
+func distributed_trader_reward(
+    season_id: felt, pair_id: felt, trader_address: felt, l1_token_address: felt, reward: Uint256
+) {
 }
 
 // //////////
@@ -378,13 +395,13 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 }
 
 // @notice - This function is used for setting multipliers
-// @param a1_ - alpha1 value
-// @param a2_ - alpha2 value
-// @param a3_ - alpha3 value
-// @param a4_ - alpha4 value
+// @param a_1_ - alpha1 value
+// @param a_2_ - alpha2 value
+// @param a_3_ - alpha3 value
+// @param a_4_ - alpha4 value
 @external
 func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    a1_: felt, a2_: felt, a3_: felt, a4_: felt
+    a_1_: felt, a_2_: felt, a_3_: felt, a_4_: felt
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -395,7 +412,7 @@ func set_multipliers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     }
 
     // Create Multipliers struct to store
-    let multipliers: Multipliers = Multipliers(a1=a1_, a2=a2_, a3=a3_, a4=a4_);
+    let multipliers: Multipliers = Multipliers(a_1=a_1_, a_2=a_2_, a_3=a_3_, a_4=a_4_);
     multipliers_to_calculate_reward.write(multipliers);
 
     // Emit event
@@ -497,7 +514,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Get Market from the corresponding market id
     let (market: Market) = IMarkets.get_market(
-        contract_address=market_contract_address, id=pair_id_
+        contract_address=market_contract_address, market_id_=pair_id_
     );
 
     with_attr error_message("HighTide: Listed market pair does not exist") {
@@ -543,6 +560,8 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     hightide_id_: felt
 ) {
     alloc_locals;
+    // To-do: Need to integrate signature infra for the authentication
+
     verify_hightide_id_exists(hightide_id_);
 
     let (registry) = CommonLib.get_registry_address();
@@ -593,6 +612,50 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         return ();
     }
     return ();
+}
+
+// @notice - This function is used to distribute rewards
+// @param hightide_id_ - id of hightide
+// @param trader_list_len - length of trader's list
+// @param trader_list - list of trader's
+@external
+func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_id_: felt, trader_list_len: felt, trader_list: felt*
+) {
+    alloc_locals;
+    // To-do: Need to integrate signature infra for the authentication
+
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get HightideCalc contract address from Authorized Registry
+    let (hightide_calc_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=HighTideCalc_INDEX, version=version
+    );
+
+    // Get percentage of funds transferred from liquidity pool to reward pool
+    let (local hightide_metadata: HighTideMetaData) = get_hightide(hightide_id_);
+    let (funds_flow_64x61) = IHighTideCalc.get_funds_flow_per_market(
+        contract_address=hightide_calc_address,
+        season_id_=hightide_metadata.season_id,
+        pair_id_=hightide_metadata.pair_id,
+    );
+
+    // Get reward tokens associated with the hightide
+    let (
+        reward_tokens_list_len: felt, reward_tokens_list: RewardToken*
+    ) = get_hightide_reward_tokens(hightide_id_);
+
+    // Recursively distribute rewards to all active traders for the specified hightide
+    return distribute_rewards_recurse(
+        hightide_metadata_=hightide_metadata,
+        funds_flow_64x61_=funds_flow_64x61,
+        hightide_calc_address_=hightide_calc_address,
+        trader_list_len=trader_list_len,
+        trader_list=trader_list,
+        reward_tokens_list_len=reward_tokens_list_len,
+        reward_tokens_list=reward_tokens_list,
+    );
 }
 
 // ///////////
@@ -841,4 +904,116 @@ func populate_hightide_list_recurse{
     let (hightide_id) = hightide_by_season_id.read(season_id_, index_ + 1);
     assert hightide_list[index_] = hightide_id;
     return populate_hightide_list_recurse(season_id_, index_ + 1, hightide_list_len, hightide_list);
+}
+
+func distribute_rewards_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    hightide_metadata_: HighTideMetaData,
+    funds_flow_64x61_: felt,
+    hightide_calc_address_: felt,
+    trader_list_len: felt,
+    trader_list: felt*,
+    reward_tokens_list_len: felt,
+    reward_tokens_list: RewardToken*,
+) {
+    if (trader_list_len == 0) {
+        return ();
+    }
+
+    // Get trader's score (w) per market
+    let (trader_score_64x61) = IHighTideCalc.get_trader_score_per_market(
+        contract_address=hightide_calc_address_,
+        season_id_=hightide_metadata_.season_id,
+        pair_id_=hightide_metadata_.pair_id,
+        trader_address_=[trader_list],
+    );
+
+    // Calculate individual reward (r) = R (funds flow) * w (trader's score)
+    let (individual_reward_64x61) = Math64x61_mul(funds_flow_64x61_, trader_score_64x61);
+
+    // Send reward from all the listed reward tokens of hightide
+    distribute_rewards_per_trader_recurse(
+        hightide_metadata_=hightide_metadata_,
+        trader_address_=[trader_list],
+        individual_reward_64x61_=individual_reward_64x61,
+        reward_tokens_list_len=reward_tokens_list_len,
+        reward_tokens_list=reward_tokens_list,
+    );
+
+    // Iterate over next trader to distribute reward
+    return distribute_rewards_recurse(
+        hightide_metadata_=hightide_metadata_,
+        funds_flow_64x61_=funds_flow_64x61_,
+        hightide_calc_address_=hightide_calc_address_,
+        trader_list_len=trader_list_len - 1,
+        trader_list=trader_list + 1,
+        reward_tokens_list_len=reward_tokens_list_len,
+        reward_tokens_list=reward_tokens_list,
+    );
+}
+
+func distribute_rewards_per_trader_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    hightide_metadata_: HighTideMetaData,
+    trader_address_: felt,
+    individual_reward_64x61_: felt,
+    reward_tokens_list_len: felt,
+    reward_tokens_list: RewardToken*,
+) {
+    if (reward_tokens_list_len == 0) {
+        return ();
+    }
+
+    // Convert individual reward from 64x61 to Uint256 format
+    // to convert, we will multiply and divide the reward which is in decimals with one followed by some zeros.
+    // Here, we considered one followed by 18 zeros.
+    // Ex: to convert 0.1234 -> ((0.1234) * (1000000000000000000))/ (1000000000000000000) -> we will convert numerator and denominator to Uint256 and then perform division
+    let (quintillion_64x61: felt) = Math64x61_fromIntFelt(1000000000000000000);
+    let (trader_reward_64x61: felt) = Math64x61_mul(individual_reward_64x61_, quintillion_64x61);
+
+    // Convert 64x61 value to felt value
+    let (trader_reward: felt) = Math64x61_toFelt(trader_reward_64x61);
+
+    // Convert felt value to Uint256 value
+    let (quintillion_high: felt, quintillion_low: felt) = split_felt(1000000000000000000);
+    let quintillion_Uint256: Uint256 = Uint256(low=quintillion_low, high=quintillion_high);
+
+    let (reward_high: felt, reward_low: felt) = split_felt(trader_reward);
+    let trader_reward_Uint256: Uint256 = Uint256(low=reward_low, high=reward_high);
+
+    // Calculate the individual reward for the corresponding reward token
+    let (individual_reward_Uint256, carry_Uint256) = uint256_mul(
+        trader_reward_Uint256, [reward_tokens_list].no_of_tokens
+    );
+
+    // Get the reward to be transferred
+    let (reward_Uint256, remainder_Uint256) = uint256_unsigned_div_rem(
+        individual_reward_Uint256, quintillion_Uint256
+    );
+
+    // Transfer the calculated reward amount to the trader
+    ILiquidityPool.distribute_reward_tokens(
+        contract_address=hightide_metadata_.liquidity_pool_address,
+        trader_address_=trader_address_,
+        reward_amount_Uint256_=reward_Uint256,
+        l1_token_address_=[reward_tokens_list].token_id,
+    );
+
+    // Emit event
+    distributed_trader_reward.emit(
+        season_id=hightide_metadata_.season_id,
+        pair_id=hightide_metadata_.pair_id,
+        trader_address=trader_address_,
+        l1_token_address=[reward_tokens_list].token_id,
+        reward=reward_Uint256,
+    );
+
+    // Iterate over the next reward token
+    return distribute_rewards_per_trader_recurse(
+        hightide_metadata_=hightide_metadata_,
+        trader_address_=trader_address_,
+        individual_reward_64x61_=individual_reward_64x61_,
+        reward_tokens_list_len=reward_tokens_list_len - 1,
+        reward_tokens_list=reward_tokens_list + RewardToken.SIZE,
+    );
 }

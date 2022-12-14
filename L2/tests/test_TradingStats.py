@@ -7,7 +7,9 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals
+from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
+from utils_asset import AssetID, build_asset_properties
+from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -22,17 +24,11 @@ dave_signer = Signer(123456789987654326)
 maker_trading_fees = to64x61(0.0002 * 0.97)
 taker_trading_fees = to64x61(0.0005 * 0.97)
 
-BTC_ID = str_to_felt("32f0406jz7qj8")
-ETH_ID = str_to_felt("65ksgn23nv")
-USDC_ID = str_to_felt("fghj3am52qpzsib")
-UST_ID = str_to_felt("yjk45lvmasopq")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
 TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
-DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
-TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 
 initial_timestamp = int(time.time())
 timestamp2 = int(time.time()) + (60*60*24) + 60
@@ -161,31 +157,193 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [BTC_ID, 1, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [ETH_ID, 1, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 1, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [UST_ID, 1, str_to_felt("UST"), str_to_felt("UST"), 1, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [DOGE_ID, 1, str_to_felt("DOGE"), str_to_felt("DOGECOIN"), 0, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [TSLA_ID, 1, str_to_felt("TESLA"), str_to_felt("TESLA MOTORS"), 1, 0, 1, 1, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    BTC_properties = build_asset_properties(
+        id=AssetID.BTC,
+        asset_version=1,
+        short_name=str_to_felt("BTC"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_properties)
+
+    ETH_properties = build_asset_properties(
+        id=AssetID.ETH,
+        asset_version=1,
+        short_name=str_to_felt("ETH"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=18
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', ETH_properties)
+    
+    USDC_properties = build_asset_properties(
+        id=AssetID.USDC,
+        asset_version=1,
+        short_name=str_to_felt("USDC"),
+        is_tradable=False,
+        is_collateral=True,
+        token_decimal=6
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
+    
+    UST_properties = build_asset_properties(
+        id=AssetID.UST,
+        asset_version=1,
+        short_name=str_to_felt("UST"),
+        is_tradable=True,
+        is_collateral=True,
+        token_decimal=6
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', UST_properties)
+
+    DOGE_properties = build_asset_properties(
+        id=AssetID.DOGE,
+        asset_version=1,
+        short_name=str_to_felt("DOGE"),
+        is_tradable=False,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', DOGE_properties)
+
+    TESLA_properties = build_asset_properties(
+        id=AssetID.TSLA,
+        asset_version=1,
+        short_name=str_to_felt("TESLA"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', TESLA_properties)
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [TSLA_USD_ID, TSLA_ID, USDC_ID, to64x61(10), 2, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [UST_USDC_ID, UST_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    BTC_USD_properties = MarketProperties(
+        id=BTC_USD_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+
+    BTC_UST_properties = MarketProperties(
+        id=BTC_UST_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.UST,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
+
+    ETH_USD_properties = MarketProperties(
+        id=ETH_USD_ID,
+        asset=AssetID.ETH,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
+
+    TSLA_USD_properties = MarketProperties(
+        id=TSLA_USD_ID,
+        asset=AssetID.TSLA,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=False,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', TSLA_USD_properties.to_params_list())
+
+    UST_USDC_properties = MarketProperties(
+        id=UST_USDC_ID,
+        asset=AssetID.UST,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', UST_USDC_properties.to_params_list())
 
     # Update collateral prices
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, to64x61(1)])
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [UST_ID, to64x61(1)])
+    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.USDC, to64x61(1)])
+    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.UST, to64x61(1)])
 
     # Fund the Holding contract
-    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [UST_ID, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
     # Fund the Liquidity fund contract
-    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
     season_id = 1
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
@@ -201,8 +359,8 @@ async def test_unauthorized_call(adminAuth_factory):
     alice_balance = to64x61(50000)
     bob_balance = to64x61(50000)
     
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, alice_balance])
-    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [USDC_ID, bob_balance])
+    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [AssetID.USDC, alice_balance])
+    await admin2_signer.send_transaction(admin2, bob.contract_address, 'set_balance', [AssetID.USDC, bob_balance])
 
     size1 = to64x61(1)
     marketID_1 = BTC_USD_ID
@@ -214,8 +372,8 @@ async def test_unauthorized_call(adminAuth_factory):
     margin_amount_64x61 = to64x61(5000)
 
     order_id_1 = str_to_felt("sdj324hka8kaedf")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -227,8 +385,8 @@ async def test_unauthorized_call(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljerw")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
@@ -271,8 +429,8 @@ async def test_invalid_season_id_call(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("12345")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -284,8 +442,8 @@ async def test_invalid_season_id_call(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("67899")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
@@ -346,8 +504,8 @@ async def test_closing_orders_day_0(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("sdj324hka8kaedf")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -359,8 +517,8 @@ async def test_closing_orders_day_0(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljerw")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0
@@ -437,8 +595,8 @@ async def test_closing_orders_day_1(adminAuth_factory):
     marketID_2 = BTC_USD_ID
 
     order_id_3 = str_to_felt("rlbrj32414hd")
-    assetID_3 = BTC_ID
-    collateralID_3 = USDC_ID
+    assetID_3 = AssetID.BTC
+    collateralID_3 = AssetID.USDC
     price3 = to64x61(6000)
     stopPrice3 = 0
     orderType3 = 0
@@ -449,8 +607,8 @@ async def test_closing_orders_day_1(adminAuth_factory):
     liquidatorAddress3 = 0
 
     order_id_4 = str_to_felt("tew243sdf2334")
-    assetID_4 = BTC_ID
-    collateralID_4 = USDC_ID
+    assetID_4 = AssetID.BTC
+    collateralID_4 = AssetID.USDC
     price4 = to64x61(6000)
     stopPrice4 = 0
     orderType4 = 0
@@ -533,8 +691,8 @@ async def test_opening_orders_day_2(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("sdj343234df")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(6500)
     stopPrice1 = 0
     orderType1 = 0
@@ -546,8 +704,8 @@ async def test_opening_orders_day_2(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("432342dfd23dff")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(6500)
     stopPrice2 = 0
     orderType2 = 0
@@ -613,8 +771,8 @@ async def test_opening_orders_day_2(adminAuth_factory):
     assert from64x61(order_volume.result[1])== 2*from64x61(size2)*from64x61(execution_price2)
 
     order_id_2 = str_to_felt("432342dfd23dfe")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(6500)
     stopPrice2 = 0
     orderType2 = 0
@@ -688,7 +846,7 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
     # we also test a batch of trades with open as well as close type orders
     charlie_balance = to64x61(50000)
     
-    await admin1_signer.send_transaction(admin1, charlie.contract_address, 'set_balance', [USDC_ID, charlie_balance])
+    await admin1_signer.send_transaction(admin1, charlie.contract_address, 'set_balance', [AssetID.USDC, charlie_balance])
     # increment to next day
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
@@ -712,8 +870,8 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("y7whd873i2jkfd")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(7000)
     stopPrice1 = 0
     orderType1 = 0
@@ -725,8 +883,8 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("287fj1hjksaskjh")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(7000)
     stopPrice2 = 0
     orderType2 = 0
@@ -749,8 +907,8 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
 
 
     order_id_3 = str_to_felt("rlbrj32414hd1")
-    assetID_3 = BTC_ID
-    collateralID_3 = USDC_ID
+    assetID_3 = AssetID.BTC
+    collateralID_3 = AssetID.USDC
     price3 = to64x61(7000)
     stopPrice3 = 0
     orderType3 = 0
@@ -761,8 +919,8 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
     liquidatorAddress3 = 0
 
     order_id_4 = str_to_felt("tew243sdf23341")
-    assetID_4 = BTC_ID
-    collateralID_4 = USDC_ID
+    assetID_4 = AssetID.BTC
+    collateralID_4 = AssetID.USDC
     price4 = to64x61(7000)
     stopPrice4 = 0
     orderType4 = 0
@@ -866,8 +1024,8 @@ async def test_opening_orders_day_32(adminAuth_factory):
     marketID_1 = BTC_USD_ID
 
     order_id_1 = str_to_felt("sdj324hka8kaedf123")
-    assetID_1 = BTC_ID
-    collateralID_1 = USDC_ID
+    assetID_1 = AssetID.BTC
+    collateralID_1 = AssetID.USDC
     price1 = to64x61(5000)
     stopPrice1 = 0
     orderType1 = 0
@@ -879,8 +1037,8 @@ async def test_opening_orders_day_32(adminAuth_factory):
     liquidatorAddress1 = 0
 
     order_id_2 = str_to_felt("wer4iljerw123")
-    assetID_2 = BTC_ID
-    collateralID_2 = USDC_ID
+    assetID_2 = AssetID.BTC
+    collateralID_2 = AssetID.USDC
     price2 = to64x61(5000)
     stopPrice2 = 0
     orderType2 = 0

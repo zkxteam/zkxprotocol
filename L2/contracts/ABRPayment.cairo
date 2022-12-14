@@ -24,18 +24,19 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted when abr payment called for a position
 @event
 func abr_payment_called_user_position(market_id: felt, account_address: felt, timestamp: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
+
 // @notice
 // @param registry_address_ - Address of the auth registry
 // @param contract_version_ Version of the contract
@@ -47,9 +48,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+////////////////////////
+// External Functions //
+////////////////////////
+
 // @notice Function to be called by the node
 // @param account_addresses_len_ - Length of the account_addresses array being passed
 // @param account_addresses_ - Account addresses array
@@ -89,9 +91,10 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     );
 }
 
-//#####################
-// Internal Functions #
-//#####################
+////////////////////////
+// Internal Functions //
+////////////////////////
+
 // @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
 // @param account_address_ - Address of the user of whom the positions are passed
 // @param abr_funding_ - Address of the ABR Fund contract
@@ -175,8 +178,8 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     );
 
     // Get the collateral ID of the market
-    let (collateral_id) = IMarkets.get_collateral_from_market(
-        contract_address=market_contract_, market_id=[net_positions_].market_id
+    let (_, collateral_id) = IMarkets.get_asset_collateral_from_market(
+        contract_address=market_contract_, market_id_=[net_positions_].market_id
     );
 
     if (is_called == 1) {

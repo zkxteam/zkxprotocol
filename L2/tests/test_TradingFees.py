@@ -1,9 +1,6 @@
 import pytest
 import asyncio
-from starkware.starknet.testing.starknet import Starknet
-from starkware.starkware_utils.error_handling import StarkException
-from starkware.starknet.definitions.error_codes import StarknetErrorCode
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, from64x61, to64x61
+from utils import ContractIndex, ManagerAction, assert_revert, to64x61
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
@@ -34,15 +31,15 @@ async def adminAuth_factory(starknet_service: StarknetService):
     account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
     user1 = await account_factory.deploy_ZKX_account(signer3.public_key)
 
-    non_discount = 2305843009213693952 - to64x61(0.03)
-    fee = to64x61(0.0002)
-    val = await fixed_math.Math64x61_mul(non_discount, fee).call()
+    # Give necessary permissions to admin1
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageAuthRegistry, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageFeeDetails, True])
+    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, ManagerAction.ManageGovernanceToken, True])
 
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 4, 1])
-    await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 6, 1])
-    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [3, 1, feeDiscount.contract_address])
-
+    # Add contracts to registry
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.FeeDiscount, 1, feeDiscount.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.TradingFees, 1, fees.contract_address])
+    
     await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 100])
 
     return adminAuth, fees, admin1, admin2, user1, feeDiscount

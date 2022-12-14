@@ -53,26 +53,26 @@ from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.CommonLibrary import CommonLib
-from contracts.Math_64x61 import Math64x61_mul, Math64x61_div
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_div, Math64x61_ONE
 
-//############
-// Constants #
-//############
+///////////////
+// Constants //
+///////////////
+
 const TWO_PERCENT = 46116860184273879;
-const LEVERAGE_ONE = 2305843009213693952;
 
-//#########
-// Events #
-//#########
+////////////
+// Events //
+////////////
 
 // Event emitted whenever a new market is added
 @event
 func trade_execution(address: felt, request: OrderRequest, market_id: felt, execution_price: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+/////////////////
+// Constructor //
+/////////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -85,9 +85,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+//////////////
+// External //
+//////////////
 
 // @notice Function to execute multiple orders in a batch
 // @param size_ - Size of the order to be executed
@@ -118,7 +118,7 @@ func execute_batch{
     );
 
     // Get Market from the corresponding Id
-    let (market: Market) = IMarkets.get_market(contract_address=market_address, id=marketID_);
+    let (market: Market) = IMarkets.get_market(contract_address=market_address, market_id_=marketID_);
 
     tempvar ttl = market.ttl;
 
@@ -208,9 +208,9 @@ func execute_batch{
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+//////////////
+// Internal //
+//////////////
 
 // @notice Internal function to retrieve contract addresses from the Auth Registry
 // @returns account_registry_address - Address of the Account Registry contract
@@ -499,7 +499,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert [trader_stats_list_] = element;
 
     // Deduct the amount from liquidity funds if order is leveraged
-    let is_non_leveraged = is_le(order_.leverage, LEVERAGE_ONE);
+    let is_non_leveraged = is_le(order_.leverage, Math64x61_ONE);
 
     if (is_non_leveraged == FALSE) {
         ILiquidityFund.withdraw(
@@ -651,8 +651,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         );
 
         // If no leverage is used
-        // to64x61(1) == 2305843009213693952
-        if (order_.leverage == LEVERAGE_ONE) {
+        if (order_.leverage == Math64x61_ONE) {
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -814,7 +813,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param assetID_ - Asset ID of the batch to be set by the first order
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
 // @param marketID_ - Market ID of the batch to be set by the first order
-// @param ticker_ - The ticker of each order in the batch
 // @param execution_price_ - Price at which the orders must be executed
 // @param request_list_len_ - No of orders in the batch
 // @param request_list_ - The batch of the orders
@@ -1021,21 +1019,23 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let (collateral: Asset) = IAsset.get_asset(
             contract_address=asset_address_, id=temp_order.collateralID
         );
-        let (market: Market) = IMarkets.get_market(contract_address=market_address_, id=marketID_);
+        let (market: Market) = IMarkets.get_market(contract_address=market_address_, market_id_=marketID_);
 
+        with_attr error_message("Trading: asset is not tradable") {
+            assert asset.is_tradable = TRUE;
+        }
         with_attr error_message("Trading: Collateral not valid") {
-            assert_not_zero(collateral.collateral);
+            assert collateral.is_collateral = TRUE;
         }
 
         with_attr error_message("Trading: Market not tradable") {
-            assert_not_zero(market.is_tradable);
+            assert market.is_tradable = TRUE;
         }
 
         with_attr error_message("Trading: Invalid Leverage") {
-            assert_le(temp_order.leverage, asset.currently_allowed_leverage);
+            assert_le(temp_order.leverage, market.currently_allowed_leverage);
         }
 
-        // Recursive call with the ticker and price to compare against
         return check_and_execute(
             size_,
             temp_order.assetID,
@@ -1054,7 +1054,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidate_address_,
             liquidity_fund_address_,
             insurance_fund_address_,
-            asset.currently_allowed_leverage,
+            market.currently_allowed_leverage,
             trader_stats_list_len,
             trader_stats_list,
         );
@@ -1069,7 +1069,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert collateralID_ = temp_order.collateralID;
     }
 
-    with_attr error_message("Trading: Invalid Leverage") {
+    with_attr error_message("Trading: Leverage too high") {
         assert_le(temp_order.leverage, max_leverage_);
     }
 

@@ -20,13 +20,13 @@ from contracts.Math_64x61 import (
     Math64x61_mul,
     Math64x61_sqrt,
     Math64x61_sub,
+    Math64x61_ONE
 )
 
 //############
 // Constants #
 //############
 
-const NUM_1 = 2305843009213693952;
 const NUM_8 = 18446744073709551616;
 const HOURS_8 = 28800;
 
@@ -430,7 +430,7 @@ func calc_bollinger{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         if (iterator_ == 0) {
             curr_window = 1;
         } else {
-            curr_window = curr_window_size - NUM_1;
+            curr_window = curr_window_size - Math64x61_ONE;
         }
 
         let (std_temp) = Math64x61_div(std_deviation, curr_window);
@@ -461,7 +461,7 @@ func calc_bollinger{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         let (curr_window_size) = Math64x61_fromIntFelt(window_size_);
         let (std_deviation) = find_std_sum(tail_window_len_, tail_window_, mean, window_size_, 0);
 
-        let (curr_size) = Math64x61_sub(curr_window_size, NUM_1);
+        let (curr_size) = Math64x61_sub(curr_window_size, Math64x61_ONE);
 
         let (std_temp) = Math64x61_div(std_deviation, curr_size);
         let (movstd) = Math64x61_sqrt(std_temp);

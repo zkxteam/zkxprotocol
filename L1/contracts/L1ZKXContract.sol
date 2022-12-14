@@ -26,25 +26,25 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     event LogDeposit(
         address indexed sender,
         uint256 amount,
-        uint256 indexed collateralId,
+        uint256 indexed assetId,
         uint256 indexed l2Recipient,
         bytes32 msgHash
     );
 
     event LogWithdrawal(
         address indexed recipient,
-        uint256 indexed ticker,
+        uint256 indexed assetId,
         uint256 amount,
         uint256 requestId,
         bytes32 msgHash
     );
 
-    event LogAssetListUpdated(uint256 ticker, uint256 collateralId);
+    event LogAssetListUpdated(uint256 assetId);
 
-    event LogAssetRemovedFromList(uint256 ticker, uint256 collateralId);
+    event LogAssetRemovedFromList(uint256 assetId);
 
     event LogTokenContractAddressUpdated(
-        uint256 indexed ticker,
+        uint256 indexed assetId,
         address indexed tokenContractAddress
     );
 
@@ -72,7 +72,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     event LogDepositCancelRequest(
         address indexed sender,
         uint256 indexed l2Recipient,
-        uint256 indexed collateralId,
+        uint256 indexed assetId,
         uint256 amount,
         uint256 nonce
     );
@@ -80,7 +80,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     event LogDepositReclaimed(
         address indexed sender,
         uint256 indexed l2Recipient,
-        uint256 indexed collateralId,
+        uint256 indexed assetId,
         uint256 amount,
         uint256 nonce
     );
@@ -91,9 +91,8 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     struct Asset {
         bool exists;
+        uint16 index;
         address tokenAddress;
-        uint256 index;
-        uint256 collateralID;
     }
 
     ///////////////
@@ -103,7 +102,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     /// The StarkNet core contract
     IStarknetCore immutable public starknetCore;
 
-    /// List of assets tickers
+    /// List of assets IDs
     uint256[] public assetList;
 
     /// L2 ZKX AssetContract address
@@ -112,8 +111,8 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     /// L2 ZKX WithdrawalRequestContract address
     uint256 public withdrawalRequestContractAddress;
 
-    /// Assets by ticker
-    mapping(uint256 => Asset) private assetsByTicker;
+    /// Assets stored by their IDs
+    mapping(uint256 => Asset) private assetsById;
 
     ///////////////////
     /// Constructor ///
@@ -147,21 +146,21 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     //////////////////////
 
     /// @dev Function to get the list of available assets
-    /// @return List of available asset tickers
+    /// @return List of available asset IDs
     function getAssetList() external view returns (uint256[] memory) {
         return assetList;
     }
 
-    /// @dev Function to get asset contract address by its ticker
-    /// @return Token contract address
-    function tokenContractAddress(uint256 ticker_) external view returns (address) {
-        return assetsByTicker[ticker_].tokenAddress;
+    /// @dev Function to check if asset already exists
+    /// @return Bool value, true is exists, false otherwise
+    function assetExists(uint256 assetId_) external view returns (bool) {
+        return assetsById[assetId_].exists;
     }
 
-    /// @dev Function to get asset ID by its ticker
-    /// @return Asset collateral ID
-    function assetID(uint256 ticker_) external view returns (uint256) {
-        return assetsByTicker[ticker_].collateralID;
+    /// @dev Function to get asset contract address by its ID
+    /// @return Token contract address
+    function tokenContractAddress(uint256 assetId_) external view returns (address) {
+        return assetsById[assetId_].tokenAddress;
     }
 
     ///////////////////
@@ -170,16 +169,16 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     /// @dev function to withdraw funds from an L2 Account contract
     /// @param userL1Address_ - User's L1 Account address
-    /// @param ticker_ - felt representation of the ticker
+    /// @param assetId_ - Asset ID
     /// @param amount_ - The amount of tokens to be withdrawn
     /// @param requestId_ - ID of the withdrawal request
     function withdraw(
         address userL1Address_,
-        uint256 ticker_,
+        uint256 assetId_,
         uint256 amount_,
         uint256 requestId_
     ) external nonReentrant {
-        Asset memory asset = assetsByTicker[ticker_];
+        Asset memory asset = assetsById[assetId_];
         require(asset.exists, "Withdrawal failed: non-registered asset");
         require(
             asset.tokenAddress != address(0),
@@ -191,7 +190,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             withdrawalRequestContractAddress,
             withdrawalMessagePayload(
                 uint256(uint160(userL1Address_)),
-                ticker_,
+                assetId_,
                 amount_,
                 requestId_
             )
@@ -212,7 +211,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
         emit LogWithdrawal(
             userL1Address_,
-            ticker_,
+            assetId_,
             amount_,
             requestId_,
             msgHash
@@ -229,7 +228,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         uint256 requestId_
     ) external nonReentrant {
         require(
-            assetsByTicker[ETH_TICKER].exists,
+            assetsById[ETH_ID].exists,
             "Withdraw failed: ETH not registered as asset"
         );
 
@@ -238,7 +237,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             withdrawalRequestContractAddress,
             withdrawalMessagePayload(
                 uint256(uint160(userL1Address_)),
-                ETH_TICKER,
+                ETH_ID,
                 amount_,
                 requestId_
             )
@@ -260,7 +259,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
         emit LogWithdrawal(
             userL1Address_,
-            ETH_TICKER,
+            ETH_ID,
             amount_,
             requestId_,
             msgHash
@@ -273,11 +272,11 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     /// @dev function to deposit funds to L1ZKX contract
     /// @param userL2Address_ - The L2 account address of the user
-    /// @param ticker_ - felt representation of the ticker
+    /// @param assetId_ - Asset ID
     /// @param amount_ - The amount of collateral to be deposited
     function depositToL1(
         uint256 userL2Address_,
-        uint256 ticker_,
+        uint256 assetId_,
         uint256 amount_
     ) external nonReentrant {   
         // Validate input
@@ -285,7 +284,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         require(isValidFelt(amount_), "INVALID_FELT: amount_");
 
         // Prepare transfer
-        Asset memory asset = assetsByTicker[ticker_];
+        Asset memory asset = assetsById[assetId_];
         require(asset.exists, "Deposit failed: non-registered asset");
         require(
             asset.tokenAddress != address(0),
@@ -308,7 +307,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         depositToL2(
             senderAsUint256,
             userL2Address_,
-            asset.collateralID,
+            assetId_,
             amount_
         );
     }
@@ -323,29 +322,29 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         require(isValidFelt(userL2Address_), "INVALID_FELT: userL2Address_");
         require(msg.value > 0, "Deposit failed: no value provided");
 
-        Asset storage ethAsset = assetsByTicker[ETH_TICKER];
+        Asset storage ethAsset = assetsById[ETH_ID];
         require(ethAsset.exists, "Deposit failed: ETH not registered as asset");
         uint256 senderAsUint256 = uint256(uint160(msg.sender));
         depositToL2(
             senderAsUint256,
             userL2Address_,
-            ethAsset.collateralID,
+            ETH_ID,
             msg.value
         );
     }
 
     /// @dev function to cancel deposit funds to L2 Account contract
     /// @param userL2Address_ - L2 address of user's ZKX account
-    /// @param ticker_ - felt representation of the ticker
+    /// @param assetId_ - felt representation of asset ID
     /// @param amount_ - The amount of tokens to be deposited
     /// @param nonce_ - L1 to L2 deposit message nonce
     function depositCancelRequest(
         uint256 userL2Address_,
-        uint256 ticker_,
+        uint256 assetId_,
         uint256 amount_,
         uint256 nonce_
     ) external nonReentrant {
-        Asset memory asset = assetsByTicker[ticker_];
+        Asset memory asset = assetsById[assetId_];
         require(
             asset.exists,
             "Failed to initiate deposit cancel request: non-existing asset"
@@ -357,7 +356,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             depositMessagePayload(
                 uint256(uint160(msg.sender)),
                 amount_,
-                asset.collateralID
+                assetId_
             ),
             nonce_
         );
@@ -365,7 +364,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         emit LogDepositCancelRequest(
             msg.sender,
             userL2Address_,
-            asset.collateralID,
+            assetId_,
             amount_,
             nonce_
         );
@@ -373,16 +372,16 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
 
     /// @dev function to finalize cancel deposit funds to L2 Account contract
     /// @param userL2Address_ - L2 address of user's ZKX account
-    /// @param ticker_ - felt representation of the ticker
+    /// @param assetId_ - Asset ID
     /// @param amount_ - The amount of tokens to be deposited
     /// @param nonce_ - L1 to L2 deposit message nonce
     function depositReclaim(
         uint256 userL2Address_,
-        uint256 ticker_,
+        uint256 assetId_,
         uint256 amount_,
         uint256 nonce_
     ) external nonReentrant {
-        Asset memory asset = assetsByTicker[ticker_];
+        Asset memory asset = assetsById[assetId_];
         require(
             asset.exists,
             "Failed to call deposit reclaim: non-existing asset"
@@ -394,12 +393,12 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             depositMessagePayload(
                 uint256(uint160(msg.sender)),
                 amount_,
-                asset.collateralID
+                assetId_
             ),
             nonce_
         );
 
-        if (ticker_ == ETH_TICKER) {
+        if (assetId_ == ETH_ID) {
             (bool isSuccess,) = msg.sender.call{value: amount_}("");
             require(isSuccess, "Deposit reclaim failed: ETH Transfer failed");
         } else {
@@ -409,7 +408,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         emit LogDepositReclaimed(
             msg.sender,
             userL2Address_,
-            asset.collateralID,
+            assetId_,
             amount_,
             nonce_
         );
@@ -420,18 +419,17 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     ///////////////////////
 
     /// @dev function to set token contract address
-    /// @param ticker_ - felt representation of the ticker
+    /// @param assetId_ - Asset ID
     /// @param tokenContractAddress_ - address of the token contract
     function setTokenContractAddress(
-        uint256 ticker_,
+        uint256 assetId_,
         address tokenContractAddress_
     ) external onlyOwner {
-        
         require(
             tokenContractAddress_ != address(0),
             "Failed to set token address: zero address provided"
         );
-        Asset storage asset = assetsByTicker[ticker_];
+        Asset storage asset = assetsById[assetId_];
         require(
             asset.exists,
             "Failed to set token address: non-registered asset"
@@ -441,7 +439,7 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
             "Failed to set token address: Already set"
         );
         asset.tokenAddress = tokenContractAddress_;
-        emit LogTokenContractAddressUpdated(ticker_, tokenContractAddress_);
+        emit LogTokenContractAddressUpdated(assetId_, tokenContractAddress_);
     }
 
     /// @dev function to set asset contract address
@@ -469,40 +467,36 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     }
 
     /// @dev function to update asset list in L1
-    /// @param ticker_ - felt representation of the ticker
     /// @param assetId_ - Id of the asset created
-    function updateAssetListInL1(uint256 ticker_, uint256 assetId_)
+    function updateAssetListInL1(uint256 assetId_)
         external
         onlyOwner
         nonReentrant
     {
         // Add asset
         require(
-            assetsByTicker[ticker_].exists == false,
-            "Failed to add asset: Ticker already exists"
+            assetsById[assetId_].exists == false,
+            "Failed to add asset: Asset ID already exists"
         );
-        assetsByTicker[ticker_] = Asset({
+        assetsById[assetId_] = Asset({
             exists: true,
-            tokenAddress: address(0),
-            index: assetList.length,
-            collateralID: assetId_
+            index: uint16(assetList.length),
+            tokenAddress: address(0)
         });
-        assetList.push(ticker_);
+        assetList.push(assetId_);
 
         // Consume call will revert if no matching message exists
-        uint256[] memory payload = new uint256[](3);
+        uint256[] memory payload = new uint256[](2);
         payload[0] = ADD_ASSET_INDEX;
-        payload[1] = ticker_;
-        payload[2] = assetId_;
+        payload[1] = assetId_;
         starknetCore.consumeMessageFromL2(assetContractAddress, payload);
 
-        emit LogAssetListUpdated(ticker_, assetId_);
+        emit LogAssetListUpdated(assetId_);
     }
 
     /// @dev function to remove asset from list in L1
-    /// @param ticker_ - felt representation of the ticker
     /// @param assetId_ - Id of the asset to be removed
-    function removeAssetFromList(uint256 ticker_, uint256 assetId_)
+    function removeAssetFromList(uint256 assetId_)
         external
         onlyOwner
         nonReentrant
@@ -510,29 +504,28 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
         require(assetList.length > 0, "Nothing to remove");
 
         // Prepare asset to remove
-        Asset storage assetToRemove = assetsByTicker[ticker_];
-        uint256 toRemoveIndex = assetToRemove.index;
+        Asset storage assetToRemove = assetsById[assetId_];
+        uint16 toRemoveIndex = assetToRemove.index;
         require(assetToRemove.exists, "Failed to remove non-existing asset");
 
         // Prepare asset for swap
         uint256 lastAssetIndex = assetList.length - 1;
-        uint256 lastAssetTicker = assetList[lastAssetIndex];
-        Asset storage lastAsset = assetsByTicker[lastAssetTicker];
+        uint256 lastAssetId = assetList[lastAssetIndex];
+        Asset storage lastAsset = assetsById[lastAssetId];
 
         // Swap and delete last
         lastAsset.index = toRemoveIndex;
-        assetList[toRemoveIndex] = lastAssetTicker;
+        assetList[uint256(toRemoveIndex)] = lastAssetId;
         assetList.pop();
-        delete assetsByTicker[ticker_];
+        delete assetsById[assetId_];
 
         // Consume call will revert if no matching message exists
-        uint256[] memory payload = new uint256[](3);
+        uint256[] memory payload = new uint256[](2);
         payload[0] = REMOVE_ASSET_INDEX;
-        payload[1] = ticker_;
-        payload[2] = assetId_;
+        payload[1] = assetId_;
         starknetCore.consumeMessageFromL2(assetContractAddress, payload);
 
-        emit LogAssetRemovedFromList(ticker_, assetId_);
+        emit LogAssetRemovedFromList(assetId_);
     }
 
     /// @dev function to transfer funds from this contract to another address
@@ -582,25 +575,25 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     /// @dev function to deposit funds to L2 Account contract
     /// @param userL1Address_ - L1 user address
     /// @param userL2Address_ - L2 address of user's ZKX account
-    /// @param collateralId_ - ID of the collateral
+    /// @param assetId_ - Asset ID
     /// @param amount_ - The amount of tokens to be deposited
     function depositToL2(
         uint256 userL1Address_,
         uint256 userL2Address_,
-        uint256 collateralId_,
+        uint256 assetId_,
         uint256 amount_
     ) private {
         // Send the message to the StarkNet core contract
         bytes32 msgHash = starknetCore.sendMessageToL2(
             userL2Address_,
             DEPOSIT_SELECTOR,
-            depositMessagePayload(userL1Address_, amount_, collateralId_)
+            depositMessagePayload(userL1Address_, amount_, assetId_)
         );
 
         emit LogDeposit(
             msg.sender,
             amount_,
-            collateralId_,
+            assetId_,
             userL2Address_,
             msgHash
         );
@@ -609,34 +602,34 @@ contract L1ZKXContract is Ownable, ReentrancyGuard {
     /// @dev function to get deposit message payload
     /// @param userL1Address_ - L1 user address
     /// @param amount_ - The amount of tokens to be deposited
-    /// @param collateralId_ - ID of the collateral
+    /// @param assetId_ - Asset ID
     function depositMessagePayload(
         uint256 userL1Address_,
         uint256 amount_,
-        uint256 collateralId_
+        uint256 assetId_
     ) private pure returns (uint256[] memory) {
         uint256[] memory payload = new uint256[](3);
         payload[0] = userL1Address_;
         payload[1] = amount_;
-        payload[2] = collateralId_;
+        payload[2] = assetId_;
         return payload;
     }
 
     /// @dev function to get withdrawal message payload
     /// @param userL1Address_ - L1 user address
-    /// @param ticker_ - felt representation of the ticker
+    /// @param assetId_ - Asset ID
     /// @param amount_ - The amount of tokens to be deposited
     /// @param requestId_ - ID of the withdrawal request
     function withdrawalMessagePayload(
         uint256 userL1Address_,
-        uint256 ticker_,
+        uint256 assetId_,
         uint256 amount_,
         uint256 requestId_
     ) private pure returns (uint256[] memory) {
         uint256[] memory payload = new uint256[](5);
         payload[0] = WITHDRAWAL_INDEX;
         payload[1] = userL1Address_;
-        payload[2] = ticker_;
+        payload[2] = assetId_;
         payload[3] = amount_;
         payload[4] = requestId_;
         return payload;

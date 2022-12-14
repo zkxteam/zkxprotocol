@@ -27,49 +27,12 @@ struct Market {
 
 // @notice struct to store details of assets
 struct Asset {
-    asset_version: felt,
-    ticker: felt,
-    short_name: felt,
-    tradable: felt,
-    collateral: felt,
-    token_decimal: felt,
-    metadata_id: felt,
-    tick_size: felt,
-    step_size: felt,
-    minimum_order_size: felt,
-    minimum_leverage: felt,
-    maximum_leverage: felt,
-    currently_allowed_leverage: felt,
-    maintenance_margin_fraction: felt,
-    initial_margin_fraction: felt,
-    incremental_initial_margin_fraction: felt,
-    incremental_position_size: felt,
-    baseline_position_size: felt,
-    maximum_position_size: felt,
-}
-
-// @notice struct to store details of assets with IDs
-struct AssetWID {
     id: felt,
     asset_version: felt,
-    ticker: felt,
     short_name: felt,
-    tradable: felt,
-    collateral: felt,
+    is_tradable: felt,
+    is_collateral: felt,
     token_decimal: felt,
-    metadata_id: felt,
-    tick_size: felt,
-    step_size: felt,
-    minimum_order_size: felt,
-    minimum_leverage: felt,
-    maximum_leverage: felt,
-    currently_allowed_leverage: felt,
-    maintenance_margin_fraction: felt,
-    initial_margin_fraction: felt,
-    incremental_initial_margin_fraction: felt,
-    incremental_position_size: felt,
-    baseline_position_size: felt,
-    maximum_position_size: felt,
 }
 
 // @notice Struct to store base fee percentage for each tier for maker and taker
@@ -171,7 +134,7 @@ struct Signature {
 struct WithdrawalRequest {
     user_l1_address: felt,
     user_l2_address: felt,
-    ticker: felt,
+    asset_id: felt,
     amount: felt,
 }
 
@@ -222,18 +185,18 @@ struct MarketPrice {
 // Struct for message to consume for quoting fee in L1
 struct QuoteL1Message {
     user_l1_address: felt,
-    ticker: felt,
+    asset_id: felt,
     amount: felt,
     timestamp: felt,
     L1_fee_amount: felt,
-    L1_fee_ticker: felt,
+    L1_fee_asset_id: felt,
 }
 
 // struct to store deposit payload information (for L1->L2 interaction) + other useful data
 struct DepositData {
     user_L1_address: felt,
     user_L2_address: felt,
-    ticker: felt,
+    asset_id: felt,
     amount: felt,
     nonce: felt,
     message_hash: felt,
@@ -244,21 +207,6 @@ struct DepositData {
 struct CollateralPrice {
     timestamp: felt,
     price_in_usd: felt,
-}
-
-struct CoreFunctionCall {
-    index: felt,
-    version: felt,
-    nonce: felt,
-    function_selector: felt,
-    calldata_len: felt,
-    calldata: felt*,
-}
-
-struct CoreFunction {
-    index: felt,
-    version: felt,
-    function_selector: felt,
 }
 
 // Struct to store volume metadata
@@ -277,10 +225,10 @@ struct TradingSeason {
 
 // Struct to store multipliers used to calculate total reward to be split between traders
 struct Multipliers {
-    a1: felt,
-    a2: felt,
-    a3: felt,
-    a4: felt,
+    a_1: felt,
+    a_2: felt,
+    a_3: felt,
+    a_4: felt,
 }
 
 // Struct to store constants used to calculate individual trader score
@@ -335,4 +283,18 @@ struct XpValues {
 struct LeaderboardStat {
     user_address: felt,
     reward: felt,
+}
+struct CoreFunctionCall {
+    index: felt,
+    version: felt,
+    nonce: felt,
+    function_selector: felt,
+    calldata_len: felt,
+    calldata: felt*,
+}
+
+struct CoreFunction {
+    index: felt,
+    version: felt,
+    function_selector: felt,
 }
