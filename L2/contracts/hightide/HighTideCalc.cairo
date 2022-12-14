@@ -725,7 +725,6 @@ func calculate_w_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @return fp - returns trader's individual trading fees paid
-@view
 func calculate_fp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (fp_value: felt) {
@@ -745,7 +744,6 @@ func calculate_fp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @param pair_id_- Pair Id for which to calculate x_4
 // @param user_stats_address_ - Address of the User stats contract
 // @return ft - returns overall zkx platform trading fees
-@view
 func calculate_ft{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, user_stats_address_: felt
 ) -> (ft_value: felt) {
@@ -763,7 +761,6 @@ func calculate_ft{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @return d - returns trader's average open interest
-@view
 func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (d: felt) {
@@ -828,7 +825,6 @@ func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @return p - returns p value for a pair corresponding to a trader
-@view
 func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (p: felt) {

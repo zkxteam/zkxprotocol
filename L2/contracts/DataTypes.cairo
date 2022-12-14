@@ -295,9 +295,3 @@ struct CoreFunction {
     function_selector: felt,
 }
 
-// Strcut to store fp, d and p values for a trader per pair
-struct TraderScoreFactors {
-    f_p_64x61: felt,
-    d_64x61: felt,
-    p_64x61: felt,
-}
