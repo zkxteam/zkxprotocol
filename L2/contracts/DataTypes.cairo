@@ -282,6 +282,10 @@ struct XpValues {
     final_xp_value: felt,
 }
 
+struct LeaderboardStat {
+    user_address: felt,
+    reward: felt,
+}
 struct CoreFunctionCall {
     index: felt,
     version: felt,
@@ -295,11 +299,4 @@ struct CoreFunction {
     index: felt,
     version: felt,
     function_selector: felt,
-}
-
-// Strcut to store fp, d and p values for a trader per pair
-struct TraderScoreFactors {
-    f_p_64x61: felt,
-    d_64x61: felt,
-    p_64x61: felt,
 }
