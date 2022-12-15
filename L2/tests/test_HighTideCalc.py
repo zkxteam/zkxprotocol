@@ -158,6 +158,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [26, 1, user_stats.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [27, 1, starkway.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [29, 1, rewardsCalculation.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [30, 1, hightideCalc.contract_address])
 
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
@@ -1516,7 +1517,7 @@ async def test_calculating_factors(adminAuth_factory):
 
     num_trading_days = fetched_trading_season.num_trading_days
 
-    timestamp = fetched_trading_season.start_timestamp + (num_trading_days*24*60*60) + 1
+    timestamp = fetched_trading_season.start_timestamp + (num_trading_days*24*60*60) + 60
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp, gas_price=starknet_service.starknet.state.state.block_info.gas_price,
@@ -1531,10 +1532,6 @@ async def test_calculating_factors(adminAuth_factory):
 
     top_stats = await hightideCalc.find_top_stats(1).call()
     print(top_stats.result)
-
-    set_factors_tx = await dave_signer.send_transaction(dave, hightideCalc.contract_address, "calculate_high_tide_factors", [
-        1,
-    ])
 
     ETH_factors = await hightideCalc.get_hightide_factors(1, ETH_USD_ID).call()
     ETH_parsed = list(ETH_factors.result.res)
@@ -1554,14 +1551,6 @@ async def test_calculating_factors(adminAuth_factory):
     assert from64x61(TSLA_parsed[2]) == (3/5)
     assert from64x61(TSLA_parsed[3]) == (3/3)
 
-    assert_events_emitted(
-        set_factors_tx,
-        [
-            [0, hightideCalc.contract_address, "high_tide_factors_set", [1, ETH_USD_ID] + ETH_parsed],
-            [1, hightideCalc.contract_address, "high_tide_factors_set", [1, TSLA_USD_ID] + TSLA_parsed]
-        ]
-    )
-
     await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address,"set_user_xp_values",
             [
                 season_id,
@@ -1574,10 +1563,6 @@ async def test_calculating_factors(adminAuth_factory):
                 300,
             ],
         )
-
-    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_funds_flow", [
-        season_id
-    ])
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,

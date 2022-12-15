@@ -1589,10 +1589,6 @@ async def test_calculating_factors(adminAuth_factory):
         to64x61(1), 
     ])
 
-    set_factors_tx = await dave_signer.send_transaction(dave, hightideCalc.contract_address, "calculate_high_tide_factors", [
-        season_id,
-    ])
-
     ETH_factors = await hightideCalc.get_hightide_factors(season_id, ETH_USD_ID).call()
     ETH_parsed = list(ETH_factors.result.res)
     print(ETH_parsed)
@@ -1611,14 +1607,6 @@ async def test_calculating_factors(adminAuth_factory):
     assert from64x61(TSLA_parsed[2]) == (3/5)
     assert from64x61(TSLA_parsed[3]) == (3/3)
 
-    assert_events_emitted(
-        set_factors_tx,
-        [
-            [0, hightideCalc.contract_address, "high_tide_factors_set", [season_id, ETH_USD_ID] + ETH_parsed],
-            [1, hightideCalc.contract_address, "high_tide_factors_set", [season_id, TSLA_USD_ID] + TSLA_parsed]
-        ]
-    )
-
     await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address,"set_user_xp_values",
             [
                 season_id,
@@ -1631,18 +1619,6 @@ async def test_calculating_factors(adminAuth_factory):
                 300,
             ],
         )
-
-    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_funds_flow", [
-        season_id
-    ])
-
-    # funds flow per market comparision
-    funds_flow_BTC_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, BTC_USD_ID).call()
-    assert from64x61(funds_flow_BTC_USD_ID.result.funds_flow) == 0
-    funds_flow_ETH_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, ETH_USD_ID).call()
-    assert from64x61(funds_flow_ETH_USD_ID.result.funds_flow) == 0.42719298245614035
-    funds_flow_TSLA_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, TSLA_USD_ID).call()
-    assert from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) == 0.5296052631578947
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,
@@ -1726,7 +1702,6 @@ async def test_distribute_rewards(adminAuth_factory):
 
     # Get R value of ETH_USD market
     funds_flow_ETH_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, ETH_USD_ID).call()
-    assert from64x61(funds_flow_ETH_USD_ID.result.funds_flow) == 0.42719298245614035
 
     # Get token rewards for ETH_USD market
     fetched_rewards = await hightide.get_hightide_reward_tokens(hightide_list[0]).call()
@@ -1813,7 +1788,6 @@ async def test_distribute_rewards(adminAuth_factory):
 
     # Get R value of TSLA_USD market
     funds_flow_TSLA_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, TSLA_USD_ID).call()
-    assert from64x61(funds_flow_TSLA_USD_ID.result.funds_flow) == 0.5296052631578947
 
     # Get token rewards for TSLA_USD market
     fetched_rewards = await hightide.get_hightide_reward_tokens(hightide_list[1]).call()
