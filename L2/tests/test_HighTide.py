@@ -791,7 +791,7 @@ async def test_activate_hightide_with_native_and_non_native_tokens(adminAuth_fac
 
     # 2. Initialize Hightide
     tx_exec_info=await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
-        [ETH_USD_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 3000, 0, UST_L1_address, 5000, 0])
+        [ETH_USD_ID, season_id, admin1.contract_address, 0, 2, USDC_L1_address, 3000, 0, UST_L1_address, 5000, 0])
     hightide_id = 3
     execution_info = await hightide.get_hightide(hightide_id).call()
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
@@ -847,7 +847,7 @@ async def test_activate_hightide_with_insufficient_non_native_tokens(adminAuth_f
     season_id = 3
     # 1. Initialize Hightide
     tx_exec_info=await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
-        [TSLA_USD_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 1000, 0, UST_L1_address, 2000, 0])
+        [TSLA_USD_ID, season_id, admin2.contract_address, 1, 2, USDC_L1_address, 1000, 0, UST_L1_address, 2000, 0])
     hightide_id = 4
     execution_info = await hightide.get_hightide(hightide_id).call()
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
@@ -1679,20 +1679,11 @@ async def test_distribute_rewards(adminAuth_factory):
     execution_info = await hightide.get_hightides_by_season_id(season_id).call()
     hightide_list = execution_info.result.hightide_list
 
-    # 1. Get 1st hightide metadata
+    # Get ETH/USDC hightide metadata
     ETH_execution_info = await hightide.get_hightide(hightide_list[0]).call()
     liquidity_pool_address = ETH_execution_info.result.hightide_metadata.liquidity_pool_address
 
-    # a. Get witelisted USDC balance
-    whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(liquidity_pool_address).call()
-    # b. Get witelisted UST balance
-    whitelisted_ust_balance = await whitelisted_ust.balanceOf(liquidity_pool_address).call()
-    # c. Get native USDC balance
-    native_usdc_balance = await native_erc20_usdc.balanceOf(liquidity_pool_address).call()
-    # d. Get native UST balance
-    native_ust_balance = await native_erc20_ust.balanceOf(liquidity_pool_address).call()
-
-    # 2. Distribute rewards for ETH_USDC hightide
+    # Distribute rewards for ETH_USDC hightide
     tx_exec_info = await admin1_signer.send_transaction(admin1, hightide.contract_address,"distribute_rewards",[
         hightide_list[0],
         2,
@@ -1706,7 +1697,7 @@ async def test_distribute_rewards(adminAuth_factory):
     # Get token rewards for ETH_USD market
     fetched_rewards = await hightide.get_hightide_reward_tokens(hightide_list[0]).call()
 
-    # a. Get Alice native and non native USDC and UST balance's for ETH
+    # Get Alice native and non native USDC and UST balance's for ETH/USDC pair
     alice_eth_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(alice.contract_address).call()
     alice_eth_whitelisted_ust_balance = await whitelisted_ust.balanceOf(alice.contract_address).call()
     alice_eth_native_usdc_balance = await native_erc20_usdc.balanceOf(alice.contract_address).call()
@@ -1735,7 +1726,7 @@ async def test_distribute_rewards(adminAuth_factory):
     
     assert alice_ust_balance == int(alice_ust_reward_for_ETH_USDC_pair)
 
-    # b. Get bob native and non native USDC and UST balance's for ETH
+    # Get bob native and non native USDC and UST balance's for ETH/USDC pair
     bob_eth_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(bob.contract_address).call()
     bob_eth_whitelisted_ust_balance = await whitelisted_ust.balanceOf(bob.contract_address).call()
     bob_eth_native_usdc_balance = await native_erc20_usdc.balanceOf(bob.contract_address).call()
@@ -1764,20 +1755,36 @@ async def test_distribute_rewards(adminAuth_factory):
     
     assert bob_ust_balance == int(bob_ust_reward_for_ETH_USDC_pair)
 
-    # 1. Get 2nd hightide metadata
+    # Get token lister's native and non native USDC and UST balance's for ETH/USDC pair
+    lister_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(admin1.contract_address).call()
+    lister_whitelisted_ust_balance = await whitelisted_ust.balanceOf(admin1.contract_address).call()
+    lister_native_usdc_balance = await native_erc20_usdc.balanceOf(admin1.contract_address).call()
+    lister_native_ust_balance = await native_erc20_ust.balanceOf(admin1.contract_address).call()
+
+    # Sum of reward transferred and amount sent back to lister is equal to the rewards provided by the token lister
+    usdc_balance = lister_whitelisted_usdc_balance.result.balance.low + lister_native_usdc_balance.result.balance.low + alice_usdc_balance + bob_usdc_balance 
+    ust_balance = lister_whitelisted_ust_balance.result.balance.low + lister_native_usdc_balance.result.balance.low + alice_ust_balance + bob_ust_balance
+
+    assert usdc_balance == fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low
+    assert ust_balance == fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low
+
+    # Get liquidity pool's usdc and ust balance for ETH/USDC pair
+    lp_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(liquidity_pool_address).call()
+    lp_whitelisted_ust_balance = await whitelisted_ust.balanceOf(liquidity_pool_address).call()
+    lp_native_usdc_balance = await native_erc20_usdc.balanceOf(liquidity_pool_address).call()
+    lp_native_ust_balance = await native_erc20_ust.balanceOf(liquidity_pool_address).call()
+
+    # Amount left in liquidity pool should be 0  as the remaining amount was transferred to the token lister
+    assert lp_whitelisted_usdc_balance.result.balance == (0,0)
+    assert lp_whitelisted_ust_balance.result.balance == (0,0)
+    assert lp_native_usdc_balance.result.balance == (0,0)
+    assert lp_native_ust_balance.result.balance == (0,0)
+
+    # Get TSLA_USDC hightide metadata
     TSLA_execution_info = await hightide.get_hightide(hightide_list[1]).call()
     liquidity_pool_address = TSLA_execution_info.result.hightide_metadata.liquidity_pool_address
 
-    # a. Get witelisted USDC balance
-    whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(liquidity_pool_address).call()
-    # b. Get witelisted UST balance
-    whitelisted_ust_balance = await whitelisted_ust.balanceOf(liquidity_pool_address).call()
-    # c. Get native USDC balance
-    native_usdc_balance = await native_erc20_usdc.balanceOf(liquidity_pool_address).call()
-    # d. Get native UST balance
-    native_ust_balance = await native_erc20_ust.balanceOf(liquidity_pool_address).call()
-
-    # 2. Distribute rewards for TSLA_USDC hightide
+    # Distribute rewards for TSLA_USDC hightide
     tx_exec_info = await admin1_signer.send_transaction(admin1, hightide.contract_address, "distribute_rewards", [
         hightide_list[1],
         3,
@@ -1792,7 +1799,7 @@ async def test_distribute_rewards(adminAuth_factory):
     # Get token rewards for TSLA_USD market
     fetched_rewards = await hightide.get_hightide_reward_tokens(hightide_list[1]).call()
 
-    # a. Get Alice native and non native USDC and UST balance's for TSLA
+    # Get Alice native and non native USDC and UST balance's for TSLA_USDC pair
     alice_tsla_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(alice.contract_address).call()
     alice_tsla_whitelisted_ust_balance = await whitelisted_ust.balanceOf(alice.contract_address).call()
     alice_tsla_native_usdc_balance = await native_erc20_usdc.balanceOf(alice.contract_address).call()
@@ -1821,7 +1828,7 @@ async def test_distribute_rewards(adminAuth_factory):
     
     assert alice_ust_balance == int(alice_ust_reward_for_TSLA_USDC_pair) + int(alice_ust_reward_for_ETH_USDC_pair)
 
-    # b. Get bob native and non native USDC and UST balance's for TSLA
+    # Get bob native and non native USDC and UST balance's for TSLA
     bob_tsla_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(bob.contract_address).call()
     bob_tsla_whitelisted_ust_balance = await whitelisted_ust.balanceOf(bob.contract_address).call()
     bob_tsla_native_usdc_balance = await native_erc20_usdc.balanceOf(bob.contract_address).call()
@@ -1850,7 +1857,7 @@ async def test_distribute_rewards(adminAuth_factory):
     
     assert bob_ust_balance == int(bob_ust_reward_for_TSLA_USDC_pair) + int(bob_ust_reward_for_ETH_USDC_pair)
 
-    # c. Get charlie native and non native USDC and UST balance's for TSLA
+    # Get charlie native and non native USDC and UST balance's for TSLA_USDC pair
     charlie_tsla_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(charlie.contract_address).call()
     charlie_tsla_whitelisted_ust_balance = await whitelisted_ust.balanceOf(charlie.contract_address).call()
     charlie_tsla_native_usdc_balance = await native_erc20_usdc.balanceOf(charlie.contract_address).call()
@@ -1879,4 +1886,26 @@ async def test_distribute_rewards(adminAuth_factory):
     
     assert charlie_ust_balance == int(charlie_ust_reward_for_TSLA_USDC_pair)
 
-    
+    # Get token lister's native and non native USDC and UST balance's for TSLA/USDC pair
+    lister_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(admin2.contract_address).call()
+    lister_whitelisted_ust_balance = await whitelisted_ust.balanceOf(admin2.contract_address).call()
+    lister_native_usdc_balance = await native_erc20_usdc.balanceOf(admin2.contract_address).call()
+    lister_native_ust_balance = await native_erc20_ust.balanceOf(admin2.contract_address).call()
+
+    # Lister didn't get amount as he opted for burning of tokens
+    assert lister_whitelisted_usdc_balance.result.balance == (0,0)
+    assert lister_whitelisted_ust_balance.result.balance == (0,0)
+    assert lister_native_usdc_balance.result.balance == (0,0)
+    assert lister_native_ust_balance.result.balance == (0,0)
+
+    # Get liquidity pool's usdc and ust balance for TSLA/USDC pair
+    lp_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(liquidity_pool_address).call()
+    lp_whitelisted_ust_balance = await whitelisted_ust.balanceOf(liquidity_pool_address).call()
+    lp_native_usdc_balance = await native_erc20_usdc.balanceOf(liquidity_pool_address).call()
+    lp_native_ust_balance = await native_erc20_ust.balanceOf(liquidity_pool_address).call()
+
+    # Amount left in liquidity pool should be 0 as the remaining amount was burnt
+    assert lp_whitelisted_usdc_balance.result.balance == (0,0)
+    assert lp_whitelisted_ust_balance.result.balance == (0,0)
+    assert lp_native_usdc_balance.result.balance == (0,0)
+    assert lp_native_ust_balance.result.balance == (0,0)
