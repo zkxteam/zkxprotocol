@@ -942,7 +942,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // Taker orders should form the other half of the opposite side
         with_attr error_message(
                 "Trading: Taker order must come after Maker orders- {current_index}") {
-            temp_order.side = TAKER;
+            assert temp_order.side = TAKER;
         }
 
         // Check for post-only flag; they must always be a maker
@@ -1043,9 +1043,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Price Check
-    with_attr error_message("Trading: Execution price not in range- {current_index}") {
-        assert_in_range(execution_price, lower_limit_, upper_limit_);
-    }
+    // with_attr error_message("Trading: Execution price not in range- {current_index}") {
+    //     assert_in_range(execution_price, lower_limit_, upper_limit_);
+    // }
 
     // If the order is to be opened
     if (temp_order.close_order == 1) {

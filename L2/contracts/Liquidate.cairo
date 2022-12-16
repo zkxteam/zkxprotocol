@@ -12,6 +12,7 @@ from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_a
 from contracts.Constants import (
     Asset_INDEX,
     CollateralPrices_INDEX,
+    LONG,
     Market_INDEX,
     MarketPrices_INDEX,
 )
@@ -52,6 +53,10 @@ func maintenance() -> (maintenance: felt) {
 func acc_value() -> (acc_value: felt) {
 }
 
+@storage_var
+func debug(id: felt) -> (res: felt) {
+}
+
 @view
 func return_maintenance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     res: felt
@@ -65,6 +70,14 @@ func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     res: felt
 ) {
     let (_acc_value) = acc_value.read();
+    return (res=_acc_value);
+}
+
+@view
+func return_position_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    index: felt
+) -> (res: felt) {
+    let (_acc_value) = debug.read(id=index);
     return (res=_acc_value);
 }
 
@@ -336,7 +349,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         // /////////////////
         // TO BE REMOVED //
         maintenance.write(total_maintenance_requirement);
-        acc_value.write(total_account_value_collateral);
+        acc_value.write(total_account_value);
         // /////////////////
 
         // Check if the maintenance margin is not satisfied
@@ -407,19 +420,24 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     );
 
     // Calculate pnl to check if it is the least collateralized position
+    local test_;
     local price_diff_;
     if (position_details.direction == 1) {
         tempvar price_diff = price_details.assetPrice - position_details.avg_execution_price;
         price_diff_ = price_diff;
+        test_ = 0;
     } else {
         tempvar price_diff = position_details.avg_execution_price - price_details.assetPrice;
         price_diff_ = price_diff;
+        test_ = price_diff;
     }
 
     let (pnl) = Math64x61_mul(price_diff_, position_details.position_size);
 
+    debug.write(id=positions_len, value=test_);
     // Calculate the value of the current account margin in usd
     local position_value = maintenance_position - position_details.borrowed_amount + pnl;
+
     let (net_position_value_usd: felt) = Math64x61_mul(
         position_value, price_details.collateralPrice
     );
@@ -492,7 +510,7 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let position_size = position_.position_size;
 
     local price_diff;
-    if (position_.direction == 1) {
+    if (position_.direction == LONG) {
         let (diff) = Math64x61_sub(asset_price_, position_.avg_execution_price);
         price_diff = diff;
     } else {
