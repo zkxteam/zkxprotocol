@@ -64,7 +64,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
     market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
+    trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
     rewardsCalculation = await starknet_service.deploy(ContractType.RewardsCalculation, [registry.contract_address, 1])
+    hightideCalc = await starknet_service.deploy(ContractType.HighTideCalc, [registry.contract_address, 1])
 
     account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
@@ -78,7 +80,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
     await signer1.send_transaction(admin1, registry.contract_address, "update_contract_registry", [29, 1, rewardsCalculation.contract_address])
+    await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [30, 1, hightideCalc.contract_address])
 
     # Add assets
     BTC_properties = build_asset_properties(
