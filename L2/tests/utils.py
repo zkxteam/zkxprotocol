@@ -118,10 +118,6 @@ async def assert_revert(fun, reverted_with=None):
                 'message'], f"Error mismatch, expected: {reverted_with}, actual: {error['message']}"
 
 
-def random_string(length):
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
-
-
 class Signer():
     """
     Utility for sending signed transactions to an Account on Starknet.

@@ -280,11 +280,11 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     orders_1 = [{
         "quantity": 2,
         "price": 5000,
-        "direction": order_direction["short"],
         "order_type": order_types["limit"],
         "leverage": 2,
     }, {
         "quantity": 2,
+        "direction": order_direction["short"],
         "side": order_side["taker"],
         "leverage": 2,
     }]
@@ -298,12 +298,12 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     bob_balance_usdc = await get_user_balance(bob, AssetID.USDC)
     print("bob_balance", bob_balance_usdc)
 
-    orderState1 = await alice.get_position_data(market_id_=market_id_1, direction_=order_direction["long"]).call()
+    orderState1 = await alice.get_position_data(market_id_=market_id_1, direction_=order_direction["short"]).call()
     res1 = list(orderState1.result.res)
 
     print(orderState1)
 
-    orderState2 = await bob.get_position_data(market_id_=market_id_1, direction_=order_direction["short"]).call()
+    orderState2 = await bob.get_position_data(market_id_=market_id_1, direction_=order_direction["long"]).call()
     res2 = list(orderState2.result.res)
 
     print(orderState2)

@@ -53,7 +53,6 @@ struct MultipleOrder {
     user_address: felt,
     sig_r: felt,
     sig_s: felt,
-    side: felt,
     liquidator_address: felt,
     order_id: felt,
     market_id: felt,

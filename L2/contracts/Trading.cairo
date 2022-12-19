@@ -8,6 +8,7 @@ from starkware.cairo.common.math import (
     assert_in_range,
     assert_le,
     assert_lt,
+    assert_nn,
     assert_not_zero,
 )
 from starkware.cairo.common.math_cmp import is_le
@@ -96,9 +97,26 @@ func trade_execution(address: felt, request: OrderRequest, market_id: felt, exec
 func threshold_percentage() -> (res: felt) {
 }
 
+// Stores if a batch id is executed
+@storage_var
+func batch_id_status(batch_id: felt) -> (res: felt) {
+}
+
 //##############
 // Constructor #
 //##############
+
+// ////////
+// View //
+// ////////
+func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    batch_id_: felt
+) -> (status: felt) {
+    alloc_locals;
+
+    let (status: felt) = batch_id_status.read(batch_id=batch_id_);
+    return (status,);
+}
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -115,7 +133,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // External //
 // ////////////
 
-// @notice Function to set the threshold percentage can only be called by masterAdmin
+// @notice Function to set the threshold percentage can only be called by masterAdmin; all execution_prices must be +/-threshold percentage of oracle price
 // @param new_percentage - New value of threshold percentage to be set in the contract
 @external
 func set_threshold_percentage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -145,6 +163,7 @@ func set_threshold_percentage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 func execute_batch{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
+    batch_id_: felt,
     quantity_locked_: felt,
     market_id_: felt,
     oracle_price_: felt,
@@ -259,12 +278,59 @@ func execute_batch{
     //     trader_stats_list=trader_stats_list,
     // );
 
+    batch_id_status.write(batch_id=batch_id_, value=1);
+
     return ();
 }
 
 // ////////////
 // Internal //
 // ////////////
+
+func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    slippage_: felt, price_: felt, execution_price_: felt
+) {
+    // To remove
+    alloc_locals;
+    with_attr error_message("Trading: Slippage percentage must be positive & below 15") {
+        assert_nn(slippage_);
+        assert_le(slippage_, FIFTEEN_PERCENTAGE);
+    }
+
+    let (percentage) = Math64x61_div(slippage_, HUNDRED);
+    let (threshold) = Math64x61_mul(percentage, price_);
+
+    let (lower_limit: felt) = Math64x61_sub(price_, threshold);
+    let (upper_limit: felt) = Math64x61_add(price_, threshold);
+
+    local lower_limit_;
+    assert lower_limit_ = lower_limit;
+    with_attr error_message("Trading: High slippage for execution price {lower_limit_}") {
+        assert_in_range(execution_price_, lower_limit, upper_limit);
+    }
+    return ();
+}
+
+func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    price_: felt, execution_price_: felt, direction_: felt
+) {
+    // if it's a limit order
+    if (direction_ == LONG) {
+        // if it's a long order
+        with_attr error_message("Trading: Bad long limit order") {
+            assert_le(execution_price_, price_);
+        }
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        // if it's a short order
+        with_attr error_message("Trading: Bad short limit order") {
+            assert_le(price_, execution_price_);
+        }
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    return ();
+}
 
 // @notice Internal function to retrieve contract addresses from the Auth Registry
 // @returns account_registry_address - Address of the Account Registry contract
@@ -413,6 +479,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     trader_stats_list_len_: felt,
     trader_stats_list_: TraderStats*,
     current_index_: felt,
+    side_: felt,
 ) -> (
     average_execution_price_open: felt,
     margin_amount_open: felt,
@@ -427,7 +494,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // Get the fees from Trading Fee contract
     let (fees_rate) = ITradingFees.get_user_fee_and_discount(
-        contract_address=trading_fees_address_, address_=order_.user_address, side_=order_.side
+        contract_address=trading_fees_address_, address_=order_.user_address, side_=side_
     );
 
     // Get order details
@@ -897,6 +964,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local new_running_weighted_sum;
     local quantity_to_execute;
     local current_quantity_executed;
+    local current_order_side;
+
     // Error messages require local variables to be passed in params
     local current_index;
     current_index = orders_len_ - request_list_len_;
@@ -911,7 +980,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         user_address=[request_list_].user_address,
         sig_r=[request_list_].sig_r,
         sig_s=[request_list_].sig_s,
-        side=[request_list_].side,
         liquidator_address=[request_list_].liquidator_address,
         order_id=[request_list_].order_id,
         market_id=[request_list_].market_id,
@@ -939,21 +1007,15 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Taker order
     if (quantity_remaining == 0) {
-        // Taker orders should form the other half of the opposite side
+        // There must only be a single Taker order; hence they must be the last order in the batch
         with_attr error_message(
-                "Trading: Taker order must come after Maker orders- {current_index}") {
-            assert temp_order.side = TAKER;
+                "Trading: Taker order must be the last order in the list- {current_index}") {
+            request_list_len_ = 1;
         }
 
         // Check for post-only flag; they must always be a maker
         with_attr error_message("Trading: Post Only order cannot be a taker- {current_index}") {
             assert temp_order.post_only = 0;
-        }
-
-        // There must only be a single Taker order; hence they must be the last order in the batch
-        with_attr error_message(
-                "Trading: Taker order must be the last order in the list- {current_index}") {
-            request_list_len_ = 1;
         }
 
         // Check for F&K type of orders; they must only be filled completely or rejected
@@ -982,11 +1044,29 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let (new_execution_price: felt) = Math64x61_div(running_weighted_sum, quantity_locked_);
         assert execution_price = new_execution_price;
 
+        // Price check
+        if (temp_order.order_type == 1) {
+            check_within_slippage(
+                slippage_=temp_order.slippage,
+                price_=temp_order.price,
+                execution_price_=new_execution_price,
+            );
+        } else {
+            check_limit_price(
+                price_=temp_order.price,
+                execution_price_=new_execution_price,
+                direction_=temp_order.direction,
+            );
+        }
+
         // Reset the variable
         assert current_quantity_executed = 0;
 
         // Reset the variable
         assert new_running_weighted_sum = 0;
+
+        // Set the current side as taker
+        assert current_order_side = TAKER;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
@@ -996,9 +1076,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         with_attr error_message("Trading: Maker orders must be limit orders- {current_index}") {
             temp_order.order_type = LIMIT_ORDER;
         }
-        with_attr error_message(
-                "Trading: Maker orders must come before Taker order- {current_index}") {
-            temp_order.side = MAKER;
+
+        if (request_list_len_ == 1) {
+            with_attr error_message(
+                    "Trading: Maker orders cannot be the last order in the list- {current_index}") {
+                assert 1 = 0;
+            }
         }
 
         // Get min of remaining quantity and the order quantity
@@ -1037,15 +1120,18 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // Write to local variable
         assert new_running_weighted_sum = new_running_weighted_sum_;
 
+        // Set the current side as maker
+        assert current_order_side = MAKER;
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
 
     // Price Check
-    // with_attr error_message("Trading: Execution price not in range- {current_index}") {
-    //     assert_in_range(execution_price, lower_limit_, upper_limit_);
-    // }
+    with_attr error_message("Trading: Execution price not in range- {current_index}") {
+        assert_in_range(execution_price, lower_limit_, upper_limit_);
+    }
 
     // If the order is to be opened
     if (temp_order.close_order == 1) {
@@ -1068,6 +1154,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             trader_stats_list_len_=trader_stats_list_len_,
             trader_stats_list_=trader_stats_list_,
             current_index_=current_index,
+            side_=current_order_side,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;

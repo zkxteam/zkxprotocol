@@ -14,12 +14,18 @@ UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 
 
 def random_string(length):
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+    return str_to_felt(''.join(random.choices(string.ascii_letters + string.digits, k=length)))
 
 
 order_types = {
     "market": 1,
     "limit": 2
+}
+
+
+order_side = {
+    "maker": 1,
+    "taker": 2
 }
 
 order_direction = {
@@ -31,11 +37,6 @@ order_time_in_force = {
     "good_till_time": 1,
     "fill_or_kill": 2,
     "immediate_or_cancel": 3,
-}
-
-order_side = {
-    "maker": 1,
-    "taker": 2
 }
 
 close_order = {
@@ -94,10 +95,12 @@ async def execute_batch_reverted(zkx_node_signer, zkx_node, trading, execute_bat
 
 
 async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users_test, quantity_locked, market_id, oracle_price, trading, is_reverted, error_message):
+    batch_id = random_string(10)
     complete_orders_python = []
     complete_orders_starknet = []
     # Fill the remaining order attributes
     for i in range(len(orders)):
+        print("Order id is ", orders[i]["order_id"])
         if "order_id" in orders[i]:
             (multiple_order_format,
              multiple_order_format_64x61) = users_test[i].get_order(orders[i]["order_id"])
@@ -110,6 +113,7 @@ async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users
             complete_orders_starknet += multiple_order_format_64x61.values()
 
     execute_batch_params_starknet = [
+        batch_id,
         to64x61(quantity_locked),
         market_id,
         to64x61(oracle_price),
@@ -118,6 +122,7 @@ async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users
     ]
 
     execute_batch_params_python = [
+        batch_id,
         complete_orders_python,
         users_test,
         quantity_locked,
@@ -130,7 +135,7 @@ async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users
     else:
         await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
         executor.execute_batch(*execute_batch_params_python)
-    return (complete_orders_python)
+    return (batch_id, complete_orders_python)
 
 
 async def get_user_position(user, market_id, direction):
@@ -265,10 +270,10 @@ class User:
 
         return modified_order
 
-    def __create_order_starknet(self, order: int, liquidator_address: int, side: int) -> Dict:
+    def __create_order_starknet(self, order: int, liquidator_address: int) -> Dict:
         signed_order = self.__get_signed_order(order, liquidator_address)
         multiple_order_format_64x61 = self.__get_multiple_order_representation(
-            order, signed_order, liquidator_address, side)
+            order, signed_order, liquidator_address)
 
         self.orders[order["order_id"]] = multiple_order_format_64x61
 
@@ -301,12 +306,11 @@ class User:
             liquidator = Signer(self.liquidator_private_key)
             return liquidator.sign(hashed_order)
 
-    def __get_multiple_order_representation(self, order: int, signed_order: int, liquidator_address: int, side: int) -> Dict:
+    def __get_multiple_order_representation(self, order: int, signed_order: int, liquidator_address: int) -> Dict:
         multiple_order = {
             "user_address": self.user_address,
             "sig_r": signed_order[0],
             "sig_s": signed_order[1],
-            "side": side,
             "liquidator_address": liquidator_address,
             "order_id": order["order_id"],
             "market_id": order["market_id"],
@@ -428,7 +432,6 @@ class User:
         order_portion_executed = self.get_portion_executed(
             order_id=order["order_id"])
         new_portion_executed = order_portion_executed + size
-        print("new portion executed", new_portion_executed, order_portion_executed)
         if new_portion_executed > order["quantity"]:
             print("New position size larger than order")
             return
@@ -545,13 +548,12 @@ class User:
         price: float = 1000,
         quantity: float = 1,
         leverage: float = 1,
-        slippage: float = 0,
+        slippage: float = 5,
         order_type: int = order_types["market"],
         time_in_force: int = order_time_in_force["good_till_time"],
         post_only: int = 0,
         close_order: int = close_order["open"],
         liquidator_address: int = 0,
-        side: int = order_side["maker"]
     ) -> Tuple[Dict, Dict]:
         # Checks for input
         assert price > 0, "Invalid price"
@@ -564,7 +566,7 @@ class User:
         assert close_order in (1, 2), "Invalid close_order"
 
         new_order = {
-            "order_id": order_id if order_id else str_to_felt(random_string(12)),
+            "order_id": order_id if order_id else random_string(12),
             "market_id": market_id,
             "direction": direction,
             "price": price,
@@ -579,14 +581,14 @@ class User:
         }
         signed_order = [0, 0]
         multiple_order_format = self.__get_multiple_order_representation(
-            new_order, signed_order, liquidator_address, side)
+            new_order, signed_order, liquidator_address)
 
         self.orders_decimal[new_order["order_id"]] = multiple_order_format
 
         # Convert to 64x61 format for starknet
         order_64x61 = self.__convert_order_to_64x61(new_order)
         multiple_order_format_64x61 = self.__create_order_starknet(
-            order_64x61, liquidator_address, side)
+            order_64x61, liquidator_address)
         return (multiple_order_format, multiple_order_format_64x61)
 
 
@@ -595,6 +597,7 @@ class OrderExecutor:
         self.maker_trading_fees = 0.0002 * 0.97
         self.taker_trading_fees = 0.0005 * 0.97
         self.fund_balances = {}
+        self.batch_id_status = {}
 
     def set_fund_balance(self, fund: int, asset_id: int, new_balance: float):
         self.fund_balances[fund] = {
@@ -618,9 +621,7 @@ class OrderExecutor:
 
         self.set_fund_balance(fund, asset_id, new_balance)
 
-    def __process_open_orders(self, user: User, order: Dict, execution_price: float, order_size: float, market_id) -> Tuple[float, float, float]:
-        print("size of open order", order_size)
-
+    def __process_open_orders(self, user: User, order: Dict, execution_price: float, order_size: float, side: int, market_id: int) -> Tuple[float, float, float]:
         position = user.get_position(
             market_id=order["market_id"], direction=order["direction"])
 
@@ -629,7 +630,7 @@ class OrderExecutor:
         borrowed_amount = position["borrowed_amount"]
 
         fee_rate = self.__get_fee(
-            user=user, side=order["side"])
+            user=user, side=side)
 
         # The position size is 0 or
         if position["position_size"] == 0:
@@ -783,7 +784,13 @@ class OrderExecutor:
         # Fee rate
         return self.maker_trading_fees if side == 1 else self.taker_trading_fees
 
-    def execute_batch(self, request_list: List[Dict], user_list: List, quantity_locked: float = 1, market_id: int = BTC_USD_ID, oracle_price: float = 1000):
+    def get_batch_id_status(self, batch_id: int):
+        try:
+            return self.batch_id_status[batch_id]
+        except KeyError:
+            return 0
+
+    def execute_batch(self, batch_id: int, request_list: List[Dict], user_list: List, quantity_locked: float = 1, market_id: int = BTC_USD_ID, oracle_price: float = 1000):
         # Store the quantity executed so far
         running_weighted_sum = 0
         quantity_executed = 0
@@ -795,17 +802,14 @@ class OrderExecutor:
             margin_amount = 0
             borrowed_amount = 0
             avg_execution_price = 0
+            side = 0
             if quantity_remaining == 0:
-                if request_list[i]["side"] != order_side["taker"]:
-                    print("Taker order must come afer Maker orders")
+                if i != len(request_list) - 1:
+                    print("Taker order must be the last order in the list")
                     return
 
                 if request_list[i]["post_only"] != 0:
                     print("Post Only order cannot be a taker")
-                    return
-
-                if i != len(request_list) - 1:
-                    print("Taker order must be the last order in the list")
                     return
 
                 if request_list[i]["time_in_force"] == 2:
@@ -813,19 +817,42 @@ class OrderExecutor:
                         print("F&K must be executed fully")
                     return
 
+                if request_list[i]["order_type"] == 1:
+                    if request_list[i]["slippage"] < 0:
+                        print("Slippage cannot be negative")
+                        return
+
+                if request_list[i]["slippage"] > 15:
+                    print("Slippage cannot be > 15")
+                    return
+
                 quantity_to_execute = quantity_locked
                 execution_price = running_weighted_sum/quantity_locked
+
+                if request_list[i]["order_type"] == order_types["market"]:
+                    threshold = (
+                        request_list[i]["slippage"]/100.0)*request_list[i]["price"]
+
+                    if not ((request_list[i]["price"]-threshold) < execution_price < (request_list[i]["price"] + threshold)):
+                        print("High slippage for taker order")
+                        return
+                else:
+                    if request_list[i]["direction"] == order_direction["long"]:
+                        if execution_price > request_list[i]["price"]:
+                            print("Bad long limit order")
+                            return
+                    else:
+                        if execution_price < request_list[i]["price"]:
+                            print("Bad short limit order")
+                            return
+                side = order_side["taker"]
             else:
-                if request_list[i]["side"] != order_side["maker"]:
-                    print("Maker orders must come before Taker order")
+                if i == (len(request_list) - 1):
+                    print("Taker order must be the last order in the list")
                     return
 
                 if quantity_remaining < request_list[i]["quantity"]:
                     quantity_to_execute = quantity_remaining
-
-                    if request_list[i]["time_in_force"] == 2:
-                        print("F&K should be executed fully")
-                        return
                 else:
                     quantity_to_execute = request_list[i]["quantity"]
 
@@ -834,9 +861,11 @@ class OrderExecutor:
 
                 running_weighted_sum += execution_price*quantity_to_execute
 
+                side = order_side["maker"]
+
             if request_list[i]["close_order"] == 1:
                 (avg_execution_price, margin_amount, borrowed_amount) = self.__process_open_orders(
-                    user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id)
+                    user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=side)
             else:
                 (avg_execution_price, margin_amount, borrowed_amount) = self.__process_close_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id)
@@ -846,6 +875,7 @@ class OrderExecutor:
             user_list[i].execute_order(order=request_list[i], size=quantity_to_execute, price=avg_execution_price,
                                        margin_amount=margin_amount, borrowed_amount=borrowed_amount, market_id=market_id)
 
+        self.batch_id_status[batch_id] = 1
         return
 
 
@@ -984,17 +1014,18 @@ alice.set_balance(5500, AssetID.USDC)
 bob.set_balance(6000, AssetID.USDC)
 
 (order_long, order_long_64x61) = alice.create_order(
-    quantity=2, order_type=order_types["limit"], price=5000, leverage=2)
+    quantity=2, order_type=order_types["limit"], price=1000, leverage=2)
 (order_short, order_short_64x61) = bob.create_order(
-    quantity=2, direction=order_direction["short"], side=order_side["taker"], leverage=2)
+    quantity=2, direction=order_direction["short"], leverage=2)
 
 request_list = [order_long, order_short]
 
+print(request_list)
 executoor = OrderExecutor()
-executoor.execute_batch(
-    request_list, [alice, bob], 2, BTC_USD_ID, 5000)
-print("alice_position:", alice.get_positions())
-print("bob_position:", bob.get_positions())
+executoor.execute_batch(random_string(10),
+                        request_list, [alice, bob], 2, BTC_USD_ID, 1000)
+# print("alice_position:", alice.get_positions())
+# print("bob_position:", bob.get_positions())
 
 # liquidatoor = Liquidator()
 
