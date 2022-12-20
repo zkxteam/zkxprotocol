@@ -8,7 +8,7 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61
-from utils_trading import User, order_direction, order_types, order_time_in_force, close_order, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
+from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -1189,7 +1189,7 @@ async def test_revert_if_parent_position_is_empty(adminAuth_factory):
     orders_1 = [{
         "quantity": 1,
         "order_type": order_types["limit"],
-        "close_order": close_order["close"]
+        "life_cycle": order_life_cycles["close"]
     }, {
         "quantity": 2,
         "direction": order_direction["short"],
@@ -1335,11 +1335,11 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     orders_2 = [{
         "quantity": 3,
         "direction": order_direction["short"],
-        "close_order": close_order["close"],
+        "life_cycle": order_life_cycles["close"],
         "order_type": order_types["limit"]
     }, {
         "quantity": 3,
-        "close_order": close_order["close"],
+        "life_cycle": order_life_cycles["close"],
     }]
 
     # execute order
@@ -1408,11 +1408,11 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     orders_2 = [{
         "quantity": 1.523,
         "direction": order_direction["short"],
-        "close_order": close_order["close"],
+        "life_cycle": order_life_cycles["close"],
         "order_type": order_types["limit"]
     }, {
         "quantity": 1.523,
-        "close_order": close_order["close"],
+        "life_cycle": order_life_cycles["close"],
     }]
 
     # execute order
@@ -1482,11 +1482,11 @@ async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_fac
     orders_2 = [{
         "quantity": 0.53,
         "direction": order_direction["short"],
-        "close_order": close_order["close"],
+        "life_cycle": order_life_cycles["close"],
         "order_type": order_types["limit"]
     }, {
         "quantity": 0.53,
-        "close_order": close_order["close"],
+        "life_cycle": order_life_cycles["close"],
     }]
 
     # execute order
@@ -1497,6 +1497,7 @@ async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_fac
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
 
 @pytest.mark.asyncio
 async def test_IoC_orders(adminAuth_factory):
@@ -1561,6 +1562,7 @@ async def test_IoC_orders(adminAuth_factory):
 
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=1, error_message=f"AccountManager: New position size larger than order")
+
 
 @pytest.mark.asyncio
 async def test_opening_partial_orders(adminAuth_factory):
@@ -1662,7 +1664,7 @@ async def test_opening_partial_orders(adminAuth_factory):
 #     # Create orders
 #     orders_1 = [{
 #         "quantity": 2,
-#         "close_order": close_order["close"],
+#         "life_cycle": order_life_cycles["close"],
 #         "direction": order_direction["short"],
 #         "order_type": order_types["limit"]
 #     }, {
@@ -1771,13 +1773,13 @@ async def test_opening_and_closing_full_orders_different_market(adminAuth_factor
         "quantity": 4.5,
         "price": 130.2,
         "direction": order_direction["short"],
-        "close_order": close_order["close"],
+        "life_cycle": order_life_cycles["close"],
         "order_type": order_types["limit"]
     }, {
         "market_id": ETH_USD_ID,
         "quantity": 4.5,
         "price": 130.2,
-        "close_order": close_order["close"],
+        "life_cycle": order_life_cycles["close"],
     }]
 
     # execute order

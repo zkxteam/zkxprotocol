@@ -34,6 +34,7 @@ from contracts.Constants import (
     MARKET_ORDER,
     MarketPrices_INDEX,
     MasterAdmin_ACTION,
+    OPEN,
     SHORT,
     STOP_ORDER,
     TAKER,
@@ -990,7 +991,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         order_type=[request_list_].order_type,
         time_in_force=[request_list_].time_in_force,
         post_only=[request_list_].post_only,
-        close_order=[request_list_].close_order
+        life_cycle=[request_list_].life_cycle
         );
 
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
@@ -1133,7 +1134,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // If the order is to be opened
-    if (temp_order.close_order == 1) {
+    if (temp_order.life_cycle == OPEN) {
         let (
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
@@ -1206,7 +1207,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         order_type=temp_order.order_type,
         time_in_force=temp_order.time_in_force,
         post_only=temp_order.post_only,
-        close_order=temp_order.close_order,
+        life_cycle=temp_order.life_cycle,
         liquidator_address=temp_order.liquidator_address,
     );
 

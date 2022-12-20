@@ -85,3 +85,6 @@ const HIGHTIDE_ACTIVE = 1;
 
 const FoK = 2;
 const IoC = 3;
+
+const OPEN = 1;
+const CLOSE = 2;

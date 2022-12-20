@@ -64,7 +64,7 @@ struct MultipleOrder {
     order_type: felt,
     time_in_force: felt,
     post_only: felt,
-    close_order: felt,
+    life_cycle: felt,
 }
 
 // @notice struct to pass price data to the contract
@@ -87,7 +87,7 @@ struct OrderRequest {
     order_type: felt,
     time_in_force: felt,
     post_only: felt,
-    close_order: felt,
+    life_cycle: felt,
     liquidator_address: felt,
 }
 

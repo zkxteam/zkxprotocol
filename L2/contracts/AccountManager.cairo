@@ -38,6 +38,7 @@ from contracts.Constants import (
     Liquidate_INDEX,
     LIQUIDATION_ORDER,
     LONG,
+    OPEN,
     POSITION_OPENED,
     POSITION_TO_BE_DELEVERAGED,
     POSITION_TO_BE_LIQUIDATED,
@@ -675,7 +676,7 @@ func execute_order{
 
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position
-    if (request.close_order == 1) {
+    if (request.life_cycle == OPEN) {
         if (position_details.position_size == 0) {
             add_to_market_array(market_id);
             tempvar syscall_ptr = syscall_ptr;

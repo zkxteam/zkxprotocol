@@ -39,7 +39,7 @@ order_time_in_force = {
     "immediate_or_cancel": 3,
 }
 
-close_order = {
+order_life_cycles = {
     "open": 1,
     "close": 2
 }
@@ -273,7 +273,7 @@ class User:
             "order_type": order["order_type"],
             "time_in_force": order["time_in_force"],
             "post_only": order["post_only"],
-            "close_order": order["close_order"],
+            "life_cycle": order["life_cycle"],
             "liquidator_address": order["liquidator_address"]
         }
 
@@ -331,7 +331,7 @@ class User:
             "order_type": order["order_type"],
             "time_in_force": order["time_in_force"],
             "post_only": order["post_only"],
-            "close_order": order["close_order"],
+            "life_cycle": order["life_cycle"],
         }
 
         return multiple_order
@@ -448,7 +448,7 @@ class User:
         self.__set_portion_executed(
             order_id=order["order_id"], new_amount=new_portion_executed)
 
-        if order["close_order"] == 1:
+        if order["life_cycle"] == 1:
             if position["position_size"] == 0:
                 self.__add_to_market_array(new_market_id=order["market_id"])
 
@@ -561,7 +561,7 @@ class User:
         order_type: int = order_types["market"],
         time_in_force: int = order_time_in_force["good_till_time"],
         post_only: int = 0,
-        close_order: int = close_order["open"],
+        life_cycle: int = order_life_cycles["open"],
         liquidator_address: int = 0,
     ) -> Tuple[Dict, Dict]:
         # Checks for input
@@ -572,7 +572,7 @@ class User:
         assert order_type in order_types.values(), "Invalid order_type"
         assert time_in_force in order_time_in_force.values(), "Invalid time_in_force"
         assert post_only in (0, 1), "Invalid post_only"
-        assert close_order in (1, 2), "Invalid close_order"
+        assert life_cycle in (1, 2), "Invalid life_cycle"
 
         new_order = {
             "order_id": order_id if order_id else random_string(12),
@@ -585,7 +585,7 @@ class User:
             "order_type": order_type,
             "time_in_force": time_in_force,
             "post_only": post_only,
-            "close_order": close_order,
+            "life_cycle": life_cycle,
             "liquidator_address": liquidator_address
         }
         signed_order = [0, 0]
@@ -872,7 +872,7 @@ class OrderExecutor:
 
                 side = order_side["maker"]
 
-            if request_list[i]["close_order"] == 1:
+            if request_list[i]["life_cycle"] == order_life_cycles["open"]:
                 (avg_execution_price, margin_amount, borrowed_amount) = self.__process_open_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=side)
             else:

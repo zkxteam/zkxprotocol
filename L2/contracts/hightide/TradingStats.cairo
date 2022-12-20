@@ -383,7 +383,7 @@ func record_trade_batch_stats_recurse{
 
     // Update running total of order volume
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=[request_list_].close_order
+        season_id=season_id_, pair_id=pair_id_, order_type=[request_list_].life_cycle
     );
 
     let (current_len) = num_orders.read(volume_metadata);
@@ -409,7 +409,9 @@ func record_trade_batch_stats_recurse{
         // Increment count of unique active traders for pair in season
         num_traders.write(season_id_, pair_id_, current_num_traders + 1);
         // Store trader address for pair in this season at current index
-        traders_in_pair.write(season_id_, pair_id_, current_num_traders, [request_list_].user_address);
+        traders_in_pair.write(
+            season_id_, pair_id_, current_num_traders, [request_list_].user_address
+        );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -424,7 +426,7 @@ func record_trade_batch_stats_recurse{
         season_id_,
         pair_id_,
         [request_list_].user_address,
-        [request_list_].close_order,
+        [request_list_].life_cycle,
         curr_order_size_64x61,
         execution_price_64x61_,
     );
