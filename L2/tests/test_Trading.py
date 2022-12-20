@@ -7,7 +7,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61, PRIME, PRIME_HALF
 from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
@@ -395,7 +395,7 @@ async def test_revert_balance_low_user_1(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Low Balance- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0501:", error_at_index=error_at_index, param_2=to64x61(alice_balance))
 
 
 @pytest.mark.asyncio
@@ -434,7 +434,7 @@ async def test_revert_balance_low_user_2(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Low Balance- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0501:", error_at_index=error_at_index, param_2=to64x61(bob_balance))
 
 
 @pytest.mark.asyncio
@@ -473,7 +473,7 @@ async def test_revert_if_leverage_more_than_allowed_user_1(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be <= to the maximum allowed leverage- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0502:", error_at_index=error_at_index, param_2=to64x61(10.1))
 
 
 @pytest.mark.asyncio
@@ -512,7 +512,7 @@ async def test_revert_if_leverage_more_than_allowed_user_2(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be <= to the maximum allowed leverage- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0502:", error_at_index=error_at_index, param_2=to64x61(10.001))
 
 
 @pytest.mark.asyncio
@@ -551,7 +551,7 @@ async def test_revert_if_leverage_below_1(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be >= 1- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0503:", error_at_index=error_at_index, param_2=to64x61(0.9))
 
 
 @pytest.mark.asyncio
@@ -590,7 +590,7 @@ async def test_revert_if_wrong_market_passed(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: All orders in a batch must be from the same market- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0504:", error_at_index=error_at_index, param_2=ETH_USD_ID)
 
 
 @pytest.mark.asyncio
@@ -628,7 +628,7 @@ async def test_revert_if_quantity_low_user_1(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Quantity must be >= to the minimum order size- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0505:", error_at_index=error_at_index, param_2=to64x61(0.00001))
 
 
 @pytest.mark.asyncio
@@ -666,7 +666,7 @@ async def test_revert_if_quantity_low_user_2(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Quantity must be >= to the minimum order size- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0505:", error_at_index=error_at_index, param_2=to64x61(0.00001))
 
 
 @pytest.mark.asyncio
@@ -704,8 +704,9 @@ async def test_revert_if_market_order_slippage_error(adminAuth_factory):
         "slippage": 1
     }]
 
+    error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: High slippage for execution price")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0506:", error_at_index=error_at_index, param_2=to64x61(1010.01))
 
 
 @pytest.mark.asyncio
@@ -744,8 +745,9 @@ async def test_revert_if_limit_order_bad_short_limit_price(adminAuth_factory):
         "price": 1010.02
     }]
 
+    error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Bad short limit order")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0507:", error_at_index=error_at_index, param_2=to64x61(1010.01))
 
 
 @pytest.mark.asyncio
@@ -784,8 +786,9 @@ async def test_revert_if_limit_order_bad_long_limit_price(adminAuth_factory):
         "price": 1010.00
     }]
 
+    error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Bad long limit order")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0508:", error_at_index=error_at_index, param_2=to64x61(1010.01))
 
 
 @pytest.mark.asyncio
@@ -825,7 +828,7 @@ async def test_revert_if_market_untradable(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Market is not tradable- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0509:", error_at_index=error_at_index, param_2=TSLA_USD_ID)
 
 
 @pytest.mark.asyncio
@@ -862,8 +865,15 @@ async def test_revert_if_unregistered_user(adminAuth_factory):
     }]
 
     error_at_index = 1
+    signed_address = 0
+    if eduard.contract_address > PRIME_HALF:
+        signed_address = eduard.contract_address - PRIME
+    else:
+        signed_address = eduard.contract_addres
+    print(signed_address)
+    print(eduard.contract_address)
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: User account not registered- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0510:", error_at_index=error_at_index, param_2=signed_address)
 
 
 @pytest.mark.asyncio
@@ -902,7 +912,7 @@ async def test_revert_if_taker_direction_wrong(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must be in opposite direction of Maker order(s)- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0511:", error_at_index=error_at_index, param_2=order_direction["long"])
 
 
 @pytest.mark.asyncio
@@ -946,7 +956,7 @@ async def test_revert_if_maker_direction_wrong(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: All Maker orders must be in the same direction- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0512:", error_at_index=error_at_index, param_2=order_direction["short"])
 
 
 @pytest.mark.asyncio
@@ -989,7 +999,7 @@ async def test_revert_if_invalid_batch_extra_maker_orders(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must be the last order in the list- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0513:", error_at_index=error_at_index, param_2=error_at_index)
 
 
 @pytest.mark.asyncio
@@ -1033,7 +1043,7 @@ async def test_revert_if_insufficient_maker_orders(adminAuth_factory):
 
     error_at_index = 2
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Maker order cannot be the last order in the list- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0514:", error_at_index=error_at_index, param_2=error_at_index)
 
 
 @pytest.mark.asyncio
@@ -1076,7 +1086,7 @@ async def test_revert_if_invalid_batch_extra_taker_orders(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must be the last order in the list- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0513:", error_at_index=error_at_index, param_2=error_at_index)
 
 
 @pytest.mark.asyncio
@@ -1116,7 +1126,7 @@ async def test_revert_if_taker_post_only_order(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Post Only order cannot be a taker- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0515:", error_at_index=error_at_index, param_2=error_at_index)
 
 
 @pytest.mark.asyncio
@@ -1157,7 +1167,7 @@ async def test_revert_if_taker_fk_partial_order(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: F&K order should be executed fully- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0516:", error_at_index=error_at_index, param_2=to64x61(1))
 
 
 @pytest.mark.asyncio
@@ -1199,7 +1209,7 @@ async def test_revert_if_parent_position_is_empty(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"The parentPosition size cannot be 0- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0517:", error_at_index=error_at_index, param_2=order_direction["short"])
 
 
 @pytest.mark.asyncio
@@ -1238,7 +1248,7 @@ async def test_revert_if_maker_order_is_market(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Maker orders must be limit orders- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0518:", error_at_index=error_at_index, param_2=error_at_index)
 
 
 @pytest.mark.asyncio
@@ -1278,7 +1288,7 @@ async def test_revert_if_price_beyond_threshold(adminAuth_factory):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Execution price not in range- {error_at_index}")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0519:", error_at_index=error_at_index, param_2=to64x61(1050.12))
 
 
 @pytest.mark.asyncio

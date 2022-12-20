@@ -291,7 +291,7 @@ func execute_batch{
 // ////////////
 
 func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    slippage_: felt, price_: felt, execution_price_: felt
+    order_id_: felt, slippage_: felt, price_: felt, execution_price_: felt
 ) {
     // To remove
     alloc_locals;
@@ -308,25 +308,25 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
     local lower_limit_;
     assert lower_limit_ = lower_limit;
-    with_attr error_message("Trading: High slippage for execution price") {
+    with_attr error_message("0506: {order_id_} {execution_price_}") {
         assert_in_range(execution_price_, lower_limit, upper_limit);
     }
     return ();
 }
 
 func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    price_: felt, execution_price_: felt, direction_: felt
+    order_id_: felt, price_: felt, execution_price_: felt, direction_: felt
 ) {
     // if it's a limit order
     if (direction_ == LONG) {
         // if it's a long order
-        with_attr error_message("Trading: Bad long limit order") {
+        with_attr error_message("0508: {order_id_} {execution_price_}") {
             assert_le(execution_price_, price_);
         }
         tempvar range_check_ptr = range_check_ptr;
     } else {
         // if it's a short order
-        with_attr error_message("Trading: Bad short limit order") {
+        with_attr error_message("0507: {order_id_} {execution_price_}") {
             assert_le(price_, execution_price_);
         }
         tempvar range_check_ptr = range_check_ptr;
@@ -551,15 +551,18 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // );
 
     // Error messages need local variables to be passed in params
-    local user_address;
-    assert user_address = order_.user_address;
+    local order_id_;
+    local user_balance_;
 
     let (user_balance) = IAccountManager.get_balance(
         contract_address=order_.user_address, assetID_=collateral_id_
     );
 
+    assert user_balance_ = user_balance;
+    assert order_id_ = order_.order_id;
+
     // User must be able to pay the amount
-    with_attr error_message("Trading: Low Balance- {current_index_}") {
+    with_attr error_message("0501: {order_id_} {user_balance_}") {
         assert_le(order_value_with_fee, user_balance);
     }
 
@@ -652,6 +655,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     local margin_amount_close;
     local borrowed_amount_close;
     local average_execution_price_close;
+    // To be passed as arguments to error_message
+    local order_id;
+    assert order_id = order_.order_id;
 
     // Get the direction of the position that is to be closed
     local parent_direction;
@@ -667,7 +673,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         contract_address=order_.user_address, market_id_=market_id_, direction_=parent_direction
     );
 
-    with_attr error_message("The parentPosition size cannot be 0- {current_index_}") {
+    with_attr error_message("0517: {order_id} {parent_direction}") {
         assert_not_zero(parent_position.position_size);
     }
 
@@ -966,6 +972,13 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local current_quantity_executed;
     local current_order_side;
 
+    // Local variables to be passed as arguments in error_messages
+    local order_id;
+    local leverage;
+    local market_id_order;
+    local quantity_order;
+    local user_address;
+    local direction_order;
     // Error messages require local variables to be passed in params
     local current_index;
     current_index = orders_len_ - request_list_len_;
@@ -993,12 +1006,19 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         post_only=[request_list_].post_only,
         life_cycle=[request_list_].life_cycle
         );
+    assert order_id = temp_order.order_id;
+    assert leverage = temp_order.leverage;
+    assert market_id_order = temp_order.market_id;
+    assert quantity_order = temp_order.quantity;
+    assert user_address = temp_order.user_address;
+    assert direction_order = temp_order.direction;
 
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
     let (is_registered) = IAccountRegistry.is_registered_user(
         contract_address=account_registry_address_, address_=temp_order.user_address
     );
-    with_attr error_message("Trading: User account not registered- {current_index}") {
+
+    with_attr error_message("0510: {order_id} {user_address}") {
         assert_not_zero(is_registered);
     }
 
@@ -1008,13 +1028,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Taker order
     if (quantity_remaining == 0) {
         // There must only be a single Taker order; hence they must be the last order in the batch
-        with_attr error_message(
-                "Trading: Taker order must be the last order in the list- {current_index}") {
+        with_attr error_message("0513: {order_id} {current_index}") {
             assert request_list_len_ = 1;
         }
 
         // Check for post-only flag; they must always be a maker
-        with_attr error_message("Trading: Post Only order cannot be a taker- {current_index}") {
+        with_attr error_message("0515: {order_id} {current_index}") {
             assert temp_order.post_only = 0;
         }
 
@@ -1022,8 +1041,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         if (temp_order.time_in_force == FoK) {
             let (diff_check) = Math64x61_sub(temp_order.quantity, quantity_locked_);
 
-            with_attr error_message(
-                    "Trading: F&K order should be executed fully- {current_index}") {
+            with_attr error_message("0516: {order_id} {quantity_locked_}") {
                 assert diff_check = 0;
                 assert temp_order.order_type = LIMIT_ORDER;
             }
@@ -1047,12 +1065,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // Price check
         if (temp_order.order_type == 1) {
             check_within_slippage(
+                order_id_=order_id,
                 slippage_=temp_order.slippage,
                 price_=temp_order.price,
                 execution_price_=new_execution_price,
             );
         } else {
             check_limit_price(
+                order_id_=order_id,
                 price_=temp_order.price,
                 execution_price_=new_execution_price,
                 direction_=temp_order.direction,
@@ -1073,13 +1093,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
         // Maker Order
     } else {
-        with_attr error_message("Trading: Maker orders must be limit orders- {current_index}") {
+        with_attr error_message("0518: {order_id} {current_index}") {
             assert temp_order.order_type = LIMIT_ORDER;
         }
 
         if (request_list_len_ == 1) {
-            with_attr error_message(
-                    "Trading: Maker order cannot be the last order in the list- {current_index}") {
+            with_attr error_message("0514: {order_id} {current_index}") {
                 assert 1 = 0;
             }
         }
@@ -1129,7 +1148,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Price Check
-    with_attr error_message("Trading: Execution price not in range- {current_index}") {
+    with_attr error_message("0519: {order_id} {current_index}") {
         assert_in_range(execution_price, lower_limit_, upper_limit_);
     }
 
@@ -1234,13 +1253,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     );
 
     // Market Check
-    with_attr error_message(
-            "Trading: All orders in a batch must be from the same market- {current_index}") {
+    with_attr error_message("0504: {order_id} {market_id_order}") {
         assert temp_order.market_id = market_id_;
     }
 
     // Leverage check minimum
-    with_attr error_message("Trading: Leverage must be >= 1- {current_index}") {
+    with_attr error_message("0503: {order_id} {leverage}") {
         assert_le(LEVERAGE_ONE, temp_order.leverage);
     }
 
@@ -1252,19 +1270,17 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         );
 
         // Tradable check
-        with_attr error_message("Trading: Market is not tradable- {current_index}") {
+        with_attr error_message("0509: {order_id} {market_id_}") {
             assert_not_zero(market.is_tradable);
         }
 
         // Size check
-        with_attr error_message(
-                "Trading: Quantity must be >= to the minimum order size- {current_index}") {
+        with_attr error_message("0505: {order_id} {quantity_order}") {
             assert_le(market.minimum_order_size, temp_order.quantity);
         }
 
         // Leverage check maximum
-        with_attr error_message(
-                "Trading: Leverage must be <= to the maximum allowed leverage- {current_index}") {
+        with_attr error_message("0502: {order_id} {leverage}") {
             assert_le(temp_order.leverage, market.maximum_leverage);
         }
 
@@ -1298,24 +1314,21 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Leverage check maximum
-    with_attr error_message(
-            "Trading: Leverage must be <= to the maximum allowed leverage- {current_index}") {
+    with_attr error_message("0502: {order_id} {leverage}") {
         assert_le(temp_order.leverage, max_leverage_);
     }
 
     // Direction Check
     if (request_list_len_ == 1) {
         tempvar direction_check = maker_direction_ - temp_order.direction;
-        with_attr error_message(
-                "Trading: Taker order must be in opposite direction of Maker order(s)- {current_index}") {
+        with_attr error_message("0511: {order_id} {direction_order}") {
             assert_not_zero(direction_check);
         }
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
-        with_attr error_message(
-                "Trading: All Maker orders must be in the same direction- {current_index}") {
+        with_attr error_message("0512: {order_id} {direction_order}") {
             assert maker_direction_ = temp_order.direction;
         }
         tempvar syscall_ptr = syscall_ptr;
@@ -1324,8 +1337,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Size Check
-    with_attr error_message(
-            "Trading: Quantity must be >= to the minimum order size- {current_index}") {
+    with_attr error_message("0505: {order_id} {quantity_order}") {
         assert_le(min_quantity_, temp_order.quantity);
     }
 

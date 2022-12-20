@@ -8,7 +8,7 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals, felt_to_str
-from utils_trading import User, order_direction, order_types, order_time_in_force, order_side, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, Liquidator, get_user_balance
+from utils_trading import User, order_direction, order_types, order_time_in_force, order_side, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, Liquidator, get_user_balance, check_liquidation, compare_debugging_values
 from utils_links import DEFAULT_LINK_1, prepare_starknet_string
 from utils_asset import AssetID, build_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -230,10 +230,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
-    # Set the balance of admin1 and admin2
-    # await admin1_signer.send_transaction(admin1, admin1.contract_address, 'set_balance', [AssetID.USDC, to64x61(1000000)])
-    # await admin2_signer.send_transaction(admin2, admin2.contract_address, 'set_balance', [AssetID.USDC, to64x61(1000000)])
-
+    # Set the threshold for oracle price in Trading contract
+    await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
     return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, alice_test, bob_test, charlie_test, python_executor, python_liquidator
 
 
@@ -271,11 +269,6 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array_usdc, asset_id=collateral_id_1)
     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array_ust, asset_id=collateral_id_2)
 
-    alice_balance_usdc = await get_user_balance(alice, AssetID.USDC)
-    print("alice_balance", alice_balance_usdc)
-
-    bob_balance_usdc = await get_user_balance(bob, AssetID.USDC)
-    print("bob_balance", bob_balance_usdc)
     # Create orders
     orders_1 = [{
         "quantity": 2,
@@ -284,368 +277,324 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         "leverage": 2,
     }, {
         "quantity": 2,
+        "price": 5000,
         "direction": order_direction["short"],
-        "side": order_side["taker"],
         "leverage": 2,
     }]
 
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
 
-    alice_balance_usdc = await get_user_balance(alice, AssetID.USDC)
-    print("alice_balance", alice_balance_usdc)
-
-    bob_balance_usdc = await get_user_balance(bob, AssetID.USDC)
-    print("bob_balance", bob_balance_usdc)
-
-    orderState1 = await alice.get_position_data(market_id_=market_id_1, direction_=order_direction["short"]).call()
-    res1 = list(orderState1.result.res)
-
-    print(orderState1)
-
-    orderState2 = await bob.get_position_data(market_id_=market_id_1, direction_=order_direction["long"]).call()
-    res2 = list(orderState2.result.res)
-
-    print(orderState2)
+    # compare
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
 
     ##############################################
     ######## Alice's liquidation result 1 ##########
     ##############################################
-
-    liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
-        alice.contract_address,
-        # 1 Position + 2 Collaterals
-        3,
-        # Position 1 - BTC short
-        AssetID.BTC,
-        AssetID.USDC,
-        to64x61(5000),
-        to64x61(1.05),
-        # Collateral 1 - USDC
-        0,
-        AssetID.USDC,
-        0,
-        to64x61(1.05),
-        # Collateral 2 - UST
-        0,
-        AssetID.UST,
-        0,
-        to64x61(0.05)
-    ])
-    print("liquidation resul...", liquidate_result_alice.call_info.retdata[1], " ",
-          liquidate_result_alice.call_info.retdata[2])
-    print(liquidate_result_alice.call_info.retdata)
-
-    assert liquidate_result_alice.call_info.retdata[1] == 0
-    assert liquidate_result_alice.call_info.retdata[4:] == res1
-
-    alice_balance_usdc = await alice.get_balance(AssetID.USDC).call()
-    print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
-
-    assert from64x61(alice_balance_usdc.result.res) == 495.15
-
-    alice_balance_ust = await alice.get_balance(AssetID.UST).call()
-    print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
-
-    assert from64x61(alice_balance_ust.result.res) == 1000
-
-    alice_maintenance = await liquidate.return_maintenance().call()
-    print("Alice maintenance requirement:",
-          from64x61(alice_maintenance.result.res))
-
-    assert from64x61(alice_maintenance.result.res) == 787.5
-
-    alice_acc_value = await liquidate.return_acc_value().call()
-    print("Alice acc value:", from64x61(alice_acc_value.result.res))
-
-    # assert from64x61(alice_acc_value.result.res) == 5819.9075
-
-    ##############################################
-    ######## Bob's liquidation result 1 ##########
-    ##############################################
-
-    liquidate_result_bob = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
-        bob.contract_address,
-        # 1 Position + 2 Collaterals
-        3,
-        # Position 1 - BTC long
-        AssetID.BTC,
-        AssetID.USDC,
-        to64x61(5000),
-        to64x61(1.05),
-        # Collateral 1 - USDC
-        0,
-        AssetID.USDC,
-        0,
-        to64x61(1.05),
-        # Collateral 2 - UST
-        0,
-        AssetID.UST,
-        0,
-        to64x61(0.05)
-    ])
-
-    print("liquidation resul...", liquidate_result_bob.call_info.retdata[1],
-          liquidate_result_bob.call_info.retdata[2])
-
-    assert liquidate_result_bob.call_info.retdata[1] == 0
-    print(liquidate_result_bob.call_info.retdata[4:]) == res2
-
-    bob_balance_usdc = await bob.get_balance(AssetID.USDC).call()
-    print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
-
-    assert from64x61(bob_balance_usdc.result.res) == 998.0600000000001
-
-    bob_balance_ust = await bob.get_balance(AssetID.UST).call()
-    print("Bob ust balance is...", from64x61(bob_balance_ust.result.res))
-
-    assert from64x61(bob_balance_ust.result.res) == 5500
-
-    bob_maintenance = await liquidate.return_maintenance().call()
-    print("Bob maintenance requirement:",
-          from64x61(bob_maintenance.result.res))
-
-    assert from64x61(bob_maintenance.result.res) == 787.5
-
-    bob_acc_value = await liquidate.return_acc_value().call()
-    print("bob acc value:", from64x61(bob_acc_value.result.res))
-
-    # assert from64x61(bob_acc_value.result.res) == 6572.963000000001
-
-    # ###### Opening of Orders 2 #######
-    # Batch params for OPEN orders 2
-    quantity_locked_2 = 3
-    market_id_2 = ETH_USD_ID
-    asset_id_2 = AssetID.USDC
-    oracle_price_2 = 100
-
-    orders_1 = [{
-        "quantity": 3,
-        "market_id": ETH_USD_ID,
-        "price": 100,
-        "order_type": order_types["limit"],
-        "leverage": 3,
-    }, {
-        "quantity": 3,
-        "market_id": ETH_USD_ID,
-        "side": order_side["taker"],
-        "direction": order_direction["short"],
-        "leverage": 3,
+    market_prices = [{
+        "market_id": BTC_USD_ID,
+        "asset_price": 5000,
+        "collateral_price": 1.05
     }]
 
-    # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    collateral_prices = [{
+        "collateral_id": AssetID.USDC,
+        "collateral_price": 1.05
+    }, {
+        "collateral_id": AssetID.UST,
+        "collateral_price": 0.05
+    }]
 
-    orderState3 = await alice.get_position_data(market_id_=market_id_2, direction_=order_direction["short"]).call()
-    res3 = list(orderState3.result.res)
+    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
+                            user_test=alice_test, market_prices=market_prices, collateral_prices=collateral_prices, liquidate=liquidate)
 
-    orderState4 = await bob.get_position_data(market_id_=market_id_2, direction_=order_direction["long"]).call()
-    res4 = list(orderState4.result.res)
+    # await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+# ##############################################
+# ######## Bob's liquidation result 1 ##########
+# ##############################################
 
-    print("Alice positions: ")
-    alice_positions = await alice.get_positions().call()
-    alice_parsed_positions = list(alice_positions.result.positions_array)
-    print_parsed_positions(alice_parsed_positions)
+# liquidate_result_bob = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+#     bob.contract_address,
+#     # 1 Position + 2 Collaterals
+#     3,
+#     # Position 1 - BTC long
+#     AssetID.BTC,
+#     AssetID.USDC,
+#     to64x61(5000),
+#     to64x61(1.05),
+#     # Collateral 1 - USDC
+#     0,
+#     AssetID.USDC,
+#     0,
+#     to64x61(1.05),
+#     # Collateral 2 - UST
+#     0,
+#     AssetID.UST,
+#     0,
+#     to64x61(0.05)
+# ])
 
-    print("Bob positions: ")
-    bob_positions = await alice.get_positions().call()
-    bob_parsed_positions = list(bob_positions.result.positions_array)
-    print_parsed_positions(bob_parsed_positions)
+# print("liquidation resul...", liquidate_result_bob.call_info.retdata[1],
+#       liquidate_result_bob.call_info.retdata[2])
 
-    print("Alice collaterals :")
-    alice_collaterals = await alice.return_array_collaterals().call()
-    alice_collaterals_parsed = list(alice_collaterals.result.array_list)
-    print_parsed_collaterals(alice_collaterals_parsed)
+# assert liquidate_result_bob.call_info.retdata[1] == 0
+# print(liquidate_result_bob.call_info.retdata[4:]) == res2
 
-    print("Bob collaterals :")
-    bob_collaterals = await bob.return_array_collaterals().call()
-    bob_collaterals_parsed = list(bob_collaterals.result.array_list)
-    print_parsed_collaterals(bob_collaterals_parsed)
+# bob_balance_usdc = await bob.get_balance(AssetID.USDC).call()
+# print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
 
-    # ##############################################
-    # ######## Alice's liquidation result 2 ##########
-    # ##############################################
+# assert from64x61(bob_balance_usdc.result.res) == 998.0600000000001
 
-    liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
-        alice.contract_address,
-        # 2 Position + 2 Collaterals
-        4,
-        # Position 1 - BTC short
-        AssetID.BTC,
-        AssetID.USDC,
-        to64x61(5000),
-        to64x61(1.05),
-        # Position 2 - ETH short
-        AssetID.ETH,
-        AssetID.USDC,
-        to64x61(100),
-        to64x61(1.05),
-        # Collateral 1 - USDC
-        0,
-        AssetID.USDC,
-        0,
-        to64x61(1.05),
-        # Collateral 2 - UST
-        0,
-        AssetID.UST,
-        0,
-        to64x61(0.05)
-    ])
-    print("liquidation resul...", liquidate_result_alice.call_info.retdata[1], " ",
-          liquidate_result_alice.call_info.retdata[2])
+# bob_balance_ust = await bob.get_balance(AssetID.UST).call()
+# print("Bob ust balance is...", from64x61(bob_balance_ust.result.res))
 
-    assert liquidate_result_alice.call_info.retdata[1] == 0
-    assert liquidate_result_alice.call_info.retdata[4:] == res3
+# assert from64x61(bob_balance_ust.result.res) == 5500
 
-    alice_balance_usdc = await alice.get_balance(AssetID.USDC).call()
-    print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
+# bob_maintenance = await liquidate.return_maintenance().call()
+# print("Bob maintenance requirement:",
+#       from64x61(bob_maintenance.result.res))
 
-    assert from64x61(alice_balance_usdc.result.res) == 395.0045
+# assert from64x61(bob_maintenance.result.res) == 787.5
 
-    alice_balance_ust = await alice.get_balance(AssetID.UST).call()
-    print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
+# bob_acc_value = await liquidate.return_acc_value().call()
+# print("bob acc value:", from64x61(bob_acc_value.result.res))
 
-    assert from64x61(alice_balance_ust.result.res) == 1000
+# # assert from64x61(bob_acc_value.result.res) == 6572.963000000001
 
-    alice_maintenance = await liquidate.return_maintenance().call()
-    print("Alice maintenance requirement:",
-          from64x61(alice_maintenance.result.res))
+# # ###### Opening of Orders 2 #######
+# # Batch params for OPEN orders 2
+# quantity_locked_2 = 3
+# market_id_2 = ETH_USD_ID
+# asset_id_2 = AssetID.USDC
+# oracle_price_2 = 100
 
-    assert from64x61(alice_maintenance.result.res) == 811.125
+# orders_1 = [{
+#     "quantity": 3,
+#     "market_id": ETH_USD_ID,
+#     "price": 100,
+#     "order_type": order_types["limit"],
+#     "leverage": 3,
+# }, {
+#     "quantity": 3,
+#     "market_id": ETH_USD_ID,
+#     "direction": order_direction["short"],
+#     "leverage": 3,
+# }]
 
-    alice_acc_value = await liquidate.return_acc_value().call()
-    print("Alice acc value:", from64x61(alice_acc_value.result.res))
+# # execute order
+# await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
 
-    # assert from64x61(alice_acc_value.result.res) == 5819.754725000001
+# orderState3 = await alice.get_position_data(market_id_=market_id_2, direction_=order_direction["short"]).call()
+# res3 = list(orderState3.result.res)
 
-    ##############################################
-    ######## Bob's liquidation result 2 ##########
-    ##############################################
-    liquidate_result_bob = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
-        bob.contract_address,
-        # 2 Position + 2 Collaterals
-        4,
-        # Position 1 - BTC long
-        AssetID.BTC,
-        AssetID.USDC,
-        to64x61(5000),
-        to64x61(1.05),
-        # Position 2 - ETH long
-        AssetID.ETH,
-        AssetID.USDC,
-        to64x61(100),
-        to64x61(1.05),
-        # Collateral 1 - USDC
-        0,
-        AssetID.USDC,
-        0,
-        to64x61(1.05),
-        # Collateral 2 - UST
-        0,
-        AssetID.UST,
-        0,
-        to64x61(0.05)
-    ])
+# orderState4 = await bob.get_position_data(market_id_=market_id_2, direction_=order_direction["long"]).call()
+# res4 = list(orderState4.result.res)
 
-    print("liquidation resul...", liquidate_result_bob.call_info.retdata[1],
-          liquidate_result_bob.call_info.retdata[2])
+# print("Alice positions: ")
+# alice_positions = await alice.get_positions().call()
+# alice_parsed_positions = list(alice_positions.result.positions_array)
+# print_parsed_positions(alice_parsed_positions)
 
-    assert liquidate_result_bob.call_info.retdata[1] == 0
-    assert liquidate_result_alice.call_info.retdata[4:] == res4
+# print("Bob positions: ")
+# bob_positions = await alice.get_positions().call()
+# bob_parsed_positions = list(bob_positions.result.positions_array)
+# print_parsed_positions(bob_parsed_positions)
 
-    bob_balance_usdc = await bob.get_balance(AssetID.USDC).call()
-    print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
+# print("Alice collaterals :")
+# alice_collaterals = await alice.return_array_collaterals().call()
+# alice_collaterals_parsed = list(alice_collaterals.result.array_list)
+# print_parsed_collaterals(alice_collaterals_parsed)
 
-    assert from64x61(bob_balance_usdc.result.res) == 898.0018
+# print("Bob collaterals :")
+# bob_collaterals = await bob.return_array_collaterals().call()
+# bob_collaterals_parsed = list(bob_collaterals.result.array_list)
+# print_parsed_collaterals(bob_collaterals_parsed)
 
-    bob_balance_ust = await bob.get_balance(AssetID.UST).call()
-    print("Bob ust balance is...", from64x61(bob_balance_ust.result.res))
+# # ##############################################
+# # ######## Alice's liquidation result 2 ##########
+# # ##############################################
 
-    assert from64x61(bob_balance_ust.result.res) == 5500
+# liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+#     alice.contract_address,
+#     # 2 Position + 2 Collaterals
+#     4,
+#     # Position 1 - BTC short
+#     AssetID.BTC,
+#     AssetID.USDC,
+#     to64x61(5000),
+#     to64x61(1.05),
+#     # Position 2 - ETH short
+#     AssetID.ETH,
+#     AssetID.USDC,
+#     to64x61(100),
+#     to64x61(1.05),
+#     # Collateral 1 - USDC
+#     0,
+#     AssetID.USDC,
+#     0,
+#     to64x61(1.05),
+#     # Collateral 2 - UST
+#     0,
+#     AssetID.UST,
+#     0,
+#     to64x61(0.05)
+# ])
+# print("liquidation resul...", liquidate_result_alice.call_info.retdata[1], " ",
+#       liquidate_result_alice.call_info.retdata[2])
 
-    bob_maintenance = await liquidate.return_maintenance().call()
-    print("Bob maintenance requirement:",
-          from64x61(bob_maintenance.result.res))
+# assert liquidate_result_alice.call_info.retdata[1] == 0
+# assert liquidate_result_alice.call_info.retdata[4:] == res3
 
-    assert from64x61(bob_maintenance.result.res) == 811.125
+# alice_balance_usdc = await alice.get_balance(AssetID.USDC).call()
+# print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
 
-    bob_acc_value = await liquidate.return_acc_value().call()
-    print("bob acc value:", from64x61(bob_acc_value.result.res))
+# assert from64x61(alice_balance_usdc.result.res) == 395.0045
 
-    # assert from64x61(bob_acc_value.result.res) == 6572.90189
+# alice_balance_ust = await alice.get_balance(AssetID.UST).call()
+# print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
+
+# assert from64x61(alice_balance_ust.result.res) == 1000
+
+# alice_maintenance = await liquidate.return_maintenance().call()
+# print("Alice maintenance requirement:",
+#       from64x61(alice_maintenance.result.res))
+
+# assert from64x61(alice_maintenance.result.res) == 811.125
+
+# alice_acc_value = await liquidate.return_acc_value().call()
+# print("Alice acc value:", from64x61(alice_acc_value.result.res))
+
+# # assert from64x61(alice_acc_value.result.res) == 5819.754725000001
+
+# ##############################################
+# ######## Bob's liquidation result 2 ##########
+# ##############################################
+# liquidate_result_bob = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+#     bob.contract_address,
+#     # 2 Position + 2 Collaterals
+#     4,
+#     # Position 1 - BTC long
+#     AssetID.BTC,
+#     AssetID.USDC,
+#     to64x61(5000),
+#     to64x61(1.05),
+#     # Position 2 - ETH long
+#     AssetID.ETH,
+#     AssetID.USDC,
+#     to64x61(100),
+#     to64x61(1.05),
+#     # Collateral 1 - USDC
+#     0,
+#     AssetID.USDC,
+#     0,
+#     to64x61(1.05),
+#     # Collateral 2 - UST
+#     0,
+#     AssetID.UST,
+#     0,
+#     to64x61(0.05)
+# ])
+
+# print("liquidation resul...", liquidate_result_bob.call_info.retdata[1],
+#       liquidate_result_bob.call_info.retdata[2])
+
+# assert liquidate_result_bob.call_info.retdata[1] == 0
+# assert liquidate_result_alice.call_info.retdata[4:] == res4
+
+# bob_balance_usdc = await bob.get_balance(AssetID.USDC).call()
+# print("Bob usdc balance is...", from64x61(bob_balance_usdc.result.res))
+
+# assert from64x61(bob_balance_usdc.result.res) == 898.0018
+
+# bob_balance_ust = await bob.get_balance(AssetID.UST).call()
+# print("Bob ust balance is...", from64x61(bob_balance_ust.result.res))
+
+# assert from64x61(bob_balance_ust.result.res) == 5500
+
+# bob_maintenance = await liquidate.return_maintenance().call()
+# print("Bob maintenance requirement:",
+#       from64x61(bob_maintenance.result.res))
+
+# assert from64x61(bob_maintenance.result.res) == 811.125
+
+# bob_acc_value = await liquidate.return_acc_value().call()
+# print("bob acc value:", from64x61(bob_acc_value.result.res))
+
+# assert from64x61(bob_acc_value.result.res) == 6572.90189
 
 
-@pytest.mark.asyncio
-async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund,  alice_test, bob_test, charlie_test, python_executor, python_liquidator = adminAuth_factory
+# @pytest.mark.asyncio
+# async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
+# adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund,  alice_test, bob_test, charlie_test, python_executor, python_liquidator = adminAuth_factory
 
-    ##############################################
-    ######## Alice's liquidation result 3 ##########
-    ##############################################
+# ##############################################
+# ######## Alice's liquidation result 3 ##########
+# ##############################################
 
-    liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
-        alice.contract_address,
-        # 2 Position + 2 Collaterals
-        4,
-        # Position 1 - BTC short
-        AssetID.BTC,
-        AssetID.USDC,
-        to64x61(8000.5),
-        to64x61(1.05),
-        # Position 2 - ETH short
-        AssetID.ETH,
-        AssetID.USDC,
-        to64x61(100),
-        to64x61(1.05),
-        # Collateral 1 - USDC
-        0,
-        AssetID.USDC,
-        0,
-        to64x61(1.05),
-        # Collateral 2 - UST
-        0,
-        AssetID.UST,
-        0,
-        to64x61(0.05)
-    ])
-    # print("liquidation result alice liquidated...", liquidate_result_alice.call_info.retdata[1], " ",
-    #       liquidate_result_alice.call_info.retdata[2])
+# liquidate_result_alice = await liquidator_signer.send_transaction(liquidator, liquidate.contract_address, "check_liquidation", [
+#     alice.contract_address,
+#     # 2 Position + 2 Collaterals
+#     4,
+#     # Position 1 - BTC short
+#     AssetID.BTC,
+#     AssetID.USDC,
+#     to64x61(8000.5),
+#     to64x61(1.05),
+#     # Position 2 - ETH short
+#     AssetID.ETH,
+#     AssetID.USDC,
+#     to64x61(100),
+#     to64x61(1.05),
+#     # Collateral 1 - USDC
+#     0,
+#     AssetID.USDC,
+#     0,
+#     to64x61(1.05),
+#     # Collateral 2 - UST
+#     0,
+#     AssetID.UST,
+#     0,
+#     to64x61(0.05)
+# ])
+# # print("liquidation result alice liquidated...", liquidate_result_alice.call_info.retdata[1], " ",
+# #       liquidate_result_alice.call_info.retdata[2])
 
-    # assert liquidate_result_alice.call_info.retdata[1] == 1
-    # assert liquidate_result_alice.call_info.retdata[2] == BTC_USD_ID
-    # assert liquidate_result_alice.call_info.retdata[3] == 0
+# # assert liquidate_result_alice.call_info.retdata[1] == 1
+# # assert liquidate_result_alice.call_info.retdata[2] == BTC_USD_ID
+# # assert liquidate_result_alice.call_info.retdata[3] == 0
 
-    alice_balance_usdc = await alice.get_balance(AssetID.USDC).call()
-    print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
+# alice_balance_usdc = await alice.get_balance(AssetID.USDC).call()
+# print("Alice usdc balance is...", from64x61(alice_balance_usdc.result.res))
 
-    # assert from64x61(alice_balance_usdc.result.res) == 395.0045
+# # assert from64x61(alice_balance_usdc.result.res) == 395.0045
 
-    alice_balance_ust = await alice.get_balance(AssetID.UST).call()
-    print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
+# alice_balance_ust = await alice.get_balance(AssetID.UST).call()
+# print("Alice ust balance is...", from64x61(alice_balance_ust.result.res))
 
-    # assert from64x61(alice_balance_ust.result.res) == 1000
+# # assert from64x61(alice_balance_ust.result.res) == 1000
 
-    alice_maintenance = await liquidate.return_maintenance().call()
-    print("Alice maintenance requirement:",
-          from64x61(alice_maintenance.result.res))
+# alice_maintenance = await liquidate.return_maintenance().call()
+# print("Alice maintenance requirement:",
+#       from64x61(alice_maintenance.result.res))
 
-    # assert from64x61(alice_maintenance.result.res) == 811.125
+# # assert from64x61(alice_maintenance.result.res) == 811.125
 
-    alice_acc_value = await liquidate.return_acc_value().call()
-    print("Alice acc value:", from64x61(alice_acc_value.result.res))
+# alice_acc_value = await liquidate.return_acc_value().call()
+# print("Alice acc value:", from64x61(alice_acc_value.result.res))
 
-    pnls = await liquidate.return_position_value(index=1).call()
-    print("Alice pnl value:", from64x61(pnls.result.res))
+# pnls = await liquidate.return_position_value(index=1).call()
+# print("Alice pnl value:", from64x61(pnls.result.res))
 
-    pnls = await liquidate.return_position_value(index=2).call()
-    print("Alice pnl value:", from64x61(pnls.result.res))
+# pnls = await liquidate.return_position_value(index=2).call()
+# print("Alice pnl value:", from64x61(pnls.result.res))
 
-    # assert from64x61(alice_acc_value.result.res) == -481.295275
+# # assert from64x61(alice_acc_value.result.res) == -481.295275
 
-    orderState1 = await alice.get_deleveragable_or_liquidatable_position().call()
-    res1 = orderState1.result.position
-    # assert res1.market_id == liquidate_result_alice.call_info.retdata[2]
-    # assert res1.direction == liquidate_result_alice.call_info.retdata[3]
+# orderState1 = await alice.get_deleveragable_or_liquidatable_position().call()
+# res1 = orderState1.result.position
+# assert res1.market_id == liquidate_result_alice.call_info.retdata[2]
+# assert res1.direction == liquidate_result_alice.call_info.retdata[3]
 
 
 # @pytest.mark.asyncio

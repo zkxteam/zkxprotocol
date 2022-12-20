@@ -1,5 +1,5 @@
 import pytest
-import asyncio
+import copy
 import random
 import string
 from utils_asset import AssetID
@@ -56,11 +56,119 @@ fund_mode = {
     "defund": 0
 }
 
-market_to_asset_mapping = {
+market_to_collateral_mapping = {
     BTC_USD_ID: AssetID.USDC,
     ETH_USD_ID: AssetID.USDC,
     TSLA_USD_ID: AssetID.USDC
 }
+
+market_to_asset_mapping = {
+    BTC_USD_ID: AssetID.BTC,
+    ETH_USD_ID: AssetID.ETH,
+    TSLA_USD_ID: AssetID.TSLA
+}
+
+
+def convert_list_to_64x61(decimals_list):
+    return [to64x61(x) for x in decimals_list]
+
+
+def convert_list_from_64x61(fixed_point_list):
+    return [from64x61(x) for x in fixed_point_list]
+
+
+async def compare_debugging_values(liquidate, liquidator):
+    maintenance_requirement_query = await liquidate.return_maintenance().call()
+    maintenance_requirement = from64x61(
+        maintenance_requirement_query.result.res)
+
+    print("maintanence requirement starknet", maintenance_requirement)
+
+    account_value_query = await liquidate.return_acc_value().call()
+    account_value = from64x61(account_value_query.result.res)
+    print("account_value starknet", account_value)
+
+    (maintenance_requirement_python,
+     account_value_python) = liquidator.get_debugging_values()
+    print("maintanence requirement python", maintenance_requirement_python)
+    print("account value python", account_value_python)
+    assert maintenance_requirement_python == maintenance_requirement
+    assert account_value_python == account_value
+
+
+async def check_liquidation_starknet(zkx_node_signer, zkx_node, liquidate, liquidate_params):
+    liquidation_result_object = await zkx_node_signer.send_transaction(zkx_node, liquidate.contract_address, "check_liquidation", liquidate_params)
+    liquidation_return_data = liquidation_result_object.call_info.retdata
+    least_collateral_ratio_position = convert_list_from_64x61(
+        liquidation_return_data[4:])
+
+    return (liquidation_return_data[1], least_collateral_ratio_position)
+
+
+def check_liquidation_python(user_test, liquidator, liquidate_params):
+    result = liquidator.check_for_liquidation(
+        user=user_test, prices_array=liquidate_params)
+    print("Python initial", result)
+    return (result[0], list(result[1].values())[:-2])
+
+
+def convert_to_64x61_liquidation_format(price_data_dict):
+    new_dict = copy.deepcopy(price_data_dict)
+    new_dict["asset_price"] = to64x61(new_dict["asset_price"])
+    new_dict["collateral_price"] = to64x61(
+        new_dict["collateral_price"])
+
+    return list(new_dict.values())
+
+
+def compare_result_liquidation(python_result, starknet_result):
+    assert python_result[0] == starknet_result[0]
+
+    for element_1, element_2 in zip(python_result[1], starknet_result[1]):
+        assert element_1 == pytest.approx(element_2, abs=1e-6)
+
+
+async def check_liquidation(zkx_node_signer, zkx_node, liquidator, user, user_test, market_prices, collateral_prices, liquidate):
+    total_length = len(market_prices) + len(collateral_prices)
+    liquidation_params_starknet = [user.contract_address, total_length]
+    liquidation_params_python = []
+
+    for i in range(len(market_prices)):
+        price_data_dict = {
+            "asset_id": market_to_asset_mapping[market_prices[i]["market_id"]],
+            "collateral_id": market_to_collateral_mapping[market_prices[i]["market_id"]],
+            "asset_price": market_prices[i]["asset_price"],
+            "collateral_price": market_prices[i]["collateral_price"]
+        }
+
+        liquidation_params_python.append(price_data_dict)
+
+        liquidation_format_starknet = convert_to_64x61_liquidation_format(
+            price_data_dict)
+
+        liquidation_params_starknet.extend(liquidation_format_starknet)
+
+    for i in range(len(collateral_prices)):
+        price_data_dict = {
+            "asset_id": 0,
+            "collateral_id": collateral_prices[i]["collateral_id"],
+            "asset_price": 0,
+            "collateral_price": collateral_prices[i]["collateral_price"]
+        }
+        liquidation_params_python.append(price_data_dict)
+
+        liquidation_format_starknet = convert_to_64x61_liquidation_format(
+            price_data_dict)
+
+        liquidation_params_starknet.extend(liquidation_format_starknet)
+
+    starknet_result = await check_liquidation_starknet(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, liquidate=liquidate, liquidate_params=liquidation_params_starknet)
+
+    python_result = check_liquidation_python(
+        user_test=user_test, liquidator=liquidator, liquidate_params=liquidation_params_python)
+
+    compare_result_liquidation(
+        starknet_result=starknet_result, python_result=python_result)
 
 
 async def check_batch_status(batch_id, trading, is_executed):
@@ -104,7 +212,7 @@ async def execute_batch_reverted(zkx_node_signer, zkx_node, trading, execute_bat
     return
 
 
-async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users_test, quantity_locked, market_id, oracle_price, trading, is_reverted, error_message):
+async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users_test, quantity_locked, market_id, oracle_price, trading, is_reverted, error_code, error_at_index, param_2):
     batch_id = random_string(10)
     complete_orders_python = []
     complete_orders_starknet = []
@@ -140,7 +248,9 @@ async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users
     ]
 
     if is_reverted:
-        await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=error_message)
+        error_at_order_id = complete_orders_python[error_at_index]["order_id"]
+        actual_error_message = f"{error_code} {error_at_order_id} {param_2}"
+        await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
     else:
         await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
         executor.execute_batch(*execute_batch_params_python)
@@ -392,10 +502,10 @@ class User:
         is_present = 0
         for i in range(len(collaterals)):
             if asset_id == collaterals[i]:
-                isPresent = 1
+                is_present = 1
 
         if not is_present:
-            collaterals.append(asset_id)
+            self.collateral_array.append(asset_id)
 
     def get_balance(self, asset_id: int = AssetID.USDC) -> float:
         try:
@@ -695,7 +805,7 @@ class OrderExecutor:
 
         # Get position details of the user
         user_balance = user.get_balance(
-            asset_id=market_to_asset_mapping[order["market_id"]],
+            asset_id=market_to_collateral_mapping[order["market_id"]],
         )
 
         if user_balance <= balance_to_be_deducted:
@@ -703,15 +813,15 @@ class OrderExecutor:
             return (0, 0, 0)
 
         user.modify_balance(
-            mode=fund_mode["defund"], asset_id=market_to_asset_mapping[order["market_id"]], amount=balance_to_be_deducted)
+            mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=balance_to_be_deducted)
         self.__modify_fund_balance(fund=fund_mapping["fee_balance"], mode=fund_mode["fund"],
-                                   asset_id=market_to_asset_mapping[order["market_id"]], amount=fees)
+                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=fees)
         self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["fund"],
-                                   asset_id=market_to_asset_mapping[order["market_id"]], amount=leveraged_position_value)
+                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_position_value)
 
         if order["leverage"] > 1:
             self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["defund"],
-                                       asset_id=market_to_asset_mapping[order["market_id"]], amount=amount_to_be_borrowed)
+                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_be_borrowed)
 
         return (average_execution_price, margin_amount, borrowed_amount)
 
@@ -759,7 +869,7 @@ class OrderExecutor:
         margin_amount_to_be_reduced = margin_amount*percent_of_position
 
         self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["defund"],
-                                   asset_id=market_to_asset_mapping[order["market_id"]], amount=leveraged_amount_out)
+                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
 
         if order["order_type"] == 4:
             borrowed_amount = borrowed_amount - leveraged_amount_out
@@ -770,38 +880,38 @@ class OrderExecutor:
         if order["order_type"] <= 3:
             if position["leverage"] > 1:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
-                                           asset_id=market_to_asset_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
+                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
             if net_account_value <= 0:
                 deficit = leveraged_amount_out - borrowed_amount_to_be_returned
                 user.modify_balance(
-                    mode=fund_mode["defund"], asset_id=market_to_asset_mapping[order["market_id"]], amount=deficit)
+                    mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
             else:
                 amount_to_transfer_from = leveraged_amount_out - borrowed_amount_to_be_returned
                 user.modify_balance(
-                    mode=fund_mode["fund"], asset_id=market_to_asset_mapping[order["market_id"]], amount=amount_to_transfer_from)
+                    mode=fund_mode["fund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_transfer_from)
         else:
             if order["order_type"] == 4:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
-                                           asset_id=market_to_asset_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
+                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
                 if net_account_value <= 0:
                     deficit = min(0, net_account_value)
 
                     # Get position details of the user
                     user_balance = user.get_balance(
-                        asset_id=market_to_asset_mapping[order["market_id"]],
+                        asset_id=market_to_collateral_mapping[order["market_id"]],
                     )
 
                     if deficit <= user_balance:
                         user.modify_balance(
-                            mode=fund_mode["defund"], asset_id=market_to_asset_mapping[order["market_id"]], amount=deficit)
+                            mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
                     else:
                         user.modify_balance(
-                            mode=fund_mode["defund"], asset_id=market_to_asset_mapping[order["market_id"]], amount=user_balance)
+                            mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance)
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                                                   asset_id=market_to_asset_mapping[order["market_id"]], amount=deficit - user_balance)
+                                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_balance)
             else:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
-                                           asset_id=market_to_asset_mapping[order["market_id"]], amount=leveraged_amount_out)
+                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
 
         return (average_execution_price, margin_amount, borrowed_amount)
 
@@ -951,6 +1061,7 @@ class Liquidator:
 
     def check_for_liquidation(self, user: User, prices_array: List[Dict]) -> Tuple[int, Dict]:
         positions = user.get_positions()
+        print("User positions: ", positions)
 
         if len(positions) == 0:
             print("Liquidator: Empty positions array")
@@ -960,7 +1071,7 @@ class Liquidator:
             print("Liquidator: Invalid prices array")
             return
 
-        least_collateral_ratio = 0
+        least_collateral_ratio = 1
         least_collateral_ratio_position = 0
         least_collateral_ratio_position_collateral_price = 0
         least_collateral_ratio_position_asset_price = 0
@@ -981,7 +1092,7 @@ class Liquidator:
                     positions[i]["avg_execution_price"]
             else:
                 price_diff = positions[i]["avg_execution_price"] - \
-                    prices_array["asset_price"]
+                    prices_array[i]["asset_price"]
 
             pnl = price_diff*positions[i]["position_size"]
             print("Alice pnl:", pnl)
@@ -999,6 +1110,7 @@ class Liquidator:
             print("Collateral ratio", collateral_ratio)
 
             if collateral_ratio < least_collateral_ratio:
+                print("reaches here")
                 least_collateral_ratio = collateral_ratio
                 least_collateral_ratio_position = positions[i]
                 least_collateral_ratio_position_collateral_price = prices_array[
@@ -1009,6 +1121,7 @@ class Liquidator:
             total_account_value += net_position_value_usd
 
         collaterals_array = user.get_collaterals()
+        print("User collaterals: ", collaterals_array)
         user_balance = self.__find_collateral_balance(
             prices_array=prices_array[len(positions):],
             collateral_array=collaterals_array
@@ -1033,26 +1146,55 @@ class Liquidator:
         return (liq_result, least_collateral_ratio_position)
 
 
-alice = User(123456, 0x123234324)
-bob = User(73879, 0x1234589402)
+# alice = User(123456, 0x123234324)
+# bob = User(73879, 0x1234589402)
 
-alice.set_balance(5500, AssetID.USDC)
-bob.set_balance(6000, AssetID.USDC)
+# alice.set_balance(5500, AssetID.USDC)
+# bob.set_balance(6000, AssetID.USDC)
 
-(order_long, order_long_64x61) = alice.create_order(
-    quantity=2, order_type=order_types["limit"], price=1000, leverage=2)
-(order_short, order_short_64x61) = bob.create_order(
-    quantity=2, direction=order_direction["short"], leverage=2)
+# alice.set_balance(5500, AssetID.UST)
+# bob.set_balance(6000, AssetID.UST)
 
-request_list = [order_long, order_short]
+# alice.set_balance(5500, AssetID.USDC)
+# bob.set_balance(6000, AssetID.USDC)
 
-print(request_list)
-executoor = OrderExecutor()
-executoor.execute_batch(random_string(10),
-                        request_list, [alice, bob], 2, BTC_USD_ID, 1000)
-print(order_long["order_id"])
-(python_order, _) = alice.get_order(order_long["order_id"])
-print(python_order)
+# print(alice.get_collaterals())
+# print(bob.get_collaterals())
+# market_prices = [{
+#     "market_id": BTC_USD_ID,
+#     "asset_price": 5000,
+#     "collateral_price": 1.05
+# }, {
+#     "market_id": ETH_USD_ID,
+#     "asset_price": 100,
+#     "collateral_price": 1.23
+# }]
+
+# collateral_prices = [{
+#     "collateral_id": AssetID.USDC,
+#     "collateral_price": 1.05
+# }, {
+#     "collateral_id": AssetID.UST,
+#     "collateral_price": 0.05
+# }]
+
+# check_liquidation_starknet(alice, alice, market_prices, collateral_prices)
+
+
+# (order_long, order_long_64x61) = alice.create_order(
+#     quantity=2, order_type=order_types["limit"], price=1000, leverage=2)
+# (order_short, order_short_64x61) = bob.create_order(
+#     quantity=2, direction=order_direction["short"], leverage=2)
+
+# request_list = [order_long, order_short]
+
+# print(request_list)
+# executoor = OrderExecutor()
+# executoor.execute_batch(random_string(10),
+#                         request_list, [alice, bob], 2, BTC_USD_ID, 1000)
+# print(order_long["order_id"])
+# (python_order, _) = alice.get_order(order_long["order_id"])
+# print(python_order)
 # print("alice_position:", alice.get_positions())
 # print("bob_position:", bob.get_positions())
 
