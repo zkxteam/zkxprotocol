@@ -8,7 +8,7 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61
-from utils_trading import User, order_direction, order_types, order_time_in_force, order_side, close_order, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions
+from utils_trading import User, order_direction, order_types, order_time_in_force, close_order, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -359,980 +359,1144 @@ async def adminAuth_factory(starknet_service: StarknetService):
     return starknet_service.starknet, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, feeBalance, marketPrices, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance
 
 
-# @pytest.mark.asyncio
-# async def test_revert_balance_low_user_1(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 100
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Low Balance- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_balance_low_user_2(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 100
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Low Balance- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_leverage_more_than_allowed_user_1(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "leverage": 10.1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be <= to the maximum allowed leverage- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_leverage_more_than_allowed_user_2(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#         "leverage": 10.001,
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be <= to the maximum allowed leverage- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_leverage_below_1(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "leverage": 0.9,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be >= 1- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_wrong_market_passed(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "market_id": ETH_USD_ID,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: All orders in a batch must be from the same market- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_quantity_low_user_1(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 0.00001
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 0.00001,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 0.00001,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Quantity must be >= to the minimum order size- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_quantity_low_user_2(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 0.00001
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 0.00001,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Quantity must be >= to the minimum order size- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_market_untradable(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = TSLA_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "market_id": TSLA_USD_ID,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 0.00001,
-#         "market_id": TSLA_USD_ID,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Market is not tradable- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_unregistered_user(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, eduard]
-#     users_test = [alice_test, eduard_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     eduard_balance = 10000
-#     balance_array = [alice_balance, eduard_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: User account not registered- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_taker_direction_wrong(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["long"]
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must be in opposite direction of Maker order(s)- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_maker_direction_wrong(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob, charlie]
-#     users_test = [alice_test, bob_test, charlie_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     charlie_balance = 10000
-#     balance_array = [alice_balance, bob_balance, charlie_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 2
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: All Maker orders must be in the same direction- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_invalid_batch_extra_maker_orders(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob, charlie]
-#     users_test = [alice_test, bob_test, charlie_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     charlie_balance = 10000
-#     balance_array = [alice_balance, bob_balance, charlie_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must come after Maker orders- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_invalid_batch_extra_taker_orders(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob, charlie]
-#     users_test = [alice_test, bob_test, charlie_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     charlie_balance = 10000
-#     balance_array = [alice_balance, bob_balance, charlie_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must be the last order in the list- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_taker_post_only_order(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1,
-#         "direction": order_direction["short"],
-#         "post_only": 1
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Post Only order cannot be a taker- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_taker_fk_partial_order(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"],
-#     }, {
-#         "quantity": 2,
-#         "direction": order_direction["short"],
-#         "time_in_force": order_time_in_force["fill_or_kill"]
-
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: F&K order should be executed fully- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_parent_position_is_empty(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["limit"],
-#         "close_order": close_order["close"]
-#     }, {
-#         "quantity": 2,
-#         "direction": order_direction["short"],
-#         "time_in_force": order_time_in_force["fill_or_kill"]
-
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"The parentPosition size cannot be 0- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_maker_order_is_market(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "order_type": order_types["market"],
-#     }, {
-#         "quantity": 2,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Maker orders must be limit orders- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_revert_if_price_beyond_threshold(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Insufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "price": 1050.12,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 2,
-#         "direction": order_direction["short"],
-#     }]
-
-#     error_at_index = 0
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Execution price not in range- {error_at_index}")
-
-
-# @pytest.mark.asyncio
-# async def test_opening_and_closing_full_orders(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 10000
-#     bob_balance = 10000
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 3
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 3,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 3,
-#         "direction": order_direction["short"],
-#     }]
-
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
-
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-#     ###################
-#     ### Close orders ##
-#     ###################
-#     # Batch params for OPEN orders
-#     quantity_locked_2 = 3
-#     oracle_price_2 = 1000
-
-#     # Create orders
-#     orders_2 = [{
-#         "quantity": 3,
-#         "direction": order_direction["short"],
-#         "close_order": close_order["close"],
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 3,
-#         "close_order": close_order["close"],
-#     }]
-
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
-
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-#     ########
-
-
-# @pytest.mark.asyncio
-# async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 12343.3428549
-#     bob_balance = 9334.98429831
-#     balance_array = [alice_balance, bob_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1.523
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1038.1
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 3,
-#         "leverage": 4.234,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1.523,
-#         "leverage": 5.1,
-#         "direction": order_direction["short"],
-#     }]
-
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
-
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-#     ###################
-#     ### Close orders ##
-#     ###################
-#     # Batch params for OPEN orders
-#     quantity_locked_2 = 1.523
-#     oracle_price_2 = 1018.87
-
-#     # Create orders
-#     orders_2 = [{
-#         "quantity": 1.523,
-#         "direction": order_direction["short"],
-#         "close_order": close_order["close"],
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 1.523,
-#         "close_order": close_order["close"],
-#     }]
-
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
-
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-#     #########
-
-
-# @pytest.mark.asyncio
-# async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob, charlie]
-#     users_test = [alice_test, bob_test, charlie_test]
-
-#     # Sufficient balance for users
-#     alice_balance = 12343.3428549
-#     bob_balance = 9334.98429831
-#     charlie_balance = 54324.65215
-#     balance_array = [alice_balance, bob_balance, charlie_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 0.53
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1013.41
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 0.6,
-#         "leverage": 6.435,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 0.53,
-#         "leverage": 5.194,
-#         "direction": order_direction["short"],
-#     }]
-
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
-
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-#     ###################
-#     ### Close orders ##
-#     ###################
-#     # Batch params for OPEN orders
-#     quantity_locked_2 = 0.53
-#     oracle_price_2 = 1018.87
-
-#     # Create orders
-#     orders_2 = [{
-#         "quantity": 0.53,
-#         "direction": order_direction["short"],
-#         "close_order": close_order["close"],
-#         "order_type": order_types["limit"]
-#     }, {
-#         "quantity": 0.53,
-#         "close_order": close_order["close"],
-#     }]
-
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
-
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-#     #########
+@pytest.mark.asyncio
+async def test_revert_balance_low_user_1(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Insufficient balance for users
+    alice_balance = 100
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Low Balance- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_balance_low_user_2(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 100
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Low Balance- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_leverage_more_than_allowed_user_1(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "leverage": 10.1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be <= to the maximum allowed leverage- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_leverage_more_than_allowed_user_2(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "leverage": 10.001,
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be <= to the maximum allowed leverage- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_leverage_below_1(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "leverage": 0.9,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Leverage must be >= 1- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_wrong_market_passed(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "market_id": ETH_USD_ID,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: All orders in a batch must be from the same market- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_quantity_low_user_1(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 0.00001
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 0.00001,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 0.00001,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Quantity must be >= to the minimum order size- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_quantity_low_user_2(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 0.00001
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 0.00001,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Quantity must be >= to the minimum order size- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_market_order_slippage_error(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "price": 1010.01
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "slippage": 1
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: High slippage for execution price")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_limit_order_bad_short_limit_price(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "price": 1010.01
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "order_type": order_types["limit"],
+        "price": 1010.02
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Bad short limit order")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_limit_order_bad_long_limit_price(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "direction": order_direction["short"],
+        "price": 1010.01
+    }, {
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "price": 1010.00
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Bad long limit order")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_market_untradable(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = TSLA_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "market_id": TSLA_USD_ID,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 0.00001,
+        "market_id": TSLA_USD_ID,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Market is not tradable- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_unregistered_user(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, eduard]
+    users_test = [alice_test, eduard_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    eduard_balance = 10000
+    balance_array = [alice_balance, eduard_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: User account not registered- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_taker_direction_wrong(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["long"]
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must be in opposite direction of Maker order(s)- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_maker_direction_wrong(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob, charlie]
+    users_test = [alice_test, bob_test, charlie_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    charlie_balance = 10000
+    balance_array = [alice_balance, bob_balance, charlie_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 2
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: All Maker orders must be in the same direction- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_invalid_batch_extra_maker_orders(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob, charlie]
+    users_test = [alice_test, bob_test, charlie_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    charlie_balance = 10000
+    balance_array = [alice_balance, bob_balance, charlie_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must be the last order in the list- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_insufficient_maker_orders(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob, charlie]
+    users_test = [alice_test, bob_test, charlie_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    charlie_balance = 10000
+    balance_array = [alice_balance, bob_balance, charlie_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 2
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 0.5,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 0.5,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "order_type": order_types["limit"]
+    }]
+
+    error_at_index = 2
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Maker order cannot be the last order in the list- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_invalid_batch_extra_taker_orders(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob, charlie]
+    users_test = [alice_test, bob_test, charlie_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    charlie_balance = 10000
+    balance_array = [alice_balance, bob_balance, charlie_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Taker order must be the last order in the list- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_taker_post_only_order(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "post_only": 1
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Post Only order cannot be a taker- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_taker_fk_partial_order(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+    }, {
+        "quantity": 2,
+        "direction": order_direction["short"],
+        "time_in_force": order_time_in_force["fill_or_kill"]
+
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: F&K order should be executed fully- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_parent_position_is_empty(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "close_order": close_order["close"]
+    }, {
+        "quantity": 2,
+        "direction": order_direction["short"],
+        "time_in_force": order_time_in_force["fill_or_kill"]
+
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"The parentPosition size cannot be 0- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_maker_order_is_market(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["market"],
+    }, {
+        "quantity": 2,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Maker orders must be limit orders- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_revert_if_price_beyond_threshold(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Insufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "price": 1050.12,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 2,
+        "direction": order_direction["short"],
+    }]
+
+    error_at_index = 0
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_message=f"Trading: Execution price not in range- {error_at_index}")
+
+
+@pytest.mark.asyncio
+async def test_opening_and_closing_full_orders(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 3
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 3,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 3,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    ###################
+    ### Close orders ##
+    ###################
+    # Batch params for OPEN orders
+    quantity_locked_2 = 3
+    oracle_price_2 = 1000
+
+    # Create orders
+    orders_2 = [{
+        "quantity": 3,
+        "direction": order_direction["short"],
+        "close_order": close_order["close"],
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 3,
+        "close_order": close_order["close"],
+    }]
+
+    # execute order
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+
+@pytest.mark.asyncio
+async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 12343.3428549
+    bob_balance = 9334.98429831
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1.523
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1038.1
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 3,
+        "leverage": 4.234,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1.523,
+        "leverage": 5.1,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    (batch_id_1, _) = complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    ###################
+    ### Close orders ##
+    ###################
+    # Batch params for OPEN orders
+    quantity_locked_2 = 1.523
+    oracle_price_2 = 1018.87
+
+    # Create orders
+    orders_2 = [{
+        "quantity": 1.523,
+        "direction": order_direction["short"],
+        "close_order": close_order["close"],
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 1.523,
+        "close_order": close_order["close"],
+    }]
+
+    # execute order
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+
+@pytest.mark.asyncio
+async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob, charlie]
+    users_test = [alice_test, bob_test, charlie_test]
+
+    # Sufficient balance for users
+    alice_balance = 12343.3428549
+    bob_balance = 9334.98429831
+    charlie_balance = 54324.65215
+    balance_array = [alice_balance, bob_balance, charlie_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 0.53
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1013.41
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 0.6,
+        "leverage": 6.435,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 0.53,
+        "leverage": 5.194,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    ###################
+    ### Close orders ##
+    ###################
+    # Batch params for OPEN orders
+    quantity_locked_2 = 0.53
+    oracle_price_2 = 1018.87
+
+    # Create orders
+    orders_2 = [{
+        "quantity": 0.53,
+        "direction": order_direction["short"],
+        "close_order": close_order["close"],
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 0.53,
+        "close_order": close_order["close"],
+    }]
+
+    # execute order
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
 
 @pytest.mark.asyncio
@@ -1363,16 +1527,17 @@ async def test_opening_partial_orders(adminAuth_factory):
     # Create orders
     orders_1 = [{
         "quantity": 2,
-        # "leverage": 1,
+        "leverage": 1,
         "order_type": order_types["limit"]
     }, {
         "quantity": 0.81,
-        # "leverage": 5.194,
+        "leverage": 1,
         "direction": order_direction["short"],
     }]
 
     # execute order
     (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1388,14 +1553,15 @@ async def test_opening_partial_orders(adminAuth_factory):
 
     # Create orders
     orders_2 = [{
-        "order_id": complete_orders_1[1]["order_id"]
+        "order_id": complete_orders_1[0]["order_id"]
     }, {
         "quantity": 1.19,
         "direction": order_direction["short"],
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1483,80 +1649,78 @@ async def test_opening_partial_orders(adminAuth_factory):
 #     #########
 
 
-# @pytest.mark.asyncio
-# async def test_opening_and_closing_full_orders_different_market(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+@pytest.mark.asyncio
+async def test_opening_and_closing_full_orders_different_market(adminAuth_factory):
+    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
 
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
 
-#     # Sufficient balance for users
-#     alice_balance = 2321.3428549
-#     bob_balance = 4535.98429831
-#     balance_array = [alice_balance, bob_balance]
+    # Sufficient balance for users
+    alice_balance = 2321.3428549
+    bob_balance = 4535.98429831
+    balance_array = [alice_balance, bob_balance]
 
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 4.5
-#     market_id_1 = ETH_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 123.45
+    # Batch params for OPEN orders
+    quantity_locked_1 = 4.5
+    market_id_1 = ETH_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 123.45
 
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
 
-#     # Create orders
-#     orders_1 = [{
-#         "market_id": ETH_USD_ID,
-#         "quantity": 4.5,
-#         "price": 120.2,
-#         "order_type": order_types["limit"]
-#     }, {
-#         "market_id": ETH_USD_ID,
-#         "quantity": 4.5,
-#         "price": 120.2,
-#         "direction": order_direction["short"],
-#     }]
+    # Create orders
+    orders_1 = [{
+        "market_id": ETH_USD_ID,
+        "quantity": 4.5,
+        "price": 120.2,
+        "order_type": order_types["limit"]
+    }, {
+        "market_id": ETH_USD_ID,
+        "quantity": 4.5,
+        "price": 120.2,
+        "direction": order_direction["short"],
+    }]
 
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    # execute order
+    complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
 
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-#     ###################
-#     ### Close orders ##
-#     ###################
-#     # Batch params for OPEN orders
-#     quantity_locked_2 = 1.523
-#     oracle_price_2 = 130.87
+    ###################
+    ### Close orders ##
+    ###################
+    # Batch params for OPEN orders
+    quantity_locked_2 = 1.523
+    oracle_price_2 = 130.87
 
-#     # Create orders
-#     orders_2 = [{
-#         "market_id": ETH_USD_ID,
-#         "quantity": 4.5,
-#         "price": 130.2,
-#         "direction": order_direction["short"],
-#         "close_order": close_order["close"],
-#         "order_type": order_types["limit"]
-#     }, {
-#         "market_id": ETH_USD_ID,
-#         "quantity": 4.5,
-#         "price": 130.2,
-#         "close_order": close_order["close"],
-#     }]
+    # Create orders
+    orders_2 = [{
+        "market_id": ETH_USD_ID,
+        "quantity": 4.5,
+        "price": 130.2,
+        "direction": order_direction["short"],
+        "close_order": close_order["close"],
+        "order_type": order_types["limit"]
+    }, {
+        "market_id": ETH_USD_ID,
+        "quantity": 4.5,
+        "price": 130.2,
+        "close_order": close_order["close"],
+    }]
 
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    # execute order
+    complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
 
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-#     #########
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)

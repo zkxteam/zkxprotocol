@@ -109,6 +109,7 @@ func batch_id_status(batch_id: felt) -> (res: felt) {
 // ////////
 // View //
 // ////////
+@view
 func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     batch_id_: felt
 ) -> (status: felt) {
@@ -228,7 +229,7 @@ func execute_batch{
         maker_direction_=0,
         trader_stats_list_len_=0,
         trader_stats_list_=trader_stats_list,
-        running_weighted_sum=0,
+        total_order_volume_=0,
         taker_execution_price=0,
     );
 
@@ -305,7 +306,7 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
     local lower_limit_;
     assert lower_limit_ = lower_limit;
-    with_attr error_message("Trading: High slippage for execution price {lower_limit_}") {
+    with_attr error_message("Trading: High slippage for execution price") {
         assert_in_range(execution_price_, lower_limit, upper_limit);
     }
     return ();
@@ -521,25 +522,23 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    let (leveraged_position_value) = Math64x61_mul(order_size_, execution_price_);
-    let (total_position_value) = Math64x61_div(leveraged_position_value, order_.leverage);
-    let (amount_to_be_borrowed_felt) = Math64x61_sub(
-        leveraged_position_value, total_position_value
-    );
+    let (leveraged_order_value) = Math64x61_mul(order_size_, execution_price_);
+    let (margin_order_value) = Math64x61_div(leveraged_order_value, order_.leverage);
+    let (amount_to_be_borrowed_felt) = Math64x61_sub(leveraged_order_value, margin_order_value);
     tempvar amount_to_be_borrowed = amount_to_be_borrowed_felt;
 
     // Calculate borrowed and margin amounts to be stored in account contract
-    let (margin_amount_open_felt) = Math64x61_add(margin_amount, total_position_value);
+    let (margin_amount_open_felt) = Math64x61_add(margin_amount, margin_order_value);
     let (borrowed_amount_open_felt) = Math64x61_add(borrowed_amount, amount_to_be_borrowed);
     assert margin_amount_open = margin_amount_open_felt;
     assert borrowed_amount_open = borrowed_amount_open_felt;
 
     // Calculate the fees for the order
-    let (fees) = Math64x61_mul(fees_rate, leveraged_position_value);
+    let (fees) = Math64x61_mul(fees_rate, leveraged_order_value);
 
     // Calculate the total amount by adding fees
-    let (total_amount_felt) = Math64x61_add(total_position_value, fees);
-    tempvar total_amount = total_amount_felt;
+    let (order_value_with_fee_felt) = Math64x61_add(margin_order_value, fees);
+    tempvar order_value_with_fee = order_value_with_fee_felt;
 
     // // Check if the position can be opened
     // ILiquidate.check_order_can_be_opened(
@@ -559,12 +558,12 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // User must be able to pay the amount
     with_attr error_message("Trading: Low Balance- {current_index_}") {
-        assert_le(total_amount, user_balance);
+        assert_le(order_value_with_fee, user_balance);
     }
 
     // Deduct the amount from account contract
     IAccountManager.transfer_from(
-        contract_address=order_.user_address, assetID_=collateral_id_, amount=total_amount
+        contract_address=order_.user_address, assetID_=collateral_id_, amount=order_value_with_fee
     );
 
     // Update the fees to be paid by user in fee balance contract
@@ -599,11 +598,10 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
 
     // Deposit the funds taken from the user and liquidity fund
     IHolding.deposit(
-        contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_position_value
+        contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_order_value
     );
 
     return (
@@ -677,7 +675,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     local diff;
     local actual_execution_price;
-    local net_acc_value;
+    local margin_plus_pnl;
 
     // current order is short order
     if (order_.direction == SHORT) {
@@ -697,8 +695,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Calculate pnl and net account value
     let (pnl) = Math64x61_mul(order_size_, diff);
-    let (net_acc_value_felt) = Math64x61_add(margin_amount, pnl);
-    assert net_acc_value = net_acc_value_felt;
+    let (margin_plus_pnl_felt) = Math64x61_add(margin_amount, pnl);
+    assert margin_plus_pnl = margin_plus_pnl_felt;
 
     // Total value of the asset at current price
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
@@ -768,9 +766,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
 
         // Check if the position is underwater
-        let is_loss = is_le(net_acc_value, 0);
+        let is_negative = is_le(margin_plus_pnl, 0);
 
-        if (is_loss == TRUE) {
+        if (is_negative == TRUE) {
             // If yes, deduct the difference from user's balance, can go negative
             let (amount_to_transfer_from) = Math64x61_sub(
                 leveraged_amount_out, borrowed_amount_to_be_returned
@@ -809,11 +807,11 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             );
 
             // Check if the account value for the position is negative
-            let is_negative = is_le(net_acc_value, 0);
+            let is_negative = is_le(margin_plus_pnl, 0);
 
             if (is_negative == TRUE) {
                 // Absolute value of the acc value
-                let deficit = abs_value(net_acc_value);
+                let deficit = abs_value(margin_plus_pnl);
 
                 // Get the user balance
                 let (user_balance) = IAccountManager.get_balance(
@@ -860,7 +858,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 IInsuranceFund.deposit(
                     contract_address=insurance_fund_address_,
                     asset_id_=collateral_id_,
-                    amount=net_acc_value,
+                    amount=margin_plus_pnl,
                     position_id_=order_.order_id,
                 );
 
@@ -922,7 +920,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param maker_direction_ - Direction of the maker order
 // @param trader_stats_list_len_ - length of the trader fee list
 // @param trader_stats_list_ - This list contains trader addresses along with fee charged
-// @param running_weighted_sum - This stores the sum of size*execution_price for each maker order
+// @param total_order_volume_ - This stores the sum of size*execution_price for each maker order
 // @param taker_execution_price - The price to be stored for the market price in execute_batch
 // @return res - returns the net sum of the orders do far
 // @return trader_stats_list_len - returns the length of the trader fee list so far
@@ -950,7 +948,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     maker_direction_: felt,
     trader_stats_list_len_: felt,
     trader_stats_list_: TraderStats*,
-    running_weighted_sum: felt,
+    total_order_volume_: felt,
     taker_execution_price: felt,
 ) -> (trader_stats_list_len: felt, taker_execution_price: felt) {
     alloc_locals;
@@ -961,7 +959,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local average_execution_price;
     local trader_stats_list_len;
     local trader_stats_list: TraderStats*;
-    local new_running_weighted_sum;
+    local new_total_order_volume;
     local quantity_to_execute;
     local current_quantity_executed;
     local current_order_side;
@@ -1010,7 +1008,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // There must only be a single Taker order; hence they must be the last order in the batch
         with_attr error_message(
                 "Trading: Taker order must be the last order in the list- {current_index}") {
-            request_list_len_ = 1;
+            assert request_list_len_ = 1;
         }
 
         // Check for post-only flag; they must always be a maker
@@ -1041,7 +1039,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert quantity_to_execute = quantity_locked_;
 
         // The execution price of a taker order is the weighted mean of the Maker orders
-        let (new_execution_price: felt) = Math64x61_div(running_weighted_sum, quantity_locked_);
+        let (new_execution_price: felt) = Math64x61_div(total_order_volume_, quantity_locked_);
         assert execution_price = new_execution_price;
 
         // Price check
@@ -1063,7 +1061,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert current_quantity_executed = 0;
 
         // Reset the variable
-        assert new_running_weighted_sum = 0;
+        assert new_total_order_volume = 0;
 
         // Set the current side as taker
         assert current_order_side = TAKER;
@@ -1074,12 +1072,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // Maker Order
     } else {
         with_attr error_message("Trading: Maker orders must be limit orders- {current_index}") {
-            temp_order.order_type = LIMIT_ORDER;
+            assert temp_order.order_type = LIMIT_ORDER;
         }
 
         if (request_list_len_ == 1) {
             with_attr error_message(
-                    "Trading: Maker orders cannot be the last order in the list- {current_index}") {
+                    "Trading: Maker order cannot be the last order in the list- {current_index}") {
                 assert 1 = 0;
             }
         }
@@ -1116,9 +1114,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert execution_price = temp_order.price;
 
         // Add to the weighted sum of the execution prices
-        let (new_running_weighted_sum_) = Math64x61_mul(temp_order.price, quantity_to_execute);
+        let (new_total_order_volume_) = Math64x61_mul(temp_order.price, quantity_to_execute);
         // Write to local variable
-        assert new_running_weighted_sum = new_running_weighted_sum_;
+        assert new_total_order_volume = new_total_order_volume_;
 
         // Set the current side as maker
         assert current_order_side = MAKER;
@@ -1292,7 +1290,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             maker_direction_=temp_order.direction,
             trader_stats_list_len_=trader_stats_list_len,
             trader_stats_list_=trader_stats_list,
-            running_weighted_sum=new_running_weighted_sum,
+            total_order_volume_=new_total_order_volume,
             taker_execution_price=0,
         );
     }
@@ -1354,7 +1352,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         maker_direction_=0,
         trader_stats_list_len_=trader_stats_list_len,
         trader_stats_list_=trader_stats_list,
-        running_weighted_sum=new_running_weighted_sum,
+        total_order_volume_=new_total_order_volume,
         taker_execution_price=execution_price,
     );
 }

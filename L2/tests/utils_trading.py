@@ -63,6 +63,16 @@ market_to_asset_mapping = {
 }
 
 
+async def check_batch_status(batch_id, trading, is_executed):
+    batch_status = await get_batch_status(batch_id=batch_id, trading=trading)
+    assert batch_status == is_executed
+
+
+async def get_batch_status(batch_id, trading):
+    batch_status_query = await trading.get_batch_id_status(batch_id_=batch_id).call()
+    return batch_status_query.result.status
+
+
 async def set_balance_starknet(admin_signer, admin, user, asset_id, new_balance):
     await admin_signer.send_transaction(admin, user.contract_address, "set_balance", [asset_id, to64x61(new_balance)])
     return
@@ -100,7 +110,6 @@ async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users
     complete_orders_starknet = []
     # Fill the remaining order attributes
     for i in range(len(orders)):
-        print("Order id is ", orders[i]["order_id"])
         if "order_id" in orders[i]:
             (multiple_order_format,
              multiple_order_format_64x61) = users_test[i].get_order(orders[i]["order_id"])
@@ -1024,6 +1033,9 @@ print(request_list)
 executoor = OrderExecutor()
 executoor.execute_batch(random_string(10),
                         request_list, [alice, bob], 2, BTC_USD_ID, 1000)
+print(order_long["order_id"])
+(python_order, _) = alice.get_order(order_long["order_id"])
+print(python_order)
 # print("alice_position:", alice.get_positions())
 # print("bob_position:", bob.get_positions())
 
