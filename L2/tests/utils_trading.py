@@ -434,6 +434,14 @@ class User:
         }
         self.deleveragable_or_liquidatable_position = liquidatable_position
 
+    def __update_position(self, market_id: int, direction: int, updated_dict: Dict, updated_position: Dict):
+        try:
+            self.positions[market_id].update(updated_dict)
+        except KeyError:
+            self.positions[market_id] = {
+                direction: updated_position
+            }
+
     def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int):
 
         position = self.get_position(
@@ -444,6 +452,9 @@ class User:
         if new_portion_executed > order["quantity"]:
             print("New position size larger than order")
             return
+
+        if order["time_in_force"] == order_time_in_force["immediate_or_cancel"]:
+            new_portion_executed = order["quantity"]
 
         self.__set_portion_executed(
             order_id=order["order_id"], new_amount=new_portion_executed)
@@ -465,9 +476,12 @@ class User:
                 "leverage": new_leverage
             }
 
-            self.positions[order["market_id"]] = {
-                order["direction"]: updated_position
+            updated_dict = {
+                order["direction"]: updated_position,
             }
+
+            self.__update_position(
+                market_id=order["market_id"], direction=order["direction"], updated_dict=updated_dict, updated_position=updated_position)
 
         else:
             parent_direction = order_direction["short"] if order[
@@ -528,9 +542,12 @@ class User:
                 "leverage": new_leverage
             }
 
-            self.positions[order["market_id"]] = {
-                parent_direction: updated_position
+            updated_dict = {
+                parent_direction: updated_position,
             }
+
+            self.__update_position(
+                market_id=order["market_id"], direction=parent_direction, updated_dict=updated_dict, updated_position=updated_position)
 
     def get_position(self, market_id: int = BTC_USD_ID, direction: int = order_direction["long"]) -> Dict:
         try:
