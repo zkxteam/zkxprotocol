@@ -82,3 +82,6 @@ const WITHDRAWAL_SUCCEEDED = 1;
 
 const HIGHTIDE_INITIATED = 0;
 const HIGHTIDE_ACTIVE = 1;
+
+const FoK = 2;
+const IoC = 3;

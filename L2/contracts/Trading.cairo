@@ -21,6 +21,7 @@ from contracts.Constants import (
     Asset_INDEX,
     DELEVERAGING_ORDER,
     FeeBalance_INDEX,
+    FoK,
     Holding_INDEX,
     InsuranceFund_INDEX,
     LIMIT_ORDER,
@@ -1017,7 +1018,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         }
 
         // Check for F&K type of orders; they must only be filled completely or rejected
-        if (temp_order.time_in_force == 2) {
+        if (temp_order.time_in_force == FoK) {
             let (diff_check) = Math64x61_sub(temp_order.quantity, quantity_locked_);
 
             with_attr error_message(

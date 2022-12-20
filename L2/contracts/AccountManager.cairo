@@ -33,6 +33,7 @@ from contracts.Constants import (
     ABR_PAYMENT_INDEX,
     Asset_INDEX,
     DELEVERAGING_ORDER,
+    IoC,
     L1_ZKX_Address_INDEX,
     Liquidate_INDEX,
     LIQUIDATION_ORDER,
@@ -664,8 +665,13 @@ func execute_order{
         assert_le(new_position_executed, request.quantity);
     }
 
-    // Update the portion executed
-    portion_executed.write(order_id=request.order_id, value=new_position_executed);
+    if (request.time_in_force == IoC) {
+        // Update the portion executed to request.quantity if it's an IoC order
+        portion_executed.write(order_id=request.order_id, value=request.quantity);
+    } else {
+        // Update the portion executed
+        portion_executed.write(order_id=request.order_id, value=new_position_executed);
+    }
 
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position
