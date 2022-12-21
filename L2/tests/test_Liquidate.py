@@ -7,8 +7,13 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals, felt_to_str
-from utils_trading import User, order_direction, order_types, order_time_in_force, order_side, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, Liquidator, get_user_balance, check_liquidation, compare_debugging_values, compare_liquidatable_position
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61
+from utils_trading import (
+    User, Liquidator, OrderExecutor,
+    order_direction, order_types, order_life_cycles, fund_mapping,
+    set_balance, execute_and_compare, check_liquidation,
+    compare_fund_balances, compare_user_balances, compare_user_positions, compare_debugging_values, compare_liquidatable_position
+)
 from utils_links import DEFAULT_LINK_1, prepare_starknet_string
 from utils_asset import AssetID, build_asset_properties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -42,7 +47,6 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
-    print(from64x61(7043302282689101895))
     # Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [admin1_signer.public_key])
     admin2 = await starknet_service.deploy(ContractType.Account, [admin2_signer.public_key])
@@ -66,12 +70,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
     alice_test = User(123456789987654323,
                       alice.contract_address, liquidator_private_key)
-    print(alice.contract_address)
 
     bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
     bob_test = User(123456789987654324, bob.contract_address,
                     liquidator_private_key)
-    print(bob.contract_address)
 
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
     charlie_test = User(123456789987654325,
