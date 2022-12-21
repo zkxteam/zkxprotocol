@@ -41,7 +41,7 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
-    ### Deploy infrastructure (Part 1)
+    # Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
         admin1_signer.public_key
     ])
@@ -80,14 +80,14 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     timestamp = int(time.time())
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
-        block_timestamp=timestamp, 
+        block_number=1,
+        block_timestamp=timestamp,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
+        starknet_version=STARKNET_VERSION
     )
 
-    ### Deploy infrastructure (Part 2)
+    # Deploy infrastructure (Part 2)
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
     holding = await starknet_service.deploy(ContractType.Holding, [registry.contract_address, 1])
     feeBalance = await starknet_service.deploy(ContractType.FeeBalance, [registry.contract_address, 1])
@@ -100,7 +100,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     marketPrices = await starknet_service.deploy(ContractType.MarketPrices, [registry.contract_address, 1])
     liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
     collateral_prices = await starknet_service.deploy(
-        ContractType.CollateralPrices, 
+        ContractType.CollateralPrices,
         [registry.contract_address, 1]
     )
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
@@ -119,11 +119,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.AccountDeployer, 1, admin1.contract_address])
 
     # add user accounts to account registry
-    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[admin1.contract_address])
-    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[admin2.contract_address])
-    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[alice.contract_address])
-    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[bob.contract_address])
-    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[charlie.contract_address])
+    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [admin1.contract_address])
+    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [admin2.contract_address])
+    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [alice.contract_address])
+    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [bob.contract_address])
+    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [charlie.contract_address])
 
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Asset, 1, asset.contract_address])
@@ -146,32 +146,32 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     # Deploy relay contracts with appropriate indexes
     relay_trading = await starknet_service.deploy(ContractType.RelayTrading, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
         ContractIndex.Trading
     ])
     relay_asset = await starknet_service.deploy(ContractType.RelayAsset, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
         ContractIndex.Asset
     ])
     relay_market = await starknet_service.deploy(ContractType.RelayMarkets, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
         ContractIndex.Market
     ])
     relay_holding = await starknet_service.deploy(ContractType.RelayHolding, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
         ContractIndex.Holding
     ])
     relay_fees = await starknet_service.deploy(ContractType.RelayTradingFees, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
         ContractIndex.TradingFees
     ])
     relay_feeBalance = await starknet_service.deploy(ContractType.RelayFeeBalance, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
         ContractIndex.FeeBalance
     ])
@@ -181,7 +181,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_market.contract_address, ManagerAction.ManageMarkets, True])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_fees.contract_address, ManagerAction.ManageFeeDetails, True])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_holding.contract_address, ManagerAction.ManageFunds, True])
-    
+
     # Add base fee and discount in Trading Fee contract
     base_fee_maker1 = to64x61(0.0002)
     base_fee_taker1 = to64x61(0.0005)
@@ -219,7 +219,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         token_decimal=18
     )
     await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', ETH_properties)
-    
+
     USDC_properties = build_asset_properties(
         id=AssetID.USDC,
         asset_version=1,
@@ -229,7 +229,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         token_decimal=6
     )
     await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', USDC_properties)
-    
+
     UST_properties = build_asset_properties(
         id=AssetID.UST,
         asset_version=1,
@@ -271,7 +271,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ttl=60,
         tick_size=1,
         step_size=1,
-        minimum_order_size=10,
+        minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(10),
         currently_allowed_leverage=to64x61(10),
@@ -294,7 +294,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ttl=60,
         tick_size=1,
         step_size=1,
-        minimum_order_size=10,
+        minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(5),
         currently_allowed_leverage=to64x61(3),
@@ -317,7 +317,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ttl=60,
         tick_size=1,
         step_size=1,
-        minimum_order_size=10,
+        minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(5),
         currently_allowed_leverage=to64x61(3),
@@ -395,6 +395,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Set the threshold for oracle price in Trading contract
     await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
     return starknet_service.starknet, adminAuth, relay_fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, dave, eduard, fixed_math, relay_holding, relay_feeBalance, marketPrices, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance
+
 
 @pytest.mark.asyncio
 async def test_revert_balance_low_user_1(adminAuth_factory):
@@ -906,7 +907,7 @@ async def test_revert_if_unregistered_user(adminAuth_factory):
     if eduard.contract_address > PRIME_HALF:
         signed_address = eduard.contract_address - PRIME
     else:
-        signed_address = eduard.contract_addres
+        signed_address = eduard.contract_address
     print(signed_address)
     print(eduard.contract_address)
     # execute order
@@ -1363,7 +1364,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1390,7 +1391,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1436,7 +1437,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_1, _) = complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_1, _) = complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1463,7 +1464,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1510,7 +1511,7 @@ async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_fac
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1537,7 +1538,7 @@ async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_fac
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1584,7 +1585,7 @@ async def test_IoC_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1607,8 +1608,9 @@ async def test_IoC_orders(adminAuth_factory):
         "direction": order_direction["short"],
     }]
 
+    error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=1, error_message=f"AccountManager: New position size larger than order")
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=1, error_code=f"0001:", error_at_index=error_at_index, param_2=to64x61(quantity_locked_2))
 
 
 @pytest.mark.asyncio
@@ -1648,7 +1650,7 @@ async def test_opening_partial_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1672,7 +1674,7 @@ async def test_opening_partial_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1722,8 +1724,7 @@ async def test_closing_partial_orders(adminAuth_factory):
     print("Before order execution: ", user_short)
 
     # execute order
-    (_, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
-    print(complete_orders_1)
+    (_, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
 
     user_short = bob_test.get_position(
         market_id=market_id_1, direction=order_direction["short"])
@@ -1749,7 +1750,7 @@ async def test_closing_partial_orders(adminAuth_factory):
     }]
 
     # execute order
-    (_, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1796,7 +1797,7 @@ async def test_opening_and_closing_full_orders_different_market(adminAuth_factor
     }]
 
     # execute order
-    complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_message=0)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1826,7 +1827,7 @@ async def test_opening_and_closing_full_orders_different_market(adminAuth_factor
     }]
 
     # execute order
-    complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_message=0)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)

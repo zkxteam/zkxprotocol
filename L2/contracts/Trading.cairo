@@ -269,18 +269,19 @@ func execute_batch{
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     tempvar range_check_ptr = range_check_ptr;
 
-    // // Record TradingStats
-    // ITradingStats.record_trade_batch_stats(
-    //     contract_address=trading_stats_address,
-    //     pair_id_=market_id_,
-    //     order_size_64x61_=quantity_locked_,
-    //     execution_price_64x61_=taker_execution_price,
-    //     request_list_len=request_list_len,
-    //     request_list=request_list,
-    //     trader_stats_list_len=trader_stats_list_len,
-    //     trader_stats_list=trader_stats_list,
-    // );
+    // Record TradingStats
+    ITradingStats.record_trade_batch_stats(
+        contract_address=trading_stats_address,
+        pair_id_=market_id_,
+        order_size_64x61_=quantity_locked_,
+        execution_price_64x61_=taker_execution_price,
+        request_list_len=request_list_len,
+        request_list=request_list,
+        trader_stats_list_len=trader_stats_list_len,
+        trader_stats_list=trader_stats_list,
+    );
 
+    // Change the status of the batch to 1
     batch_id_status.write(batch_id=batch_id_, value=1);
 
     return ();

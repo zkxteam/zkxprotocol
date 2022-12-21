@@ -51,7 +51,22 @@ func execute_batch{
     record_call_details('execute_batch');
     let (inner_address) = get_inner_contract();
     ITrading.execute_batch(
-        inner_address, batch_id_, quantity_locked_, market_id_, oracle_price_, request_list_len, request_list
+        inner_address,
+        batch_id_,
+        quantity_locked_,
+        market_id_,
+        oracle_price_,
+        request_list_len,
+        request_list,
     );
     return ();
+}
+
+@view
+func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    batch_id_: felt
+) -> (status: felt) {
+    let (inner_address) = get_inner_contract();
+    let (res) = ITrading.get_batch_id_status(inner_address, batch_id_);
+    return (res,);
 }
