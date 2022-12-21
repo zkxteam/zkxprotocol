@@ -6,9 +6,10 @@ from contracts.DataTypes import MultipleOrder
 namespace ITrading {
     // external functions
     func execute_batch(
-        size: felt,
-        execution_price: felt,
-        marketID: felt,
+        batch_id: felt,
+        quantity_locked: felt,
+        market_id: felt,
+        oracle_price: felt,
         request_list_len: felt,
         request_list: MultipleOrder*,
     ) -> () {
