@@ -349,7 +349,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         // /////////////////
         // TO BE REMOVED //
         maintenance.write(total_maintenance_requirement);
-        acc_value.write(total_account_value);
+        acc_value.write(total_account_value_collateral);
         // /////////////////
 
         // Check if the maintenance margin is not satisfied
@@ -435,8 +435,13 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     let (pnl) = Math64x61_mul(price_diff_, position_details.position_size);
 
     debug.write(id=positions_len, value=test_);
+
     // Calculate the value of the current account margin in usd
-    local position_value = maintenance_position - position_details.borrowed_amount + pnl;
+    let (position_value_wo_pnl: felt) = Math64x61_sub(
+        maintenance_position, position_details.borrowed_amount
+    );
+
+    let (position_value: felt) = Math64x61_add(position_value_wo_pnl, pnl);
 
     let (net_position_value_usd: felt) = Math64x61_mul(
         position_value, price_details.collateralPrice

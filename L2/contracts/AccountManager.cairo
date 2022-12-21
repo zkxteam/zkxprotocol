@@ -629,6 +629,9 @@ func execute_order{
     market_id: felt,
 ) -> (res: felt) {
     alloc_locals;
+    local order_id;
+    assert order_id = request.order_id;
+
     let (__fp__, _) = get_fp_and_pc();
 
     // Make sure that the caller is the authorized Trading Contract
@@ -662,7 +665,7 @@ func execute_order{
     let (new_position_executed) = Math64x61_add(order_portion_executed, size);
 
     // Return if the position size after the executing the current order is more than the order's positionSize
-    with_attr error_message("AccountManager: New position size larger than order") {
+    with_attr error_message("0001: {order_id} {size}") {
         assert_le(new_position_executed, request.quantity);
     }
 

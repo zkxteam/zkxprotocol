@@ -19,7 +19,10 @@ def random_string(length):
 
 order_types = {
     "market": 1,
-    "limit": 2
+    "limit": 2,
+    "stop": 3,
+    "liquidation": 4,
+    "deleverage": 5
 }
 
 
@@ -92,8 +95,9 @@ async def compare_debugging_values(liquidate, liquidator):
      account_value_python) = liquidator.get_debugging_values()
     print("maintanence requirement python", maintenance_requirement_python)
     print("account value python", account_value_python)
-    assert maintenance_requirement_python == maintenance_requirement
-    assert account_value_python == account_value
+    assert maintenance_requirement_python == pytest.approx(
+        maintenance_requirement, abs=1e-3)
+    assert account_value_python == pytest.approx(account_value, abs=1e-3)
 
 
 async def check_liquidation_starknet(zkx_node_signer, zkx_node, liquidate, liquidate_params):
@@ -212,7 +216,7 @@ async def execute_batch_reverted(zkx_node_signer, zkx_node, trading, execute_bat
     return
 
 
-async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users_test, quantity_locked, market_id, oracle_price, trading, is_reverted, error_code, error_at_index, param_2):
+async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users_test, quantity_locked, market_id, oracle_price, trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0):
     batch_id = random_string(10)
     complete_orders_python = []
     complete_orders_starknet = []
@@ -297,6 +301,7 @@ def get_user_balance_python(user, asset_id):
 async def compare_user_balances(users, user_tests, asset_id):
     for i in range(len(users)):
         user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
+        print("balance:", i, user_balance)
         user_balance_python = get_user_balance_python(
             user=user_tests[i], asset_id=asset_id)
 
@@ -629,7 +634,7 @@ class User:
                 self.set_deleveragable_or_liquidatable_position(
                     updated_position=liq_position)
 
-                if order["order_type"] == order_types["deleveraging_order"]:
+                if order["order_type"] == order_types["deleverage"]:
                     if liq_position["liquidatable"] == 1:
                         print("AccountManager: Position not marked as deleveragable")
                         return ()
@@ -890,11 +895,11 @@ class OrderExecutor:
                 user.modify_balance(
                     mode=fund_mode["fund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_transfer_from)
         else:
-            if order["order_type"] == 4:
+            if order["order_type"] == order_types["liquidation"]:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
                 if net_account_value <= 0:
-                    deficit = min(0, net_account_value)
+                    deficit = abs(net_account_value)
 
                     # Get position details of the user
                     user_balance = user.get_balance(
@@ -912,7 +917,8 @@ class OrderExecutor:
             else:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
-
+        print("From close order", average_execution_price,
+              margin_amount, borrowed_amount)
         return (average_execution_price, margin_amount, borrowed_amount)
 
     def __get_fee(self, user: User, side: int):
@@ -1130,7 +1136,8 @@ class Liquidator:
         print("total_account_value", total_account_value)
 
         total_account_value_collateral = total_account_value + user_balance
-
+        print("total account value w collateral",
+              total_account_value_collateral)
         self.__set_debugging_values(maintenance_requirement=total_maintenance_requirement,
                                     total_account_value_collateral=total_account_value_collateral)
         liq_result = total_account_value_collateral < total_maintenance_requirement

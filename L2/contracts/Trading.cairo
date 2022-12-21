@@ -1148,7 +1148,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     // Price Check
-    with_attr error_message("0519: {order_id} {current_index}") {
+    with_attr error_message("0519: {order_id} {execution_price}") {
         assert_in_range(execution_price, lower_limit_, upper_limit_);
     }
 
