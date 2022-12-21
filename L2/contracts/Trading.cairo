@@ -710,9 +710,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
 
     // Calculate the amount that needs to be returned to liquidity fund
-    let (percent_of_position) = Math64x61_div(order_size_, parent_position.position_size);
-    let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, percent_of_position);
-    let (margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, percent_of_position);
+    let (ratio_of_position) = Math64x61_div(order_size_, parent_position.position_size);
+    let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, ratio_of_position);
+    let (margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
     local margin_amount_open_64x61;
 
     // Calculate new values for margin and borrowed amounts

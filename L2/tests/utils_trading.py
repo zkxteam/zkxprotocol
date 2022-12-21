@@ -80,6 +80,29 @@ def convert_list_from_64x61(fixed_point_list):
     return [from64x61(x) for x in fixed_point_list]
 
 
+async def get_liquidatable_position_starknet(user):
+    liquidatable_position_query = await user.get_deleveragable_or_liquidatable_position().call()
+    liquidatable_position = list(liquidatable_position_query.result.position)
+    print("liquidatable_position_starknet in 64x61", liquidatable_position)
+    liquidatable_position[2] = from64x61(liquidatable_position[2])
+    return liquidatable_position
+
+
+def get_liquidatable_position_python(user_test):
+    return list(user_test.get_deleveragable_or_liquidatable_position().values())
+
+
+async def compare_liquidatable_position(user, user_test):
+    liquidatable_position_starknet = await get_liquidatable_position_starknet(user)
+    liquidatable_position_python = get_liquidatable_position_python(user_test)
+
+    print("liquidatable_position_starknet", liquidatable_position_starknet)
+    print("liquidatable_position_python", liquidatable_position_python)
+    for i in range(len(liquidatable_position_python)):
+        assert liquidatable_position_python[i] == pytest.approx(
+            liquidatable_position_starknet[i], abs=1e-3)
+
+
 async def compare_debugging_values(liquidate, liquidator):
     maintenance_requirement_query = await liquidate.return_maintenance().call()
     maintenance_requirement = from64x61(
@@ -836,7 +859,9 @@ class OrderExecutor:
 
         # Get the user position
         position = user.get_position(order["market_id"], current_direction)
-        assert position["position_size"] >= 0, "The parentPosition size cannot be 0"
+        if position["position_size"] == 0:
+            print("The parentPosition size cannot be 0")
+            return (0, 0, 0)
 
         # Values to be populated for position object
         margin_amount = position["margin_amount"]
@@ -876,8 +901,8 @@ class OrderExecutor:
         self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["defund"],
                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
 
-        if order["order_type"] == 4:
-            borrowed_amount = borrowed_amount - leveraged_amount_out
+        if order["order_type"] == 5:
+            borrowed_amount -= leveraged_amount_out
         else:
             borrowed_amount -= borrowed_amount_to_be_returned
             margin_amount -= margin_amount_to_be_reduced
@@ -914,6 +939,9 @@ class OrderExecutor:
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance)
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_balance)
+                else:
+                    self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
+                                               asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
             else:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
