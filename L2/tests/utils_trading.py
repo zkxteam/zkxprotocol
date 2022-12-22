@@ -423,11 +423,11 @@ class User:
 
     def __create_order_starknet(self, order: int, liquidator_address: int) -> Dict:
         signed_order = self.__get_signed_order(order, liquidator_address)
+        print("Signed order starknet", signed_order)
         multiple_order_format_64x61 = self.__get_multiple_order_representation(
             order, signed_order, liquidator_address)
-
+        print("Multiple order format", multiple_order_format_64x61)
         self.orders[order["order_id"]] = multiple_order_format_64x61
-
         return multiple_order_format_64x61
 
     def __set_portion_executed(self, order_id: int, new_amount: float):

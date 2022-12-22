@@ -1035,7 +1035,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // Check for post-only flag; they must always be a maker
         with_attr error_message("0515: {order_id} {current_index}") {
-            assert temp_order.post_only = 0;
+            assert temp_order.post_only = FALSE;
         }
 
         // Check for F&K type of orders; they must only be filled completely or rejected

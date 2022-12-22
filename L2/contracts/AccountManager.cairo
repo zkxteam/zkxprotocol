@@ -642,7 +642,7 @@ func execute_order{
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
     );
-    with_attr error_message("AccountManager: Unauthorized caller for execute_order") {
+    with_attr error_message("0002: {order_id} {market_id}") {
         assert caller = trading_address;
     }
 
@@ -735,7 +735,7 @@ func execute_order{
         let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size);
 
         // Assert that the size amount can be closed from the parent position
-        with_attr error_message("AccountManager: Cannot close more thant the positionSize") {
+        with_attr error_message("0003: {order_id} {size}") {
             assert_nn(new_position_size);
         }
 
@@ -749,13 +749,12 @@ func execute_order{
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
             let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read();
 
-            with_attr error_message(
-                    "AccountManager: Position not marked as liquidatable/deleveragable") {
+            with_attr error_message("0004: {order_id} {market_id}") {
                 assert liq_position.market_id = market_id;
                 assert liq_position.direction = parent_direction;
             }
 
-            with_attr error_message("AccountManager: Order size larger than marked one") {
+            with_attr error_message("0005: {order_id} {size}") {
                 assert_le(size, liq_position.amount_to_be_sold);
             }
 
@@ -785,7 +784,7 @@ func execute_order{
 
             // If it's a deleveraging order, calculate the new leverage
             if (request.order_type == DELEVERAGING_ORDER) {
-                with_attr error_message("AccountManager: Position not marked as deleveragable") {
+                with_attr error_message("0007: {order_id} {size}") {
                     assert liq_position.liquidatable = FALSE;
                 }
                 let total_value = margin_amount + borrowed_amount;
@@ -795,7 +794,7 @@ func execute_order{
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             } else {
-                with_attr error_message("AccountManager: Position not marked as liquidatable") {
+                with_attr error_message("0006: {order_id} {size}") {
                     assert liq_position.liquidatable = TRUE;
                 }
 
