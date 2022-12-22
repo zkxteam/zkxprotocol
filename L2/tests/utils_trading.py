@@ -5,7 +5,9 @@ import string
 from utils_asset import AssetID
 from utils import Signer, str_to_felt, assert_revert, hash_order, from64x61, to64x61
 from typing import List, Dict, Tuple
+from starkware.starknet.testing.contract import StarknetContract
 
+# Market IDs
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
@@ -13,10 +15,12 @@ TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 
 
+# To get random order_ids and batch_ids
 def random_string(length):
     return str_to_felt(''.join(random.choices(string.ascii_letters + string.digits, k=length)))
 
 
+# Constants related to trading objects
 order_types = {
     "market": 1,
     "limit": 2,
@@ -31,10 +35,12 @@ order_side = {
     "taker": 2
 }
 
+
 order_direction = {
     "long": 1,
     "short": 2,
 }
+
 
 order_time_in_force = {
     "good_till_time": 1,
@@ -42,10 +48,12 @@ order_time_in_force = {
     "immediate_or_cancel": 3,
 }
 
+
 order_life_cycles = {
     "open": 1,
     "close": 2
 }
+
 
 fund_mapping = {
     "liquidity_fund": 1,
@@ -54,10 +62,12 @@ fund_mapping = {
     "insurance_fund": 4
 }
 
+
 fund_mode = {
     "fund": 1,
     "defund": 0
 }
+
 
 market_to_collateral_mapping = {
     BTC_USD_ID: AssetID.USDC,
@@ -71,326 +81,14 @@ market_to_asset_mapping = {
     TSLA_USD_ID: AssetID.TSLA
 }
 
+#################
+#### Classes ####
+#################
 
-def convert_list_to_64x61(decimals_list):
-    return [to64x61(x) for x in decimals_list]
 
-
-def convert_list_from_64x61(fixed_point_list):
-    return [from64x61(x) for x in fixed_point_list]
-
-
-async def get_liquidatable_position_starknet(user):
-    liquidatable_position_query = await user.get_deleveragable_or_liquidatable_position().call()
-    liquidatable_position = list(liquidatable_position_query.result.position)
-    print("liquidatable_position_starknet in 64x61", liquidatable_position)
-    liquidatable_position[2] = from64x61(liquidatable_position[2])
-    return liquidatable_position
-
-
-def get_liquidatable_position_python(user_test):
-    return list(user_test.get_deleveragable_or_liquidatable_position().values())
-
-
-async def compare_liquidatable_position(user, user_test):
-    liquidatable_position_starknet = await get_liquidatable_position_starknet(user)
-    liquidatable_position_python = get_liquidatable_position_python(user_test)
-
-    print("liquidatable_position_starknet", liquidatable_position_starknet)
-    print("liquidatable_position_python", liquidatable_position_python)
-    for i in range(len(liquidatable_position_python)):
-        assert liquidatable_position_python[i] == pytest.approx(
-            liquidatable_position_starknet[i], abs=1e-3)
-
-
-async def compare_debugging_values(liquidate, liquidator):
-    maintenance_requirement_query = await liquidate.return_maintenance().call()
-    maintenance_requirement = from64x61(
-        maintenance_requirement_query.result.res)
-
-    print("maintanence requirement starknet", maintenance_requirement)
-
-    account_value_query = await liquidate.return_acc_value().call()
-    account_value = from64x61(account_value_query.result.res)
-    print("account_value starknet", account_value)
-
-    (maintenance_requirement_python,
-     account_value_python) = liquidator.get_debugging_values()
-    print("maintanence requirement python", maintenance_requirement_python)
-    print("account value python", account_value_python)
-    assert maintenance_requirement_python == pytest.approx(
-        maintenance_requirement, abs=1e-3)
-    assert account_value_python == pytest.approx(account_value, abs=1e-3)
-
-
-async def check_liquidation_starknet(zkx_node_signer, zkx_node, liquidate, liquidate_params):
-    liquidation_result_object = await zkx_node_signer.send_transaction(zkx_node, liquidate.contract_address, "check_liquidation", liquidate_params)
-    liquidation_return_data = liquidation_result_object.call_info.retdata
-    least_collateral_ratio_position = convert_list_from_64x61(
-        liquidation_return_data[4:])
-
-    return (liquidation_return_data[1], least_collateral_ratio_position)
-
-
-def check_liquidation_python(user_test, liquidator, liquidate_params):
-    result = liquidator.check_for_liquidation(
-        user=user_test, prices_array=liquidate_params)
-    print("Python initial", result)
-    return (result[0], list(result[1].values())[:-2])
-
-
-def convert_to_64x61_liquidation_format(price_data_dict):
-    new_dict = copy.deepcopy(price_data_dict)
-    new_dict["asset_price"] = to64x61(new_dict["asset_price"])
-    new_dict["collateral_price"] = to64x61(
-        new_dict["collateral_price"])
-
-    return list(new_dict.values())
-
-
-def compare_result_liquidation(python_result, starknet_result):
-    assert python_result[0] == starknet_result[0]
-
-    for element_1, element_2 in zip(python_result[1], starknet_result[1]):
-        assert element_1 == pytest.approx(element_2, abs=1e-6)
-
-
-async def check_liquidation(zkx_node_signer, zkx_node, liquidator, user, user_test, market_prices, collateral_prices, liquidate):
-    total_length = len(market_prices) + len(collateral_prices)
-    liquidation_params_starknet = [user.contract_address, total_length]
-    liquidation_params_python = []
-
-    for i in range(len(market_prices)):
-        price_data_dict = {
-            "asset_id": market_to_asset_mapping[market_prices[i]["market_id"]],
-            "collateral_id": market_to_collateral_mapping[market_prices[i]["market_id"]],
-            "asset_price": market_prices[i]["asset_price"],
-            "collateral_price": market_prices[i]["collateral_price"]
-        }
-
-        liquidation_params_python.append(price_data_dict)
-
-        liquidation_format_starknet = convert_to_64x61_liquidation_format(
-            price_data_dict)
-
-        liquidation_params_starknet.extend(liquidation_format_starknet)
-
-    for i in range(len(collateral_prices)):
-        price_data_dict = {
-            "asset_id": 0,
-            "collateral_id": collateral_prices[i]["collateral_id"],
-            "asset_price": 0,
-            "collateral_price": collateral_prices[i]["collateral_price"]
-        }
-        liquidation_params_python.append(price_data_dict)
-
-        liquidation_format_starknet = convert_to_64x61_liquidation_format(
-            price_data_dict)
-
-        liquidation_params_starknet.extend(liquidation_format_starknet)
-
-    starknet_result = await check_liquidation_starknet(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, liquidate=liquidate, liquidate_params=liquidation_params_starknet)
-
-    python_result = check_liquidation_python(
-        user_test=user_test, liquidator=liquidator, liquidate_params=liquidation_params_python)
-
-    compare_result_liquidation(
-        starknet_result=starknet_result, python_result=python_result)
-
-
-async def check_batch_status(batch_id, trading, is_executed):
-    batch_status = await get_batch_status(batch_id=batch_id, trading=trading)
-    assert batch_status == is_executed
-
-
-async def get_batch_status(batch_id, trading):
-    batch_status_query = await trading.get_batch_id_status(batch_id_=batch_id).call()
-    return batch_status_query.result.status
-
-
-async def set_balance_starknet(admin_signer, admin, user, asset_id, new_balance):
-    await admin_signer.send_transaction(admin, user.contract_address, "set_balance", [asset_id, to64x61(new_balance)])
-    return
-
-
-def set_balance_python(user_test, asset_id, new_balance):
-    user_test.set_balance(new_balance=new_balance, asset_id=asset_id)
-    return
-
-
-async def set_balance(admin_signer, admin, users, users_test, balance_array, asset_id):
-    for i in range(len(users)):
-        await set_balance_starknet(admin_signer=admin_signer, admin=admin, user=users[i], asset_id=asset_id, new_balance=balance_array[i])
-        set_balance_python(
-            user_test=users_test[i], asset_id=asset_id, new_balance=balance_array[i])
-    return
-
-
-async def execute_batch(zkx_node_signer, zkx_node, trading, execute_batch_params):
-    # Send execute_batch transaction
-    await zkx_node_signer.send_transaction(zkx_node, trading.contract_address, "execute_batch", execute_batch_params)
-    return
-
-
-async def execute_batch_reverted(zkx_node_signer, zkx_node, trading, execute_batch_params, error_message):
-    # Send execute_batch transaction
-    await assert_revert(
-        zkx_node_signer.send_transaction(zkx_node, trading.contract_address, "execute_batch", execute_batch_params), reverted_with=error_message)
-    return
-
-
-async def execute_and_compare(zkx_node_signer, zkx_node, executor, orders, users_test, quantity_locked, market_id, oracle_price, trading, is_reverted=0, error_code="", error_at_index=0, param_2=0, error_message=""):
-    batch_id = random_string(10)
-    complete_orders_python = []
-    complete_orders_starknet = []
-    # Fill the remaining order attributes
-    for i in range(len(orders)):
-        if "order_id" in orders[i]:
-            (multiple_order_format,
-             multiple_order_format_64x61) = users_test[i].get_order(orders[i]["order_id"])
-            complete_orders_python.append(multiple_order_format)
-            complete_orders_starknet += multiple_order_format_64x61.values()
-        else:
-            (multiple_order_format,
-             multiple_order_format_64x61) = users_test[i].create_order(**orders[i])
-            complete_orders_python.append(multiple_order_format)
-            complete_orders_starknet += multiple_order_format_64x61.values()
-
-    execute_batch_params_starknet = [
-        batch_id,
-        to64x61(quantity_locked),
-        market_id,
-        to64x61(oracle_price),
-        len(orders),
-        *complete_orders_starknet
-    ]
-
-    execute_batch_params_python = [
-        batch_id,
-        complete_orders_python,
-        users_test,
-        quantity_locked,
-        market_id,
-        oracle_price
-    ]
-
-    if is_reverted:
-        actual_error_message = ""
-        if error_code:
-            error_at_order_id = complete_orders_python[error_at_index]["order_id"]
-            actual_error_message = f"{error_code} {error_at_order_id} {param_2}"
-        elif error_message:
-            actual_error_message = error_message
-        await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
-    else:
-        await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
-        executor.execute_batch(*execute_batch_params_python)
-    return (batch_id, complete_orders_python)
-
-
-async def get_user_position(user, market_id, direction):
-    user_starknet_query = await user.get_position_data(market_id_=market_id, direction_=direction).call()
-    user_starknet_query_parsed = list(user_starknet_query.result.res)
-    user_starknet_position = [from64x61(x)
-                              for x in user_starknet_query_parsed]
-    return user_starknet_position
-
-
-def get_user_position_python(user, market_id, direction):
-    user_python_query = user.get_position(
-        market_id=market_id, direction=direction)
-    return list(user_python_query.values())
-
-
-async def get_fund_balance(fund, asset_id, is_fee_balance):
-    result = 0
-    if is_fee_balance:
-        result = await fund.get_total_fee(assetID_=asset_id).call()
-        return from64x61(result.result.fee)
-    else:
-        result = await fund.balance(asset_id_=asset_id).call()
-        return from64x61(result.result.amount)
-
-
-def get_fund_balance_python(executor, fund, asset_id):
-    return executor.get_fund_balance(fund, asset_id)
-
-
-async def get_user_balance(user, asset_id):
-    user_query = await user.get_balance(assetID_=asset_id).call()
-    return from64x61(user_query.result.res)
-
-
-def get_user_balance_python(user, asset_id):
-    return user.get_balance(asset_id)
-
-
-async def compare_user_balances(users, user_tests, asset_id):
-    for i in range(len(users)):
-        user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
-        print("balance:", i, user_balance)
-        user_balance_python = get_user_balance_python(
-            user=user_tests[i], asset_id=asset_id)
-
-        assert user_balance_python == pytest.approx(
-            user_balance, abs=1e-6)
-    return
-
-
-async def compare_user_positions(users, users_test, market_id):
-    for i in range(len(users)):
-        user_position_python_long = get_user_position_python(
-            user=users_test[i], market_id=market_id, direction=order_direction["long"])
-        user_position_python_short = get_user_position_python(
-            user=users_test[i], market_id=market_id, direction=order_direction["short"])
-
-        user_position_starknet_long = await get_user_position(
-            user=users[i], market_id=market_id, direction=order_direction["long"])
-        user_position_starknet_short = await get_user_position(
-            user=users[i], market_id=market_id, direction=order_direction["short"])
-
-        print("user", i)
-        print(user_position_python_long)
-        print(user_position_starknet_long)
-        print(user_position_python_short)
-        print(user_position_starknet_short)
-
-        for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
-            assert element_1 == pytest.approx(element_2, abs=1e-6)
-
-        for element_1, element_2 in zip(user_position_python_short, user_position_starknet_short):
-            assert element_1 == pytest.approx(element_2, abs=1e-6)
-
-
-async def compare_fund_balances(executor, holding, liquidity, fee_balance, insurance, asset_id):
-    holding_fund_balance = await get_fund_balance(fund=holding, asset_id=asset_id, is_fee_balance=0)
-    holding_fund_balance_python = get_fund_balance_python(
-        executor=executor, fund=fund_mapping["holding_fund"], asset_id=asset_id)
-    assert holding_fund_balance_python == pytest.approx(
-        holding_fund_balance, abs=1e-6)
-
-    liquidity_fund_balance = await get_fund_balance(fund=liquidity, asset_id=asset_id, is_fee_balance=0)
-    liquidity_fund_balance_python = get_fund_balance_python(
-        executor=executor, fund=fund_mapping["liquidity_fund"], asset_id=asset_id)
-    assert liquidity_fund_balance_python == pytest.approx(
-        liquidity_fund_balance, abs=1e-6)
-
-    fee_balance_balance = await get_fund_balance(fund=fee_balance, asset_id=asset_id, is_fee_balance=1)
-    fee_balance_python = get_fund_balance_python(
-        executor=executor, fund=fund_mapping["fee_balance"], asset_id=asset_id)
-    assert fee_balance_python == pytest.approx(
-        fee_balance_balance, abs=1e-6)
-
-    insurance_balance = await get_fund_balance(fund=insurance, asset_id=asset_id, is_fee_balance=0)
-    insurance_balance_python = get_fund_balance_python(
-        executor=executor, fund=fund_mapping["insurance_fund"], asset_id=asset_id)
-    assert insurance_balance_python == pytest.approx(
-        insurance_balance, abs=1e-6)
-    return
-
-
+# Emulates AccountManager Contract in python
 class User:
-    def __init__(self, private_key: int, user_address: int, liquidator_private_key=0):
+    def __init__(self, private_key: int, user_address: int, liquidator_private_key: int = 0):
         self.signer = Signer(private_key)
         self.user_address = user_address
         self.orders = {}
@@ -478,6 +176,14 @@ class User:
 
         return multiple_order
 
+    def __update_position(self, market_id: int, direction: int, updated_dict: Dict, updated_position: Dict):
+        try:
+            self.positions[market_id].update(updated_dict)
+        except KeyError:
+            self.positions[market_id] = {
+                direction: updated_position
+            }
+
     def get_positions(self) -> List[Dict]:
         markets = self.market_array
         positions = []
@@ -517,7 +223,7 @@ class User:
         except KeyError:
             return 0
 
-    def modify_balance(self, mode, asset_id, amount):
+    def modify_balance(self, mode: int, asset_id: int, amount: float):
         current_balance = self.get_balance(asset_id=asset_id)
         new_balance = 0
 
@@ -556,7 +262,7 @@ class User:
                 "liquidatable": 0
             }
 
-    def set_deleveragable_or_liquidatable_position(self, updated_position):
+    def set_deleveragable_or_liquidatable_position(self, updated_position: Dict):
         self.deleveragable_or_liquidatable_position = updated_position
 
     def liquidate_position(self, position: Dict, amount_to_be_sold: float):
@@ -575,14 +281,6 @@ class User:
             "liquidatable": liquidatable
         }
         self.deleveragable_or_liquidatable_position = liquidatable_position
-
-    def __update_position(self, market_id: int, direction: int, updated_dict: Dict, updated_position: Dict):
-        try:
-            self.positions[market_id].update(updated_dict)
-        except KeyError:
-            self.positions[market_id] = {
-                direction: updated_position
-            }
 
     def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int):
 
@@ -703,10 +401,14 @@ class User:
                 "leverage": 0
             }
 
-    def get_order(self, order_id: int) -> Dict:
-        python_order = self.orders_decimal[order_id]
-        starknet_order = self.orders[order_id]
-        return (python_order, starknet_order)
+    # Get orders stored in python and starknet formats
+    def get_order(self, order_id: int) -> Tuple[Dict, Dict]:
+        try:
+            python_order = self.orders_decimal[order_id]
+            starknet_order = self.orders[order_id]
+            return (python_order, starknet_order)
+        except KeyError:
+            return ({}, {})
 
     def create_order(
         self,
@@ -747,36 +449,29 @@ class User:
             "life_cycle": life_cycle,
             "liquidator_address": liquidator_address
         }
+        # Signed order for python implementation
         signed_order = [0, 0]
+        # Convert the order to multiple order format
         multiple_order_format = self.__get_multiple_order_representation(
             new_order, signed_order, liquidator_address)
-
+        # Store the multiple order format to orders_decimal list
         self.orders_decimal[new_order["order_id"]] = multiple_order_format
 
         # Convert to 64x61 format for starknet
         order_64x61 = self.__convert_order_to_64x61(new_order)
+        # Convert the order to multiple order format
         multiple_order_format_64x61 = self.__create_order_starknet(
             order_64x61, liquidator_address)
         return (multiple_order_format, multiple_order_format_64x61)
 
 
+# Emulates Trading Contract in python
 class OrderExecutor:
     def __init__(self):
         self.maker_trading_fees = 0.0002 * 0.97
         self.taker_trading_fees = 0.0005 * 0.97
         self.fund_balances = {}
         self.batch_id_status = {}
-
-    def set_fund_balance(self, fund: int, asset_id: int, new_balance: float):
-        self.fund_balances[fund] = {
-            asset_id: new_balance
-        }
-
-    def get_fund_balance(self, fund: int, asset_id: int) -> int:
-        try:
-            return self.fund_balances[fund][asset_id]
-        except KeyError:
-            return 0
 
     def __modify_fund_balance(self, fund: int, mode: int, asset_id: int, amount: float):
         current_balance = self.get_fund_balance(fund, asset_id,)
@@ -953,12 +648,23 @@ class OrderExecutor:
               margin_amount, borrowed_amount)
         return (average_execution_price, margin_amount, borrowed_amount)
 
-    def __get_fee(self, user: User, side: int):
+    def __get_fee(self, user: User, side: int) -> float:
         # ToDo change this logic when we add user discounts
         # Fee rate
         return self.maker_trading_fees if side == 1 else self.taker_trading_fees
 
-    def get_batch_id_status(self, batch_id: int):
+    def set_fund_balance(self, fund: int, asset_id: int, new_balance: float):
+        self.fund_balances[fund] = {
+            asset_id: new_balance
+        }
+
+    def get_fund_balance(self, fund: int, asset_id: int) -> int:
+        try:
+            return self.fund_balances[fund][asset_id]
+        except KeyError:
+            return 0
+
+    def get_batch_id_status(self, batch_id: int) -> int:
         try:
             return self.batch_id_status[batch_id]
         except KeyError:
@@ -1053,6 +759,7 @@ class OrderExecutor:
         return
 
 
+# Emulates Liquidate Contract in python
 class Liquidator:
     def __init__(self):
         self.maintenance_margin = 0.075
@@ -1062,9 +769,6 @@ class Liquidator:
     def __set_debugging_values(self, maintenance_requirement: float, total_account_value_collateral: float):
         self.maintenance_requirement = maintenance_requirement
         self.total_account_value_collateral = total_account_value_collateral
-
-    def get_debugging_values(self) -> Tuple[float, float]:
-        return (self.maintenance_requirement, self.total_account_value_collateral)
 
     def __find_collateral_balance(self, prices_array: List[Dict], collateral_array: List) -> int:
 
@@ -1096,6 +800,9 @@ class Liquidator:
             return 0
         else:
             return amount_to_be_sold
+
+    def get_debugging_values(self) -> Tuple[float, float]:
+        return (self.maintenance_requirement, self.total_account_value_collateral)
 
     def check_for_liquidation(self, user: User, prices_array: List[Dict]) -> Tuple[int, Dict]:
         positions = user.get_positions()
@@ -1184,140 +891,372 @@ class Liquidator:
             )
         return (liq_result, least_collateral_ratio_position)
 
-
-# alice = User(123456, 0x123234324)
-# bob = User(73879, 0x1234589402)
-
-# alice.set_balance(5500, AssetID.USDC)
-# bob.set_balance(6000, AssetID.USDC)
-
-# alice.set_balance(5500, AssetID.UST)
-# bob.set_balance(6000, AssetID.UST)
-
-# alice.set_balance(5500, AssetID.USDC)
-# bob.set_balance(6000, AssetID.USDC)
-
-# print(alice.get_collaterals())
-# print(bob.get_collaterals())
-# market_prices = [{
-#     "market_id": BTC_USD_ID,
-#     "asset_price": 5000,
-#     "collateral_price": 1.05
-# }, {
-#     "market_id": ETH_USD_ID,
-#     "asset_price": 100,
-#     "collateral_price": 1.23
-# }]
-
-# collateral_prices = [{
-#     "collateral_id": AssetID.USDC,
-#     "collateral_price": 1.05
-# }, {
-#     "collateral_id": AssetID.UST,
-#     "collateral_price": 0.05
-# }]
-
-# check_liquidation_starknet(alice, alice, market_prices, collateral_prices)
+##################################
+#### Helper Function Starknet ####
+##################################
 
 
-# (order_long, order_long_64x61) = alice.create_order(
-#     quantity=2, order_type=order_types["limit"], price=1000, leverage=2)
-# (order_short, order_short_64x61) = bob.create_order(
-#     quantity=2, direction=order_direction["short"], leverage=2)
-
-# request_list = [order_long, order_short]
-
-# print(request_list)
-# executoor = OrderExecutor()
-# executoor.execute_batch(random_string(10),
-#                         request_list, [alice, bob], 2, BTC_USD_ID, 1000)
-# print(order_long["order_id"])
-# (python_order, _) = alice.get_order(order_long["order_id"])
-# print(python_order)
-# print("alice_position:", alice.get_positions())
-# print("bob_position:", bob.get_positions())
-
-# liquidatoor = Liquidator()
-
-# (order_short, order_short_64x61) = bob.create_order(
-#     quantity=1, direction=order_direction["short"], side=order_side["taker"])
-# print("long order", order_long)
-# print("short order", order_short)
-# # ORder 1
+# Get the fund balance in decimals
+async def get_fund_balance(fund: StarknetContract, asset_id: int, is_fee_balance: int) -> int:
+    if is_fee_balance:
+        result = await fund.get_total_fee(assetID_=asset_id).call()
+        return from64x61(result.result.fee)
+    else:
+        result = await fund.balance(asset_id_=asset_id).call()
+        return from64x61(result.result.amount)
 
 
-# executoor.execute_batch(
-#     request_list, [alice, bob], 1, BTC_USD_ID, 1000)
-
-# (order_short, order_short_64x61) = bob.create_order(
-#     quantity=3, leverage=1, direction=order_direction["short"], side=order_side["taker"])
-
-
-# request_list = [order_long, order_short]
-# executoor.execute_batch(
-#     request_list, [alice, bob], 3, BTC_USD_ID, 1020)
-# print("alice_position:", alice.get_positions())
-# print(alice.get_balance(AssetID.USDC))
-
-# print("alice collaterals:", alice.get_collaterals())
-
-# prices_array = [
-#     {"asset_id": 0,
-#      "collateral_id": AssetID.USDC,
-#      "asset_price": 500,
-#      "collateral_price": 0.99
-#      }, {
-#         "asset_id": 0,
-#         "collateral_id": AssetID.USDC,
-#         "asset_price": 0,
-#         "collateral_price": 0.99
-#     }, {
-#         "asset_id": 0,
-#         "collateral_id": AssetID.UST,
-#         "asset_price": 0,
-#         "collateral_price": 0.0001
-#     }]
-# result = liquidatoor.check_for_liquidation(
-#     user=alice, prices_array=prices_array)
-# print(result)
-# liq_position = alice.get_deleveragable_or_liquidatable_position()
-# print(liq_position)
-
-# (order_short, order_short_64x61) = bob.create_order(
-#     quantity=3, leverage=1, direction=order_direction["short"], side=order_side["taker"])
+# Get the balance of the required user in decimals
+async def get_user_balance(user: StarknetContract, asset_id: int) -> int:
+    user_query = await user.get_balance(assetID_=asset_id).call()
+    return from64x61(user_query.result.res)
 
 
-# request_list = [order_long, order_short]
-# executoor.execute_batch(
-#     request_list, [alice, bob], 3, BTC_USD_ID, 1020)
-# print("alice_position:", alice.get_positions())
-# print(alice.get_balance(AssetID.USDC))
+# Convert a 64x61 array to decimals
+def convert_list_from_64x61(fixed_point_list: List[int]) -> List[float]:
+    return [from64x61(x) for x in fixed_point_list]
 
-# request_list = [order_long, order_short]
-# executoor.execute_batch(
-#     request_list, [alice, bob], 3, BTC_USD_ID, 1020)
-# print("alice_position:", alice.get_positions())
-# print(alice.get_balance(AssetID.USDC))
-# print(bob.get_balance(AssetID.USDC))
-# print(executoor.get_fund_balance(
-#     fund_mapping["holding_fund"], asset_id=AssetID.USDC))
-# print(executoor.get_fund_balance(
-#     fund_mapping["insurance_fund"], asset_id=AssetID.USDC))
-# print(executoor.get_fund_balance(
-#     fund_mapping["liquidity_fund"], asset_id=AssetID.USDC))
 
-# order_short = alice.create_order_decimals(
-#     quantity=1, direction=order_direction["short"], leverage=1, close_order=close_order["close"])
-# order_long = alice.create_order_decimals(
-#     quantity=1, side=order_side["taker"], close_order=close_order["close"])
-# request_list = [order_short, order_long]
+# Liquidation check on starknet
+async def check_liquidation_starknet(zkx_node_signer: Signer, zkx_node: StarknetContract, liquidate: StarknetContract, liquidate_params: List[int]) -> Tuple[int, List[float]]:
+    liquidation_result_object = await zkx_node_signer.send_transaction(zkx_node, liquidate.contract_address, "check_liquidation", liquidate_params)
+    liquidation_return_data = liquidation_result_object.call_info.retdata
+    # Convert the quantity to decimals
+    least_collateral_ratio_position = [
+        from64x61(x) for x in liquidation_return_data[4:]]
 
-# executoor = OrderExecutor()
-# executoor.execute_batch(
-#     request_list, [alice, bob], 1, AssetID.USDC, 1000)
-# print(alice.get_balance(AssetID.USDC))
-# print(bob.get_balance(AssetID.USDC))
-# multiple_order_long = MultipleOrder(*order_long)
-# multiple_order_short = MultipleOrder(*order_short)
-# print(multiple_order_long.get_multiple_order())
-# print(multiple_order_short.get_multiple_order())
+    # return the boolean liquidation result and the position
+    return (liquidation_return_data[1], least_collateral_ratio_position)
+
+
+# Function to get the liquidatable position from starknet
+async def get_liquidatable_position_starknet(user: User) -> List[float]:
+    liquidatable_position_query = await user.get_deleveragable_or_liquidatable_position().call()
+    liquidatable_position = list(liquidatable_position_query.result.position)
+    # Convert amount to decimals rep
+    liquidatable_position[2] = from64x61(liquidatable_position[2])
+    return liquidatable_position
+
+
+# Get the required user position in decimal rep
+async def get_user_position(user: StarknetContract, market_id: int, direction: int) -> List[float]:
+    user_starknet_query = await user.get_position_data(market_id_=market_id, direction_=direction).call()
+    user_starknet_query_parsed = list(user_starknet_query.result.res)
+    user_starknet_position = [from64x61(x)
+                              for x in user_starknet_query_parsed]
+    return user_starknet_position
+
+
+# Convert price data dict to liquidation params format
+def convert_to_64x61_liquidation_format(price_data_dict: Dict) -> List[int]:
+    new_dict = copy.deepcopy(price_data_dict)
+    new_dict["asset_price"] = to64x61(new_dict["asset_price"])
+    new_dict["collateral_price"] = to64x61(
+        new_dict["collateral_price"])
+
+    return list(new_dict.values())
+
+
+# Set the balance of a user in starknet
+async def set_balance_starknet(admin_signer: Signer, admin: StarknetContract, user: StarknetContract, asset_id: int, new_balance: int):
+    await admin_signer.send_transaction(admin, user.contract_address, "set_balance", [asset_id, to64x61(new_balance)])
+    return
+
+
+# Get the status of trading batch
+async def get_batch_status(batch_id: int, trading: StarknetContract) -> int:
+    batch_status_query = await trading.get_batch_id_status(batch_id_=batch_id).call()
+    return batch_status_query.result.status
+
+
+# Execute the orders in python and starkent
+async def execute_batch(zkx_node_signer: Signer, zkx_node: StarknetContract, trading: StarknetContract, execute_batch_params: List[int]):
+    # Send execute_batch transaction
+    await zkx_node_signer.send_transaction(zkx_node, trading.contract_address, "execute_batch", execute_batch_params)
+    return
+################################
+#### Helper Function Python ####
+################################
+
+
+# Function to get the liquidatable position from the python implementation
+def get_liquidatable_position_python(user_test: User) -> List[float]:
+    return list(user_test.get_deleveragable_or_liquidatable_position().values())
+
+
+# Function to get the balance of a user from the python implementation
+def get_user_balance_python(user: User, asset_id: int) -> float:
+    return user.get_balance(asset_id)
+
+
+# Function to get the balance of a fund from the python implementation
+def get_fund_balance_python(executor: OrderExecutor, fund: int, asset_id: int) -> int:
+    return executor.get_fund_balance(fund, asset_id)
+
+
+# Function to get the required user position from the python implementation
+def get_user_position_python(user: User, market_id: int, direction: int) -> List[float]:
+    user_python_query = user.get_position(
+        market_id=market_id, direction=direction)
+    return list(user_python_query.values())
+
+
+# Function to set the balance of the requried user in the python implementation
+def set_balance_python(user_test: User, asset_id: int, new_balance: float):
+    user_test.set_balance(new_balance=new_balance, asset_id=asset_id)
+    return
+
+
+# Liquidation check on the python implementation
+def check_liquidation_python(user_test: User, liquidator: Liquidator, liquidate_params: List[Dict]) -> Tuple[int, List]:
+    result = liquidator.check_for_liquidation(
+        user=user_test, prices_array=liquidate_params)
+    return (result[0], list(result[1].values())[:-2])
+
+
+####################################
+#### Execute on Starknet/Python ####
+####################################
+
+
+# Function to check for liquidation on starknet + python and to compare the results
+async def check_liquidation(zkx_node_signer: Signer, zkx_node: StarknetContract, liquidator: Liquidator, user: StarknetContract, user_test: User, market_prices: List[Dict], collateral_prices: List[Dict], liquidate: StarknetContract):
+    # Length of the final price data list
+    total_length = len(market_prices) + len(collateral_prices)
+    # intialize params list for starknet and python
+    liquidation_params_starknet = [user.contract_address, total_length]
+    liquidation_params_python = []
+
+    # Process each market_prices dict
+    for i in range(len(market_prices)):
+        price_data_dict = {
+            "asset_id": market_to_asset_mapping[market_prices[i]["market_id"]],
+            "collateral_id": market_to_collateral_mapping[market_prices[i]["market_id"]],
+            "asset_price": market_prices[i]["asset_price"],
+            "collateral_price": market_prices[i]["collateral_price"]
+        }
+
+        # For python, we just append the formatted price_data_dict
+        liquidation_params_python.append(price_data_dict)
+
+        # For starknet, we need to convert asset_price and collateral price to 64x61
+        liquidation_format_starknet = convert_to_64x61_liquidation_format(
+            price_data_dict)
+
+        liquidation_params_starknet.extend(liquidation_format_starknet)
+
+    for i in range(len(collateral_prices)):
+        price_data_dict = {
+            "asset_id": 0,
+            "collateral_id": collateral_prices[i]["collateral_id"],
+            "asset_price": 0,
+            "collateral_price": collateral_prices[i]["collateral_price"]
+        }
+
+        # For python, we just append the formatted price_data_dict
+        liquidation_params_python.append(price_data_dict)
+
+        # For starknet, we need to convert asset_price and collateral price to 64x61
+        liquidation_format_starknet = convert_to_64x61_liquidation_format(
+            price_data_dict)
+
+        liquidation_params_starknet.extend(liquidation_format_starknet)
+
+    # Get the liquidation result from starknet
+    starknet_result = await check_liquidation_starknet(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, liquidate=liquidate, liquidate_params=liquidation_params_starknet)
+
+    # Get the liquidation result from the python implmentation
+    python_result = check_liquidation_python(
+        user_test=user_test, liquidator=liquidator, liquidate_params=liquidation_params_python)
+
+    # Compare the results of python and starkent
+    compare_result_liquidation(
+        starknet_result=starknet_result, python_result=python_result)
+
+
+# Set balance for a list of users in python and starkent
+async def set_balance(admin_signer: Signer, admin: StarknetContract, users: List[StarknetContract], users_test: List[User], balance_array: List[float], asset_id: int):
+    for i in range(len(users)):
+        await set_balance_starknet(admin_signer=admin_signer, admin=admin, user=users[i], asset_id=asset_id, new_balance=balance_array[i])
+        set_balance_python(
+            user_test=users_test[i], asset_id=asset_id, new_balance=balance_array[i])
+    return
+
+
+# Function to assert that the reverted tx has the required error_message
+async def execute_batch_reverted(zkx_node_signer: Signer, zkx_node: StarknetContract, trading: StarknetContract, execute_batch_params: List[int], error_message: str):
+    # Send execute_batch transaction
+    await assert_revert(
+        zkx_node_signer.send_transaction(zkx_node, trading.contract_address, "execute_batch", execute_batch_params), reverted_with=error_message)
+    return
+
+
+async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContract, executor: OrderExecutor, orders: List[Dict], users_test: List[User], quantity_locked: float, market_id: int, oracle_price: float, trading: StarknetContract, is_reverted: int = 0, error_code: str = "", error_at_index: int = 0, param_2: str = "", error_message: str = "") -> Tuple[int, List]:
+    # Generate a random batch id
+    batch_id = random_string(10)
+
+    # Intialize python and starknet params
+    complete_orders_python = []
+    complete_orders_starknet = []
+    # Fill the remaining order attributes
+    for i in range(len(orders)):
+        # If an order_id is passed (for partial orders), fetch the order
+        if "order_id" in orders[i]:
+            (multiple_order_format,
+             multiple_order_format_64x61) = users_test[i].get_order(orders[i]["order_id"])
+            complete_orders_python.append(multiple_order_format)
+            complete_orders_starknet += multiple_order_format_64x61.values()
+        # If not, create the entire order
+        else:
+            (multiple_order_format,
+             multiple_order_format_64x61) = users_test[i].create_order(**orders[i])
+            complete_orders_python.append(multiple_order_format)
+            complete_orders_starknet += multiple_order_format_64x61.values()
+
+    # Format the values for starknet params
+    execute_batch_params_starknet = [
+        batch_id,
+        to64x61(quantity_locked),
+        market_id,
+        to64x61(oracle_price),
+        len(orders),
+        *complete_orders_starknet
+    ]
+
+    # Format the values for python params
+    execute_batch_params_python = [
+        batch_id,
+        complete_orders_python,
+        users_test,
+        quantity_locked,
+        market_id,
+        oracle_price
+    ]
+
+    # If the batch is to be reverted, generate the error_message
+    if is_reverted:
+        actual_error_message = ""
+        # If the error code is passed
+        if error_code:
+            error_at_order_id = complete_orders_python[error_at_index]["order_id"]
+            actual_error_message = f"{error_code} {error_at_order_id} {param_2}"
+        # If an error message is passed
+        elif error_message:
+            actual_error_message = error_message
+        await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
+    else:
+        await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
+        executor.execute_batch(*execute_batch_params_python)
+    return (batch_id, complete_orders_python)
+
+
+###################################
+#### Compare Python & Starknet ####
+###################################
+
+
+# Function to check if the debuggin values set in Liquidation contract are correct
+async def compare_debugging_values(liquidate: StarknetContract, liquidator: Liquidator):
+    # Get the maintenance requirement of the last liquidation call of starknet
+    maintenance_requirement_query = await liquidate.return_maintenance().call()
+    maintenance_requirement = from64x61(
+        maintenance_requirement_query.result.res)
+
+    # Get the Account Value of the last liquidation call of starknet
+    account_value_query = await liquidate.return_acc_value().call()
+    account_value = from64x61(account_value_query.result.res)
+    print("account_value starknet", account_value)
+
+    # Get the maintenance requirement and account value of the python implmentation
+    (maintenance_requirement_python,
+     account_value_python) = liquidator.get_debugging_values()
+
+    # Assert that both of them are appoximately equal
+    assert maintenance_requirement_python == pytest.approx(
+        maintenance_requirement, abs=1e-3)
+    assert account_value_python == pytest.approx(account_value, abs=1e-3)
+
+
+# Function to check the result of a liquidation call
+def compare_result_liquidation(python_result: Tuple[int, List], starknet_result: Tuple[int, List]):
+    assert python_result[0] == starknet_result[0]
+
+    for element_1, element_2 in zip(python_result[1], starknet_result[1]):
+        assert element_1 == pytest.approx(element_2, abs=1e-6)
+
+
+# Function to check if the batch status on starknet is as expected
+async def check_batch_status(batch_id: int, trading: StarknetContract, is_executed: int):
+    batch_status = await get_batch_status(batch_id=batch_id, trading=trading)
+    assert batch_status == is_executed
+
+
+# Compare user balance in starknet and python
+async def compare_user_balances(users: List[StarknetContract], user_tests: List[User], asset_id: int):
+    for i in range(len(users)):
+        user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
+
+        user_balance_python = get_user_balance_python(
+            user=user_tests[i], asset_id=asset_id)
+
+        assert user_balance_python == pytest.approx(
+            user_balance, abs=1e-6)
+
+
+# Compare user positions on starknet and python
+async def compare_user_positions(users: List[StarknetContract], users_test: List[User], market_id: int):
+    for i in range(len(users)):
+        user_position_python_long = get_user_position_python(
+            user=users_test[i], market_id=market_id, direction=order_direction["long"])
+        user_position_python_short = get_user_position_python(
+            user=users_test[i], market_id=market_id, direction=order_direction["short"])
+
+        user_position_starknet_long = await get_user_position(
+            user=users[i], market_id=market_id, direction=order_direction["long"])
+        user_position_starknet_short = await get_user_position(
+            user=users[i], market_id=market_id, direction=order_direction["short"])
+
+        for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
+            assert element_1 == pytest.approx(element_2, abs=1e-6)
+
+        for element_1, element_2 in zip(user_position_python_short, user_position_starknet_short):
+            assert element_1 == pytest.approx(element_2, abs=1e-6)
+
+
+# Compare fund balances of starknet and python
+async def compare_fund_balances(executor: OrderExecutor, holding: StarknetContract, liquidity: StarknetContract, fee_balance: StarknetContract, insurance: StarknetContract, asset_id: int):
+    holding_fund_balance = await get_fund_balance(fund=holding, asset_id=asset_id, is_fee_balance=0)
+    holding_fund_balance_python = get_fund_balance_python(
+        executor=executor, fund=fund_mapping["holding_fund"], asset_id=asset_id)
+    assert holding_fund_balance_python == pytest.approx(
+        holding_fund_balance, abs=1e-6)
+
+    liquidity_fund_balance = await get_fund_balance(fund=liquidity, asset_id=asset_id, is_fee_balance=0)
+    liquidity_fund_balance_python = get_fund_balance_python(
+        executor=executor, fund=fund_mapping["liquidity_fund"], asset_id=asset_id)
+    assert liquidity_fund_balance_python == pytest.approx(
+        liquidity_fund_balance, abs=1e-6)
+
+    fee_balance_balance = await get_fund_balance(fund=fee_balance, asset_id=asset_id, is_fee_balance=1)
+    fee_balance_python = get_fund_balance_python(
+        executor=executor, fund=fund_mapping["fee_balance"], asset_id=asset_id)
+    assert fee_balance_python == pytest.approx(
+        fee_balance_balance, abs=1e-6)
+
+    insurance_balance = await get_fund_balance(fund=insurance, asset_id=asset_id, is_fee_balance=0)
+    insurance_balance_python = get_fund_balance_python(
+        executor=executor, fund=fund_mapping["insurance_fund"], asset_id=asset_id)
+    assert insurance_balance_python == pytest.approx(
+        insurance_balance, abs=1e-6)
+
+
+# Assert that the liquidatable position on starknet and python class are the same
+async def compare_liquidatable_position(user: StarknetContract, user_test: User):
+    liquidatable_position_starknet = await get_liquidatable_position_starknet(user)
+    liquidatable_position_python = get_liquidatable_position_python(user_test)
+
+    print("liquidatable_position_starknet", liquidatable_position_starknet)
+    print("liquidatable_position_python", liquidatable_position_python)
+    for i in range(len(liquidatable_position_python)):
+        assert liquidatable_position_python[i] == pytest.approx(
+            liquidatable_position_starknet[i], abs=1e-3)

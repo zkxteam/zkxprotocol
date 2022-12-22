@@ -626,8 +626,11 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         least_collateral_ratio_position_collateral_price=0,
         least_collateral_ratio_position_asset_price=0,
     );
-
-    with_attr error_message("Liquidate: Position doesn't satisfy maintanence margin") {
+    local order_id;
+    local market_id;
+    assert order_id = order.order_id;
+    assert market_id = order.market_id;
+    with_attr error_message("1101: {order_id} {market_id}") {
         assert liq_result = FALSE;
     }
     return ();

@@ -543,13 +543,13 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     let (order_value_with_fee_felt) = Math64x61_add(margin_order_value, fees);
     tempvar order_value_with_fee = order_value_with_fee_felt;
 
-    // // Check if the position can be opened
-    // ILiquidate.check_order_can_be_opened(
-    //     contract_address=liquidate_address_,
-    //     order=order_,
-    //     size=order_size_,
-    //     execution_price=execution_price_,
-    // );
+    // Check if the position can be opened
+    ILiquidate.check_order_can_be_opened(
+        contract_address=liquidate_address_,
+        order=order_,
+        size=order_size_,
+        execution_price=execution_price_,
+    );
 
     // Error messages need local variables to be passed in params
     local order_id_;
