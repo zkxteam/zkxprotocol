@@ -22,6 +22,8 @@ bob_signer = Signer(123456789987654324)
 charlie_signer = Signer(123456789987654325)
 dave_signer = Signer(123456789987654326)
 eduard_signer = Signer(123456789987654327)
+felix_signer = Signer(123456789987654328)
+gary_signer = Signer(123456789987654329)
 
 
 maker_trading_fees = to64x61(0.0002 * 0.97)
@@ -40,7 +42,7 @@ def event_loop():
 
 
 @pytest.fixture(scope='module')
-async def adminAuth_factory(starknet_service: StarknetService):
+async def trading_test_initializer(starknet_service: StarknetService):
     # Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
         admin1_signer.public_key
@@ -77,6 +79,12 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     eduard = await account_factory.deploy_ZKX_account(eduard_signer.public_key)
     eduard_test = User(123456789987654327, eduard.contract_address)
+
+    felix = await account_factory.deploy_ZKX_account(felix_signer.public_key)
+    felix_test = User(123456789987654328, felix.contract_address)
+
+    gary = await account_factory.deploy_ZKX_account(gary_signer.public_key)
+    gary_test = User(123456789987654329, gary.contract_address)
 
     timestamp = int(time.time())
     starknet_service.starknet.state.state.block_info = BlockInfo(
@@ -124,6 +132,8 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [alice.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [bob.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [charlie.contract_address])
+    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [felix.contract_address])
+    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [gary.contract_address])
 
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Asset, 1, asset.contract_address])
@@ -136,7 +146,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.EmergencyFund, 1, emergency.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.LiquidityFund, 1, liquidity.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.InsuranceFund, 1, insurance.contract_address])
-    # await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Liquidate, 1, liquidate.contract_address])
+    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Liquidate, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.CollateralPrices, 1, collateral_prices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.AccountRegistry, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.MarketPrices, 1, marketPrices.contract_address])
@@ -394,12 +404,146 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     # Set the threshold for oracle price in Trading contract
     await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
-    return starknet_service.starknet, adminAuth, relay_fees, admin1, admin2, relay_asset, relay_trading, alice, bob, charlie, dave, eduard, fixed_math, relay_holding, relay_feeBalance, marketPrices, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance
+    return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance
 
 
 @pytest.mark.asyncio
-async def test_revert_balance_low_user_1(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_for_risk_while_opening_order(trading_test_initializer):
+    starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [felix, gary]
+    users_test = [felix_test, gary_test]
+
+    # Sufficient balance for users
+    felix_balance = 100
+    gary_balance = 100
+    balance_array = [felix_balance, gary_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 200
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "price": 200,
+        "order_type": order_types["limit"],
+        "leverage": 10
+    }, {
+        "quantity": 1,
+        "price": 200,
+        "leverage": 3,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
+    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    timestamp = int(time.time()) + 61
+
+    starknet_service.state.state.block_info = BlockInfo(
+        block_number=1, block_timestamp=timestamp, gas_price=starknet_service.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.state.state.block_info.sequencer_address,
+        starknet_version=STARKNET_VERSION
+    )
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [felix, gary]
+    users_test = [felix_test, gary_test]
+
+    # Sufficient balance for users
+    felix_balance = 40
+    gary_balance = 100
+    balance_array = [felix_balance, gary_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_2 = 1
+    market_id_2 = BTC_USD_ID
+    asset_id_2 = AssetID.USDC
+    oracle_price_2 = 40
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_2)
+
+    # Create orders
+    orders_2 = [{
+        "quantity": 1,
+        "price": 40,
+        "order_type": order_types["limit"],
+        "leverage": 10
+    }, {
+        "quantity": 1,
+        "price": 40,
+        "leverage": 3,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_2)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [felix, gary]
+    users_test = [felix_test, gary_test]
+
+    # Sufficient balance for users
+    felix_balance = 40
+    gary_balance = 40
+    balance_array = [felix_balance, gary_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_3 = 1
+    market_id_3 = BTC_USD_ID
+    asset_id_3 = AssetID.USDC
+    oracle_price_3 = 40
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_3)
+
+    # Create orders
+    orders_3 = [{
+        "quantity": 1,
+        "price": 40,
+        "order_type": order_types["limit"],
+        "leverage": 10
+    }, {
+        "quantity": 1,
+        "price": 40,
+        "leverage": 3,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_3, oracle_price=oracle_price_3, trading=trading, is_reverted=1, error_code="1101:", error_at_index=0, param_2=market_id_3)
+
+
+@pytest.mark.asyncio
+async def test_revert_balance_low_user_1(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -437,8 +581,8 @@ async def test_revert_balance_low_user_1(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_balance_low_user_2(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_balance_low_user_2(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -476,8 +620,8 @@ async def test_revert_balance_low_user_2(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_leverage_more_than_allowed_user_1(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_leverage_more_than_allowed_user_1(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -515,8 +659,8 @@ async def test_revert_if_leverage_more_than_allowed_user_1(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_leverage_more_than_allowed_user_2(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_leverage_more_than_allowed_user_2(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -554,8 +698,8 @@ async def test_revert_if_leverage_more_than_allowed_user_2(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_leverage_below_1(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_leverage_below_1(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -593,8 +737,8 @@ async def test_revert_if_leverage_below_1(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_wrong_market_passed(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_wrong_market_passed(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -632,8 +776,8 @@ async def test_revert_if_wrong_market_passed(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_quantity_low_user_1(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_quantity_low_user_1(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -670,8 +814,8 @@ async def test_revert_if_quantity_low_user_1(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_quantity_low_user_2(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_quantity_low_user_2(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -708,8 +852,8 @@ async def test_revert_if_quantity_low_user_2(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_market_order_slippage_error(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_market_order_slippage_error(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -748,8 +892,8 @@ async def test_revert_if_market_order_slippage_error(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_limit_order_bad_short_limit_price(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_limit_order_bad_short_limit_price(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -789,8 +933,8 @@ async def test_revert_if_limit_order_bad_short_limit_price(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_limit_order_bad_long_limit_price(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_limit_order_bad_long_limit_price(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -830,8 +974,8 @@ async def test_revert_if_limit_order_bad_long_limit_price(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_market_untradable(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_market_untradable(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -870,19 +1014,20 @@ async def test_revert_if_market_untradable(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_unregistered_user(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_unregistered_user(trading_test_initializer):
+    _, python_executor, admin1, _, alice, _, _, _, eduard, _, _, alice_test, _, _, eduard_test, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
+
     ###################
     ### Open orders ##
     ###################
     # List of users
-    users = [alice, eduard]
-    users_test = [alice_test, eduard_test]
+    users = [eduard, alice]
+    users_test = [eduard_test, alice_test]
 
     # Sufficient balance for users
     alice_balance = 10000
     eduard_balance = 10000
-    balance_array = [alice_balance, eduard_balance]
+    balance_array = [eduard_balance, alice_balance]
 
     # Batch params for OPEN orders
     quantity_locked_1 = 1
@@ -902,21 +1047,16 @@ async def test_revert_if_unregistered_user(adminAuth_factory):
         "direction": order_direction["short"],
     }]
 
-    error_at_index = 1
-    signed_address = 0
-    if eduard.contract_address > PRIME_HALF:
-        signed_address = eduard.contract_address - PRIME
-    else:
-        signed_address = eduard.contract_address
-    print(signed_address)
-    print(eduard.contract_address)
+    error_at_index = 0
+    signed_address = eduard.contract_address - \
+        PRIME if eduard.contract_address > PRIME_HALF else eduard.contract_address
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0510:", error_at_index=error_at_index, param_2=signed_address)
 
 
 @pytest.mark.asyncio
-async def test_revert_if_taker_direction_wrong(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_taker_direction_wrong(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -954,8 +1094,8 @@ async def test_revert_if_taker_direction_wrong(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_maker_direction_wrong(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_maker_direction_wrong(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -998,8 +1138,8 @@ async def test_revert_if_maker_direction_wrong(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_invalid_batch_extra_maker_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_invalid_batch_extra_maker_orders(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1041,8 +1181,8 @@ async def test_revert_if_invalid_batch_extra_maker_orders(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_insufficient_maker_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_insufficient_maker_orders(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1085,9 +1225,8 @@ async def test_revert_if_insufficient_maker_orders(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_invalid_batch_extra_taker_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
-
+async def test_revert_if_invalid_batch_extra_taker_orders(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -1128,8 +1267,8 @@ async def test_revert_if_invalid_batch_extra_taker_orders(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_taker_post_only_order(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_taker_post_only_order(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1168,8 +1307,8 @@ async def test_revert_if_taker_post_only_order(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_taker_fk_partial_order(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_taker_fk_partial_order(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1209,8 +1348,8 @@ async def test_revert_if_taker_fk_partial_order(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_parent_position_is_empty(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_parent_position_is_empty(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1251,8 +1390,8 @@ async def test_revert_if_parent_position_is_empty(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_maker_order_is_market(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_maker_order_is_market(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1290,8 +1429,8 @@ async def test_revert_if_maker_order_is_market(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_price_beyond_threshold(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_revert_if_price_beyond_threshold(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1330,8 +1469,8 @@ async def test_revert_if_price_beyond_threshold(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_opening_and_closing_full_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_opening_and_closing_full_orders(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1364,7 +1503,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
+    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1391,7 +1530,7 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1401,8 +1540,8 @@ async def test_opening_and_closing_full_orders(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_opening_and_closing_full_orders_with_leverage(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1437,7 +1576,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_1, _) = complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
+    (batch_id_1, _) = complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1464,7 +1603,7 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1474,8 +1613,8 @@ async def test_opening_and_closing_full_orders_with_leverage(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_opening_and_closing_three_orders_full_with_leverage(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1511,7 +1650,7 @@ async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_fac
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
+    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1538,7 +1677,7 @@ async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_fac
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1548,8 +1687,8 @@ async def test_opening_and_closing_three_orders_full_with_leverage(adminAuth_fac
 
 
 @pytest.mark.asyncio
-async def test_IoC_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_IoC_orders(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1585,7 +1724,7 @@ async def test_IoC_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
+    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1609,13 +1748,14 @@ async def test_IoC_orders(adminAuth_factory):
     }]
 
     error_at_index = 0
+
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=1, error_code=f"0001:", error_at_index=error_at_index, param_2=to64x61(quantity_locked_2))
 
 
 @pytest.mark.asyncio
-async def test_opening_partial_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_opening_partial_orders(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1650,7 +1790,7 @@ async def test_opening_partial_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
+    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1674,7 +1814,7 @@ async def test_opening_partial_orders(adminAuth_factory):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
+    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1684,8 +1824,8 @@ async def test_opening_partial_orders(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_closing_partial_orders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_closing_partial_orders(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ##############################
     ### Close orders partially ###
@@ -1724,7 +1864,8 @@ async def test_closing_partial_orders(adminAuth_factory):
     print("Before order execution: ", user_short)
 
     # execute order
-    (_, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
+    (_, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
+    print(complete_orders_1)
 
     user_short = bob_test.get_position(
         market_id=market_id_1, direction=order_direction["short"])
@@ -1750,7 +1891,7 @@ async def test_closing_partial_orders(adminAuth_factory):
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
+    (_, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1759,8 +1900,8 @@ async def test_closing_partial_orders(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_opening_and_closing_full_orders_different_market(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_opening_and_closing_full_orders_different_market(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1797,7 +1938,7 @@ async def test_opening_and_closing_full_orders_different_market(adminAuth_factor
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
+    complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1827,7 +1968,7 @@ async def test_opening_and_closing_full_orders_different_market(adminAuth_factor
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading)
+    complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1836,8 +1977,8 @@ async def test_opening_and_closing_full_orders_different_market(adminAuth_factor
 
 
 @pytest.mark.asyncio
-async def test_placing_order_directly(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_placing_order_directly(trading_test_initializer):
+    _, _, admin1, _, alice, bob, _, dave, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1879,8 +2020,8 @@ async def test_placing_order_directly(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_closing_more_than_parent_size(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_closing_more_than_parent_size(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1945,8 +2086,8 @@ async def test_closing_more_than_parent_size(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_invalid_liquidation(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_invalid_liquidation(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -2016,8 +2157,8 @@ async def test_invalid_liquidation(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_invalid_deleverage(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, eduard, fixed_math, holding, fee_balance, _, alice_test, bob_test, charlie_test, eduard_test, python_executor, liquidity, insurance = adminAuth_factory
+async def test_invalid_deleverage(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
     ###################
     ### Open orders ##
