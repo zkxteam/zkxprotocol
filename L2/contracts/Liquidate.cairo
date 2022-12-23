@@ -53,10 +53,6 @@ func maintenance() -> (maintenance: felt) {
 func acc_value() -> (acc_value: felt) {
 }
 
-@storage_var
-func debug(id: felt) -> (res: felt) {
-}
-
 @view
 func return_maintenance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     res: felt
@@ -70,14 +66,6 @@ func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     res: felt
 ) {
     let (_acc_value) = acc_value.read();
-    return (res=_acc_value);
-}
-
-@view
-func return_position_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    index: felt
-) -> (res: felt) {
-    let (_acc_value) = debug.read(id=index);
     return (res=_acc_value);
 }
 
@@ -433,8 +421,6 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     }
 
     let (pnl) = Math64x61_mul(price_diff_, position_details.position_size);
-
-    debug.write(id=positions_len, value=test_);
 
     // Calculate the value of the current account margin in usd
     let (position_value_wo_pnl: felt) = Math64x61_sub(
