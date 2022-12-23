@@ -25,6 +25,9 @@ from contracts.Constants import (
     HighTideCalc_INDEX,
     ManageHighTide_ACTION,
     Market_INDEX,
+    SEASON_CREATED,
+    SEASON_ENDED,
+    SEASON_STARTED,
     Starkway_INDEX,
 )
 from contracts.DataTypes import (
@@ -320,7 +323,7 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Create Trading season struct to store
     let trading_season: TradingSeason = TradingSeason(
-        start_block_number=0, start_timestamp=start_timestamp_, num_trading_days=num_trading_days_
+        start_block_number=0, start_timestamp=start_timestamp_, num_trading_days=num_trading_days_, status=SEASON_CREATED
     );
 
     trading_season_by_id.write(season_id, trading_season);
@@ -345,6 +348,10 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
     validate_season_to_start(season_id_);
+
+    with_attr error_message("HighTide: Season's status should be created to start ") {
+        assert new_season.status == SEASON_CREATED
+    }
 
     let (new_season: TradingSeason) = get_season(season_id_);
 
