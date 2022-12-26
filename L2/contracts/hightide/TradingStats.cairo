@@ -371,19 +371,19 @@ func record_trade_batch_stats_recurse{
     local curr_order_size_64x61;
 
     // Check if size is less than or equal to postionSize
-    let cmp_res = is_le(order_size_64x61_, [request_list_].positionSize);
+    let cmp_res = is_le(order_size_64x61_, [request_list_].quantity);
 
     if (cmp_res == 1) {
         // If yes, make the order_size to be size
         assert curr_order_size_64x61 = order_size_64x61_;
     } else {
         // If no, make order_size to be the positionSize̦
-        assert curr_order_size_64x61 = [request_list_].positionSize;
+        assert curr_order_size_64x61 = [request_list_].quantity;
     }
 
     // Update running total of order volume
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=[request_list_].closeOrder
+        season_id=season_id_, pair_id=pair_id_, order_type=[request_list_].life_cycle
     );
 
     let (current_len) = num_orders.read(volume_metadata);
@@ -399,17 +399,19 @@ func record_trade_batch_stats_recurse{
     num_orders.write(volume_metadata, current_len + 1);
 
     // Update number of unique active traders for a pair in a season
-    let (trader_status) = trader_for_pair.read(season_id_, pair_id_, [request_list_].pub_key);
+    let (trader_status) = trader_for_pair.read(season_id_, pair_id_, [request_list_].user_address);
 
     // If trader was not active for pair in this season
     if (trader_status == 0) {
         // Mark trader as active
-        trader_for_pair.write(season_id_, pair_id_, [request_list_].pub_key, 1);
+        trader_for_pair.write(season_id_, pair_id_, [request_list_].user_address, 1);
         let (current_num_traders) = num_traders.read(season_id_, pair_id_);
         // Increment count of unique active traders for pair in season
         num_traders.write(season_id_, pair_id_, current_num_traders + 1);
         // Store trader address for pair in this season at current index
-        traders_in_pair.write(season_id_, pair_id_, current_num_traders, [request_list_].pub_key);
+        traders_in_pair.write(
+            season_id_, pair_id_, current_num_traders, [request_list_].user_address
+        );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -423,8 +425,8 @@ func record_trade_batch_stats_recurse{
     trade_recorded.emit(
         season_id_,
         pair_id_,
-        [request_list_].pub_key,
-        [request_list_].closeOrder,
+        [request_list_].user_address,
+        [request_list_].life_cycle,
         curr_order_size_64x61,
         execution_price_64x61_,
     );

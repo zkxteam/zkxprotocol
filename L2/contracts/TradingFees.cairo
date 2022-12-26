@@ -157,7 +157,7 @@ func get_user_fee_and_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     );
 
     local base_fee;
-    if (side_ == 0) {
+    if (side_ == 1) {
         base_fee = base_fee_maker;
     } else {
         base_fee = base_fee_taker;

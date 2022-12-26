@@ -33,10 +33,12 @@ from contracts.Constants import (
     ABR_PAYMENT_INDEX,
     Asset_INDEX,
     DELEVERAGING_ORDER,
+    IoC,
     L1_ZKX_Address_INDEX,
     Liquidate_INDEX,
     LIQUIDATION_ORDER,
     LONG,
+    OPEN,
     POSITION_OPENED,
     POSITION_TO_BE_DELEVERAGED,
     POSITION_TO_BE_LIQUIDATED,
@@ -76,9 +78,9 @@ from contracts.Math_64x61 import (
     Math64x61_sub,
 )
 
-////////////
+// //////////
 // Events //
-////////////
+// //////////
 
 // Event emitted whenever collateral is transferred from account by trading
 @event
@@ -115,9 +117,9 @@ func liquidate_deleverage(market_id: felt, direction: felt, amount_to_be_sold: f
 func deposited(asset_id: felt, amount: felt) {
 }
 
-/////////////
+// ///////////
 // Storage //
-/////////////
+// ///////////
 
 // Stores public key associated with an account
 @storage_var
@@ -131,12 +133,12 @@ func balance(assetID: felt) -> (res: felt) {
 
 // Mapping of marketID, direction to PositionDetails struct
 @storage_var
-func position_mapping(marketID: felt, direction: felt) -> (res: PositionDetails) {
+func position_mapping(market_id: felt, direction: felt) -> (res: PositionDetails) {
 }
 
 // Mapping of orderID to portionExecuted of that order
 @storage_var
-func portion_executed(orderID: felt) -> (res: felt) {
+func portion_executed(order_id: felt) -> (res: felt) {
 }
 
 // Mapping of orderID to the timestamp of last updated value
@@ -204,9 +206,9 @@ func withdrawal_history_array_len() -> (len: felt) {
 func order_id_mapping(order_id: felt) -> (hash: felt) {
 }
 
-/////////////////
+// ///////////////
 // Constructor //
-/////////////////
+// ///////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -224,9 +226,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-////////////////////
+// //////////////////
 // View Functions //
-////////////////////
+// //////////////////
 
 // @notice view function to get public key
 // @return res - public key of an account
@@ -310,6 +312,14 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return (res=res);
 }
 
+@view
+func get_portion_executed{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    order_id_: felt
+) -> (res: felt) {
+    let (res) = portion_executed.read(order_id=order_id_);
+    return (res=res);
+}
+
 // @notice view function to get order details
 // @param orderID_ - ID of an order
 // @return res - Order details corresponding to an order
@@ -317,7 +327,7 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func get_position_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, direction_: felt
 ) -> (res: PositionDetails) {
-    let (res) = position_mapping.read(marketID=market_id_, direction=direction_);
+    let (res) = position_mapping.read(market_id=market_id_, direction=direction_);
     return (res=res);
 }
 
@@ -384,9 +394,9 @@ func timestamp_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return (is_eight_hours,);
 }
 
-////////////////
+// //////////////
 // L1 Handler //
-////////////////
+// //////////////
 
 // @notice Function to handle deposit from L1ZKX contract
 // @param from_address - The address from where deposit function is called from
@@ -442,9 +452,9 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return ();
 }
 
-////////////////////////
+// //////////////////////
 // External Functions //
-////////////////////////
+// //////////////////////
 
 // @notice External function called by the Trading Contract
 // @param assetID_ - asset ID of the collateral that needs to be transferred
@@ -619,6 +629,9 @@ func execute_order{
     market_id: felt,
 ) -> (res: felt) {
     alloc_locals;
+    local order_id;
+    assert order_id = request.order_id;
+
     let (__fp__, _) = get_fp_and_pc();
 
     // Make sure that the caller is the authorized Trading Contract
@@ -629,7 +642,7 @@ func execute_order{
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
     );
-    with_attr error_message("AccountManager: Unauthorized caller for execute_order") {
+    with_attr error_message("0002: {order_id} {market_id}") {
         assert caller = trading_address;
     }
 
@@ -637,31 +650,36 @@ func execute_order{
     let (hash) = hash_order(&request);
 
     // Check for hash collision
-    order_hash_check(request.orderID, hash);
+    order_hash_check(request.order_id, hash);
 
     // check if signed by the user/liquidator
-    is_valid_signature_order(hash, signature, request.liquidatorAddress);
+    is_valid_signature_order(hash, signature, request.liquidator_address);
 
     // Get the details of the position
     let (position_details: PositionDetails) = position_mapping.read(
-        marketID=market_id, direction=request.direction
+        market_id=market_id, direction=request.direction
     );
 
     // Get the portion executed details if already exists
-    let (order_portion_executed) = portion_executed.read(orderID=request.orderID);
+    let (order_portion_executed) = portion_executed.read(order_id=request.order_id);
     let (new_position_executed) = Math64x61_add(order_portion_executed, size);
 
     // Return if the position size after the executing the current order is more than the order's positionSize
-    with_attr error_message("AccountManager: New position size larger than order") {
-        assert_le(new_position_executed, request.positionSize);
+    with_attr error_message("0001: {order_id} {size}") {
+        assert_le(new_position_executed, request.quantity);
     }
 
-    // Update the portion executed
-    portion_executed.write(orderID=request.orderID, value=new_position_executed);
+    if (request.time_in_force == IoC) {
+        // Update the portion executed to request.quantity if it's an IoC order
+        portion_executed.write(order_id=request.order_id, value=request.quantity);
+    } else {
+        // Update the portion executed
+        portion_executed.write(order_id=request.order_id, value=new_position_executed);
+    }
 
-    // closeOrder == 0 -> Open a new position
-    // closeOrder == 1 -> Close a position
-    if (request.closeOrder == 0) {
+    // closeOrder == 1 -> Open a new position
+    // closeOrder == 2 -> Close a position
+    if (request.life_cycle == OPEN) {
         if (position_details.position_size == 0) {
             add_to_market_array(market_id);
             tempvar syscall_ptr = syscall_ptr;
@@ -695,7 +713,7 @@ func execute_order{
 
         // Write to the mapping
         position_mapping.write(
-            marketID=market_id, direction=request.direction, value=updated_position
+            market_id=market_id, direction=request.direction, value=updated_position
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -712,17 +730,12 @@ func execute_order{
 
         // Get the parent position details
         let (parent_position_details) = position_mapping.read(
-            marketID=market_id, direction=parent_direction
+            market_id=market_id, direction=parent_direction
         );
         let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size);
 
-        // Assert that the parent position is open
-        with_attr error_message("AccountManager: Parent Position is not open") {
-            assert_not_zero(parent_position_details.position_size);
-        }
-
         // Assert that the size amount can be closed from the parent position
-        with_attr error_message("AccountManager: Cannot close more thant the positionSize") {
+        with_attr error_message("0003: {order_id} {size}") {
             assert_nn(new_position_size);
         }
 
@@ -730,19 +743,18 @@ func execute_order{
         local new_leverage;
 
         // Check if it's liq/delveraging order
-        let is_liq = is_le(2, request.orderType);
+        let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
 
         if (is_liq == 1) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
             let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read();
 
-            with_attr error_message(
-                    "AccountManager: Position not marked as liquidatable/deleveragable") {
+            with_attr error_message("0004: {order_id} {market_id}") {
                 assert liq_position.market_id = market_id;
                 assert liq_position.direction = parent_direction;
             }
 
-            with_attr error_message("AccountManager: Order size larger than marked one") {
+            with_attr error_message("0005: {order_id} {size}") {
                 assert_le(size, liq_position.amount_to_be_sold);
             }
 
@@ -771,8 +783,8 @@ func execute_order{
             deleveragable_or_liquidatable_position.write(value=updated_liquidatable_position);
 
             // If it's a deleveraging order, calculate the new leverage
-            if (request.orderType == DELEVERAGING_ORDER) {
-                with_attr error_message("AccountManager: Position not marked as deleveragable") {
+            if (request.order_type == DELEVERAGING_ORDER) {
+                with_attr error_message("0007: {order_id} {size}") {
                     assert liq_position.liquidatable = FALSE;
                 }
                 let total_value = margin_amount + borrowed_amount;
@@ -782,7 +794,7 @@ func execute_order{
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             } else {
-                with_attr error_message("AccountManager: Position not marked as liquidatable") {
+                with_attr error_message("0006: {order_id} {size}") {
                     assert liq_position.liquidatable = TRUE;
                 }
 
@@ -814,23 +826,12 @@ func execute_order{
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
-            } else {
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
             }
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
         }
 
         // Write to the mapping
         position_mapping.write(
-            marketID=market_id, direction=parent_direction, value=updated_position
+            market_id=market_id, direction=parent_direction, value=updated_position
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1040,9 +1041,9 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return ();
 }
 
-////////////////////////
+// //////////////////////
 // Internal Functions //
-////////////////////////
+// //////////////////////
 
 // @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
 // @param withdrawal_list_len_ - Stores the current length of the populated withdrawals array
@@ -1109,12 +1110,12 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
-        marketID=curr_market_id, direction=LONG
+        market_id=curr_market_id, direction=LONG
     );
 
     // Get Short position
     let (short_position: PositionDetails) = position_mapping.read(
-        marketID=curr_market_id, direction=SHORT
+        market_id=curr_market_id, direction=SHORT
     );
 
     local is_long;
@@ -1181,12 +1182,12 @@ func populate_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
-        marketID=curr_market_id, direction=LONG
+        market_id=curr_market_id, direction=LONG
     );
 
     // Get Short position
     let (short_position: PositionDetails) = position_mapping.read(
-        marketID=curr_market_id, direction=SHORT
+        market_id=curr_market_id, direction=SHORT
     );
 
     // Calculate the net position
@@ -1215,7 +1216,7 @@ func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res
     let hash_ptr = pedersen_ptr;
     with hash_ptr {
         let (hash_state_ptr) = hash_init();
-        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 10);
+        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 11);
         let (res) = hash_finalize(hash_state_ptr);
         let pedersen_ptr = hash_ptr;
         return (res=res);

@@ -46,6 +46,9 @@ namespace IAccountManager {
     ) {
     }
 
+    func get_portion_executed(order_id_: felt) -> (res: felt) {
+    }
+
     func transfer_from_abr(collateral_id_: felt, market_id_: felt, amount_: felt) {
     }
 

@@ -1,3 +1,4 @@
+from utils import ContractIndex, ManagerAction, assert_revert, to64x61
 import pytest
 import asyncio
 from starkware.starknet.testing.starknet import Starknet
@@ -24,14 +25,15 @@ async def adminAuth_factory(starknet_service: StarknetService):
     admin2 = await starknet_service.deploy(ContractType.Account, [
         signer2.public_key
     ])
-    
+
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
+    account_factory = AccountFactory(
+        starknet_service, L1_dummy_address, registry.contract_address, 1)
     user1 = await account_factory.deploy_ZKX_account(signer3.public_key)
 
     non_discount = 2305843009213693952 - to64x61(0.03)
@@ -47,15 +49,15 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     # Deploy relay contracts with appropriate indexes
     relay_feeDiscount = await starknet_service.deploy(ContractType.RelayFeeDiscount, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
-        3 # feeDiscount index
+        3  # feeDiscount index
     ])
 
     relay_fees = await starknet_service.deploy(ContractType.RelayTradingFees, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
-        4 # tradingFees index
+        4  # tradingFees index
     ])
 
     # Give appripritae permissions to relays
@@ -151,6 +153,7 @@ async def test_update_discount(adminAuth_factory):
     assert result.numberOfTokens == 5000
     assert result.discount == discount3
 
+
 @pytest.mark.asyncio
 async def test_get_fee1(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
@@ -160,9 +163,10 @@ async def test_get_fee1(adminAuth_factory):
     # result = execution_info.result
     # assert result.fee == to64x61(0.0002 * 0.97)
 
-    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 2).call()
     result = execution_info.result
     assert result.fee == to64x61(0.0005 * 0.97)
+
 
 @pytest.mark.asyncio
 async def test_get_fee2(adminAuth_factory):
@@ -170,13 +174,14 @@ async def test_get_fee2(adminAuth_factory):
 
     await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 1000])
 
-    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 0).call()
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
     result = execution_info.result
     assert result.fee == to64x61(0.00015 * 0.95)
 
-    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 2).call()
     result = execution_info.result
     assert result.fee == to64x61(0.0004 * 0.95)
+
 
 @pytest.mark.asyncio
 async def test_update_base_fee_tier_to_higher_value(adminAuth_factory):
@@ -185,9 +190,11 @@ async def test_update_base_fee_tier_to_higher_value(adminAuth_factory):
     base_fee_maker3 = to64x61(0.0001)
     base_fee_taker3 = to64x61(0.00035)
     await assert_revert(
-        signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [5, 5000, base_fee_maker3, base_fee_taker3]),
+        signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [
+                                 5, 5000, base_fee_maker3, base_fee_taker3]),
         reverted_with="TradingFees: Invalid tier"
     )
+
 
 @pytest.mark.asyncio
 async def test_update_discount_tier_to_higher_value(adminAuth_factory):
@@ -195,9 +202,11 @@ async def test_update_discount_tier_to_higher_value(adminAuth_factory):
 
     discount3 = to64x61(0.1)
     await assert_revert(
-        signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [5, 5000, discount3]),
-        reverted_with="TradingFees: Invalid tier"    
+        signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [
+                                 5, 5000, discount3]),
+        reverted_with="TradingFees: Invalid tier"
     )
+
 
 @pytest.mark.asyncio
 async def test_update_base_fee_tier_with_incorrect_tier_and_details(adminAuth_factory):
@@ -231,6 +240,7 @@ async def test_update_base_fee_tier_with_incorrect_tier_and_details(adminAuth_fa
     base_fee_taker1 = to64x61(0.0004)
     await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")
 
+
 @pytest.mark.asyncio
 async def test_update_discount_tier_with_incorrect_tier_and_details(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
@@ -250,14 +260,7 @@ async def test_update_discount_tier_with_incorrect_tier_and_details(adminAuth_fa
     discount3 = to64x61(0.05)
     await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [1, 5000, discount3]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")
 
-### RELAY
-
-import pytest
-import asyncio
-from utils import ContractIndex, ManagerAction, assert_revert, to64x61
-from helpers import StarknetService, ContractType, AccountFactory
-from dummy_addresses import L1_dummy_address
-from dummy_signers import signer1, signer2, signer3
+# RELAY
 
 
 @pytest.fixture(scope='module')
@@ -275,14 +278,15 @@ async def adminAuth_factory(starknet_service: StarknetService):
     admin2 = await starknet_service.deploy(ContractType.Account, [
         signer2.public_key
     ])
-    
+
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
+    account_factory = AccountFactory(
+        starknet_service, L1_dummy_address, registry.contract_address, 1)
     user1 = await account_factory.deploy_ZKX_account(signer3.public_key)
 
     # Give necessary permissions to admin1
@@ -296,13 +300,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     # Deploy relay contracts
     relay_feeDiscount = await starknet_service.deploy(ContractType.RelayFeeDiscount, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
         ContractIndex.FeeDiscount
     ])
 
     relay_fees = await starknet_service.deploy(ContractType.RelayTradingFees, [
-        registry.contract_address, 
+        registry.contract_address,
         1,
         ContractIndex.TradingFees
     ])
@@ -311,7 +315,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_feeDiscount.contract_address, ManagerAction.ManageFeeDetails, True])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_fees.contract_address, ManagerAction.ManageFeeDetails, True])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_feeDiscount.contract_address, ManagerAction.ManageGovernanceToken, True])
-    
+
     await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 100])
 
     return adminAuth, fees, admin1, admin2, user1, feeDiscount
@@ -408,13 +412,15 @@ async def test_update_discount(adminAuth_factory):
     result = execution_info.result.value
     assert result == 3
 
+
 @pytest.mark.asyncio
 async def test_get_fee1(adminAuth_factory):
     adminAuth, fees, admin1, admin2, user1, feeDiscount = adminAuth_factory
 
-    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 2).call()
     result = execution_info.result
     assert result.fee == to64x61(0.0005 * 0.97)
+
 
 @pytest.mark.asyncio
 async def test_get_fee2(adminAuth_factory):
@@ -422,13 +428,14 @@ async def test_get_fee2(adminAuth_factory):
 
     await signer1.send_transaction(admin1, feeDiscount.contract_address, 'increment_governance_tokens', [user1.contract_address, 1000])
 
-    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 0).call()
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
     result = execution_info.result
     assert result.fee == to64x61(0.00015 * 0.95)
 
-    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 1).call()
+    execution_info = await fees.get_user_fee_and_discount(user1.contract_address, 2).call()
     result = execution_info.result
     assert result.fee == to64x61(0.0004 * 0.95)
+
 
 @pytest.mark.asyncio
 async def test_update_base_fee_tier_to_higher_value(adminAuth_factory):
@@ -437,9 +444,11 @@ async def test_update_base_fee_tier_to_higher_value(adminAuth_factory):
     base_fee_maker3 = to64x61(0.0001)
     base_fee_taker3 = to64x61(0.00035)
     await assert_revert(
-        signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [5, 5000, base_fee_maker3, base_fee_taker3]),
+        signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [
+                                 5, 5000, base_fee_maker3, base_fee_taker3]),
         reverted_with="TradingFees: Invalid tier"
     )
+
 
 @pytest.mark.asyncio
 async def test_update_discount_tier_to_higher_value(adminAuth_factory):
@@ -447,9 +456,11 @@ async def test_update_discount_tier_to_higher_value(adminAuth_factory):
 
     discount3 = to64x61(0.1)
     await assert_revert(
-        signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [5, 5000, discount3]),
-        reverted_with="TradingFees: Invalid tier"    
+        signer1.send_transaction(admin1, fees.contract_address, 'update_discount', [
+                                 5, 5000, discount3]),
+        reverted_with="TradingFees: Invalid tier"
     )
+
 
 @pytest.mark.asyncio
 async def test_update_base_fee_tier_with_incorrect_tier_and_details(adminAuth_factory):
@@ -482,6 +493,7 @@ async def test_update_base_fee_tier_with_incorrect_tier_and_details(adminAuth_fa
     base_fee_maker1 = to64x61(0.0002)
     base_fee_taker1 = to64x61(0.0004)
     await assert_revert(signer1.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1]), reverted_with="TradingFees: Invalid fees for the tier to exisiting upper tiers")
+
 
 @pytest.mark.asyncio
 async def test_update_discount_tier_with_incorrect_tier_and_details(adminAuth_factory):
