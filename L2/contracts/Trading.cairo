@@ -307,8 +307,6 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     let (lower_limit: felt) = Math64x61_sub(price_, threshold);
     let (upper_limit: felt) = Math64x61_add(price_, threshold);
 
-    local lower_limit_;
-    assert lower_limit_ = lower_limit;
     with_attr error_message("0506: {order_id_} {execution_price_}") {
         assert_in_range(execution_price_, lower_limit, upper_limit);
     }
@@ -1026,6 +1024,11 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Quantity remaining to be executed
     let (quantity_remaining: felt) = Math64x61_sub(quantity_locked_, quantity_executed_);
 
+    // Get the portion executed of the order
+    let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
+        contract_address=user_address, order_id_=order_id
+    );
+
     // Taker order
     if (quantity_remaining == 0) {
         // There must only be a single Taker order; hence they must be the last order in the batch
@@ -1105,7 +1108,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         }
 
         // Get min of remaining quantity and the order quantity
-        let cmp_res = is_le(quantity_remaining, temp_order.quantity);
+        let (executable_quantity: felt) = Math64x61_sub(quantity_order, order_portion_executed);
+        let cmp_res = is_le(quantity_remaining, executable_quantity);
 
         // If yes, make the quantity_to_execute to be quantity_remaining
         // i.e Partial order
@@ -1116,13 +1120,16 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
-            // Full execution
         } else {
-            assert quantity_to_execute = temp_order.quantity;
+            assert quantity_to_execute = executable_quantity;
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
+        }
+
+        with_attr error_message("0520: {order_id} {quantity_remaining}") {
+            assert_not_zero(quantity_to_execute);
         }
 
         // Add the executed quantity to the running sum of quantity executed
@@ -1136,7 +1143,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert execution_price = temp_order.price;
 
         // Add to the weighted sum of the execution prices
-        let (new_total_order_volume_) = Math64x61_mul(temp_order.price, quantity_to_execute);
+        let (new_order_volume) = Math64x61_mul(temp_order.price, quantity_to_execute);
+        let (new_total_order_volume_) = Math64x61_add(new_order_volume, total_order_volume_);
         // Write to local variable
         assert new_total_order_volume = new_total_order_volume_;
 

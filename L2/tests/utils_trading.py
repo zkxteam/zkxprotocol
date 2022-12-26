@@ -215,7 +215,7 @@ class User:
             })
         return collateral_array_with_balances
 
-    def get_portion_executed(self, order_id: int) -> int:
+    def get_portion_executed(self, order_id: int) -> float:
         try:
             return self.portion_executed[order_id]
         except KeyError:
@@ -729,10 +729,15 @@ class OrderExecutor:
                     print("Taker order must be the last order in the list")
                     return
 
-                if quantity_remaining < request_list[i]["quantity"]:
+                order_portion_executed = user_list[i].get_portion_executed(
+                    order_id=request_list[i]["order_id"])
+                executable_quantity = request_list[i]["quantity"] - \
+                    order_portion_executed
+
+                if quantity_remaining < executable_quantity:
                     quantity_to_execute = quantity_remaining
                 else:
-                    quantity_to_execute = request_list[i]["quantity"]
+                    quantity_to_execute = executable_quantity
 
                 quantity_executed += quantity_to_execute
                 execution_price = request_list[i]["price"]
