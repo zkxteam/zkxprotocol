@@ -373,7 +373,8 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) {
-    let (registry) = CommonLib.get_registry_address();
+    alloc_locals;
+    let (local registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
     // Auth check
@@ -385,6 +386,21 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     with_attr error_message("HighTide: Trading season is still active") {
         assert is_expired = TRUE;
     }
+
+    // Get HightideCalc contract address from Authorized Registry
+    let (hightide_calc_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=HighTideCalc_INDEX, version=version
+    );
+
+    // Calculate hightide factors
+    IHighTideCalc.calculate_high_tide_factors(
+        contract_address=hightide_calc_address, season_id_=season_id_
+    );
+
+    // Calculate R (Funds flow)
+    IHighTideCalc.calculate_funds_flow(
+        contract_address=hightide_calc_address, season_id_=season_id_
+    );
 
     current_trading_season.write(0);
 
@@ -647,7 +663,7 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     ) = get_hightide_reward_tokens(hightide_id_);
 
     // Recursively distribute rewards to all active traders for the specified hightide
-    return distribute_rewards_recurse(
+    distribute_rewards_recurse(
         hightide_metadata_=hightide_metadata,
         funds_flow_64x61_=funds_flow_64x61,
         hightide_calc_address_=hightide_calc_address,
@@ -656,6 +672,12 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         reward_tokens_list_len=reward_tokens_list_len,
         reward_tokens_list=reward_tokens_list,
     );
+
+    ILiquidityPool.perform_return_or_burn(
+        contract_address=hightide_metadata.liquidity_pool_address
+    );
+
+    return ();
 }
 
 // ///////////

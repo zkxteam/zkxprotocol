@@ -1404,10 +1404,6 @@ async def test_calculating_factors(hightide_test_initializer):
         to64x61(1),
     ])
 
-    set_factors_tx = await dave_signer.send_transaction(dave, hightideCalc.contract_address, "calculate_high_tide_factors", [
-        season_id,
-    ])
-
     ETH_factors = await hightideCalc.get_hightide_factors(season_id, ETH_USD_ID).call()
     ETH_parsed = list(ETH_factors.result.res)
     print(ETH_parsed)

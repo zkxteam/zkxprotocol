@@ -9,6 +9,8 @@ from starkware.starknet.core.os.class_hash import compute_class_hash
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals, assert_event_emitted
+from utils_asset import AssetID, build_asset_properties
+from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -18,24 +20,9 @@ admin2_signer = Signer(123456789987654322)
 alice_signer = Signer(123456789987654323)
 bob_signer = Signer(123456789987654324)
 charlie_signer = Signer(123456789987654325)
-dave_signer = Signer(123456789987654326)
-eduard_signer = Signer(123456789987654327)
-gary_signer = Signer(123456789987654328)
 
-maker_trading_fees = to64x61(0.0002 * 0.97)
-taker_trading_fees = to64x61(0.0005 * 0.97)
-
-BTC_ID = str_to_felt("32f0406jz7qj8")
-ETH_ID = str_to_felt("65ksgn23nv")
-USDC_ID = str_to_felt("fghj3am52qpzsib")
-UST_ID = str_to_felt("yjk45lvmasopq")
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
-BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
-TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
-UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
-DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
-TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
 class_hash = 0
 
 initial_timestamp = int(time.time())
@@ -62,7 +49,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
-    fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
 
     contract_class = starknet_service.contracts_holder.get_contract_class(ContractType.LiquidityPool)
@@ -82,9 +68,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
     bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
-    dave = await account_factory.deploy_account(dave_signer.public_key)
-    eduard = await account_factory.deploy_account(eduard_signer.public_key)
-    gary = await account_factory.deploy_account(gary_signer.public_key)
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
@@ -95,25 +78,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
 
     ### Deploy infrastructure (Part 2)
-    fixed_math = await starknet_service.deploy(ContractType.Math_64x61, [])
-    holding = await starknet_service.deploy(ContractType.Holding, [registry.contract_address, 1])
-    feeBalance = await starknet_service.deploy(ContractType.FeeBalance, [registry.contract_address, 1])
     market = await starknet_service.deploy(ContractType.Markets, [registry.contract_address, 1])
-    liquidity = await starknet_service.deploy(ContractType.LiquidityFund, [registry.contract_address, 1])
-    insurance = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
-    emergency = await starknet_service.deploy(ContractType.EmergencyFund, [registry.contract_address, 1])
-    trading = await starknet_service.deploy(ContractType.Trading, [registry.contract_address, 1])
-    feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
-    marketPrices = await starknet_service.deploy(ContractType.MarketPrices, [registry.contract_address, 1])
-    liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
-    collateral_prices = await starknet_service.deploy(
-        ContractType.CollateralPrices, 
-        [registry.contract_address, 1]
-    )
     hightide = await starknet_service.deploy(ContractType.TestHighTide, [registry.contract_address, 1])
     leaderboard = await starknet_service.deploy(ContractType.Leaderboard, [registry.contract_address, 1])
-    trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
-    user_stats = await starknet_service.deploy(ContractType.UserStats, [registry.contract_address, 1])
 
     # Access 1 allows adding and removing assets from the system
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
@@ -137,70 +104,90 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[alice.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[bob.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[charlie.contract_address])
-    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry',[dave.contract_address])
 
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [2, 1, market.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [3, 1, feeDiscount.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [4, 1, fees.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [5, 1, trading.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [6, 1, feeBalance.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [7, 1, holding.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [8, 1, emergency.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [9, 1, liquidity.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [10, 1, insurance.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [13, 1, collateral_prices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [21, 1, marketPrices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [24, 1, hightide.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [25, 1, trading_stats.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [26, 1, user_stats.contract_address])
-    
-    # Add base fee and discount in Trading Fee contract
-    base_fee_maker1 = to64x61(0.0002)
-    base_fee_taker1 = to64x61(0.0005)
-    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1])
-    base_fee_maker2 = to64x61(0.00015)
-    base_fee_taker2 = to64x61(0.0004)
-    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_base_fees', [2, 1000, base_fee_maker2, base_fee_taker2])
-    base_fee_maker3 = to64x61(0.0001)
-    base_fee_taker3 = to64x61(0.00035)
-    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_base_fees', [3, 5000, base_fee_maker3, base_fee_taker3])
-    discount1 = to64x61(0.03)
-    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [1, 0, discount1])
-    discount2 = to64x61(0.05)
-    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [2, 1000, discount2])
-    discount3 = to64x61(0.1)
-    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [3, 5000, discount3])
 
     # Add assets
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [BTC_ID, 1, str_to_felt("BTC"), str_to_felt("Bitcoin"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [ETH_ID, 1, str_to_felt("ETH"), str_to_felt("Etherum"), 1, 0, 18, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [USDC_ID, 1, str_to_felt("USDC"), str_to_felt("USDC"), 0, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [UST_ID, 1, str_to_felt("UST"), str_to_felt("UST"), 1, 1, 6, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [DOGE_ID, 1, str_to_felt("DOGE"), str_to_felt("DOGECOIN"), 0, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', [TSLA_ID, 1, str_to_felt("TESLA"), str_to_felt("TESLA MOTORS"), 1, 0, 8, 0, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    BTC_properties = build_asset_properties(
+        id=AssetID.BTC,
+        asset_version=1,
+        short_name=str_to_felt("BTC"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_properties)
+
+    ETH_properties = build_asset_properties(
+        id=AssetID.ETH,
+        asset_version=1,
+        short_name=str_to_felt("ETH"),
+        is_tradable=True,
+        is_collateral=False,
+        token_decimal=18
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', ETH_properties)
+    
+    USDC_properties = build_asset_properties(
+        id=AssetID.USDC,
+        asset_version=1,
+        short_name=str_to_felt("USDC"),
+        is_tradable=False,
+        is_collateral=True,
+        token_decimal=6
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
 
     # Add markets
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, BTC_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_UST_ID, BTC_ID, UST_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, ETH_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [TSLA_USD_ID, TSLA_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [UST_USDC_ID, UST_ID, USDC_ID, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), 1, 1, 1, 100, 1000, 10000])
+    BTC_USD_properties = MarketProperties(
+        id=BTC_USD_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
 
-    # Update collateral prices
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, to64x61(1)])
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [UST_ID, to64x61(1)])
-
-    # Fund the Holding contract
-    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [UST_ID, to64x61(1000000)])
-
-    # Fund the Liquidity fund contract
-    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [USDC_ID, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [UST_ID, to64x61(1000000)])
+    ETH_USD_properties = MarketProperties(
+        id=ETH_USD_ID,
+        asset=AssetID.ETH,
+        asset_collateral=AssetID.USDC,
+        leverage=to64x61(10),
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=1,
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
 
     season_id = 1
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
@@ -210,24 +197,17 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await admin1_signer.send_transaction(admin1, hightide.contract_address,'set_liquidity_pool_contract_class_hash',[class_hash])
 
-    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [ETH_USD_ID, 1, admin1.contract_address, 1, 2, USDC_ID, 1000, 0, UST_ID, 500, 0])
-    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [TSLA_USD_ID, 1, admin1.contract_address, 1, 2, USDC_ID, 1000, 0, UST_ID, 500, 0])
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [ETH_USD_ID, 1, admin1.contract_address, 1, 2, AssetID.USDC, 1000, 0, AssetID.UST, 500, 0])
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', [BTC_USD_ID, 1, admin1.contract_address, 1, 2, AssetID.USDC, 1000, 0, AssetID.UST, 500, 0])
 
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'activate_high_tide', [1])
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'activate_high_tide', [2])
 
-    await admin1_signer.send_transaction(admin1, alice.contract_address, 'set_balance', [USDC_ID, to64x61(100000)])
-    await admin1_signer.send_transaction(admin1, bob.contract_address, 'set_balance', [USDC_ID, to64x61(100000)])
-
-    return starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate, trading_stats, hightide, leaderboard
-
-@pytest.mark.asyncio
-async def test_setting_leaderboard_without_setting_params(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    return starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard
 
 @pytest.mark.asyncio
 async def test_setting_time_between_calls_unauthorized(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
 
     await assert_revert(
         admin2_signer.send_transaction(admin2, leaderboard.contract_address, "set_time_between_calls", [300]),
@@ -239,7 +219,7 @@ async def test_setting_time_between_calls_unauthorized(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_time_between_calls_invalid(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
 
     await assert_revert(
         admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_time_between_calls", [0]),
@@ -251,7 +231,7 @@ async def test_setting_time_between_calls_invalid(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_set_number_of_top_traders_unauthorized(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
 
     await assert_revert(
         admin2_signer.send_transaction(admin2, leaderboard.contract_address, "set_number_of_top_traders", [10]),
@@ -263,7 +243,7 @@ async def test_setting_set_number_of_top_traders_unauthorized(adminAuth_factory)
 
 @pytest.mark.asyncio
 async def test_setting_time_between_calls_invalid(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
 
     await assert_revert(
         admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_number_of_top_traders", [0]),
@@ -275,7 +255,7 @@ async def test_setting_time_between_calls_invalid(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_params_admin(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
     # Admin setting params
     traders_tx = await admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_number_of_top_traders", [2])
     time_between_tx = await admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_time_between_calls", [300])
@@ -308,7 +288,7 @@ async def test_setting_params_admin(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_leaderboard_wrong_number_of_traders(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
 
     await assert_revert(
         admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_leaderboard", 
@@ -329,7 +309,7 @@ async def test_setting_leaderboard_wrong_number_of_traders(adminAuth_factory):
 
 # @pytest.mark.asyncio
 # async def test_setting_leaderboard_invalid_reward(adminAuth_factory):
-#     _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+#     starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
 
 #     await assert_revert(
 #         admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_leaderboard", 
@@ -348,7 +328,7 @@ async def test_setting_leaderboard_wrong_number_of_traders(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_leaderboard_btc(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
 
     set_leaderboard = await admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_leaderboard", 
         [
@@ -389,7 +369,7 @@ async def test_setting_leaderboard_btc(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_get_status_1(adminAuth_factory):
-    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
   
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
@@ -415,7 +395,7 @@ async def test_get_status_1(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_leaderboard_eth(adminAuth_factory):
-    _, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
 
     set_leaderboard = await admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_leaderboard", 
         [
@@ -458,7 +438,7 @@ async def test_setting_leaderboard_eth(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_get_status_2(adminAuth_factory):
-    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
   
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
@@ -482,7 +462,7 @@ async def test_get_status_2(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_leaderboard_before_time(adminAuth_factory):
-    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
     
     await assert_revert(
         admin1_signer.send_transaction(
@@ -503,7 +483,7 @@ async def test_setting_leaderboard_before_time(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_get_status_3(adminAuth_factory):
-    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
   
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
@@ -527,7 +507,7 @@ async def test_get_status_3(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_get_status_4(adminAuth_factory):
-    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
   
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 
@@ -551,7 +531,7 @@ async def test_get_status_4(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_leaderboard_btc_2(adminAuth_factory):
-    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
   
     set_leaderboard = await admin1_signer.send_transaction(admin1, leaderboard.contract_address, "set_leaderboard", 
         [
@@ -591,7 +571,7 @@ async def test_setting_leaderboard_btc_2(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_eth_leaderboard_before_time(adminAuth_factory):
-    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
     
     await assert_revert(
         admin1_signer.send_transaction(
@@ -611,7 +591,7 @@ async def test_setting_eth_leaderboard_before_time(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_setting_leaderboard_eth_2(adminAuth_factory):
-    starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, _, _, trading_stats, hightide, leaderboard = adminAuth_factory
+    starknet_service, adminAuth, admin1, admin2, alice, bob, charlie, leaderboard = adminAuth_factory
     
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, 

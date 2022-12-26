@@ -4,6 +4,8 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
+from starkware.starknet.common.syscalls import get_caller_address
+
 from contracts.Constants import (
     Hightide_INDEX,
     Market_INDEX,
@@ -219,13 +221,19 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     season_id_: felt
 ) {
     alloc_locals;
+    let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
     // Get HightideAdmin address from Authorized Registry
-    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+    let (local hightide_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Hightide_INDEX, version=version
     );
+
+    // Check that this call originated from Hightide contract
+    with_attr error_message("HighTideCalc: Caller is not hightide contract") {
+        assert caller = hightide_address;
+    }
 
     // Get trading stats contract from Authorized Registry
     let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
@@ -236,15 +244,6 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     let (season: TradingSeason) = IHighTide.get_season(
         contract_address=hightide_address, season_id=season_id_
     );
-
-    // Get the current day according to the season
-    let (is_expired: felt) = IHighTide.get_season_expiry_state(
-        contract_address=hightide_address, season_id=season_id_
-    );
-
-    with_attr error_message("HighTideCalc: Season still ongoing") {
-        assert is_expired = TRUE;
-    }
 
     // Get top stats across all the markets
     let (
@@ -301,11 +300,6 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         contract_address=registry, index=RewardsCalculation_INDEX, version=version
     );
 
-    // Get trading season data
-    let (season: TradingSeason) = IHighTide.get_season(
-        contract_address=hightide_address, season_id=season_id_
-    );
-
     // Get the current day according to the season
     let (is_expired: felt) = IHighTide.get_season_expiry_state(
         contract_address=hightide_address, season_id=season_id_
@@ -349,11 +343,6 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    // Get trading season data
-    let (season: TradingSeason) = IHighTide.get_season(
-        contract_address=hightide_address, season_id=season_id_
-    );
-
     // Get the current day according to the season
     let (is_expired: felt) = IHighTide.get_season_expiry_state(
         contract_address=hightide_address, season_id=season_id_
@@ -378,10 +367,7 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) {
-    alloc_locals;
-
-    // To-do: Need to integrate signature infra for the authentication
-
+    let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
@@ -390,18 +376,9 @@ func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    // Get trading season data
-    let (season: TradingSeason) = IHighTide.get_season(
-        contract_address=hightide_address, season_id=season_id_
-    );
-
-    // Get the current day according to the season
-    let (is_expired: felt) = IHighTide.get_season_expiry_state(
-        contract_address=hightide_address, season_id=season_id_
-    );
-
-    with_attr error_message("HighTideCalc: Season still ongoing") {
-        assert is_expired = TRUE;
+    // Check that this call originated from Hightide contract
+    with_attr error_message("HighTideCalc: Caller is not hightide contract") {
+        assert caller = hightide_address;
     }
 
     // get hightide pairs
