@@ -743,7 +743,7 @@ func execute_order{
         local new_leverage;
 
         // Check if it's liq/delveraging order
-        let is_liq = is_le(4, request.order_type);
+        let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
 
         if (is_liq == 1) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
