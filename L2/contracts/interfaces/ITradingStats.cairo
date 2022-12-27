@@ -38,6 +38,8 @@ namespace ITradingStats {
         request_list: MultipleOrder*,
         trader_stats_list_len: felt,
         trader_stats_list: TraderStats*,
+        executed_sizes_list_len: felt,
+        executed_sizes_list: felt*,
     ) -> () {
     }
 }

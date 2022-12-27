@@ -277,6 +277,8 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     request_list: MultipleOrder*,
     trader_stats_list_len: felt,
     trader_stats_list: TraderStats*,
+    executed_sizes_list_len: felt,
+    executed_sizes_list: felt*,
 ) {
     alloc_locals;
 
@@ -342,6 +344,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         execution_price_64x61_=execution_price_64x61_,
         request_list_len_=request_list_len,
         request_list_=request_list,
+        executed_sizes_list_=executed_sizes_list,
     );
 
     return ();
@@ -361,24 +364,12 @@ func record_trade_batch_stats_recurse{
     execution_price_64x61_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
+    executed_sizes_list_: felt*,
 ) {
     alloc_locals;
 
     if (request_list_len_ == 0) {
         return ();
-    }
-
-    local curr_order_size_64x61;
-
-    // Check if size is less than or equal to postionSize
-    let cmp_res = is_le(order_size_64x61_, [request_list_].quantity);
-
-    if (cmp_res == 1) {
-        // If yes, make the order_size to be size
-        assert curr_order_size_64x61 = order_size_64x61_;
-    } else {
-        // If no, make order_size to be the positionSize̦
-        assert curr_order_size_64x61 = [request_list_].quantity;
     }
 
     // Update running total of order volume
@@ -389,7 +380,9 @@ func record_trade_batch_stats_recurse{
     let (current_len) = num_orders.read(volume_metadata);
 
     let (current_volume_64x61) = order_volume.read(volume_metadata);
-    let (present_trade_volume_64x61) = Math64x61_mul(curr_order_size_64x61, execution_price_64x61_);
+    let (present_trade_volume_64x61) = Math64x61_mul(
+        [executed_sizes_list_], execution_price_64x61_
+    );
     let (updated_order_volume_64x61) = Math64x61_add(
         current_volume_64x61, present_trade_volume_64x61
     );
@@ -427,7 +420,7 @@ func record_trade_batch_stats_recurse{
         pair_id_,
         [request_list_].user_address,
         [request_list_].life_cycle,
-        curr_order_size_64x61,
+        [executed_sizes_list_],
         execution_price_64x61_,
     );
 
@@ -438,6 +431,7 @@ func record_trade_batch_stats_recurse{
         execution_price_64x61_,
         request_list_len_ - 1,
         request_list_ + MultipleOrder.SIZE,
+        executed_sizes_list_,
     );
 }
 

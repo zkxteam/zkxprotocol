@@ -196,8 +196,6 @@ func execute_batch{
         market_prices_address: felt,
     ) = get_registry_addresses();
 
-    let (trader_stats_list: TraderStats*) = alloc();
-
     // check oracle price
     let (lower_limit: felt, upper_limit: felt) = get_price_range(oracle_price_=oracle_price_);
 
@@ -205,6 +203,10 @@ func execute_batch{
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
         contract_address=market_address, market_id_=market_id_
     );
+
+    // Initialize trader_stats_list and executed_size arrays
+    let (trader_stats_list: TraderStats*) = alloc();
+    let (executed_sizes_list: felt*) = alloc();
 
     // Recursively loop through the orders in the batch
     let (taker_execution_price: felt) = check_and_execute(
@@ -230,6 +232,7 @@ func execute_batch{
         min_quantity_=0,
         maker_direction_=0,
         trader_stats_list_=trader_stats_list,
+        executed_sizes_list_=executed_sizes_list,
         total_order_volume_=0,
         taker_execution_price=0,
     );
@@ -278,6 +281,8 @@ func execute_batch{
         request_list=request_list,
         trader_stats_list_len=request_list_len,
         trader_stats_list=trader_stats_list,
+        executed_sizes_list_len=request_list_len,
+        executed_sizes_list=executed_sizes_list,
     );
 
     // Change the status of the batch to 1
@@ -927,6 +932,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     min_quantity_: felt,
     maker_direction_: felt,
     trader_stats_list_: TraderStats*,
+    executed_sizes_list_: felt*,
     total_order_volume_: felt,
     taker_execution_price: felt,
 ) -> (taker_execution_price: felt) {
@@ -1220,6 +1226,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         execution_price=average_execution_price,
     );
 
+    // Set the order size in executed_sizes_list array
+    assert [executed_sizes_list_] = quantity_to_execute;
+
     // Market Check
     with_attr error_message("0504: {order_id} {market_id_order}") {
         assert temp_order.market_id = market_id_;
@@ -1275,6 +1284,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             min_quantity_=market.minimum_order_size,
             maker_direction_=temp_order.direction,
             trader_stats_list_=trader_stats_list_ + TraderStats.SIZE,
+            executed_sizes_list_=executed_sizes_list_ + 1,
             total_order_volume_=new_total_order_volume,
             taker_execution_price=0,
         );
@@ -1332,6 +1342,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         min_quantity_=0,
         maker_direction_=0,
         trader_stats_list_=trader_stats_list_ + TraderStats.SIZE,
+        executed_sizes_list_=executed_sizes_list_ + 1,
         total_order_volume_=new_total_order_volume,
         taker_execution_price=execution_price,
     );
