@@ -551,7 +551,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @notice External function called by the ABR Contract to get the array of net positions of the user
 // @returns net_positions_array_len - Length of the array
 // @returns net_positions_array - Required array of net positions
-@external
+@view
 func get_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     net_positions_array_len: felt, net_positions_array: NetPositions*
 ) {
@@ -567,7 +567,7 @@ func get_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @notice External function called by the Liquidate Contract to get the array of net positions of the user
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of positions
-@external
+@view
 func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     positions_array_len: felt, positions_array: PositionDetailsWithMarket*
 ) {
