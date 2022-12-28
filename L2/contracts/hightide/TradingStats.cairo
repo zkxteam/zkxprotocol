@@ -191,12 +191,12 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     // Create a VolumeMetadata struct for open orders
     let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=0
+        season_id=season_id_, pair_id=pair_id_, order_type=1
     );
 
     // Create a VolumeMetadata struct for close orders
     let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=1
+        season_id=season_id_, pair_id=pair_id_, order_type=2
     );
 
     // Get the order volume for open orders

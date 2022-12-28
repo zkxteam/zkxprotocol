@@ -241,8 +241,8 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     local total_fee_64x61;
 
     // 1. Update trader fee
-    // Fee is charged only for open orders. So, if order_type is 0 (open order) we record the fee.
-    if ([trader_stats_list].order_type == 0) {
+    // Fee is charged only for open orders. So, if order_type is 1 (open order) we record the fee.
+    if ([trader_stats_list].order_type == 1) {
         let fee_64x61 = [trader_stats_list].fee_64x61;
         let (current_trader_fee_64x61) = trader_fee_by_market.read(
             season_id_, pair_id_, trader_address
@@ -298,7 +298,7 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     // 3. Update PnL
     // Realized PnL is calculated when trader closes a position. So, we record PnL for close orders.
-    if ([trader_stats_list].order_type == 1) {
+    if ([trader_stats_list].order_type == 2) {
         let pnl_64x61 = [trader_stats_list].pnl_64x61;
         let abs_pnl_64x61 = abs_value(pnl_64x61);
         let (current_pnl_64x61) = trader_pnl_by_market.read(season_id_, pair_id_, trader_address);
