@@ -19,6 +19,7 @@ from contracts.Constants import (
     AccountRegistry_INDEX,
     AdminAuth_INDEX,
     Asset_INDEX,
+    CLOSE,
     DELEVERAGING_ORDER,
     FeeBalance_INDEX,
     FoK,
@@ -576,7 +577,14 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
 
     // Update Trader stats
-    let element: TraderStats = TraderStats(order_.user_address, fees, order_volume_64x61, 0, 0, 0);
+    let element: TraderStats = TraderStats(
+        trader_address=order_.user_address,
+        fee_64x61=fees,
+        order_volume_64x61=order_volume_64x61,
+        life_cycle=OPEN,
+        pnl_64x61=0,
+        margin_amount_64x61=0,
+    );
     assert [trader_stats_list_] = element;
 
     // Deduct the amount from liquidity funds if order is leveraged
@@ -720,7 +728,12 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // If close order is a deleveraging order, margin won't be reduced. So, we will record 0.
     // Else, we will record margin_to_be_reduced
     let element: TraderStats = TraderStats(
-        order_.user_address, 0, order_volume_64x61, 1, pnl, margin_amount_open_64x61
+        trader_address=order_.user_address,
+        fee_64x61=0,
+        order_volume_64x61=order_volume_64x61,
+        life_cycle=CLOSE,
+        pnl_64x61=pnl,
+        margin_amount_64x61=margin_amount_open_64x61,
     );
     assert [trader_stats_list_] = element;
 

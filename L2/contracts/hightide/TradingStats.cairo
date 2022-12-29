@@ -13,7 +13,7 @@ from starkware.cairo.common.math import (
 )
 from starkware.cairo.common.math_cmp import is_nn, is_le
 
-from contracts.Constants import Hightide_INDEX, Trading_INDEX, UserStats_INDEX
+from contracts.Constants import CLOSE, Hightide_INDEX, OPEN, Trading_INDEX, UserStats_INDEX
 from contracts.DataTypes import VolumeMetaData, TraderStats, TradingSeason, MultipleOrder
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -191,12 +191,12 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     // Create a VolumeMetadata struct for open orders
     let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=1
+        season_id=season_id_, pair_id=pair_id_, life_cycle=OPEN
     );
 
     // Create a VolumeMetadata struct for close orders
     let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=2
+        season_id=season_id_, pair_id=pair_id_, life_cycle=CLOSE
     );
 
     // Get the order volume for open orders
@@ -371,7 +371,7 @@ func record_trade_batch_stats_recurse{
 
     // Update running total of order volume
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=[request_list_].life_cycle
+        season_id=season_id_, pair_id=pair_id_, life_cycle=[request_list_].life_cycle
     );
 
     let (current_len) = num_orders.read(volume_metadata);

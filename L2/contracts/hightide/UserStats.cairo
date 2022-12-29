@@ -6,7 +6,7 @@ from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
-from contracts.Constants import Hightide_INDEX, TradingStats_INDEX
+from contracts.Constants import CLOSE, Hightide_INDEX, OPEN, TradingStats_INDEX
 from contracts.DataTypes import TraderStats, TradingSeason, VolumeMetaData
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
@@ -241,8 +241,8 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     local total_fee_64x61;
 
     // 1. Update trader fee
-    // Fee is charged only for open orders. So, if order_type is 1 (open order) we record the fee.
-    if ([trader_stats_list].order_type == 1) {
+    // Fee is charged only for open orders. So, if life_cycle is 1 (open order) we record the fee.
+    if ([trader_stats_list].life_cycle == OPEN) {
         let fee_64x61 = [trader_stats_list].fee_64x61;
         let (current_trader_fee_64x61) = trader_fee_by_market.read(
             season_id_, pair_id_, trader_address
@@ -268,7 +268,7 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     // Order volume is recorded for all order types
     let order_volume_64x61 = [trader_stats_list].order_volume_64x61;
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=[trader_stats_list].order_type
+        season_id=season_id_, pair_id=pair_id_, life_cycle=[trader_stats_list].life_cycle
     );
 
     let (current_order_volume_64x61) = trader_order_volume_by_market.read(
@@ -298,7 +298,7 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     // 3. Update PnL
     // Realized PnL is calculated when trader closes a position. So, we record PnL for close orders.
-    if ([trader_stats_list].order_type == 2) {
+    if ([trader_stats_list].life_cycle == CLOSE) {
         let pnl_64x61 = [trader_stats_list].pnl_64x61;
         let abs_pnl_64x61 = abs_value(pnl_64x61);
         let (current_pnl_64x61) = trader_pnl_by_market.read(season_id_, pair_id_, trader_address);
