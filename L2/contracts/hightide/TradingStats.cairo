@@ -271,7 +271,6 @@ func get_traders_in_pair{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 @external
 func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     pair_id_: felt,
-    order_size_64x61_: felt,
     execution_price_64x61_: felt,
     request_list_len: felt,
     request_list: MultipleOrder*,
@@ -291,7 +290,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     );
 
     // Check that this call originated from Trading contract
-    with_attr error_message("Trade can be recorded only by Trading contract") {
+    with_attr error_message("TradingStats: Trade can be recorded only by Trading contract") {
         assert caller = trading_address;
     }
 
@@ -340,7 +339,6 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     record_trade_batch_stats_recurse(
         season_id_=season_id_,
         pair_id_=pair_id_,
-        order_size_64x61_=order_size_64x61_,
         execution_price_64x61_=execution_price_64x61_,
         request_list_len_=request_list_len,
         request_list_=request_list,
@@ -360,7 +358,6 @@ func record_trade_batch_stats_recurse{
 }(
     season_id_: felt,
     pair_id_: felt,
-    order_size_64x61_: felt,
     execution_price_64x61_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
@@ -427,7 +424,6 @@ func record_trade_batch_stats_recurse{
     return record_trade_batch_stats_recurse(
         season_id_,
         pair_id_,
-        order_size_64x61_,
         execution_price_64x61_,
         request_list_len_ - 1,
         request_list_ + MultipleOrder.SIZE,

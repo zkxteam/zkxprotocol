@@ -275,7 +275,6 @@ func execute_batch{
     ITradingStats.record_trade_batch_stats(
         contract_address=trading_stats_address,
         pair_id_=market_id_,
-        order_size_64x61_=quantity_locked_,
         execution_price_64x61_=taker_execution_price,
         request_list_len=request_list_len,
         request_list=request_list,
