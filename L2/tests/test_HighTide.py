@@ -991,30 +991,6 @@ async def test_placing_orders_day_0(hightide_test_initializer):
 
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
-
-    days_traded = await trading_stats.get_total_days_traded(season_id, BTC_USD_ID).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, BTC_USD_ID, 0).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, BTC_USD_ID).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, BTC_USD_ID).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, BTC_USD_ID).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, BTC_USD_ID, 1)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
     ##########################
     ### Open orders ETH_USD ##
     ##########################
@@ -1042,29 +1018,6 @@ async def test_placing_orders_day_0(hightide_test_initializer):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_2).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_2, 0).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_2).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_2).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_2).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_2, 1)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
     #############################
     ### Open orders TELSA_USD ###
     #############################
@@ -1092,35 +1045,10 @@ async def test_placing_orders_day_0(hightide_test_initializer):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_3, oracle_price=oracle_price_3, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_3).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_3, 0).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_3).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_3).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_3).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_3, 1)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
-
 
 @pytest.mark.asyncio
 async def test_closing_orders_day_1(hightide_test_initializer):
     starknet_service, python_executor, admin1, _, alice, bob, _, dave, _, alice_test, bob_test, _, _, trading, hightide, _, _, _, _, _, trading_stats = hightide_test_initializer
-    print("Day 1: ")
 
     execution_info = await hightide.get_current_season_id().call()
     season_id = execution_info.result.season_id
@@ -1166,30 +1094,6 @@ async def test_closing_orders_day_1(hightide_test_initializer):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_1).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_1, 1).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_1).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_1).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_1).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_1, 2)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
-
     ############################
     ### Close orders ETH_USD ###
     ############################
@@ -1220,29 +1124,6 @@ async def test_closing_orders_day_1(hightide_test_initializer):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_2).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_2, 1).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_2).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_2).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_2).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_2, 2)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
     #############################
     ### Close orders TSLA_USD ###
     #############################
@@ -1273,35 +1154,10 @@ async def test_closing_orders_day_1(hightide_test_initializer):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_3, oracle_price=oracle_price_3, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_3).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_3, 1).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_3).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_3).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_3).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_3, 2)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
-
 
 @pytest.mark.asyncio
 async def test_opening_orders_day_2(hightide_test_initializer):
     starknet_service, python_executor, admin1, _, alice, bob, _, dave, _, alice_test, bob_test, _, _, trading, hightide, _, _, _, _, _, trading_stats = hightide_test_initializer
-    print("Day 2: ")
 
     execution_info = await hightide.get_current_season_id().call()
     season_id = execution_info.result.season_id
@@ -1348,30 +1204,6 @@ async def test_opening_orders_day_2(hightide_test_initializer):
     # execute order
     (_, complete_orders) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_1).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_1, 1).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_1).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_1).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_1).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_1, 1)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
-
     ##########################
     ### Open orders BTC_USD ##
     ##########################
@@ -1395,35 +1227,10 @@ async def test_opening_orders_day_2(hightide_test_initializer):
     # execute order
     (_, complete_orders) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_1).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_1, 1).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_1).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_1).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_1).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_1, 1)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
-
 
 @pytest.mark.asyncio
 async def test_opening_closing_orders_day_3(hightide_test_initializer):
     starknet_service, python_executor, admin1, _, alice, bob, charlie, dave, _, alice_test, bob_test, charlie_test, _, trading, hightide, _, _, _, _, _, trading_stats = hightide_test_initializer
-    print("Day 3: ")
 
     execution_info = await hightide.get_current_season_id().call()
     season_id = execution_info.result.season_id
@@ -1481,29 +1288,6 @@ async def test_opening_closing_orders_day_3(hightide_test_initializer):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_1).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_1, 1).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_1).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_1).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_1).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_1, 1)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
     ############################
     ### CLOSE orders BTC_USD ###
     ############################
@@ -1530,43 +1314,10 @@ async def test_opening_closing_orders_day_3(hightide_test_initializer):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, market_id_1).call()
-    print("Number of days traded:", days_traded.result.res)
-    # assert days_traded.result.res == 1
-
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id_1, 1).call()
-    print("Number of trades in a day 0:", num_trades_in_a_day.result.res)
-    # assert num_trades_in_a_day.result.res == 2
-
-    active_traders = await trading_stats.get_num_active_traders(season_id, market_id_1).call()
-    print("Number of active traders:", active_traders.result.res)
-    # assert active_traders.result.res == 2
-
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id_1).call()
-    print("Trade frequency:", trade_frequency.result.frequency)
-    # assert trade_frequency.result.frequency == [2]
-
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id_1).call()
-    print("Max trades for a market",  max_trades.result.res)
-    # assert max_trades.result.res == 2
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_1, 1)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
-
-    order_volume = await trading_stats.get_order_volume((season_id, market_id_1, 2)).call()
-    print("Order volume len", order_volume.result[0])
-    print("Order volume", from64x61(order_volume.result[1]))
-
-    avg_order_volume = await trading_stats.get_average_order_volume(season_id, market_id_1).call()
-    print("Average order voliume:", from64x61(
-        avg_order_volume.result.average_volume_64x61))
-
 
 @pytest.mark.asyncio
 async def test_opening_closing_orders_day_4(hightide_test_initializer):
     starknet_service, python_executor, admin1, _, alice, bob, charlie, dave, _, alice_test, bob_test, charlie_test, _, trading, hightide, _, _, _, _, _, trading_stats = hightide_test_initializer
-    print("Day 4: ")
 
     execution_info = await hightide.get_current_season_id().call()
     season_id = execution_info.result.season_id
