@@ -830,7 +830,7 @@ async def test_activate_hightide_with_native_and_non_native_tokens(hightide_test
 
     # 2. Initialize Hightide
     tx_exec_info = await admin1_signer.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide',
-                                                        [ETH_USD_ID, season_id, admin1.contract_address, 1, 2, USDC_L1_address, 3000, 0, UST_L1_address, 5000, 0])
+                                                        [ETH_USD_ID, season_id, admin1.contract_address, 0, 2, USDC_L1_address, 3000, 0, UST_L1_address, 5000, 0])
     hightide_id = 3
     execution_info = await hightide.get_hightide(hightide_id).call()
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
@@ -951,7 +951,7 @@ async def test_activate_hightide_with_sufficient_non_native_tokens(hightide_test
 @pytest.mark.asyncio
 async def test_placing_orders_day_0(hightide_test_initializer):
     _, python_executor, admin1, _, alice, bob, _, _, _, alice_test, bob_test, _, _, trading, hightide, _, _, _, _, _, trading_stats = hightide_test_initializer
-    print("Day 0: ")
+    print("day 0:")
 
     execution_info = await hightide.get_current_season_id().call()
     season_id = execution_info.result.season_id
@@ -1768,15 +1768,29 @@ async def test_distribute_rewards(hightide_test_initializer):
 
     # Get R value of ETH_USD market
     funds_flow_ETH_USD_ID = await hightideCalc.get_funds_flow_per_market(season_id, ETH_USD_ID).call()
+    print("Funds flow ETH", from64x61(funds_flow_ETH_USD_ID.result.funds_flow))
 
     # Get token rewards for ETH_USD market
     fetched_rewards = await hightide.get_hightide_reward_tokens(hightide_list[0]).call()
+    print("Fetched reweards usdc:",
+          fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low)
+    print("Fetched reweards ust:",
+          fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low)
 
     # Get Alice native and non native USDC and UST balance's for ETH/USDC pair
     alice_eth_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(alice.contract_address).call()
+    print("alice_eth_whitelisted_usdc_balance",
+          alice_eth_whitelisted_usdc_balance.result.balance.low)
     alice_eth_whitelisted_ust_balance = await whitelisted_ust.balanceOf(alice.contract_address).call()
+    print("alice_eth_whitelisted_ust_balance",
+          alice_eth_whitelisted_ust_balance.result.balance.low)
     alice_eth_native_usdc_balance = await native_erc20_usdc.balanceOf(alice.contract_address).call()
+    print("alice_eth_native_usdc_balance",
+          alice_eth_native_usdc_balance.result.balance.low)
+
     alice_eth_native_ust_balance = await native_erc20_ust.balanceOf(alice.contract_address).call()
+    print("alice_eth_native_ust_balance",
+          alice_eth_native_ust_balance.result.balance.low)
 
     # Get w value of ETH_USD market
     alice_w_ETH_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, ETH_USD_ID, alice.contract_address).call()
@@ -1787,29 +1801,41 @@ async def test_distribute_rewards(hightide_test_initializer):
     alice_usdc_reward_for_ETH_USDC_pair = (from64x61(funds_flow_ETH_USD_ID.result.funds_flow) *
                                            from64x61(alice_w_ETH_USD_ID.result.trader_score) *
                                            fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low)
+    print(alice_usdc_reward_for_ETH_USDC_pair,
+          "alice_usdc_reward_for_ETH_USDC_pair")
 
     alice_ust_reward_for_ETH_USDC_pair = (from64x61(funds_flow_ETH_USD_ID.result.funds_flow) *
                                           from64x61(alice_w_ETH_USD_ID.result.trader_score) *
                                           fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low)
+    print(alice_ust_reward_for_ETH_USDC_pair,
+          "alice_ust_reward_for_ETH_USDC_pair")
 
     alice_usdc_balance = (alice_eth_whitelisted_usdc_balance.result.balance.low +
                           alice_eth_native_usdc_balance.result.balance.low)
+    print("alice_usdc_balance", alice_usdc_balance)
 
     assert alice_usdc_balance == int(alice_usdc_reward_for_ETH_USDC_pair)
 
     alice_ust_balance = (alice_eth_whitelisted_ust_balance.result.balance.low +
                          alice_eth_native_ust_balance.result.balance.low)
+    print("alice_ust_balance", alice_ust_balance)
 
     assert alice_ust_balance == int(alice_ust_reward_for_ETH_USDC_pair)
 
     # Get bob native and non native USDC and UST balance's for ETH/USDC pair
     bob_eth_whitelisted_usdc_balance = await whitelisted_usdc.balanceOf(bob.contract_address).call()
+    print("bob_eth_whitelisted_usdc_balance", bob_eth_whitelisted_usdc_balance)
     bob_eth_whitelisted_ust_balance = await whitelisted_ust.balanceOf(bob.contract_address).call()
+    print("bob_eth_whitelisted_ust_balance", bob_eth_whitelisted_ust_balance)
     bob_eth_native_usdc_balance = await native_erc20_usdc.balanceOf(bob.contract_address).call()
+    print("bob_eth_native_usdc_balance", bob_eth_native_usdc_balance)
     bob_eth_native_ust_balance = await native_erc20_ust.balanceOf(bob.contract_address).call()
+    print("bob_eth_native_ust_balance", bob_eth_native_ust_balance)
 
     # Get w value of ETH_USD market
     bob_w_ETH_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, ETH_USD_ID, bob.contract_address).call()
+    print("bob_w_ETH_USD_ID", from64x61(
+        bob_w_ETH_USD_ID.result.trader_score))
     assert from64x61(
         bob_w_ETH_USD_ID.result.trader_score) == 0.5520957543681121
 
@@ -1817,18 +1843,23 @@ async def test_distribute_rewards(hightide_test_initializer):
     bob_usdc_reward_for_ETH_USDC_pair = (from64x61(funds_flow_ETH_USD_ID.result.funds_flow) *
                                          from64x61(bob_w_ETH_USD_ID.result.trader_score) *
                                          fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low)
+    print("bob_usdc_reward_for_ETH_USDC_pair",
+          bob_usdc_reward_for_ETH_USDC_pair)
 
     bob_ust_reward_for_ETH_USDC_pair = (from64x61(funds_flow_ETH_USD_ID.result.funds_flow) *
                                         from64x61(bob_w_ETH_USD_ID.result.trader_score) *
                                         fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low)
+    print("bob_ust_reward_for_ETH_USDC_pair", bob_ust_reward_for_ETH_USDC_pair)
 
     bob_usdc_balance = (bob_eth_whitelisted_usdc_balance.result.balance.low +
                         bob_eth_native_usdc_balance.result.balance.low)
+    print("bob_usdc_balance", bob_usdc_balance)
 
     assert bob_usdc_balance == int(bob_usdc_reward_for_ETH_USDC_pair)
 
     bob_ust_balance = (bob_eth_whitelisted_ust_balance.result.balance.low +
                        bob_eth_native_ust_balance.result.balance.low)
+    print("bob_ust_balance", bob_ust_balance)
 
     assert bob_ust_balance == int(bob_ust_reward_for_ETH_USDC_pair)
 
@@ -1837,18 +1868,24 @@ async def test_distribute_rewards(hightide_test_initializer):
     print("lister_whitelisted_usdc_balance",
           lister_whitelisted_usdc_balance.result.balance.low)
     lister_whitelisted_ust_balance = await whitelisted_ust.balanceOf(admin1.contract_address).call()
+    print("lister_whitelisted_ust_balance",
+          lister_whitelisted_ust_balance.result.balance.low)
     lister_native_usdc_balance = await native_erc20_usdc.balanceOf(admin1.contract_address).call()
     print("lister_native_usdc_balance",
           lister_native_usdc_balance.result.balance.low)
     lister_native_ust_balance = await native_erc20_ust.balanceOf(admin1.contract_address).call()
+    print("lister_native_ust_balance",
+          lister_native_ust_balance.result.balance.low)
 
     # Sum of reward transferred and amount sent back to lister is equal to the rewards provided by the token lister
     usdc_balance = lister_whitelisted_usdc_balance.result.balance.low + \
         lister_native_usdc_balance.result.balance.low + \
         alice_usdc_balance + bob_usdc_balance
+    print("usdc_balance", usdc_balance)
     ust_balance = lister_whitelisted_ust_balance.result.balance.low + \
-        lister_native_usdc_balance.result.balance.low + \
+        lister_native_ust_balance.result.balance.low + \
         alice_ust_balance + bob_ust_balance
+    print("ust_balance", ust_balance)
 
     assert usdc_balance == fetched_rewards.result.reward_tokens_list[0].no_of_tokens.low
     assert ust_balance == fetched_rewards.result.reward_tokens_list[1].no_of_tokens.low
