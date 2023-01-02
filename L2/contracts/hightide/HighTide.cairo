@@ -114,6 +114,11 @@ func distributed_trader_reward(
 // Storage //
 // //////////
 
+// Stores the previous trading season id
+@storage_var
+func previous_trading_season() -> (season_id: felt) {
+}
+
 // Stores the current trading season id
 @storage_var
 func current_trading_season() -> (season_id: felt) {
@@ -343,24 +348,30 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) {
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
+    // Get previous season id
+    let (previous_season_id) = previous_trading_season.read();
 
-    // Auth check
-    with_attr error_message("HighTide: Unauthorized call to start trade season") {
-        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    if (previous_season_id != 0) {
+        let (previous_season: TradingSeason) = get_season(previous_season_id);
+        with_attr error_message("HighTide: Previous season should be ended to start new season") {
+            assert previous_season.status = SEASON_ENDED;
+        }
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
+    
     validate_season_to_start(season_id_);
-
     let (new_season: TradingSeason) = get_season(season_id_);
-    with_attr error_message("HighTide: Season's status should be created to start ") {
-        assert new_season.status = SEASON_CREATED;
-    }
 
-    // get current block number
+    // Get current block number
     let (current_block_number) = get_block_number();
 
-    // update start block number in trading season
+    // Update start block number in trading season
     let trading_season: TradingSeason = TradingSeason(
         start_block_number=current_block_number,
         start_timestamp=new_season.start_timestamp,
@@ -387,11 +398,6 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let (local registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
-    // Auth check
-    with_attr error_message("HighTide: Unauthorized call to end trade season") {
-        verify_caller_authority(registry, version, ManageHighTide_ACTION);
-    }
-
     let (season: TradingSeason) = get_season(season_id_);
     with_attr error_message("HighTide: Season's status should be started to end ") {
         assert season.status = SEASON_STARTED;
@@ -417,6 +423,16 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         contract_address=hightide_calc_address, season_id_=season_id_
     );
 
+    // Update status in trading season
+    let trading_season: TradingSeason = TradingSeason(
+        start_block_number=season.start_block_number,
+        start_timestamp=season.start_timestamp,
+        num_trading_days=season.num_trading_days,
+        status=SEASON_ENDED,
+    );
+    trading_season_by_id.write(season_id_, trading_season);
+
+    previous_trading_season.write(season_id_);
     current_trading_season.write(0);
 
     // Emit event
