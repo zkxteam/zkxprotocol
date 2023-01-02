@@ -28,6 +28,10 @@ from contracts.libraries.CommonLibrary import (
 )
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_add, Math64x61_div, Math64x61_fromIntFelt
 
+// /////////
+// Events //
+// /////////
+
 // This contract can be used as a source of truth for all consumers of trade stats off-chain/on-chain
 // This does not have functions to calculate any of the hightide formulas
 // This contract just does on-chain trade stats storage and reporting
@@ -45,6 +49,11 @@ func trade_recorded(
     order_price_64x61: felt,
 ) {
 }
+
+// //////////
+// Storage //
+// //////////
+
 // this var stores the total number of recorded trades for a volume_type
 // this is identified by VolumeMetaData (season, market, order_type)
 @storage_var
@@ -67,7 +76,6 @@ func num_traders(season_id: felt, market_id: felt) -> (res: felt) {
 }
 
 // stores list of trader addresses for a market in a season - retrievable by index in the list
-// currently this is maintained but not used
 @storage_var
 func traders_in_market(season_id: felt, market_id: felt, index: felt) -> (trader_address: felt) {
 }
@@ -79,9 +87,26 @@ func trader_for_market(season_id: felt, market_id: felt, trader_address: felt) -
 ) {
 }
 
-//##############
-// Constructor #
-//##############
+// this stores number of traders who traded listed hightides in a season 
+@storage_var
+func num_traders_in_season(season_id: felt) -> (res: felt) {
+}
+
+// stores list of trader addresses who traded listed hightides in a season - retrievable by index in the list
+@storage_var
+func traders_in_season(season_id: felt, index: felt) -> (trader_address: felt) {
+}
+
+// stores whether a trader is an active trader who traded listed hightides in a season i.e. has traded at least once
+@storage_var
+func trader_for_season(season_id: felt, trader_address: felt) -> (
+    is_trader: felt
+) {
+}
+
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -94,9 +119,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @dev - This function returns current running total for VolumeMetaData
 // It supports pagination through the use of num_order_required_ and index_from_ params
@@ -265,9 +290,20 @@ func get_traders_in_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     );
 }
 
-//#####################
-// External Functions #
-//#####################
+// @notice View function to get the list of traders participating in all hightides corresponding to the season
+// @param season_id_ - id of the season
+// @param starting_index_ - Index from which to fetch the array
+// @return trader_list_len - length of trader's list
+// @return trader_list - list of trader's
+@view
+func get_traders_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, starting_index_: felt, num_traders_: felt
+) -> (trader_list_len: felt, trader_list: felt*) {
+}
+
+// ///////////
+// External //
+// ///////////
 
 // @dev - Function called by trading contract after trade execution
 @external
