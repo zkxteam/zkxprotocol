@@ -29,6 +29,7 @@ from contracts.Constants import (
     SEASON_ENDED,
     SEASON_STARTED,
     Starkway_INDEX,
+    TokenLister_ACTION,
 )
 from contracts.DataTypes import (
     Constants,
@@ -364,7 +365,7 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-    
+
     validate_season_to_start(season_id_);
     let (new_season: TradingSeason) = get_season(season_id_);
 
@@ -541,7 +542,7 @@ func initialize_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
     // Auth check
     with_attr error_message("HighTide: Unauthorized call to initialize hightide") {
-        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+        verify_caller_authority(registry, version, TokenLister_ACTION);
     }
 
     let (is_expired) = get_season_expiry_state(season_id_);
@@ -607,12 +608,16 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     hightide_id_: felt
 ) {
     alloc_locals;
-    // To-do: Need to integrate signature infra for the authentication
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("HighTide: Unauthorized call to activate hightide") {
+        verify_caller_authority(registry, version, TokenLister_ACTION);
+    }
 
     verify_hightide_id_exists(hightide_id_);
 
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
     // Get Starkway contract address
     let (local starkway_contract_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Starkway_INDEX, version=version
