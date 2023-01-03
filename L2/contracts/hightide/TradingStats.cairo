@@ -299,6 +299,9 @@ func get_traders_in_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 func get_traders_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, starting_index_: felt, num_traders_: felt
 ) -> (trader_list_len: felt, trader_list: felt*) {
+    alloc_locals;
+    let (trader_list: felt*) = alloc();
+    return (0, trader_list);
 }
 
 // ///////////
