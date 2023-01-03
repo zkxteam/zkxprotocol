@@ -7,8 +7,10 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import (
+    CLOSE,
     Hightide_INDEX,
     Market_INDEX,
+    OPEN,
     RewardsCalculation_INDEX,
     TradingStats_INDEX,
     UserStats_INDEX,
@@ -743,12 +745,12 @@ func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 ) -> (d: felt) {
     // Create a VolumeMetadata struct for open orders
     let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=0
+        season_id=season_id_, pair_id=pair_id_, life_cycle=OPEN
     );
 
     // Create a VolumeMetadata struct for close orders
     let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=1
+        season_id=season_id_, pair_id=pair_id_, life_cycle=CLOSE
     );
 
     // Get the order volume for open orders

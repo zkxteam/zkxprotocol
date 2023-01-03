@@ -214,7 +214,7 @@ struct CollateralPrice {
 struct VolumeMetaData {
     season_id: felt,
     pair_id: felt,
-    order_type: felt,  // open/close
+    life_cycle: felt,  // open/close
 }
 
 // Struct to store trading season data
@@ -270,7 +270,7 @@ struct TraderStats {
     trader_address: felt,
     fee_64x61: felt,
     order_volume_64x61: felt,
-    order_type: felt,  // 0 for open order, 1 for close order
+    life_cycle: felt,  // 1 for open order, 2 for close order
     pnl_64x61: felt,
     margin_amount_64x61: felt,
 }

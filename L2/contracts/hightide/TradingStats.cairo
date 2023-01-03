@@ -13,7 +13,7 @@ from starkware.cairo.common.math import (
 )
 from starkware.cairo.common.math_cmp import is_nn, is_le
 
-from contracts.Constants import Hightide_INDEX, Trading_INDEX, UserStats_INDEX
+from contracts.Constants import CLOSE, Hightide_INDEX, OPEN, Trading_INDEX, UserStats_INDEX
 from contracts.DataTypes import VolumeMetaData, TraderStats, TradingSeason, MultipleOrder
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -191,12 +191,12 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     // Create a VolumeMetadata struct for open orders
     let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=0
+        season_id=season_id_, pair_id=pair_id_, life_cycle=OPEN
     );
 
     // Create a VolumeMetadata struct for close orders
     let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=1
+        season_id=season_id_, pair_id=pair_id_, life_cycle=CLOSE
     );
 
     // Get the order volume for open orders
@@ -271,12 +271,13 @@ func get_traders_in_pair{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 @external
 func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     pair_id_: felt,
-    order_size_64x61_: felt,
     execution_price_64x61_: felt,
     request_list_len: felt,
     request_list: MultipleOrder*,
     trader_stats_list_len: felt,
     trader_stats_list: TraderStats*,
+    executed_sizes_list_len: felt,
+    executed_sizes_list: felt*,
 ) {
     alloc_locals;
 
@@ -289,7 +290,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     );
 
     // Check that this call originated from Trading contract
-    with_attr error_message("Trade can be recorded only by Trading contract") {
+    with_attr error_message("TradingStats: Trade can be recorded only by Trading contract") {
         assert caller = trading_address;
     }
 
@@ -338,10 +339,10 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     record_trade_batch_stats_recurse(
         season_id_=season_id_,
         pair_id_=pair_id_,
-        order_size_64x61_=order_size_64x61_,
         execution_price_64x61_=execution_price_64x61_,
         request_list_len_=request_list_len,
         request_list_=request_list,
+        executed_sizes_list_=executed_sizes_list,
     );
 
     return ();
@@ -357,10 +358,10 @@ func record_trade_batch_stats_recurse{
 }(
     season_id_: felt,
     pair_id_: felt,
-    order_size_64x61_: felt,
     execution_price_64x61_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
+    executed_sizes_list_: felt*,
 ) {
     alloc_locals;
 
@@ -368,28 +369,17 @@ func record_trade_batch_stats_recurse{
         return ();
     }
 
-    local curr_order_size_64x61;
-
-    // Check if size is less than or equal to postionSize
-    let cmp_res = is_le(order_size_64x61_, [request_list_].quantity);
-
-    if (cmp_res == 1) {
-        // If yes, make the order_size to be size
-        assert curr_order_size_64x61 = order_size_64x61_;
-    } else {
-        // If no, make order_size to be the positionSize̦
-        assert curr_order_size_64x61 = [request_list_].quantity;
-    }
-
     // Update running total of order volume
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, order_type=[request_list_].life_cycle
+        season_id=season_id_, pair_id=pair_id_, life_cycle=[request_list_].life_cycle
     );
 
     let (current_len) = num_orders.read(volume_metadata);
 
     let (current_volume_64x61) = order_volume.read(volume_metadata);
-    let (present_trade_volume_64x61) = Math64x61_mul(curr_order_size_64x61, execution_price_64x61_);
+    let (present_trade_volume_64x61) = Math64x61_mul(
+        [executed_sizes_list_], execution_price_64x61_
+    );
     let (updated_order_volume_64x61) = Math64x61_add(
         current_volume_64x61, present_trade_volume_64x61
     );
@@ -427,17 +417,17 @@ func record_trade_batch_stats_recurse{
         pair_id_,
         [request_list_].user_address,
         [request_list_].life_cycle,
-        curr_order_size_64x61,
+        [executed_sizes_list_],
         execution_price_64x61_,
     );
 
     return record_trade_batch_stats_recurse(
         season_id_,
         pair_id_,
-        order_size_64x61_,
         execution_price_64x61_,
         request_list_len_ - 1,
         request_list_ + MultipleOrder.SIZE,
+        executed_sizes_list_,
     );
 }
 
