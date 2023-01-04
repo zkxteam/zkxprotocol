@@ -272,7 +272,7 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     // Order volume is recorded for all order types
     let order_volume_64x61 = [trader_stats_list].order_volume_64x61;
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, market_id=market_id_, life_cycle=[trader_stats_list].order_type
+        season_id=season_id_, market_id=market_id_, life_cycle=[trader_stats_list].life_cycle
     );
 
     let (current_order_volume_64x61) = trader_order_volume_by_market.read(

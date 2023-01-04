@@ -529,24 +529,24 @@ async def test_opening_orders_day_0(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_1
+    market_id = market_id_1
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 1
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 0).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 0).call()
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 1)).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, 1)).call()
     print("Order volume long, day 0:", from64x61(order_volume.result[1]))
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
@@ -922,32 +922,32 @@ async def test_opening_orders_day_32(adminAuth_factory):
     ])
 
     season_id = 1
-    pair_id = marketID_1
+    market_id = marketID_1
 
     # all stats should be same as per previous probe except frequency table
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 4
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 30).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 30).call()
     print(num_trades_in_a_day.result.res)
     assert num_trades_in_a_day.result.res == 0
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 3
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2, 2, 4, 4] + 26*[0]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 4
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 0)).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, 0)).call()
     print(order_volume.result)
     assert order_volume.result[0] == 8
     assert from64x61(order_volume.result[1]) == (2*from64x61(size1)*from64x61(execution_price1) + 4*from64x61(size3)*from64x61(execution_price3)
                                                  + 2*from64x61(size4)*from64x61(execution_price4))
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, 1)).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, 1)).call()
     print(order_volume.result)
     assert order_volume.result[0] == 4
     assert from64x61(order_volume.result[1]) == (2*from64x61(size2)*from64x61(execution_price2)
