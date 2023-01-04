@@ -175,11 +175,9 @@ func reward_tokens_len_by_hightide(hightide_id: felt) -> (len: felt) {
 func hightide_by_season_id(season_id: felt, index: felt) -> (hightide_id: felt) {
 }
 
-// Stores whether a market is listed under hightide in a season 
+// Stores whether a market is listed under hightide in a season
 @storage_var
-func market_under_hightide(season_id: felt, market_id: felt) -> (
-    is_listed: felt
-) {
+func market_under_hightide(season_id: felt, market_id: felt) -> (is_listed: felt) {
 }
 
 // //////////////
@@ -676,7 +674,7 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         hightide_activated.emit(caller=caller, hightide_id=hightide_id_);
 
         assign_hightide_to_season(hightide_id_, hightide_metadata.season_id);
-        
+        market_under_hightide.write(hightide_metadata.season_id, hightide_metadata.market_id, TRUE);
     } else {
         with_attr error_message("HighTide: Liquidity pool should be fully funded") {
             assert status = TRUE;

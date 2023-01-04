@@ -87,7 +87,7 @@ func trader_for_market(season_id: felt, market_id: felt, trader_address: felt) -
 ) {
 }
 
-// this stores number of traders who traded listed hightides in a season 
+// this stores number of traders who traded listed hightides in a season
 @storage_var
 func num_traders_in_season(season_id: felt) -> (res: felt) {
 }
@@ -99,9 +99,7 @@ func traders_in_season(season_id: felt, index: felt) -> (trader_address: felt) {
 
 // stores whether a trader is an active trader who traded listed hightides in a season i.e. has traded at least once
 @storage_var
-func trader_for_season(season_id: felt, trader_address: felt) -> (
-    is_trader: felt
-) {
+func trader_for_season(season_id: felt, trader_address: felt) -> (is_trader: felt) {
 }
 
 // //////////////
@@ -290,20 +288,6 @@ func get_traders_in_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     );
 }
 
-// @notice View function to get the list of traders participating in all hightides corresponding to the season
-// @param season_id_ - id of the season
-// @param starting_index_ - Index from which to fetch the array
-// @return trader_list_len - length of trader's list
-// @return trader_list - list of trader's
-@view
-func get_traders_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, starting_index_: felt, num_traders_: felt
-) -> (trader_list_len: felt, trader_list: felt*) {
-    alloc_locals;
-    let (trader_list: felt*) = alloc();
-    return (0, trader_list);
-}
-
 // ///////////
 // External //
 // ///////////
@@ -376,6 +360,10 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         season_id_, market_id_, current_day, current_daily_count + request_list_len
     );
 
+    let (is_market_listed) = IHighTide.is_market_under_hightide(
+        hightide_address, season_id_, market_id_
+    );
+
     // Recursively set the trading stats for each order
     record_trade_batch_stats_recurse(
         season_id_=season_id_,
@@ -384,6 +372,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         request_list_len_=request_list_len,
         request_list_=request_list,
         executed_sizes_list_=executed_sizes_list,
+        is_market_listed_=is_market_listed,
     );
 
     return ();
@@ -403,6 +392,7 @@ func record_trade_batch_stats_recurse{
     request_list_len_: felt,
     request_list_: MultipleOrder*,
     executed_sizes_list_: felt*,
+    is_market_listed_: felt,
 ) {
     alloc_locals;
 
@@ -454,6 +444,33 @@ func record_trade_batch_stats_recurse{
         tempvar range_check_ptr = range_check_ptr;
     }
 
+    if (is_market_listed_ == 1) {
+        // Get the trader status in a season
+        let (trader_status) = trader_for_season.read(season_id_, [request_list_].user_address);
+
+        // If trader was not active for a market listed under hightide in this season
+        if (trader_status == 0) {
+            // Mark trader as active
+            trader_for_season.write(season_id_, [request_list_].user_address, 1);
+            let (current_num_traders) = num_traders_in_season.read(season_id_);
+            // Increment count of unique active traders for market listed under hightide in season
+            num_traders_in_season.write(season_id_, current_num_traders + 1);
+            // Store trader address for a market listed under hightide in this season at current index
+            traders_in_season.write(season_id_, current_num_traders, [request_list_].user_address);
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
     // emit event for off-chain consumers
     trade_recorded.emit(
         season_id_,
@@ -471,6 +488,7 @@ func record_trade_batch_stats_recurse{
         request_list_len_ - 1,
         request_list_ + MultipleOrder.SIZE,
         executed_sizes_list_,
+        is_market_listed_,
     );
 }
 
