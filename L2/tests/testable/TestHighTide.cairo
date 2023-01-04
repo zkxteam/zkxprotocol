@@ -55,7 +55,7 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let (hightide_metadata: HighTideMetaData) = get_hightide(hightide_id);
     // Update hightide status to active
     let hightide: HighTideMetaData = HighTideMetaData(
-        pair_id=hightide_metadata.pair_id,
+        market_id=hightide_metadata.market_id,
         status=HIGHTIDE_ACTIVE,
         season_id=hightide_metadata.season_id,
         token_lister_address=hightide_metadata.token_lister_address,
