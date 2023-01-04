@@ -17,4 +17,12 @@ namespace IAccountRegistry {
 
     func is_registered_user(address_: felt) -> (present: felt) {
     }
+
+    func get_batch(starting_index_: felt, ending_index_: felt) -> (
+        account_registry_len: felt, account_registry: felt*
+    ) {
+    }
+
+    func get_registry_len() -> (len: felt) {
+    }
 }

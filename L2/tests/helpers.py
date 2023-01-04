@@ -7,6 +7,7 @@ from starkware.starknet.testing.contract import StarknetContract
 from starkware.starknet.testing.state import StarknetState
 from starkware.starknet.services.api.contract_class import ContractClass
 
+
 class ContractType(Enum):
     Account = "tests/contracts/Account.cairo"
     AccountManager = "tests/testable/TestAccountManager.cairo"
@@ -60,7 +61,7 @@ class ContractType(Enum):
     RelayFeeDiscount = "contracts/relay_contracts/RelayFeeDiscount.cairo"
     WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
     ZKXDeployer = "contracts/ZKXDeployer.cairo"
-    
+
     # Test-helping contracts
     ArrayTesting = "tests/testable/TestArrayTesting.cairo"
     CallFeeBalance = "tests/testable/CallFeeBalance.cairo"
@@ -68,13 +69,16 @@ class ContractType(Enum):
     TestHighTide = "tests/testable/TestHighTide.cairo"
     Starkway = "tests/testable/StarkwayProxy.cairo"
     ERC20 = "tests/testable/TestERC20Mintable.cairo"
+    TestUserBatch = "tests/testable/TestUserBatch.cairo"
+
 
 class OptimizedStarknetState(StarknetState):
 
     def copy(self) -> "OptimizedStarknetState":
-        ### StarknetState's copy operation is the most expesive part of send tx call
-        ### We don't use StarknetState, so no problem in skipping copy operation
+        # StarknetState's copy operation is the most expesive part of send tx call
+        # We don't use StarknetState, so no problem in skipping copy operation
         return self
+
 
 class ContractsHolder:
 
@@ -88,6 +92,7 @@ class ContractsHolder:
             return compiled_class
         else:
             return self.contract_classes[type]
+
 
 class StarknetService:
 
@@ -103,11 +108,12 @@ class StarknetService:
 
     async def deploy(self, type: ContractType, calldata) -> StarknetContract:
         contract_class = self.contracts_holder.get_contract_class(type)
-        ### Computing class cache is the most expensive part of deploy call
-        ### We reduce tests duration keeping class hashes in LRUCache shared between all tests (via Fixture)
+        # Computing class cache is the most expensive part of deploy call
+        # We reduce tests duration keeping class hashes in LRUCache shared between all tests (via Fixture)
         with set_class_hash_cache(self.compilation_cache):
             deployed_contract = await self.starknet.deploy(contract_class=contract_class, constructor_calldata=calldata)
             return deployed_contract
+
 
 class AccountFactory:
 
