@@ -346,7 +346,7 @@ func get_next_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     // Fetch all pending trade seasons
     let (local season_list_len: felt, season_list: felt*) = get_all_pending_seasons();
 
-    if (season_list_len == 0){
+    if (season_list_len == 0) {
         return (0, 0, 0);
     }
 
@@ -356,6 +356,35 @@ func get_next_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     return fetch_next_season_to_start_recurse(
         1, season_list_len, season_list, season_list[0], trading_season.start_timestamp
     );
+}
+
+// @notice View function to get next trade season to end
+// @return season_id - id of the season
+// @return can_be_ended - returns TRUE, if end timestamp of the season has reached else returns FALSE
+// @return time_remaining - returns the time remaining to end the trade season
+@view
+func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    season_id: felt, can_be_ended: felt, time_remaining: felt
+) {
+    alloc_locals;
+    // Fetch current active season id
+    let (local season_id: felt) = get_current_season_id();
+
+    if (season_id == 0) {
+        return (0, 0, 0);
+    }
+
+    // Get current active trade season's metadata
+    let (current_season: TradingSeason) = get_season(season_id);
+    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
+    let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
+
+    let (current_timestamp) = get_block_timestamp();
+    if (is_le(current_timestamp, current_seasons_end_timestamp - 1) == 1) {
+        return (season_id, FALSE, current_seasons_end_timestamp - current_timestamp);
+    } else {
+        return (season_id, TRUE, 0);
+    }
 }
 
 // ///////////
@@ -1139,7 +1168,7 @@ func populate_pending_season_list_recurse{
     if (index_ == num_seasons_ + 1) {
         return (season_list_len,);
     }
-    // Get season expiry state. It returns false for the seasons which are not yet started 
+    // Get season expiry state. It returns false for the seasons which are not yet started
     // and also for ongoing seasons
     let (is_expired) = get_season_expiry_state(index_);
     if (is_expired == FALSE) {
