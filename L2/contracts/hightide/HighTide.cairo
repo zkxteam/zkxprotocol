@@ -321,6 +321,20 @@ func is_market_under_hightide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     return (is_listed,);
 }
 
+// @notice View function to get the list of all pending seasons
+// @return season_list_len - length of season list
+// @return season_list - list of season id's
+@view
+func get_all_pending_seasons{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    season_list_len: felt, season_list: felt*
+) {
+    alloc_locals;
+    let (season_list: felt*) = alloc();
+    let (local num_seasons) = seasons_array_len.read();
+    let (season_list_len) = populate_pending_season_list_recurse(1, num_seasons, 0, season_list);
+    return (season_list_len, season_list);
+}
+
 // @notice View function to get next trade season to start
 // @return season_id - id of the season
 // @return can_be_started - returns TRUE, if start timestamp of the season has reached else returns FALSE
@@ -329,20 +343,14 @@ func is_market_under_hightide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 func get_next_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     ) -> (season_id: felt, can_be_started: felt, time_remaining: felt) {
     alloc_locals;
-    // Get previously ended trade season
-    let (local previous_season_id) = previous_trading_season.read();
+    // Fetch all pending trade seasons
+    let (local season_list_len: felt, season_list: felt*) = get_all_pending_seasons();
 
-    // Get number of seasons
-    let (num_seasons) = seasons_array_len.read();
+    // Get first pending trade season metadata
+    let (trading_season: TradingSeason) = get_season(season_list[0]);
 
-    with_attr error_message("HighTide: There are no pending seasons to start") {
-        assert_le(previous_season_id + 1, num_seasons);
-    }
-
-    // Get next trade season
-    let (trading_season: TradingSeason) = get_season(previous_season_id + 1);
     return fetch_next_season_to_start_recurse(
-        previous_season_id + 2, num_seasons, previous_season_id + 1, trading_season.start_timestamp
+        1, season_list_len, season_list, season_list[0], trading_season.start_timestamp
     );
 }
 
@@ -1119,12 +1127,44 @@ func distribute_rewards_per_trader_recurse{
     );
 }
 
+func populate_pending_season_list_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(index_: felt, num_seasons_: felt, season_list_len: felt, season_list: felt*) -> (
+    season_list_len: felt
+) {
+    if (index_ == num_seasons_ + 1) {
+        return (season_list_len,);
+    }
+    let (is_expired) = get_season_expiry_state(index_);
+    if (is_expired == FALSE) {
+        let (current_season_id) = get_current_season_id();
+        if (current_season_id == index_) {
+            return populate_pending_season_list_recurse(
+                index_ + 1, num_seasons_, season_list_len, season_list
+            );
+        } else {
+            assert season_list[season_list_len] = index_;
+            return populate_pending_season_list_recurse(
+                index_ + 1, num_seasons_, season_list_len + 1, season_list
+            );
+        }
+    } else {
+        return populate_pending_season_list_recurse(
+            index_ + 1, num_seasons_, season_list_len, season_list
+        );
+    }
+}
+
 func fetch_next_season_to_start_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(start_index: felt, end_index: felt, season_to_start: felt, min_timestamp: felt) -> (
-    season_id: felt, can_be_started: felt, time_remaining: felt
-) {
-    if (start_index == end_index) {
+}(
+    index_: felt,
+    season_list_len: felt,
+    season_list: felt*,
+    season_to_start: felt,
+    min_timestamp: felt,
+) -> (season_id: felt, can_be_started: felt, time_remaining: felt) {
+    if (index_ == season_list_len + 1) {
         let (trading_season: TradingSeason) = get_season(season_to_start);
         let (current_timestamp) = get_block_timestamp();
         if (is_le(trading_season.start_timestamp, current_timestamp) == 1) {
@@ -1133,15 +1173,15 @@ func fetch_next_season_to_start_recurse{
             return (season_to_start, FALSE, trading_season.start_timestamp - current_timestamp);
         }
     }
-    let (trading_season: TradingSeason) = get_season(start_index);
+    let (trading_season: TradingSeason) = get_season(season_list[index_]);
     let current_season_timestamp = trading_season.start_timestamp;
     if (is_le(current_season_timestamp, min_timestamp) == 1) {
         return fetch_next_season_to_start_recurse(
-            start_index + 1, end_index, start_index, current_season_timestamp
+            index_ + 1, season_list_len, season_list, season_list[index_], current_season_timestamp
         );
     } else {
         return fetch_next_season_to_start_recurse(
-            start_index + 1, end_index, season_to_start, min_timestamp
+            index_ + 1, season_list_len, season_list, season_to_start, min_timestamp
         );
     }
 }
