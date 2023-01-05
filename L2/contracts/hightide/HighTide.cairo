@@ -346,8 +346,8 @@ func get_next_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     // Fetch all pending trade seasons
     let (local season_list_len: felt, season_list: felt*) = get_all_pending_seasons();
 
-    with_attr error_message("HighTide: There are no pending seasons to start") {
-        assert_not_zero(season_list_len);
+    if (season_list_len == 0){
+        return (0, 0, 0);
     }
 
     // Get first pending trade season metadata
