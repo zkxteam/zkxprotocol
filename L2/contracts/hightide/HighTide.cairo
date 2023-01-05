@@ -346,6 +346,10 @@ func get_next_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     // Fetch all pending trade seasons
     let (local season_list_len: felt, season_list: felt*) = get_all_pending_seasons();
 
+    with_attr error_message("HighTide: There are no pending seasons to start") {
+        assert_not_zero(season_list_len);
+    }
+
     // Get first pending trade season metadata
     let (trading_season: TradingSeason) = get_season(season_list[0]);
 
@@ -1135,20 +1139,25 @@ func populate_pending_season_list_recurse{
     if (index_ == num_seasons_ + 1) {
         return (season_list_len,);
     }
+    // Get season expiry state. It returns false for the seasons which are not yet started 
+    // and also for ongoing seasons
     let (is_expired) = get_season_expiry_state(index_);
     if (is_expired == FALSE) {
         let (current_season_id) = get_current_season_id();
         if (current_season_id == index_) {
+            // Don't include the current active season id in the list
             return populate_pending_season_list_recurse(
                 index_ + 1, num_seasons_, season_list_len, season_list
             );
         } else {
+            // Include the season which are not expired to the list
             assert season_list[season_list_len] = index_;
             return populate_pending_season_list_recurse(
                 index_ + 1, num_seasons_, season_list_len + 1, season_list
             );
         }
     } else {
+        // Don't include the expired seasons to the list
         return populate_pending_season_list_recurse(
             index_ + 1, num_seasons_, season_list_len, season_list
         );
