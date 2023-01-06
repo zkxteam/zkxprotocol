@@ -4,6 +4,7 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
+from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AccountDeployer_INDEX, MasterAdmin_ACTION, Trading_INDEX
@@ -68,6 +69,35 @@ func get_registry_len{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 ) {
     let (reg_len) = account_registry_len.read();
     return (reg_len,);
+}
+
+// @notice Helper function to get a user batch
+// @param starting_index_ - Index at which begin populating the array
+// @param ending_index_ - Upper limit of the batch
+@view
+func get_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    starting_index_: felt, ending_index_: felt
+) -> (account_registry_len: felt, account_registry: felt*) {
+    alloc_locals;
+
+    local ending_index;
+    let (reg_len) = account_registry_len.read();
+    let is_longer = is_le(reg_len, ending_index_);
+
+    // Check if batch must be truncated
+    if (is_longer == 1) {
+        ending_index = reg_len;
+    } else {
+        ending_index = ending_index_;
+    }
+
+    let (account_registry_list: felt*) = alloc();
+    return populate_account_registry(
+        iterator_=0,
+        starting_index_=starting_index_,
+        ending_index_=ending_index,
+        account_registry_list_=account_registry_list,
+    );
 }
 
 // @notice Function to get all user account addresses
@@ -193,7 +223,7 @@ func remove_from_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
 // @returns account_registry_len - Length of the account registry
 // @returns account_registry - registry of account addresses
 func populate_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    iterator_, starting_index_: felt, ending_index_: felt, account_registry_list_: felt*
+    iterator_: felt, starting_index_: felt, ending_index_: felt, account_registry_list_: felt*
 ) -> (account_registry_len: felt, account_registry: felt*) {
     if (starting_index_ == ending_index_) {
         return (iterator_, account_registry_list_);
