@@ -840,9 +840,9 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         return ();
     }
 
-    let (is_expired) = get_season_expiry_state(current_season_id);
-    with_attr error_message("HighTide: Current trading season is still active") {
-        assert is_expired = TRUE;
+    let (current_season: TradingSeason) = get_season(current_season_id);
+    with_attr error_message("HighTide: Current trading season should be ended") {
+        assert current_season.status = SEASON_ENDED;
     }
 
     verify_season_id_exists(season_id_);
