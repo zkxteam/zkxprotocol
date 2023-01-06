@@ -58,18 +58,18 @@ const NUM_1_64x61 = 2305843009213693952;
 
 // Event emitted whenever collateral is transferred from account by trading
 @event
-func high_tide_factors_set(season_id: felt, pair_id: felt, factors: HighTideFactors) {
+func high_tide_factors_set(season_id: felt, market_id: felt, factors: HighTideFactors) {
 }
 
 // Event emitted whenever funds flow by market is calculated
 @event
-func funds_flow_by_market_set(season_id: felt, pair_id: felt, funds_flow: felt) {
+func funds_flow_by_market_set(season_id: felt, market_id: felt, funds_flow: felt) {
 }
 
 // Event emitted whenever trader's score by market is calculated
 @event
 func trader_score_by_market_set(
-    season_id: felt, pair_id: felt, trader_address: felt, trader_score: felt
+    season_id: felt, market_id: felt, trader_address: felt, trader_score: felt
 ) {
 }
 
@@ -79,33 +79,33 @@ func trader_score_by_market_set(
 
 // Stores high tide factors for
 @storage_var
-func high_tide_factors(season_id: felt, pair_id: felt) -> (factors: HighTideFactors) {
+func high_tide_factors(season_id: felt, market_id: felt) -> (factors: HighTideFactors) {
 }
 
-// Stores the w values for a trader per pair in a season
+// Stores the w values for a trader per market in a season
 // Here, w value is the numerator of trader score formula
 @storage_var
-func trader_w_value_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
+func trader_w_value_by_market(season_id: felt, market_id: felt, trader_address: felt) -> (
     w_value_64x61: felt
 ) {
 }
 
-// Stores the cumulative sum of w values for a pair in a season
+// Stores the cumulative sum of w values for a market in a season
 // Here, total w value is the denominator of trader score formula
 @storage_var
-func total_w_value_by_market(season_id: felt, pair_id: felt) -> (total_w_value_64x61: felt) {
+func total_w_value_by_market(season_id: felt, market_id: felt) -> (total_w_value_64x61: felt) {
 }
 
-// Stores the trader score per pair in a season
+// Stores the trader score per market in a season
 @storage_var
-func trader_score_by_market(season_id: felt, pair_id: felt, trader_address: felt) -> (
+func trader_score_by_market(season_id: felt, market_id: felt, trader_address: felt) -> (
     trader_score_64x61: felt
 ) {
 }
 
-// Stores funds flow per pair in a season
+// Stores funds flow per market in a season
 @storage_var
-func funds_flow_by_market(season_id: felt, pair_id: felt) -> (funds_flow_64x61: felt) {
+func funds_flow_by_market(season_id: felt, market_id: felt) -> (funds_flow_64x61: felt) {
 }
 
 // //////////////
@@ -127,30 +127,30 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // View //
 // ///////
 
-// @notice view function to get the hightide factors of a pair
+// @notice view function to get the hightide factors of a market
 // @param season_id_ - Id of the season
-// @param pair_id - Market Id of the pair
+// @param market_id - Market Id of the market
 // @return res - A struct of type HighTideFactors
 @view
 func get_hightide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
+    season_id_: felt, market_id_: felt
 ) -> (res: HighTideFactors) {
-    let (factors) = high_tide_factors.read(season_id=season_id_, pair_id=pair_id_);
+    let (factors) = high_tide_factors.read(season_id=season_id_, market_id=market_id_);
     return (res=factors);
 }
 
 // @notice view function to get the top stats of a season
 // @param season_id_ - Id of the season
-// @return max_trades_top_pair_64x61 - Value of the max trades in a season for a pair (in a day)
-// @return number_of_traders_top_pair_64x61 - Value of the max number of traders in a season for a pair
-// @return average_volume_top_pair_64x61 - Value of the average volume of the top pair in a season for a pair
+// @return max_trades_top_market_64x61 - Value of the max trades in a season for a market (in a day)
+// @return number_of_traders_top_market_64x61 - Value of the max number of traders in a season for a market
+// @return average_volume_top_market_64x61 - Value of the average volume of the top market in a season for a market
 @view
 func find_top_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) -> (
-    max_trades_top_pair_64x61: felt,
-    number_of_traders_top_pair_64x61: felt,
-    average_volume_top_pair_64x61: felt,
+    max_trades_top_market_64x61: felt,
+    number_of_traders_top_market_64x61: felt,
+    average_volume_top_market_64x61: felt,
 ) {
     alloc_locals;
     let (registry) = CommonLib.get_registry_address();
@@ -171,7 +171,7 @@ func find_top_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     );
 
     // Get all the tradable markets in the system
-    let (pair_list_len: felt, pair_list: Market*) = IMarkets.get_all_markets_by_state(
+    let (market_list_len: felt, market_list: Market*) = IMarkets.get_all_markets_by_state(
         contract_address=markets_address, is_tradable_=1, is_archived_=0
     );
 
@@ -179,36 +179,36 @@ func find_top_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         season_id_=season_id_,
         hightide_address_=hightide_address,
         trading_stats_address_=trading_stats_address,
-        pair_list_len_=pair_list_len,
-        pair_list_=pair_list,
-        max_trades_top_pair_64x61_=0,
-        number_of_traders_top_pair_64x61_=0,
-        average_volume_top_pair_64x61_=0,
+        market_list_len_=market_list_len,
+        market_list_=market_list,
+        max_trades_top_market_64x61_=0,
+        number_of_traders_top_market_64x61_=0,
+        average_volume_top_market_64x61_=0,
     );
 }
 
-// @notice view function to get trader score of a pair
+// @notice view function to get trader score of a market
 // @param season_id_ - Id of the season
-// @param pair_id_ - Market Id of the pair
+// @param market_id_ - Market Id of the market
 // @param trader_address_ - Address of the trader
-// @return trader_score - returns traders score of a pair
+// @return trader_score - returns traders score of a market
 @view
 func get_trader_score_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, trader_address_: felt
+    season_id_: felt, market_id_: felt, trader_address_: felt
 ) -> (trader_score: felt) {
-    let (trader_score) = trader_score_by_market.read(season_id_, pair_id_, trader_address_);
+    let (trader_score) = trader_score_by_market.read(season_id_, market_id_, trader_address_);
     return (trader_score,);
 }
 
-// @notice view function to get funds flow of a pair
+// @notice view function to get funds flow of a market
 // @param season_id_ - Id of the season
-// @param pair_id_ - Market Id of the pair
-// @return funds_flow - returns the funds transferred from liquidity pool to reward pool for a pair
+// @param market_id_ - Market Id of the market
+// @return funds_flow - returns the funds transferred from liquidity pool to reward pool for a market
 @view
 func get_funds_flow_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
+    season_id_: felt, market_id_: felt
 ) -> (funds_flow: felt) {
-    let (funds_flow) = funds_flow_by_market.read(season_id_, pair_id_);
+    let (funds_flow) = funds_flow_by_market.read(season_id_, market_id_);
     return (funds_flow,);
 }
 
@@ -217,7 +217,7 @@ func get_funds_flow_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 // ///////////
 
 // @notice external function to calculate the factors
-// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param season_id_ - Season Id for which to calculate the factors of a market
 @external
 func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
@@ -249,38 +249,38 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     // Get top stats across all the markets
     let (
-        max_trades_top_pair_64x61: felt,
-        number_of_traders_top_pair_64x61: felt,
-        average_volume_top_pair_64x61: felt,
+        max_trades_top_market_64x61: felt,
+        number_of_traders_top_market_64x61: felt,
+        average_volume_top_market_64x61: felt,
     ) = find_top_stats(season_id_=season_id_);
 
-    // Find HighTide factors for highTide pairs
-    let (pair_id_list_len: felt, pair_id_list: felt*) = IHighTide.get_hightides_by_season_id(
+    // Find HighTide factors for highTide markets
+    let (market_id_list_len: felt, market_id_list: felt*) = IHighTide.get_hightides_by_season_id(
         contract_address=hightide_address, season_id=season_id_
     );
 
-    // Recursively calculate the factors for each pair_id
+    // Recursively calculate the factors for each market_id
     return calculate_high_tide_factors_recurse(
-        pair_id_list_len=pair_id_list_len,
-        pair_id_list=pair_id_list,
+        market_id_list_len=market_id_list_len,
+        market_id_list=market_id_list,
         trading_stats_address_=trading_stats_address,
         hightide_address_=hightide_address,
         season_id_=season_id_,
-        average_volume_top_pair_64x61_=average_volume_top_pair_64x61,
-        max_trades_top_pair_64x61_=max_trades_top_pair_64x61,
-        number_of_traders_top_pair_64x61_=number_of_traders_top_pair_64x61,
+        average_volume_top_market_64x61_=average_volume_top_market_64x61,
+        max_trades_top_market_64x61_=max_trades_top_market_64x61,
+        number_of_traders_top_market_64x61_=number_of_traders_top_market_64x61,
         total_days_=season.num_trading_days,
     );
 }
 
 // @notice external function to calculate w
 // @param season_id_ - Season Id for which to calculate the w for traders
-// @param pair_id_ - Pair Id for which to calculate w
+// @param market_id_ - market Id for which to calculate w
 // @param trader_list_len - length of trader's list
 // @param trader_list - list of trader's
 @external
 func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, trader_list_len: felt, trader_list: felt*
+    season_id_: felt, market_id_: felt, trader_list_len: felt, trader_list: felt*
 ) {
     // To-do: Need to integrate signature infra for the authentication
 
@@ -317,7 +317,7 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     // Recursively calculate w for each trader
     return calculate_w_recurse(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         constants_=constants,
         trader_list_len=trader_list_len,
         trader_list=trader_list,
@@ -327,13 +327,13 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }
 
 // @notice external function to calculate trader score
-// @param season_id_ - Season Id for which to calculate the w for a trader per pair
-// @param pair_id_ - Pair Id for which to calculate traders score
+// @param season_id_ - Season Id for which to calculate the w for a trader per market
+// @param market_id_ - market Id for which to calculate traders score
 // @param trader_list_len - length of trader's list
 // @param trader_list - list of trader's
 @external
 func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, trader_list_len: felt, trader_list: felt*
+    season_id_: felt, market_id_: felt, trader_list_len: felt, trader_list: felt*
 ) {
     // To-do: Need to integrate signature infra for the authentication
 
@@ -354,17 +354,17 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         assert is_expired = TRUE;
     }
 
-    // Recursively calculate trader score for pair
+    // Recursively calculate trader score for market
     return calculate_trader_score_recurse(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_list_len=trader_list_len,
         trader_list=trader_list,
     );
 }
 
 // @notice external function to calculate the funds flowing from LP (Liquidity Pool) to RP (Rewards Pool)
-// @param season_id_ - Season Id for which to calculate the flow of a pair
+// @param season_id_ - Season Id for which to calculate the flow of a market
 @external
 func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
@@ -383,7 +383,7 @@ func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         assert caller = hightide_address;
     }
 
-    // get hightide pairs
+    // get hightide markets
     let (hightide_list_len: felt, hightide_list: felt*) = IHighTide.get_hightides_by_season_id(
         contract_address=hightide_address, season_id=season_id_
     );
@@ -391,7 +391,7 @@ func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Get multipliers to calculate funds flow
     let (multipliers: Multipliers) = IHighTide.get_multipliers(contract_address=hightide_address);
 
-    // Recursively calculate the flow for each pair_id
+    // Recursively calculate the flow for each market_id
     return calculate_funds_flow_recurse(
         season_id_=season_id_,
         multipliers_=multipliers,
@@ -406,146 +406,151 @@ func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // ///////////
 
 // @notice internal function to recursively calculate the factors
-// @param pair_id_list_len - Length of the pair_id array
-// @param pair_id_list - Array of pair_ids
+// @param market_id_list_len - Length of the market_id array
+// @param market_id_list - Array of market_ids
 // @param trading_stats_address_ - Address of the Trading stats contract
 // @param hightide_address_ - Address of the HighTide contract
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param average_volume_top_pair_64x61_ - Average volume of the top pair in the season
-// @param max_trades_top_pair_64x61_ - Max number of trades by the top pair in the season
-// @param number_of_traders_top_pair_64x61_ - Number of unique traders for the top pair in the season
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param average_volume_top_market_64x61_ - Average volume of the top market in the season
+// @param max_trades_top_market_64x61_ - Max number of trades by the top market in the season
+// @param number_of_traders_top_market_64x61_ - Number of unique traders for the top market in the season
 // @param total_days_ - Number of days the season is active
 func calculate_high_tide_factors_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
-    pair_id_list_len: felt,
-    pair_id_list: felt*,
+    market_id_list_len: felt,
+    market_id_list: felt*,
     trading_stats_address_: felt,
     hightide_address_: felt,
     season_id_: felt,
-    average_volume_top_pair_64x61_: felt,
-    max_trades_top_pair_64x61_: felt,
-    number_of_traders_top_pair_64x61_: felt,
+    average_volume_top_market_64x61_: felt,
+    max_trades_top_market_64x61_: felt,
+    number_of_traders_top_market_64x61_: felt,
     total_days_: felt,
 ) {
     alloc_locals;
-    if (pair_id_list_len == 0) {
+    if (market_id_list_len == 0) {
         return ();
     }
 
     let (highTideDetails: HighTideMetaData) = IHighTide.get_hightide(
-        contract_address=hightide_address_, hightide_id=[pair_id_list]
+        contract_address=hightide_address_, hightide_id=[market_id_list]
     );
 
     let (x_1: felt) = calculate_x_1(
         season_id_=season_id_,
-        pair_id_=highTideDetails.pair_id,
+        market_id_=highTideDetails.market_id,
         trading_stats_address_=trading_stats_address_,
-        average_volume_top_pair_64x61_=average_volume_top_pair_64x61_,
+        average_volume_top_market_64x61_=average_volume_top_market_64x61_,
     );
 
     let (x_2: felt) = calculate_x_2(
         season_id_=season_id_,
-        pair_id_=highTideDetails.pair_id,
+        market_id_=highTideDetails.market_id,
         trading_stats_address_=trading_stats_address_,
-        max_trades_top_pair_64x61_=max_trades_top_pair_64x61_,
+        max_trades_top_market_64x61_=max_trades_top_market_64x61_,
     );
 
     let (x_3: felt) = calculate_x_3(
         season_id_=season_id_,
-        pair_id_=highTideDetails.pair_id,
+        market_id_=highTideDetails.market_id,
         total_days_=total_days_,
         trading_stats_address_=trading_stats_address_,
     );
 
     let (x_4: felt) = calculate_x_4(
         season_id_=season_id_,
-        pair_id_=highTideDetails.pair_id,
+        market_id_=highTideDetails.market_id,
         trading_stats_address_=trading_stats_address_,
-        number_of_traders_top_pair_64x61_=number_of_traders_top_pair_64x61_,
+        number_of_traders_top_market_64x61_=number_of_traders_top_market_64x61_,
     );
 
     let factors: HighTideFactors = HighTideFactors(x_1=x_1, x_2=x_2, x_3=x_3, x_4=x_4);
 
     // Write the calculated factors to storage
-    high_tide_factors.write(season_id=season_id_, pair_id=highTideDetails.pair_id, value=factors);
+    high_tide_factors.write(
+        season_id=season_id_, market_id=highTideDetails.market_id, value=factors
+    );
     high_tide_factors_set.emit(
-        season_id=season_id_, pair_id=highTideDetails.pair_id, factors=factors
+        season_id=season_id_, market_id=highTideDetails.market_id, factors=factors
     );
 
     return calculate_high_tide_factors_recurse(
-        pair_id_list_len=pair_id_list_len - 1,
-        pair_id_list=pair_id_list + 1,
+        market_id_list_len=market_id_list_len - 1,
+        market_id_list=market_id_list + 1,
         trading_stats_address_=trading_stats_address_,
         hightide_address_=hightide_address_,
         season_id_=season_id_,
-        average_volume_top_pair_64x61_=average_volume_top_pair_64x61_,
-        max_trades_top_pair_64x61_=max_trades_top_pair_64x61_,
-        number_of_traders_top_pair_64x61_=number_of_traders_top_pair_64x61_,
+        average_volume_top_market_64x61_=average_volume_top_market_64x61_,
+        max_trades_top_market_64x61_=max_trades_top_market_64x61_,
+        number_of_traders_top_market_64x61_=number_of_traders_top_market_64x61_,
         total_days_=total_days_,
     );
 }
 
-// @notice internal function to calculate x_1 for a pair
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param pair_id_- Pair Id for which to calculate x_1
+// @notice internal function to calculate x_1 for a market
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param market_id_- market Id for which to calculate x_1
 // @param trading_stats_address_ - Address of the Trading stats contract
-// @param average_volume_top_pair_64x61_ - Average volume of the top pair in the season
-// @returns x_1 - x_1 value for the pair
+// @param average_volume_top_market_64x61_ - Average volume of the top market in the season
+// @returns x_1 - x_1 value for the market
 func calculate_x_1{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     trading_stats_address_: felt,
-    average_volume_top_pair_64x61_: felt,
+    average_volume_top_market_64x61_: felt,
 ) -> (x_1: felt) {
-    if (average_volume_top_pair_64x61_ == 0) {
+    if (average_volume_top_market_64x61_ == 0) {
         return (0,);
     }
-    let (average_volume_pair_64x61: felt) = ITradingStats.get_average_order_volume(
-        contract_address=trading_stats_address_, season_id_=season_id_, pair_id_=pair_id_
+    let (average_volume_market_64x61: felt) = ITradingStats.get_average_order_volume(
+        contract_address=trading_stats_address_, season_id_=season_id_, market_id_=market_id_
     );
-    let (x_1: felt) = Math64x61_div(average_volume_pair_64x61, average_volume_top_pair_64x61_);
+    let (x_1: felt) = Math64x61_div(average_volume_market_64x61, average_volume_top_market_64x61_);
 
     return (x_1,);
 }
 
-// @notice internal function to calculate x_2 for a pair
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param pair_id_- Pair Id for which to calculate x_2
+// @notice internal function to calculate x_2 for a market
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param market_id_- market Id for which to calculate x_2
 // @param trading_stats_address_ - Address of the Trading stats contract
-// @param max_trades_top_pair_64x61_ - Max number of trades by the top pair in the season
-// @returns x_2 - x_2 value for the pair
+// @param max_trades_top_market_64x61_ - Max number of trades by the top market in the season
+// @returns x_2 - x_2 value for the market
 func calculate_x_2{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, trading_stats_address_: felt, max_trades_top_pair_64x61_: felt
+    season_id_: felt,
+    market_id_: felt,
+    trading_stats_address_: felt,
+    max_trades_top_market_64x61_: felt,
 ) -> (x_2: felt) {
-    if (max_trades_top_pair_64x61_ == 0) {
+    if (max_trades_top_market_64x61_ == 0) {
         return (0,);
     }
-    let (max_trades_pair: felt) = ITradingStats.get_max_trades_in_day(
-        contract_address=trading_stats_address_, season_id_=season_id_, pair_id_=pair_id_
+    let (max_trades_market: felt) = ITradingStats.get_max_trades_in_day(
+        contract_address=trading_stats_address_, season_id_=season_id_, market_id_=market_id_
     );
 
-    let (max_trades_pair_64x61: felt) = Math64x61_fromIntFelt(max_trades_pair);
+    let (max_trades_market_64x61: felt) = Math64x61_fromIntFelt(max_trades_market);
 
-    let (x_2: felt) = Math64x61_div(max_trades_pair_64x61, max_trades_top_pair_64x61_);
+    let (x_2: felt) = Math64x61_div(max_trades_market_64x61, max_trades_top_market_64x61_);
 
     return (x_2,);
 }
 
-// @notice internal function to calculate x_3 for a pair
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param pair_id_- Pair Id for which to calculate x_2
+// @notice internal function to calculate x_3 for a market
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param market_id_- market Id for which to calculate x_2
 // @param total_days_ - Number of days the season is active
 // @param trading_stats_address_ - Address of the Trading stats contract
-// @returns x_3 - x_3 value for the pair
+// @returns x_3 - x_3 value for the market
 func calculate_x_3{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, total_days_: felt, trading_stats_address_: felt
+    season_id_: felt, market_id_: felt, total_days_: felt, trading_stats_address_: felt
 ) -> (x_3: felt) {
     if (total_days_ == 0) {
         return (0,);
     }
     let (num_days_traded: felt) = ITradingStats.get_total_days_traded(
-        contract_address=trading_stats_address_, season_id_=season_id_, pair_id_=pair_id_
+        contract_address=trading_stats_address_, season_id_=season_id_, market_id_=market_id_
     );
 
     let (num_days_traded_64x61: felt) = Math64x61_fromIntFelt(num_days_traded);
@@ -556,35 +561,35 @@ func calculate_x_3{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return (x3,);
 }
 
-// @notice internal function to calculate x_4 for a pair
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param pair_id_- Pair Id for which to calculate x_4
+// @notice internal function to calculate x_4 for a market
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param market_id_- market Id for which to calculate x_4
 // @param trading_stats_address_ - Address of the Trading stats contract
-// @param number_of_traders_top_pair_64x61_ - Number of unique traders for the top pair in the season
-// @returns x_4 - x_4 value for the pair
+// @param number_of_traders_top_market_64x61_ - Number of unique traders for the top market in the season
+// @returns x_4 - x_4 value for the market
 func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     trading_stats_address_: felt,
-    number_of_traders_top_pair_64x61_: felt,
+    number_of_traders_top_market_64x61_: felt,
 ) -> (x_4: felt) {
-    if (number_of_traders_top_pair_64x61_ == 0) {
+    if (number_of_traders_top_market_64x61_ == 0) {
         return (0,);
     }
     let (number_of_traders: felt) = ITradingStats.get_num_active_traders(
-        contract_address=trading_stats_address_, season_id_=season_id_, pair_id_=pair_id_
+        contract_address=trading_stats_address_, season_id_=season_id_, market_id_=market_id_
     );
 
     let (number_of_traders_64x61: felt) = Math64x61_fromIntFelt(number_of_traders);
 
-    let (x_4: felt) = Math64x61_div(number_of_traders_64x61, number_of_traders_top_pair_64x61_);
+    let (x_4: felt) = Math64x61_div(number_of_traders_64x61, number_of_traders_top_market_64x61_);
 
     return (x_4,);
 }
 
 // @notice internal function to recursively calculate w for each trader
-// @param season_id_ - Season Id for which to calculate w for each trader of a pair
-// @param pair_id_- Pair Id for which to calculate w
+// @param season_id_ - Season Id for which to calculate w for each trader of a market
+// @param market_id_- market Id for which to calculate w
 // @param constants_ - Constants used to calculate individual trader score
 // @param trader_list_len - Length of the traders array
 // @param trader_list - Array of traders
@@ -592,7 +597,7 @@ func calculate_x_4{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param rewards_calculation_address_ - Address of the rewards calculation contract
 func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     constants_: Constants,
     trader_list_len: felt,
     trader_list: felt*,
@@ -613,7 +618,7 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // Calculate w per market
     calculate_w_per_market(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_address_=[trader_list],
         user_stats_address_=user_stats_address_,
         xp_value_=xp_value,
@@ -623,7 +628,7 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // Recursively call next trader to calculate w
     return calculate_w_recurse(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         constants_=constants_,
         trader_list_len=trader_list_len - 1,
         trader_list=trader_list + 1,
@@ -633,15 +638,15 @@ func calculate_w_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 }
 
 // @notice internal function to recursively calculate w for each trader
-// @param season_id_ - Season Id for which to calculate w for each trader of a pair
-// @param pair_id_ - Pair Id for which to calculate w
+// @param season_id_ - Season Id for which to calculate w for each trader of a market
+// @param market_id_ - market Id for which to calculate w
 // @param trader_address_ - Address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @param xp_value_ - xp_value of a trader
 // @param constants_ - Constants used to calculate individual trader score
 func calculate_w_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     trader_address_: felt,
     user_stats_address_: felt,
     xp_value_: felt,
@@ -652,20 +657,20 @@ func calculate_w_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     // Get fp value
     let (local fp_value: felt) = calculate_fp(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
 
     // Get ft value
     let (local ft_value: felt) = calculate_ft(
-        season_id_=season_id_, pair_id_=pair_id_, user_stats_address_=user_stats_address_
+        season_id_=season_id_, market_id_=market_id_, user_stats_address_=user_stats_address_
     );
 
     // Get d value
     let (d_value: felt) = calculate_d(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
@@ -673,7 +678,7 @@ func calculate_w_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     // Get p value
     let (p_value: felt) = calculate_p(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_address_=trader_address_,
         user_stats_address_=user_stats_address_,
     );
@@ -688,69 +693,69 @@ func calculate_w_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         constants_=constants_,
     );
 
-    // Update w value for a pair corresponding to a trader
-    trader_w_value_by_market.write(season_id_, pair_id_, trader_address_, w_value_64x61);
+    // Update w value for a market corresponding to a trader
+    trader_w_value_by_market.write(season_id_, market_id_, trader_address_, w_value_64x61);
 
-    // Update total w value for a pair
-    let (current_w_value_64x61) = total_w_value_by_market.read(season_id_, pair_id_);
+    // Update total w value for a market
+    let (current_w_value_64x61) = total_w_value_by_market.read(season_id_, market_id_);
     let (new_w_value_64x61) = Math64x61_add(current_w_value_64x61, w_value_64x61);
-    total_w_value_by_market.write(season_id_, pair_id_, new_w_value_64x61);
+    total_w_value_by_market.write(season_id_, market_id_, new_w_value_64x61);
     return ();
 }
 
-// @notice internal function to calculate fp for a pair corresponding to a trader
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param pair_id_- Pair Id for which to calculate x_4
+// @notice internal function to calculate fp for a market corresponding to a trader
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param market_id_- market Id for which to calculate x_4
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @return fp - returns trader's individual trading fees paid
 func calculate_fp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
+    season_id_: felt, market_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (fp_value: felt) {
     // Get trader's individual trading fees paid
     let (fee_64x61) = IUserStats.get_trader_fee(
         contract_address=user_stats_address_,
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_address_=trader_address_,
     );
 
     return (fee_64x61,);
 }
 
-// @notice internal function to calculate ft for a pair
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param pair_id_- Pair Id for which to calculate x_4
+// @notice internal function to calculate ft for a market
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param market_id_- market Id for which to calculate x_4
 // @param user_stats_address_ - Address of the User stats contract
 // @return ft - returns overall zkx platform trading fees
 func calculate_ft{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, user_stats_address_: felt
+    season_id_: felt, market_id_: felt, user_stats_address_: felt
 ) -> (ft_value: felt) {
     // Get overall zkx platform trading fees
     let (total_fee_64x61) = IUserStats.get_total_fee(
-        contract_address=user_stats_address_, season_id_=season_id_, pair_id_=pair_id_
+        contract_address=user_stats_address_, season_id_=season_id_, market_id_=market_id_
     );
 
     return (total_fee_64x61,);
 }
 
-// @notice internal function to calculate d for a pair corresponding to a trader
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param pair_id_- Pair Id for which to calculate x_4
+// @notice internal function to calculate d for a market corresponding to a trader
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param market_id_- market Id for which to calculate x_4
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
 // @return d - returns trader's average open interest
 func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
+    season_id_: felt, market_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (d: felt) {
     // Create a VolumeMetadata struct for open orders
-    let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, life_cycle=OPEN
+    let volume_metadata_market_open: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, market_id=market_id_, life_cycle=OPEN
     );
 
     // Create a VolumeMetadata struct for close orders
-    let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, life_cycle=CLOSE
+    let volume_metadata_market_close: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, market_id=market_id_, life_cycle=CLOSE
     );
 
     // Get the order volume for open orders
@@ -759,7 +764,7 @@ func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     ) = IUserStats.get_trader_order_volume(
         contract_address=user_stats_address_,
         trader_address_=trader_address_,
-        volume_type_=volume_metadata_pair_open,
+        volume_type_=volume_metadata_market_open,
     );
 
     // Get the order volume for close orders
@@ -768,7 +773,7 @@ func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     ) = IUserStats.get_trader_order_volume(
         contract_address=user_stats_address_,
         trader_address_=trader_address_,
-        volume_type_=volume_metadata_pair_close,
+        volume_type_=volume_metadata_market_close,
     );
 
     // check whether subtracting close order volume from open order volume is either positive or negative
@@ -798,20 +803,20 @@ func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return (d,);
 }
 
-// @notice internal function to calculate p for a pair corresponding to a trader
-// @param season_id_ - Season Id for which to calculate the factors of a pair
-// @param pair_id_- Pair Id for which to calculate x_4
+// @notice internal function to calculate p for a market corresponding to a trader
+// @param season_id_ - Season Id for which to calculate the factors of a market
+// @param market_id_- market Id for which to calculate x_4
 // @param trader_address_ - l2 address of the trader
 // @param user_stats_address_ - Address of the User stats contract
-// @return p - returns p value for a pair corresponding to a trader
+// @return p - returns p value for a market corresponding to a trader
 func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, trader_address_: felt, user_stats_address_: felt
+    season_id_: felt, market_id_: felt, trader_address_: felt, user_stats_address_: felt
 ) -> (p: felt) {
-    // Get pnl for a pair
+    // Get pnl for a market
     let (pnl_64x61) = IUserStats.get_trader_pnl(
         contract_address=user_stats_address_,
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_address_=trader_address_,
     );
 
@@ -819,7 +824,7 @@ func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     let (margin_amount_64x61) = IUserStats.get_trader_margin_amount(
         contract_address=user_stats_address_,
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_address_=trader_address_,
     );
 
@@ -833,14 +838,14 @@ func calculate_p{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return (p,);
 }
 
-// @notice internal function to calculate w for a pair corresponding to a trader
-// @param fp_value_64x61_ - fp value for a pair corresponding to a trader
-// @param ft_value_64x61_- ft value for a pair
-// @param d_value_64x61_ - d value for a pair corresponding to a trader
-// @param p_value_64x61_ - p value for a pair corresponding to a trader
+// @notice internal function to calculate w for a market corresponding to a trader
+// @param fp_value_64x61_ - fp value for a market corresponding to a trader
+// @param ft_value_64x61_- ft value for a market
+// @param d_value_64x61_ - d value for a market corresponding to a trader
+// @param p_value_64x61_ - p value for a market corresponding to a trader
 // @param xp_value_ - xp value for a trader
 // @param constants_ - constants used for calculating trader's score
-// @return w - returns w value for a pair corresponding to a trader
+// @return w - returns w value for a market corresponding to a trader
 func calculate_w_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     fp_value_64x61_: felt,
     ft_value_64x61_: felt,
@@ -887,43 +892,43 @@ func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 }
 
 // @notice internal function to recursively calculate trader score
-// @param season_id_ - Season Id for which to calculate trader score for each trader of a pair
-// @param pair_id_ - Pair Id for which to calculate traders score
+// @param season_id_ - Season Id for which to calculate trader score for each trader of a market
+// @param market_id_ - market Id for which to calculate traders score
 // @param trader_list_len - Length of the traders array
 // @param trader_list - Array of traders
 func calculate_trader_score_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(season_id_: felt, pair_id_: felt, trader_list_len: felt, trader_list: felt*) {
+}(season_id_: felt, market_id_: felt, trader_list_len: felt, trader_list: felt*) {
     if (trader_list_len == 0) {
         return ();
     }
 
     // Calculate trader's score per market
     calculate_trader_score_per_market(
-        season_id_=season_id_, pair_id_=pair_id_, trader_address_=[trader_list]
+        season_id_=season_id_, market_id_=market_id_, trader_address_=[trader_list]
     );
 
     // Recursively calculate trader's score
     return calculate_trader_score_recurse(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_list_len=trader_list_len - 1,
         trader_list=trader_list + 1,
     );
 }
 
 // @notice internal function to recursively calculate trader score
-// @param season_id_ - Season Id for which to calculate trader score for each trader of a pair
-// @param pair_id_ - Pair Id for which to calculate traders score
+// @param season_id_ - Season Id for which to calculate trader score for each trader of a market
+// @param market_id_ - market Id for which to calculate traders score
 // @param trader_address_ - Address of the trader
 func calculate_trader_score_per_market{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(season_id_: felt, pair_id_: felt, trader_address_: felt) {
-    // Get w value for a pair corresponding to a trader
-    let (w_value_64x61) = trader_w_value_by_market.read(season_id_, pair_id_, trader_address_);
+}(season_id_: felt, market_id_: felt, trader_address_: felt) {
+    // Get w value for a market corresponding to a trader
+    let (w_value_64x61) = trader_w_value_by_market.read(season_id_, market_id_, trader_address_);
 
-    // Get total w value for a pair
-    let (total_w_value_64x61) = total_w_value_by_market.read(season_id_, pair_id_);
+    // Get total w value for a market
+    let (total_w_value_64x61) = total_w_value_by_market.read(season_id_, market_id_);
 
     if (total_w_value_64x61 == 0) {
         return ();
@@ -932,12 +937,12 @@ func calculate_trader_score_per_market{
     let (trader_score_64x61) = Math64x61_div(w_value_64x61, total_w_value_64x61);
 
     // Update trader's score per market
-    trader_score_by_market.write(season_id_, pair_id_, trader_address_, trader_score_64x61);
+    trader_score_by_market.write(season_id_, market_id_, trader_address_, trader_score_64x61);
 
     // Emit event
     trader_score_by_market_set.emit(
         season_id=season_id_,
-        pair_id=pair_id_,
+        market_id=market_id_,
         trader_address=trader_address_,
         trader_score=trader_score_64x61,
     );
@@ -945,106 +950,106 @@ func calculate_trader_score_per_market{
 }
 
 // @notice internal function to recursively calculate the top stats in a season
-// @param season_id_ - Season Id for which to calculate the factors of a pair
+// @param season_id_ - Season Id for which to calculate the factors of a market
 // @param hightide_address_ - Address of the HighTide contract
 // @param trading_stats_address_ - Address of the Trading stats contract
-// @param pair_list_len - Length of the pair_id array
-// @param pair_list - Array of pair_ids
-// @param max_trades_top_pair_64x61_ - Current max number of trades by the top pair in the season for a market
-// @param number_of_traders_top_pair_64x61_ - Current max number of unique traders in the season for a market
-// @param average_volume_top_pair_64x61_ - Current max average volume in the season for a market
-// @return max_trades_top_pair_64x61 - Max number of trades by the top pair in the season for a market
-// @return number_of_traders_top_pair_64x61 - Max number of unique traders in the season for a market
-// @return average_volume_top_pair_64x61 - Max average volume in the season for a market
+// @param market_list_len - Length of the market_id array
+// @param market_list - Array of market_ids
+// @param max_trades_top_market_64x61_ - Current max number of trades by the top market in the season for a market
+// @param number_of_traders_top_market_64x61_ - Current max number of unique traders in the season for a market
+// @param average_volume_top_market_64x61_ - Current max average volume in the season for a market
+// @return max_trades_top_market_64x61 - Max number of trades by the top market in the season for a market
+// @return number_of_traders_top_market_64x61 - Max number of unique traders in the season for a market
+// @return average_volume_top_market_64x61 - Max average volume in the season for a market
 func find_top_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
     hightide_address_: felt,
     trading_stats_address_: felt,
-    pair_list_len_: felt,
-    pair_list_: Market*,
-    max_trades_top_pair_64x61_: felt,
-    number_of_traders_top_pair_64x61_: felt,
-    average_volume_top_pair_64x61_: felt,
+    market_list_len_: felt,
+    market_list_: Market*,
+    max_trades_top_market_64x61_: felt,
+    number_of_traders_top_market_64x61_: felt,
+    average_volume_top_market_64x61_: felt,
 ) -> (
-    max_trades_top_pair_64x61: felt,
-    number_of_traders_top_pair_64x61: felt,
-    average_volume_top_pair_64x61: felt,
+    max_trades_top_market_64x61: felt,
+    number_of_traders_top_market_64x61: felt,
+    average_volume_top_market_64x61: felt,
 ) {
     alloc_locals;
-    local current_max_trades_pair: felt;
+    local current_max_trades_market: felt;
     local current_top_number_of_traders: felt;
     local current_top_average_volume: felt;
 
-    if (pair_list_len_ == 0) {
+    if (market_list_len_ == 0) {
         return (
-            max_trades_top_pair_64x61_,
-            number_of_traders_top_pair_64x61_,
-            average_volume_top_pair_64x61_,
+            max_trades_top_market_64x61_,
+            number_of_traders_top_market_64x61_,
+            average_volume_top_market_64x61_,
         );
     }
 
     // Get max number of trades in a day for this highTide
-    let (max_trades_pair: felt) = ITradingStats.get_max_trades_in_day(
-        contract_address=trading_stats_address_, season_id_=season_id_, pair_id_=[pair_list_].id
+    let (max_trades_market: felt) = ITradingStats.get_max_trades_in_day(
+        contract_address=trading_stats_address_, season_id_=season_id_, market_id_=[market_list_].id
     );
 
     // Convert the above stat to 64x61 format
-    let (max_trades_64x61: felt) = Math64x61_fromIntFelt(max_trades_pair);
+    let (max_trades_64x61: felt) = Math64x61_fromIntFelt(max_trades_market);
 
-    // Get average volume for the pair in 64x61 format
+    // Get average volume for the market in 64x61 format
     let (average_volume_64x61: felt) = ITradingStats.get_average_order_volume(
-        contract_address=trading_stats_address_, season_id_=season_id_, pair_id_=[pair_list_].id
+        contract_address=trading_stats_address_, season_id_=season_id_, market_id_=[market_list_].id
     );
 
-    // Get number of activat traders for this pair
+    // Get number of activat traders for this market
     let (number_of_traders: felt) = ITradingStats.get_num_active_traders(
-        contract_address=trading_stats_address_, season_id_=season_id_, pair_id_=[pair_list_].id
+        contract_address=trading_stats_address_, season_id_=season_id_, market_id_=[market_list_].id
     );
 
     // Convert the above stat to 64x61 format
     let (number_of_traders_64x61: felt) = Math64x61_fromIntFelt(number_of_traders);
 
     // Compare with our current largest stats
-    let is_larger_volume = is_le(average_volume_top_pair_64x61_, average_volume_64x61);
-    let is_larger_trades = is_le(max_trades_top_pair_64x61_, max_trades_64x61);
-    let is_larger_traders = is_le(number_of_traders_top_pair_64x61_, number_of_traders_64x61);
+    let is_larger_volume = is_le(average_volume_top_market_64x61_, average_volume_64x61);
+    let is_larger_trades = is_le(max_trades_top_market_64x61_, max_trades_64x61);
+    let is_larger_traders = is_le(number_of_traders_top_market_64x61_, number_of_traders_64x61);
 
     if (is_larger_volume == 1) {
         assert current_top_average_volume = average_volume_64x61;
     } else {
-        assert current_top_average_volume = average_volume_top_pair_64x61_;
+        assert current_top_average_volume = average_volume_top_market_64x61_;
     }
 
     if (is_larger_trades == 1) {
-        assert current_max_trades_pair = max_trades_64x61;
+        assert current_max_trades_market = max_trades_64x61;
     } else {
-        assert current_max_trades_pair = max_trades_top_pair_64x61_;
+        assert current_max_trades_market = max_trades_top_market_64x61_;
     }
 
     if (is_larger_traders == 1) {
         assert current_top_number_of_traders = number_of_traders_64x61;
     } else {
-        assert current_top_number_of_traders = number_of_traders_top_pair_64x61_;
+        assert current_top_number_of_traders = number_of_traders_top_market_64x61_;
     }
 
     return find_top_stats_recurse(
         season_id_=season_id_,
         hightide_address_=hightide_address_,
         trading_stats_address_=trading_stats_address_,
-        pair_list_len_=pair_list_len_ - 1,
-        pair_list_=pair_list_ + Market.SIZE,
-        max_trades_top_pair_64x61_=current_max_trades_pair,
-        number_of_traders_top_pair_64x61_=current_top_number_of_traders,
-        average_volume_top_pair_64x61_=current_top_average_volume,
+        market_list_len_=market_list_len_ - 1,
+        market_list_=market_list_ + Market.SIZE,
+        max_trades_top_market_64x61_=current_max_trades_market,
+        number_of_traders_top_market_64x61_=current_top_number_of_traders,
+        average_volume_top_market_64x61_=current_top_average_volume,
     );
 }
 
-// @notice internal function to recursively calculate funds flow for each pair
-// @param season_id_ - Season Id for which to calculate funds flow for each pair
+// @notice internal function to recursively calculate funds flow for each market
+// @param season_id_ - Season Id for which to calculate funds flow for each market
 // @param multipliers_ - Multipliers used to calculate funds flow
 // @param hightide_address_ - Address of the HighTide contract
-// @param hightide_list_len_, length of hightide market pair id's
-// @param hightide_list_ - List of hightide market pair_ids
+// @param hightide_list_len_, length of hightide market market id's
+// @param hightide_list_ - List of hightide market market_ids
 func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
     multipliers_: Multipliers,
@@ -1063,9 +1068,9 @@ func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
         contract_address=hightide_address_, hightide_id=[hightide_list]
     );
 
-    // Get hightide factors corresponding to a pair
+    // Get hightide factors corresponding to a market
     let (factors: HighTideFactors) = high_tide_factors.read(
-        season_id=season_id_, pair_id=hightide_details.pair_id
+        season_id=season_id_, market_id=hightide_details.market_id
     );
 
     // Find cumulative sum of multipliers to the hightide factors
@@ -1091,15 +1096,15 @@ func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     // Find percentage of funds to be transferred from LP to RP
     let (funds_flow_64x61) = Math64x61_div(numerator_64x61, denominator_64x61);
 
-    // Update funds flow for a pair
-    funds_flow_by_market.write(season_id_, hightide_details.pair_id, funds_flow_64x61);
+    // Update funds flow for a market
+    funds_flow_by_market.write(season_id_, hightide_details.market_id, funds_flow_64x61);
 
     // Emit event
     funds_flow_by_market_set.emit(
-        season_id=season_id_, pair_id=hightide_details.pair_id, funds_flow=funds_flow_64x61
+        season_id=season_id_, market_id=hightide_details.market_id, funds_flow=funds_flow_64x61
     );
 
-    // Recursively calculate the flow for each pair_id
+    // Recursively calculate the flow for each market_id
     return calculate_funds_flow_recurse(
         season_id_=season_id_,
         multipliers_=multipliers_,

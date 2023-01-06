@@ -134,6 +134,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 5, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 7, 1])
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 8, 1])
+    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 10, 1])
 
     # spoof admin1 as account_deployer so that it can update account registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [20, 1, admin1.contract_address])
@@ -367,13 +368,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.UST, to64x61(1)])
 
     # Fund the Holding contract
-    # Fund the Holding contract
     python_executor.set_fund_balance(
         fund=fund_mapping["holding_fund"], asset_id=AssetID.USDC, new_balance=1000000)
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
-    # Fund the Liquidity fund contract
     # Fund the Liquidity fund contract
     python_executor.set_fund_balance(
         fund=fund_mapping["liquidity_fund"], asset_id=AssetID.USDC, new_balance=1000000)
@@ -454,61 +453,61 @@ async def test_placing_orders_day_0(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_1
+    market_id = market_id_1
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 1
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 0).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 0).call()
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     print(order_volume)
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_1*oracle_price_1
 
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     fee = pytest.approx(
         (from64x61(maker_trading_fees) * quantity_locked_1*oracle_price_1), abs=1e-6)
     assert from64x61(trader1_fee.result.fee_64x61) == fee
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     fee = pytest.approx(
         (from64x61(taker_trading_fees) * quantity_locked_1*oracle_price_1), abs=1e-6)
     assert from64x61(trader2_fee.result.fee_64x61) == fee
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_1 * oracle_price_1
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_1 * oracle_price_1
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 0
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 0
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 0
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 0
 
     ##########################
@@ -539,61 +538,61 @@ async def test_placing_orders_day_0(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_2
+    market_id = market_id_2
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 1
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 0).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 0).call()
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     print(order_volume)
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_2*oracle_price_2
 
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     fee = pytest.approx((from64x61(maker_trading_fees) *
                         quantity_locked_2*oracle_price_2), abs=1e-6)
     assert from64x61(trader1_fee.result.fee_64x61) == fee
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     fee = pytest.approx((from64x61(taker_trading_fees) *
                         quantity_locked_2*oracle_price_2), abs=1e-6)
     assert from64x61(trader2_fee.result.fee_64x61) == fee
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_2*oracle_price_2
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_2*oracle_price_2
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 0
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 0
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 0
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 0
 
     #############################
@@ -624,66 +623,66 @@ async def test_placing_orders_day_0(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_3, oracle_price=oracle_price_3, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_3
+    market_id = market_id_3
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 1
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 0).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 0).call()
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     print(order_volume)
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_3 * oracle_price_3
 
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     fee = pytest.approx((from64x61(maker_trading_fees) *
                         quantity_locked_3 * oracle_price_3), abs=1e-6)
     assert from64x61(trader1_fee.result.fee_64x61) == fee
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     fee = pytest.approx((from64x61(taker_trading_fees) *
                         quantity_locked_3 * oracle_price_3), abs=1e-6)
     assert from64x61(trader2_fee.result.fee_64x61) == fee
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_3 * oracle_price_3
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_3 * oracle_price_3
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 0
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 0
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 0
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 0
 
     await assert_revert(admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,
-        pair_id,
+        market_id,
         2,
         alice.contract_address,
         bob.contract_address
@@ -691,7 +690,7 @@ async def test_placing_orders_day_0(adminAuth_factory):
 
     await assert_revert(admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
         season_id,
-        pair_id,
+        market_id,
         2,
         alice.contract_address,
         bob.contract_address
@@ -743,64 +742,64 @@ async def test_closing_orders_day_1(adminAuth_factory):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
     season_id = 1
-    pair_id = market_id_2
+    market_id = market_id_2
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 2
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 1).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 1).call()
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2, 2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_1 * execution_price_1
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_2 * oracle_price_2
 
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     fee = pytest.approx((from64x61(maker_trading_fees) *
                          quantity_locked_1 * execution_price_1), abs=1e-6)
     assert from64x61(trader1_fee.result.fee_64x61) == fee
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     fee = pytest.approx((from64x61(taker_trading_fees) *
                          quantity_locked_1 * execution_price_1), abs=1e-6)
     assert from64x61(trader2_fee.result.fee_64x61) == fee
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 1000
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 5000
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 1000
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 5000
 
     #### Open orders ##############
@@ -838,67 +837,67 @@ async def test_closing_orders_day_1(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_2
+    market_id = market_id_2
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 2
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 1).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 1).call()
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2, 2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_1 * execution_price_1
     print("final short volume ETH", from64x61(order_volume.result[1]))
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_2 * oracle_price_2
     print("final long volume ETH", from64x61(order_volume.result[1]))
 
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     fee = pytest.approx((from64x61(maker_trading_fees) *
                         quantity_locked_1 * execution_price_1), abs=1e-6)
     assert from64x61(trader1_fee.result.fee_64x61) == fee
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     fee = pytest.approx((from64x61(taker_trading_fees) *
                         quantity_locked_1 * execution_price_1), abs=1e-6)
     assert from64x61(trader2_fee.result.fee_64x61) == fee
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 200
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 1000
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 200
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 1000
 
     #### Open orders ##############
@@ -936,67 +935,67 @@ async def test_closing_orders_day_1(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_2
+    market_id = market_id_2
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 2
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 1).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 1).call()
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2, 2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_1 * execution_price_1
     print("final short volume TSLA", from64x61(order_volume.result[1]))
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_2 * oracle_price_2
     print("final long volume TSLA", from64x61(order_volume.result[1]))
 
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     fee = pytest.approx((from64x61(maker_trading_fees) *
                         quantity_locked_1 * execution_price_1), abs=1e-6)
     assert from64x61(trader1_fee.result.fee_64x61) == fee
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     fee = pytest.approx((from64x61(taker_trading_fees) *
                         quantity_locked_1 * execution_price_1), abs=1e-6)
     assert from64x61(trader2_fee.result.fee_64x61) == fee
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 30
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 150
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 30
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 150
 
 
@@ -1048,34 +1047,34 @@ async def test_opening_orders_day_2(adminAuth_factory):
     (_, complete_orders) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_3, oracle_price=oracle_price_3, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_3
+    market_id = market_id_3
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     print(days_traded.result.res)
     assert days_traded.result.res == 3
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 2).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 2).call()
     print(num_trades_in_a_day.result.res)
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     print(active_traders.result.res)
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     print(trade_frequency.result.frequency)
     assert trade_frequency.result.frequency == [2, 2, 2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     print(order_volume.result)
     assert order_volume.result[0] == 4
     assert from64x61(order_volume.result[1]) == 2*quantity_locked_1 * \
         execution_price_1 + 2*quantity_locked_3*oracle_price_3
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
     print("real", order_volume.result)
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
@@ -1104,34 +1103,34 @@ async def test_opening_orders_day_2(adminAuth_factory):
     (_, complete_orders) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_4, users_test=users_test, quantity_locked=quantity_locked_4, market_id=market_id_4, oracle_price=oracle_price_4, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_4
+    market_id = market_id_4
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     print(days_traded.result.res)
     assert days_traded.result.res == 3
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 2).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 2).call()
     print(num_trades_in_a_day.result.res)
     assert num_trades_in_a_day.result.res == 4
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     print(active_traders.result.res)
     assert active_traders.result.res == 2
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     print(trade_frequency.result.frequency)
     assert trade_frequency.result.frequency == [2, 2, 4]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 4
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     print(order_volume.result)
     assert order_volume.result[0] == 6
     assert from64x61(order_volume.result[1]) == 2*quantity_locked_1 * \
         execution_price_1 + 4*quantity_locked_3*oracle_price_3
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
     print("real", order_volume.result)
     #print("expected", [2, 2*to64x61(size2*execution_price2)])
     assert order_volume.result[0] == 2
@@ -1230,32 +1229,32 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_5, users_test=users_test, quantity_locked=quantity_locked_5, market_id=market_id_5, oracle_price=oracle_price_5, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_4
+    market_id = market_id_4
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 4
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 3).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 3).call()
     print(num_trades_in_a_day.result.res)
     assert num_trades_in_a_day.result.res == 4
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 3
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2, 2, 4, 4]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 4
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     print(order_volume.result)
     assert order_volume.result[0] == 8
     assert from64x61(order_volume.result[1]) == (2*quantity_locked_1*execution_price_1 + 4*quantity_locked_3*execution_price_3
                                                  + 2*quantity_locked_4*oracle_price_4)
     print("final short volume BTC", from64x61(order_volume.result[1]))
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
     print(order_volume.result)
     assert order_volume.result[0] == 4
     assert from64x61(order_volume.result[1]) == (2*quantity_locked_2*execution_price_2
@@ -1305,62 +1304,62 @@ async def test_opening_closing_orders_day_4(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_1
+    market_id = market_id_1
 
-    days_traded = await trading_stats.get_total_days_traded(season_id, pair_id).call()
+    days_traded = await trading_stats.get_total_days_traded(season_id, market_id).call()
     assert days_traded.result.res == 3
 
-    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, pair_id, 4).call()
+    num_trades_in_a_day = await trading_stats.get_num_trades_in_day(season_id, market_id, 4).call()
     assert num_trades_in_a_day.result.res == 2
 
-    active_traders = await trading_stats.get_num_active_traders(season_id, pair_id).call()
+    active_traders = await trading_stats.get_num_active_traders(season_id, market_id).call()
     assert active_traders.result.res == 3
 
-    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, pair_id).call()
+    trade_frequency = await trading_stats.get_season_trade_frequency(season_id, market_id).call()
     assert trade_frequency.result.frequency == [2, 2, 0, 0, 2]
 
-    max_trades = await trading_stats.get_max_trades_in_day(season_id, pair_id).call()
+    max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
     assert order_volume.result[0] == 3
     assert from64x61(order_volume.result[1]) == ((2*4*50) + (1*1*30))
     print("final short volume TSLA", from64x61(order_volume.result[1]))
 
-    order_volume = await trading_stats.get_order_volume((season_id, pair_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
     assert order_volume.result[0] == 3
     assert from64x61(order_volume.result[1]) == ((2*3*40) + (1*1*30))
     print("final long volume TSLA", from64x61(order_volume.result[1]))
 
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_fee.result.fee_64x61) == 0.03879999999999986
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, charlie.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, charlie.contract_address).call()
     fee = pytest.approx((from64x61(taker_trading_fees) *
                         quantity_locked_1 * oracle_price_1), abs=1e-6)
     assert from64x61(trader2_fee.result.fee_64x61) == fee
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == 0.1503499999999998
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader1_order_volume.result.number_of_orders == 2
     assert from64x61(trader1_order_volume.result.total_volume_64x61) == (
         (3*40) + quantity_locked_1 * oracle_price_1)
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(charlie.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(charlie.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_1 * oracle_price_1
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 50
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 200
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, charlie.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, charlie.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 0
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, charlie.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, charlie.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 0
 
 

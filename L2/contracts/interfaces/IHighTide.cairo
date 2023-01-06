@@ -31,4 +31,7 @@ namespace IHighTide {
 
     func get_constants() -> (constants: Constants) {
     }
+
+    func is_market_under_hightide(season_id_: felt, market_id_: felt) -> (is_listed: felt) {
+    }
 }
