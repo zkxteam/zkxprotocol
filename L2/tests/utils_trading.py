@@ -384,7 +384,6 @@ class User:
                     new_leverage = parent_position["leverage"]
             else:
                 new_leverage = parent_position["leverage"]
-
             updated_position = {
                 "avg_execution_price": price,
                 "position_size": new_position_size,
@@ -553,7 +552,7 @@ class OrderExecutor:
 
         if user_balance <= balance_to_be_deducted:
             print("Low balance", balance_to_be_deducted, user_balance)
-            return (0, 0, 0)
+            return (0, 0, 0, 0)
 
         user.modify_balance(
             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=balance_to_be_deducted)
@@ -576,12 +575,15 @@ class OrderExecutor:
         position = user.get_position(order["market_id"], current_direction)
         if position["position_size"] == 0:
             print("The parentPosition size cannot be 0")
-            return (0, 0, 0)
+            return (0, 0, 0, 0)
 
         # Values to be populated for position object
         margin_amount = position["margin_amount"]
         borrowed_amount = position["borrowed_amount"]
         average_execution_price = position["avg_execution_price"]
+
+        margin_amount_close = 0
+        borrowed_amount_close = 0
 
         # Diff is the difference between average execution price and current price
         diff = 0
@@ -599,7 +601,7 @@ class OrderExecutor:
 
         # Calculate the profit and loss for the user
         pnl = order_size * diff
-        realized_pnl=pnl
+        realized_pnl = 0
         # Value of the position after factoring in the pnl
         net_account_value = margin_amount + pnl
 
@@ -618,10 +620,11 @@ class OrderExecutor:
                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
 
         if order["order_type"] == 5:
-            borrowed_amount -= leveraged_amount_out
+            borrowed_amount_close = borrowed_amount - leveraged_amount_out
+            margin_amount_close = margin_amount
         else:
-            borrowed_amount -= borrowed_amount_to_be_returned
-            margin_amount -= margin_amount_to_be_reduced
+            borrowed_amount_close = borrowed_amount - borrowed_amount_to_be_returned
+            margin_amount_close = margin_amount - margin_amount_to_be_reduced
 
         if order["order_type"] <= 3:
             if position["leverage"] > 1:
@@ -635,6 +638,7 @@ class OrderExecutor:
                 amount_to_transfer_from = leveraged_amount_out - borrowed_amount_to_be_returned
                 user.modify_balance(
                     mode=fund_mode["fund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_transfer_from)
+            realized_pnl = pnl
         else:
             if order["order_type"] == order_types["liquidation"]:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
@@ -650,23 +654,23 @@ class OrderExecutor:
                     if deficit <= user_balance:
                         user.modify_balance(
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
-                        realized_pnl=deficit+margin_amount
+                        realized_pnl = deficit+margin_amount
                     else:
                         user.modify_balance(
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance)
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_balance)
-                        realized_pnl=user_balance+margin_amount
+                        realized_pnl = user_balance+margin_amount
+
                 else:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
                                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
-                    realized_pnl=margin_amount
+                    realized_pnl = margin_amount
             else:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
-        print("From close order", average_execution_price,
-              margin_amount, borrowed_amount)
-        return (average_execution_price, margin_amount, borrowed_amount, realized_pnl)
+                realized_pnl = pnl
+        return (average_execution_price, margin_amount_close, borrowed_amount_close, realized_pnl)
 
     def __get_fee(self, user: User, side: int) -> float:
         # ToDo change this logic when we add user discounts
@@ -768,7 +772,7 @@ class OrderExecutor:
 
                 side = order_side["maker"]
 
-            pnl=0
+            pnl = 0
 
             if request_list[i]["life_cycle"] == order_life_cycles["open"]:
                 (avg_execution_price, margin_amount, borrowed_amount) = self.__process_open_orders(
@@ -833,7 +837,6 @@ class Liquidator:
 
     def check_for_liquidation(self, user: User, prices_array: List[Dict]) -> Tuple[int, Dict]:
         positions = user.get_positions()
-        print("User positions: ", positions)
 
         if len(positions) == 0:
             print("Liquidator: Empty positions array")
@@ -867,19 +870,15 @@ class Liquidator:
                     prices_array[i]["asset_price"]
 
             pnl = price_diff*positions[i]["position_size"]
-            print("Alice pnl:", pnl)
             # Calculate the value of the current account margin in usd
             position_value = maintenance_position - \
                 positions[i]["borrowed_amount"] + pnl
-            print("position value", position_value)
             net_position_value_usd = position_value * \
                 prices_array[i]["collateral_price"]
-            print("net_position_value_usd", net_position_value_usd)
 
             # Margin ratio calculation
             collateral_ratio = (positions[i]["margin_amount"] + pnl)/(
                 positions[i]["position_size"] * prices_array[i]["asset_price"])
-            print("Collateral ratio", collateral_ratio)
 
             if collateral_ratio < least_collateral_ratio:
                 least_collateral_ratio = collateral_ratio
@@ -892,17 +891,12 @@ class Liquidator:
             total_account_value += net_position_value_usd
 
         collaterals_array = user.get_collaterals()
-        print("User collaterals: ", collaterals_array)
         user_balance = self.__find_collateral_balance(
             prices_array=prices_array[len(positions):],
             collateral_array=collaterals_array
         )
-        print("user_balance", user_balance)
-        print("total_account_value", total_account_value)
 
         total_account_value_collateral = total_account_value + user_balance
-        print("total account value w collateral",
-              total_account_value_collateral)
         self.__set_debugging_values(maintenance_requirement=total_maintenance_requirement,
                                     total_account_value_collateral=total_account_value_collateral)
         liq_result = total_account_value_collateral < total_maintenance_requirement
@@ -910,7 +904,6 @@ class Liquidator:
         if liq_result:
             amount_to_be_sold = self.__check_for_deleveraging(
                 position=least_collateral_ratio_position, collateral_price=least_collateral_ratio_position_collateral_price, asset_price=least_collateral_ratio_position_asset_price)
-            print("Amount to be sold", amount_to_be_sold)
             user.liquidate_position(
                 position=least_collateral_ratio_position,
                 amount_to_be_sold=amount_to_be_sold
@@ -1192,7 +1185,6 @@ async def compare_debugging_values(liquidate: StarknetContract, liquidator: Liqu
     # Get the Account Value of the last liquidation call of starknet
     account_value_query = await liquidate.return_acc_value().call()
     account_value = from64x61(account_value_query.result.res)
-    print("account_value starknet", account_value)
 
     # Get the maintenance requirement and account value of the python implmentation
     (maintenance_requirement_python,
@@ -1243,8 +1235,6 @@ async def compare_user_positions(users: List[StarknetContract], users_test: List
         user_position_starknet_short = await get_user_position(
             user=users[i], market_id=market_id, direction=order_direction["short"])
 
-        print("python long: ", user_position_python_long)
-        print("starknet long: ", user_position_starknet_long)
         for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
             assert element_1 == pytest.approx(element_2, abs=1e-6)
 
@@ -1284,8 +1274,6 @@ async def compare_liquidatable_position(user: StarknetContract, user_test: User)
     liquidatable_position_starknet = await get_liquidatable_position_starknet(user)
     liquidatable_position_python = get_liquidatable_position_python(user_test)
 
-    print("liquidatable_position_starknet", liquidatable_position_starknet)
-    print("liquidatable_position_python", liquidatable_position_python)
     for i in range(len(liquidatable_position_python)):
         assert liquidatable_position_python[i] == pytest.approx(
             liquidatable_position_starknet[i], abs=1e-3)

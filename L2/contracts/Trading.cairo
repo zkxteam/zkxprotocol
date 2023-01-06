@@ -639,7 +639,12 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     holding_address_: felt,
     trader_stats_list_: TraderStats*,
     current_index_: felt,
-) -> (margin_amount_close: felt, borrowed_amount_close: felt, average_execution_price_close: felt, realized_pnl: felt,) {
+) -> (
+    margin_amount_close: felt,
+    borrowed_amount_close: felt,
+    average_execution_price_close: felt,
+    realized_pnl: felt,
+) {
     alloc_locals;
 
     local margin_amount_close;
@@ -897,7 +902,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    return (average_execution_price_close, margin_amount_close, borrowed_amount_close, realized_pnl,);
+    return (
+        average_execution_price_close, margin_amount_close, borrowed_amount_close, realized_pnl,
+    );
 }
 
 // @notice Internal function called by execute_batch
@@ -1187,7 +1194,10 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
     } else {
         let (
-            average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt, realized_pnl: felt,
+            average_execution_price_temp: felt,
+            margin_amount_temp: felt,
+            borrowed_amount_temp: felt,
+            realized_pnl: felt,
         ) = process_close_orders(
             order_=temp_order,
             execution_price_=execution_price,
