@@ -627,12 +627,16 @@ func execute_order{
     margin_amount: felt,
     borrowed_amount: felt,
     market_id: felt,
+    pnl: felt,
 ) -> (res: felt) {
     alloc_locals;
     local order_id;
     assert order_id = request.order_id;
 
     let (__fp__, _) = get_fp_and_pc();
+
+    local created_timestamp;
+    local modified_timestamp;
 
     // Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address();
@@ -677,15 +681,19 @@ func execute_order{
         portion_executed.write(order_id=request.order_id, value=new_position_executed);
     }
 
+    let (local current_timestamp) = get_block_timestamp();
+
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position
     if (request.life_cycle == OPEN) {
         if (position_details.position_size == 0) {
             add_to_market_array(market_id);
+            created_timestamp = current_timestamp;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
+            created_timestamp = position_details.created_timestamp;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -701,6 +709,7 @@ func execute_order{
         // New leverage
         let total_value = margin_amount + borrowed_amount;
         let (new_leverage) = Math64x61_div(total_value, margin_amount);
+        modified_timestamp = current_timestamp;
 
         // Create a new struct with the updated details
         let updated_position = PositionDetails(
@@ -709,6 +718,9 @@ func execute_order{
             margin_amount=margin_amount,
             borrowed_amount=borrowed_amount,
             leverage=new_leverage,
+            created_timestamp=created_timestamp,
+            modified_timestamp=modified_timestamp,
+            realized_pnl=pnl,
         );
 
         // Write to the mapping
@@ -811,15 +823,6 @@ func execute_order{
         }
         tempvar range_check_ptr = range_check_ptr;
 
-        // Create a new struct with the updated details
-        let updated_position = PositionDetails(
-            avg_execution_price=execution_price,
-            position_size=new_position_size,
-            margin_amount=margin_amount,
-            borrowed_amount=borrowed_amount,
-            leverage=new_leverage,
-        );
-
         if (new_position_size == 0) {
             if (position_details.position_size == 0) {
                 remove_from_market_array(market_id);
@@ -827,7 +830,25 @@ func execute_order{
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
+
+            created_timestamp = 0;
+            modified_timestamp = 0;
+        } else {
+            created_timestamp = parent_position_details.created_timestamp;
+            modified_timestamp = current_timestamp;
         }
+
+        // Create a new struct with the updated details
+        let updated_position = PositionDetails(
+            avg_execution_price=execution_price,
+            position_size=new_position_size,
+            margin_amount=margin_amount,
+            borrowed_amount=borrowed_amount,
+            leverage=new_leverage,
+            created_timestamp=created_timestamp,
+            modified_timestamp=modified_timestamp,
+            realized_pnl=pnl,
+        );
 
         // Write to the mapping
         position_mapping.write(

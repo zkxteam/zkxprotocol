@@ -280,8 +280,9 @@ class User:
         }
         self.deleveragable_or_liquidatable_position = liquidatable_position
 
-    def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int):
-
+    def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int, timestamp: int, pnl: int):
+        created_timestamp = 0
+        modified_timestamp = 0
         position = self.get_position(
             market_id=order["market_id"], direction=order["direction"])
         order_portion_executed = self.get_portion_executed(
@@ -300,8 +301,12 @@ class User:
         if order["life_cycle"] == 1:
             if position["position_size"] == 0:
                 self.__add_to_market_array(new_market_id=order["market_id"])
+                created_timestamp = timestamp
+            else:
+                created_timestamp = position["created_timestamp"]
 
             new_position_size = position["position_size"] + size
+            modified_timestamp = timestamp
 
             total_value = margin_amount + borrowed_amount
             new_leverage = total_value/margin_amount
@@ -311,7 +316,10 @@ class User:
                 "position_size": new_position_size,
                 "margin_amount": margin_amount,
                 "borrowed_amount": borrowed_amount,
-                "leverage": new_leverage
+                "leverage": new_leverage,
+                "created_timestamp": created_timestamp,
+                "modified_timestamp": modified_timestamp,
+                "realized_pnl": pnl,
             }
 
             updated_dict = {
@@ -337,6 +345,11 @@ class User:
             if new_position_size == 0:
                 if position["position_size"] == 0:
                     self.__remove_from_market_array(market_id=market_id)
+                created_timestamp = 0
+                modified_timestamp = 0
+            else:
+                created_timestamp = parent_position["created_timestamp"]
+                modified_timestamp = timestamp
 
             new_leverage = 0
 
@@ -377,7 +390,10 @@ class User:
                 "position_size": new_position_size,
                 "margin_amount": margin_amount,
                 "borrowed_amount": borrowed_amount,
-                "leverage": new_leverage
+                "leverage": new_leverage,
+                "created_timestamp": created_timestamp,
+                "modified_timestamp": modified_timestamp,
+                "realized_pnl": pnl,
             }
 
             updated_dict = {
@@ -396,7 +412,9 @@ class User:
                 "position_size": 0,
                 "margin_amount": 0,
                 "borrowed_amount": 0,
-                "leverage": 0
+                "leverage": 0,
+                "created_timestamp": 0,
+                "modified_timestamp": 0,
             }
 
     # Get orders stored in python and starknet formats
@@ -581,6 +599,7 @@ class OrderExecutor:
 
         # Calculate the profit and loss for the user
         pnl = order_size * diff
+        realized_pnl=pnl
         # Value of the position after factoring in the pnl
         net_account_value = margin_amount + pnl
 
@@ -631,20 +650,23 @@ class OrderExecutor:
                     if deficit <= user_balance:
                         user.modify_balance(
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
+                        realized_pnl=deficit+margin_amount
                     else:
                         user.modify_balance(
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance)
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_balance)
+                        realized_pnl=user_balance+margin_amount
                 else:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
                                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
+                    realized_pnl=margin_amount
             else:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
         print("From close order", average_execution_price,
               margin_amount, borrowed_amount)
-        return (average_execution_price, margin_amount, borrowed_amount)
+        return (average_execution_price, margin_amount, borrowed_amount, realized_pnl)
 
     def __get_fee(self, user: User, side: int) -> float:
         # ToDo change this logic when we add user discounts
@@ -668,7 +690,7 @@ class OrderExecutor:
         except KeyError:
             return 0
 
-    def execute_batch(self, batch_id: int, request_list: List[Dict], user_list: List, quantity_locked: float = 1, market_id: int = BTC_USD_ID, oracle_price: float = 1000):
+    def execute_batch(self, batch_id: int, request_list: List[Dict], user_list: List, quantity_locked: float = 1, market_id: int = BTC_USD_ID, oracle_price: float = 1000, timestamp: int = 0):
         # Store the quantity executed so far
         running_weighted_sum = 0
         quantity_executed = 0
@@ -746,17 +768,19 @@ class OrderExecutor:
 
                 side = order_side["maker"]
 
+            pnl=0
+
             if request_list[i]["life_cycle"] == order_life_cycles["open"]:
                 (avg_execution_price, margin_amount, borrowed_amount) = self.__process_open_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=side)
             else:
-                (avg_execution_price, margin_amount, borrowed_amount) = self.__process_close_orders(
+                (avg_execution_price, margin_amount, borrowed_amount, realized_pnl) = self.__process_close_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id)
-
+                pnl = realized_pnl
                 if avg_execution_price == 0:
                     return
             user_list[i].execute_order(order=request_list[i], size=quantity_to_execute, price=avg_execution_price,
-                                       margin_amount=margin_amount, borrowed_amount=borrowed_amount, market_id=market_id)
+                                       margin_amount=margin_amount, borrowed_amount=borrowed_amount, market_id=market_id, timestamp=timestamp, pnl=pnl)
 
         self.batch_id_status[batch_id] = 1
         return
@@ -1093,7 +1117,7 @@ async def execute_batch_reverted(zkx_node_signer: Signer, zkx_node: StarknetCont
     return
 
 
-async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContract, executor: OrderExecutor, orders: List[Dict], users_test: List[User], quantity_locked: float, market_id: int, oracle_price: float, trading: StarknetContract, is_reverted: int = 0, error_code: str = "", error_at_index: int = 0, param_2: str = "", error_message: str = "") -> Tuple[int, List]:
+async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContract, executor: OrderExecutor, orders: List[Dict], users_test: List[User], quantity_locked: float, market_id: int, oracle_price: float, trading: StarknetContract, timestamp: int = 0, is_reverted: int = 0, error_code: str = "", error_at_index: int = 0, param_2: str = "", error_message: str = "") -> Tuple[int, List]:
     # Generate a random batch id
     batch_id = random_string(10)
 
@@ -1132,7 +1156,8 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
         users_test,
         quantity_locked,
         market_id,
-        oracle_price
+        oracle_price,
+        timestamp
     ]
 
     # If the batch is to be reverted, generate the error_message
@@ -1218,6 +1243,8 @@ async def compare_user_positions(users: List[StarknetContract], users_test: List
         user_position_starknet_short = await get_user_position(
             user=users[i], market_id=market_id, direction=order_direction["short"])
 
+        print("python long: ", user_position_python_long)
+        print("starknet long: ", user_position_starknet_long)
         for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
             assert element_1 == pytest.approx(element_2, abs=1e-6)
 

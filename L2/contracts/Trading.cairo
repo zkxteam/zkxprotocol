@@ -639,12 +639,13 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     holding_address_: felt,
     trader_stats_list_: TraderStats*,
     current_index_: felt,
-) -> (margin_amount_close: felt, borrowed_amount_close: felt, average_execution_price_close: felt) {
+) -> (margin_amount_close: felt, borrowed_amount_close: felt, average_execution_price_close: felt, realized_pnl: felt,) {
     alloc_locals;
 
     local margin_amount_close;
     local borrowed_amount_close;
     local average_execution_price_close;
+    local realized_pnl;
     // To be passed as arguments to error_message
     local order_id;
     assert order_id = order_.order_id;
@@ -798,6 +799,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
+        realized_pnl = pnl;
     } else {
         // Liquidation order
         if (order_.order_type == LIQUIDATION_ORDER) {
@@ -832,6 +834,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                         amount=deficit,
                     );
 
+                    realized_pnl = margin_amount + deficit;
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                     tempvar range_check_ptr = range_check_ptr;
@@ -852,6 +855,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                         position_id_=order_.order_id,
                     );
 
+                    realized_pnl = margin_amount + user_balance;
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                     tempvar range_check_ptr = range_check_ptr;
@@ -865,6 +869,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     position_id_=order_.order_id,
                 );
 
+                realized_pnl = margin_amount;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -882,6 +887,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 position_id_=order_.order_id,
             );
 
+            realized_pnl = pnl;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -891,7 +897,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    return (average_execution_price_close, margin_amount_close, borrowed_amount_close,);
+    return (average_execution_price_close, margin_amount_close, borrowed_amount_close, realized_pnl,);
 }
 
 // @notice Internal function called by execute_batch
@@ -1150,6 +1156,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_in_range(execution_price, lower_limit_, upper_limit_);
     }
 
+    local pnl;
+
     // If the order is to be opened
     if (temp_order.life_cycle == OPEN) {
         let (
@@ -1172,13 +1180,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
+        assert pnl = 0;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         let (
-            average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt
+            average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt, realized_pnl: felt,
         ) = process_close_orders(
             order_=temp_order,
             execution_price_=execution_price,
@@ -1194,6 +1203,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
+        assert pnl = realized_pnl;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1229,6 +1239,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         margin_amount=margin_amount,
         borrowed_amount=borrowed_amount,
         market_id=market_id_,
+        pnl=pnl,
     );
 
     trade_execution.emit(
