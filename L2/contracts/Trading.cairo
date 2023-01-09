@@ -839,7 +839,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                         amount=deficit,
                     );
 
-                    realized_pnl = margin_amount + deficit;
+                    realized_pnl = margin_plus_pnl;
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                     tempvar range_check_ptr = range_check_ptr;
@@ -860,7 +860,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                         position_id_=order_.order_id,
                     );
 
-                    realized_pnl = margin_amount + user_balance;
+                    realized_pnl = margin_plus_pnl;
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                     tempvar range_check_ptr = range_check_ptr;

@@ -654,13 +654,13 @@ class OrderExecutor:
                     if deficit <= user_balance:
                         user.modify_balance(
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
-                        realized_pnl = deficit+margin_amount
+                        realized_pnl = net_account_value
                     else:
                         user.modify_balance(
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance)
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_balance)
-                        realized_pnl = user_balance+margin_amount
+                        realized_pnl = net_account_value
 
                 else:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
