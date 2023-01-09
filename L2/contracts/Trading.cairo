@@ -79,6 +79,7 @@ from contracts.Math_64x61 import (
 // Constants #
 //############
 const LEVERAGE_ONE = 2305843009213693952;
+const NEGATIVE_ONE = 3618502788666131213697322783095070105623107215331596699970786213126658326529;
 const FIFTEEN_PERCENTAGE = 34587645138205409280;
 const HUNDRED = 230584300921369395200;
 
@@ -483,12 +484,18 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     trader_stats_list_: TraderStats*,
     current_index_: felt,
     side_: felt,
-) -> (average_execution_price_open: felt, margin_amount_open: felt, borrowed_amount_open: felt) {
+) -> (
+    average_execution_price_open: felt,
+    margin_amount_open: felt,
+    borrowed_amount_open: felt,
+    trading_fee: felt,
+) {
     alloc_locals;
 
     local margin_amount_open;
     local borrowed_amount_open;
     local average_execution_price_open;
+    local trading_fee;
 
     // Get the fees from Trading Fee contract
     let (fees_rate) = ITradingFees.get_user_fee_and_discount(
@@ -532,6 +539,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // Calculate the fees for the order
     let (fees) = Math64x61_mul(fees_rate, leveraged_order_value);
+    let (trading_fee) = Math64x61_mul(fees, NEGATIVE_ONE);
 
     // Calculate the total amount by adding fees
     let (order_value_with_fee_felt) = Math64x61_add(margin_order_value, fees);
@@ -611,7 +619,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_order_value
     );
 
-    return (average_execution_price_open, margin_amount_open, borrowed_amount_open,);
+    return (average_execution_price_open, margin_amount_open, borrowed_amount_open, trading_fee,);
 }
 
 // @notice Intenal function that processes close orders including Liquidation & Deleveraging
@@ -860,7 +868,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                         position_id_=order_.order_id,
                     );
 
-                    realized_pnl = margin_plus_pnl;
+                    let (realized_pnl_) = Math64x61_add(user_balance, margin_amount);
+                    let (signed_realized_pnl_) = Math64x61_mul(realized_pnl_, NEGATIVE_ONE);
+                    realized_pnl = signed_realized_pnl_;
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                     tempvar range_check_ptr = range_check_ptr;
@@ -1168,7 +1178,10 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // If the order is to be opened
     if (temp_order.life_cycle == OPEN) {
         let (
-            average_execution_price_temp: felt, margin_amount_temp: felt, borrowed_amount_temp: felt
+            average_execution_price_temp: felt,
+            margin_amount_temp: felt,
+            borrowed_amount_temp: felt,
+            trading_fee: felt,
         ) = process_open_orders(
             order_=temp_order,
             execution_price_=execution_price,
@@ -1187,7 +1200,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
-        assert pnl = 0;
+        assert pnl = trading_fee;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;

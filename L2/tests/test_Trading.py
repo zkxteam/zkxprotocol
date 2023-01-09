@@ -1754,9 +1754,6 @@ async def test_opening_partial_orders(trading_test_initializer):
 async def test_closing_partial_orders(trading_test_initializer):
     _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance = trading_test_initializer
 
-    print("Trading: ", trading.contract_address)
-    print("Alice: ", alice.contract_address)
-    print("Bob: ", bob.contract_address)
     ##############################
     ### Close orders partially ###
     ##############################

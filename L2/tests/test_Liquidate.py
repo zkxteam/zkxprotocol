@@ -7,7 +7,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, PRIME
 from utils_trading import (
     User, Liquidator, OrderExecutor,
     order_direction, order_types, order_life_cycles, fund_mapping,

@@ -283,6 +283,8 @@ class User:
     def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int, timestamp: int, pnl: int):
         created_timestamp = 0
         modified_timestamp = 0
+        current_pnl = 0
+
         position = self.get_position(
             market_id=order["market_id"], direction=order["direction"])
         order_portion_executed = self.get_portion_executed(
@@ -302,8 +304,10 @@ class User:
             if position["position_size"] == 0:
                 self.__add_to_market_array(new_market_id=order["market_id"])
                 created_timestamp = timestamp
+                current_pnl = pnl
             else:
                 created_timestamp = position["created_timestamp"]
+                current_pnl = position["realized_pnl"] + pnl
 
             new_position_size = position["position_size"] + size
             modified_timestamp = timestamp
@@ -319,7 +323,7 @@ class User:
                 "leverage": new_leverage,
                 "created_timestamp": created_timestamp,
                 "modified_timestamp": modified_timestamp,
-                "realized_pnl": pnl,
+                "realized_pnl": current_pnl,
             }
 
             updated_dict = {
@@ -347,9 +351,11 @@ class User:
                     self.__remove_from_market_array(market_id=market_id)
                 created_timestamp = 0
                 modified_timestamp = 0
+                current_pnl = 0
             else:
                 created_timestamp = parent_position["created_timestamp"]
                 modified_timestamp = timestamp
+                current_pnl = parent_position["realized_pnl"] + pnl
 
             new_leverage = 0
 
@@ -384,6 +390,7 @@ class User:
                     new_leverage = parent_position["leverage"]
             else:
                 new_leverage = parent_position["leverage"]
+
             updated_position = {
                 "avg_execution_price": price,
                 "position_size": new_position_size,
@@ -392,7 +399,7 @@ class User:
                 "leverage": new_leverage,
                 "created_timestamp": created_timestamp,
                 "modified_timestamp": modified_timestamp,
-                "realized_pnl": pnl,
+                "realized_pnl": current_pnl,
             }
 
             updated_dict = {
@@ -499,7 +506,7 @@ class OrderExecutor:
 
         self.set_fund_balance(fund, asset_id, new_balance)
 
-    def __process_open_orders(self, user: User, order: Dict, execution_price: float, order_size: float, side: int, market_id: int) -> Tuple[float, float, float]:
+    def __process_open_orders(self, user: User, order: Dict, execution_price: float, order_size: float, side: int, market_id: int) -> Tuple[float, float, float, float]:
         position = user.get_position(
             market_id=order["market_id"], direction=order["direction"])
 
@@ -541,6 +548,7 @@ class OrderExecutor:
 
         # Calculate the fee for the order
         fees = fee_rate*leveraged_position_value
+        trading_fees = fees * -1
 
         # Balance that the user must stake/pay
         balance_to_be_deducted = order_value_wo_leverage + fees
@@ -565,9 +573,9 @@ class OrderExecutor:
             self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["defund"],
                                        asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_be_borrowed)
 
-        return (average_execution_price, margin_amount, borrowed_amount)
+        return (average_execution_price, margin_amount, borrowed_amount, trading_fees)
 
-    def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, market_id) -> Tuple[float, float, float]:
+    def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, market_id) -> Tuple[float, float, float, float]:
         current_direction = order_direction["short"] if order[
             "direction"] == order_direction["long"] else order_direction["long"]
 
@@ -609,7 +617,7 @@ class OrderExecutor:
         leveraged_amount_out = order_size * actual_execution_price
 
         if position["position_size"] == 0:
-            return (0, 0, 0)
+            return (0, 0, 0, 0)
         # Calculate the amount that needs to be returned to the user
         percent_of_position = order_size / \
             position["position_size"]
@@ -660,7 +668,7 @@ class OrderExecutor:
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance)
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_balance)
-                        realized_pnl = net_account_value
+                        realized_pnl = (user_balance+margin_amount)*-1
 
                 else:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
@@ -775,8 +783,9 @@ class OrderExecutor:
             pnl = 0
 
             if request_list[i]["life_cycle"] == order_life_cycles["open"]:
-                (avg_execution_price, margin_amount, borrowed_amount) = self.__process_open_orders(
+                (avg_execution_price, margin_amount, borrowed_amount, trading_fees) = self.__process_open_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=side)
+                pnl = trading_fees
             else:
                 (avg_execution_price, margin_amount, borrowed_amount, realized_pnl) = self.__process_close_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id)

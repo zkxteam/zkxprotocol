@@ -637,6 +637,7 @@ func execute_order{
 
     local created_timestamp;
     local modified_timestamp;
+    local current_pnl;
 
     // Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address();
@@ -710,6 +711,8 @@ func execute_order{
         let total_value = margin_amount + borrowed_amount;
         let (new_leverage) = Math64x61_div(total_value, margin_amount);
         modified_timestamp = current_timestamp;
+        let (current_pnl_: felt) = Math64x61_add(position_details.realized_pnl, pnl);
+        current_pnl = current_pnl_;
 
         // Create a new struct with the updated details
         let updated_position = PositionDetails(
@@ -720,7 +723,7 @@ func execute_order{
             leverage=new_leverage,
             created_timestamp=created_timestamp,
             modified_timestamp=modified_timestamp,
-            realized_pnl=pnl,
+            realized_pnl=current_pnl,
         );
 
         // Write to the mapping
@@ -833,9 +836,20 @@ func execute_order{
 
             created_timestamp = 0;
             modified_timestamp = 0;
+            current_pnl = 0;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         } else {
             created_timestamp = parent_position_details.created_timestamp;
             modified_timestamp = current_timestamp;
+            let (current_pnl_: felt) = Math64x61_add(parent_position_details.realized_pnl, pnl);
+            current_pnl = current_pnl_;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
 
         // Create a new struct with the updated details
@@ -847,7 +861,7 @@ func execute_order{
             leverage=new_leverage,
             created_timestamp=created_timestamp,
             modified_timestamp=modified_timestamp,
-            realized_pnl=pnl,
+            realized_pnl=current_pnl,
         );
 
         // Write to the mapping
