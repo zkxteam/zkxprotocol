@@ -1202,7 +1202,7 @@ func fetch_next_season_to_start_recurse{
     season_to_start: felt,
     min_timestamp: felt,
 ) -> (season_id: felt, can_be_started: felt, time_remaining: felt) {
-    if (index_ == season_list_len + 1) {
+    if (index_ == season_list_len) {
         let (trading_season: TradingSeason) = get_season(season_to_start);
         let (current_timestamp) = get_block_timestamp();
         if (is_le(trading_season.start_timestamp, current_timestamp) == 1) {
