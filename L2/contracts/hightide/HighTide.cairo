@@ -397,6 +397,24 @@ func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // External //
 // ///////////
 
+// @notice Function to set the number of users in a batch
+// @param new_no_of_users_per_batch_ - no.of users per batch
+@external
+func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_no_of_users_per_batch_: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("HighTideCalc: Unauthorized call to set no of users per batch") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    no_of_users_per_batch.write(new_no_of_users_per_batch_);
+    return ();
+}
+
 // @notice - This function is used for setting up trade season
 // @param start_timestamp_ - start timestamp of the season
 // @param num_trading_days_ - number of trading days
