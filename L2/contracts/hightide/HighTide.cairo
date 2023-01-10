@@ -50,7 +50,7 @@ from contracts.DataTypes import (
     RewardToken,
     TradingSeason,
 )
-from contracts.hightide.libraries.UserBatches import get_batch
+from contracts.hightide.libraries.UserBatches import calculate_no_of_batches, get_batch
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
 from contracts.interfaces.IHighTideCalc import IHighTideCalc
@@ -419,6 +419,7 @@ func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     } else {
         return (season_id, TRUE, 0);
     }
+}
 
 // @notice view function to get the number of batches for a season by a market
 // @param season_id_ - Id of the season
@@ -460,24 +461,6 @@ func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // ///////////
 // External //
 // ///////////
-
-// @notice Function to set the number of users in a batch
-// @param new_no_of_users_per_batch_ - no.of users per batch
-@external
-func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_no_of_users_per_batch_: felt
-) {
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
-
-    // Auth check
-    with_attr error_message("HighTideCalc: Unauthorized call to set no of users per batch") {
-        verify_caller_authority(registry, version, ManageHighTide_ACTION);
-    }
-
-    no_of_users_per_batch.write(new_no_of_users_per_batch_);
-    return ();
-}
 
 // @notice - This function is used for setting up trade season
 // @param start_timestamp_ - start timestamp of the season
@@ -981,6 +964,24 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
+    return ();
+}
+
+// @notice Function to set the number of users in a batch
+// @param new_no_of_users_per_batch_ - no.of users per batch
+@external
+func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_no_of_users_per_batch_: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("HighTideCalc: Unauthorized call to set no of users per batch") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    no_of_users_per_batch.write(new_no_of_users_per_batch_);
     return ();
 }
 
