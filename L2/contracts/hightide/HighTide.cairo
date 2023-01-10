@@ -31,6 +31,7 @@ from contracts.Constants import (
     SEASON_STARTED,
     Starkway_INDEX,
     TokenLister_ACTION,
+    TradingStats_INDEX,
 )
 from contracts.DataTypes import (
     Constants,
@@ -40,6 +41,7 @@ from contracts.DataTypes import (
     RewardToken,
     TradingSeason,
 )
+from contracts.hightide.libraries.UserBatches import calculate_no_of_batches
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
 from contracts.interfaces.IHighTideCalc import IHighTideCalc
@@ -397,24 +399,6 @@ func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // External //
 // ///////////
 
-// @notice Function to set the number of users in a batch
-// @param new_no_of_users_per_batch_ - no.of users per batch
-@external
-func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_no_of_users_per_batch_: felt
-) {
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
-
-    // Auth check
-    with_attr error_message("HighTideCalc: Unauthorized call to set no of users per batch") {
-        verify_caller_authority(registry, version, ManageHighTide_ACTION);
-    }
-
-    no_of_users_per_batch.write(new_no_of_users_per_batch_);
-    return ();
-}
-
 // @notice - This function is used for setting up trade season
 // @param start_timestamp_ - start timestamp of the season
 // @param num_trading_days_ - number of trading days
@@ -516,6 +500,11 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         assert is_expired = TRUE;
     }
 
+    // Get Trading Stats contract address from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
     // Get HightideCalc contract address from Authorized Registry
     let (hightide_calc_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=HighTideCalc_INDEX, version=version
@@ -529,6 +518,14 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     // Calculate R (Funds flow)
     IHighTideCalc.calculate_funds_flow(
         contract_address=hightide_calc_address, season_id_=season_id_
+    );
+
+    // Fetch list of hightides in a season
+    let (hightide_list_len: felt, hightide_list: felt*) = get_hightides_by_season_id(season_id_);
+
+    // Store no.of batches in a season per market
+    calculate_no_of_batches_per_market_recurse(
+        0, season_id_, trading_stats_address, hightide_list_len, hightide_list
     );
 
     // Update status in trading season
