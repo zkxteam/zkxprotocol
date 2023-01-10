@@ -9,6 +9,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import (
     CLOSE,
     Hightide_INDEX,
+    ManageHighTide_ACTION,
     Market_INDEX,
     OPEN,
     RewardsCalculation_INDEX,
@@ -37,6 +38,7 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
+from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_div,
@@ -106,6 +108,21 @@ func trader_score_by_market(season_id: felt, market_id: felt, trader_address: fe
 // Stores funds flow per market in a season
 @storage_var
 func funds_flow_by_market(season_id: felt, market_id: felt) -> (funds_flow_64x61: felt) {
+}
+
+// Stores no.of users per batch
+@storage_var
+func no_of_users_per_batch() -> (no_of_users: felt) {
+}
+
+// Stores the no.of batches fetched for a market in a season
+@storage_var
+func batches_fetched_by_market(season_id: felt, market_id: felt) -> (batches_fetched: felt) {
+}
+
+// Stores the no.of batches for a market in a season
+@storage_var
+func no_of_batches_by_market(season_id: felt, market_id: felt) -> (no_of_batches: felt) {
 }
 
 // //////////////
@@ -215,6 +232,24 @@ func get_funds_flow_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 // ///////////
 // External //
 // ///////////
+
+// @notice Function to set the number of users in a batch
+// @param new_no_of_users_per_batch_ - no.of users per batch
+@external
+func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_no_of_users_per_batch_: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("HighTideCalc: Unauthorized call to set no of users per batch") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    no_of_users_per_batch.write(new_no_of_users_per_batch_);
+    return ();
+}
 
 // @notice external function to calculate the factors
 // @param season_id_ - Season Id for which to calculate the factors of a market
