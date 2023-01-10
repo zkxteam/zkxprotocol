@@ -54,10 +54,10 @@ from contracts.DataTypes import (
     CollateralBalance,
     LiquidatablePosition,
     Message,
-    NetPositions,
     OrderRequest,
     PositionDetails,
     PositionDetailsWithMarket,
+    SimplifiedPosition,
     Signature,
     WithdrawalHistory,
     WithdrawalRequestForHashing,
@@ -523,15 +523,14 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @returns net_positions_array_len - Length of the array
 // @returns net_positions_array - Required array of net positions
 @view
-func get_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    net_positions_array_len: felt, net_positions_array: NetPositions*
-) {
+func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
     alloc_locals;
 
-    let (net_positions_array: NetPositions*) = alloc();
+    let (positions_array: SimplifiedPosition*) = alloc();
     let (array_len: felt) = index_to_market_array_len.read();
-    return populate_net_positions(
-        net_positions_array_len_=0, net_positions_array_=net_positions_array, final_len_=array_len
+    return populate_simplified_positions(
+        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     );
 }
 
@@ -1180,16 +1179,20 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param final_len_ - Length of the final array
 // @returns net_positions_array_len - Length of the net positions array
 // @returns net_positions_array - Array with the net positions
-func populate_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    net_positions_array_len_: felt, net_positions_array_: NetPositions*, final_len_: felt
-) -> (net_positions_array_len: felt, net_positions_array: NetPositions*) {
+func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    positions_array_len_: felt,
+    positions_array_: SimplifiedPosition*,
+    iterator_: felt,
+    final_len_: felt,
+) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
+    alloc_locals;
     // If reached the end of the array, then return
-    if (net_positions_array_len_ == final_len_) {
-        return (net_positions_array_len_, net_positions_array_);
+    if (final_len_ == iterator_) {
+        return (positions_array_len_, positions_array_);
     }
 
     // Get the market id at that position
-    let (curr_market_id: felt) = index_to_market_array.read(index=net_positions_array_len_);
+    let (curr_market_id: felt) = index_to_market_array.read(index=iterator_);
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
@@ -1201,21 +1204,42 @@ func populate_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         market_id=curr_market_id, direction=SHORT
     );
 
-    // Calculate the net position
-    let (net_size: felt) = Math64x61_sub(long_position.position_size, short_position.position_size);
+    local is_long;
+    local is_short;
 
-    // Create the struct with the details
-    let net_position_struct: NetPositions = NetPositions(
-        market_id=curr_market_id, position_size=net_size
-    );
+    if (long_position.position_size == 0) {
+        assert is_long = 0;
+    } else {
+        // Create the struct with the details
+        let position_struct_long: SimplifiedPosition = SimplifiedPosition(
+            market_id=curr_market_id,
+            direction=LONG,
+            position_size=long_position.position_size,
+            created_timestamp=long_position.created_timestamp,
+        );
+        assert positions_array_[positions_array_len_] = position_struct_long;
+        assert is_long = 1;
+    }
 
-    // Store it in the array
-    assert net_positions_array_[net_positions_array_len_] = net_position_struct;
+    if (short_position.position_size == 0) {
+        assert is_short = 0;
+    } else {
+        // Create the struct with the details
+        let position_struct_short: SimplifiedPosition = SimplifiedPosition(
+            market_id=curr_market_id,
+            direction=SHORT,
+            position_size=short_position.position_size,
+            created_timestamp=short_position.created_timestamp,
+        );
+        assert positions_array_[positions_array_len_ + is_long] = position_struct_short;
+        assert is_short = 1;
+    }
 
     // Recursively call the next market_id
-    return populate_net_positions(
-        net_positions_array_len_=net_positions_array_len_ + 1,
-        net_positions_array_=net_positions_array_,
+    return populate_simplified_positions(
+        positions_array_len_=positions_array_len_ + is_long + is_short,
+        positions_array_=positions_array_,
+        iterator_=iterator_ + 1,
         final_len_=final_len_,
     );
 }

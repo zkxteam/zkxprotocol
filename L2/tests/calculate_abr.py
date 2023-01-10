@@ -116,6 +116,3 @@ def calculate_abr(perp_spot, perp, base_rate, boll_width):
     final_premium = find_jump(premium, mark_prices, index_prices, lower, upper)
     abr = effective_abr(final_premium, base_rate)
     return abr
-
-
-calculate_abr(ABR_data.eth_perp_spot, ABR_data.eth_perp, 0.000025, 2.0)

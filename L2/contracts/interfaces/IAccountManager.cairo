@@ -3,11 +3,11 @@
 from contracts.DataTypes import (
     CollateralBalance,
     LiquidatablePosition,
-    NetPositions,
     OrderRequest,
     PositionDetails,
     PositionDetailsWithMarket,
     Signature,
+    SimplifiedPosition
 )
 
 @contract_interface
@@ -42,8 +42,8 @@ namespace IAccountManager {
     func get_positions() -> (array_list_len: felt, array_list: PositionDetailsWithMarket*) {
     }
 
-    func get_net_positions() -> (
-        net_positions_array_len: felt, net_positions_array: NetPositions*
+    func get_simplified_positions() -> (
+        positions_array_len: felt, positions_array: SimplifiedPosition*
     ) {
     }
 

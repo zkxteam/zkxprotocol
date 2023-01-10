@@ -2,9 +2,11 @@ import pytest
 import copy
 import random
 import string
+import calculate_abr
 from utils_asset import AssetID
 from utils import Signer, str_to_felt, assert_revert, hash_order, from64x61, to64x61
 from typing import List, Dict, Tuple
+from calculate_abr import calculate_abr
 from starkware.starknet.testing.contract import StarknetContract
 
 # Market IDs
@@ -220,6 +222,18 @@ class User:
             return self.portion_executed[order_id]
         except KeyError:
             return 0
+
+    def transfer_abr(self, market_id: int, amount: float):
+        asset_id = market_to_asset_mapping[market_id]
+
+        self.modify_balance(
+            mode=fund_mode["fund"], asset_id=asset_id, amount=amount)
+
+    def transfer_from_abr(self, market_id: int, amount: float):
+        asset_id = market_to_asset_mapping[market_id]
+
+        self.modify_balance(
+            mode=fund_mode["defund"], asset_id=asset_id, amount=amount)
 
     def modify_balance(self, mode: int, asset_id: int, amount: float):
         current_balance = self.get_balance(asset_id=asset_id)
@@ -923,6 +937,68 @@ class Liquidator:
                 amount_to_be_sold=amount_to_be_sold
             )
         return (liq_result, least_collateral_ratio_position)
+
+
+class ABR:
+    def __init__(self):
+        self.abr_values = {}
+        self.abr_fund = {}
+
+    def fund_abr(self, market_id, amount):
+        asset_id = market_to_asset_mapping[market_id]
+        try:
+            self.abr_fund[asset_id] += amount
+        except KeyError:
+            self.abr_fund[asset_id] = amount
+
+    def defund_abr(self, market_id, amount):
+        asset_id = market_to_asset_mapping[market_id]
+        try:
+            self.abr_fund[asset_id] -= amount
+        except KeyError:
+            self.abr_fund[asset_id] = 0
+
+    def set_abr(self, market_id: int, price: float, perp_spot: List[float], perp: List[float], base_rate: float, boll_width: float):
+        abr_rate = calculate_abr(
+            perp_spot=perp_spot, perp=perp, base_rate=0.0000125, boll_width=2.0)
+
+        self.abr_values[market_id] = abr_rate
+        self.abr_last_price[market_id] = price
+
+    def user_pays(self, user: User, market_id: int, amount: float):
+        user.transfer_from_abr(market_id=market_id, amount=amount)
+        self.fund_abr(market_id=market_id, amount=amount)
+
+    def user_receives(self, user: User, market_id: int, amount: float):
+        user.transfer_abr(market_id=market_id, amount=amount)
+        self.defund_abr(market_id=market_id, amount=amount)
+
+    def pay_abr(self, users_list: List[User]):
+        for user in users_list:
+            user_positions = user.get_positions()
+
+            for position in user_positions:
+                market_id = position["market_id"]
+                direction = position["direction"]
+                abr_value = self.abr_values[market_id]
+                payment_amount = self.abr_last_price * \
+                    position["position_size"] * abr_value
+
+                if abr_value < 0:
+                    if direction == order_direction["short"]:
+                        self.user_pays(
+                            user=user, market_id=market_id, amount=payment_amount)
+                    else:
+                        self. user_receives(
+                            user=user, market_id=market_id, amount=payment_amount)
+                else:
+                    if direction == order_direction["short"]:
+                        self. user_receives(
+                            user=user, market_id=market_id, amount=payment_amount)
+                    else:
+                        self.user_pays(
+                            user=user, market_id=market_id, amount=payment_amount)
+
 
 ##################################
 #### Helper Function Starknet ####

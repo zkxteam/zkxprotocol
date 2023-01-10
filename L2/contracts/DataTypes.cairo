@@ -123,9 +123,11 @@ struct LiquidatablePosition {
 }
 
 // @notice struct for sending the array of positions for ABR calculations
-struct NetPositions {
+struct SimplifiedPosition {
     market_id: felt,
+    direction: felt,
     position_size: felt,
+    created_timestamp: felt,
 }
 
 // Struct for passing signature to Account Contract
@@ -225,7 +227,7 @@ struct TradingSeason {
     start_block_number: felt,
     start_timestamp: felt,
     num_trading_days: felt,
-    status: felt,  //Either Initialized, Started or Ended
+    status: felt,  // Either Initialized, Started or Ended
 }
 
 // Struct to store multipliers used to calculate total reward to be split between traders

@@ -16,7 +16,7 @@ from contracts.Constants import (
     SHORT,
 )
 
-from contracts.DataTypes import NetPositions
+from contracts.DataTypes import SimplifiedPosition
 from contracts.interfaces.IABR_Calculations import IABR_Calculations
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAccountManager import IAccountManager
@@ -31,7 +31,9 @@ from contracts.libraries.CommonLibrary import CommonLib
 
 // Event emitted when abr payment called for a position
 @event
-func abr_payment_called_user_position(market_id: felt, account_address: felt, timestamp: felt) {
+func abr_payment_called_user_position(
+    market_id: felt, direction: felt, account_address: felt, timestamp: felt
+) {
 }
 
 // ///////////////
@@ -158,15 +160,15 @@ func user_receives{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
 // @notice Internal function called by pay_abr_users to iterate throught the positions of the account
 // @param account_address - Address of the user of whom the positions are passed
-// @param net_positions_len_ - Length of the net positions array of the user
-// @param net_positions_ - Net Positions array of the user
+// @param positions_len_ - Length of the positions array of the user
+// @param positions_ - Positions array of the user
 // @param market_contract_ - Address of the Market contract
 // @param abr_contract_ - Address of the ABR contract
 // @param abr_funding_contract_ - Address of the ABR Funding contract
 func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address_: felt,
-    net_positions_len_: felt,
-    net_positions_: NetPositions*,
+    positions_len_: felt,
+    positions_: SimplifiedPosition*,
     market_contract_: felt,
     abr_contract_: felt,
     abr_funding_: felt,
@@ -174,37 +176,35 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 ) {
     alloc_locals;
 
-    if (net_positions_len_ == 0) {
+    if (positions_len_ == 0) {
         return ();
     }
 
     // Get the collateral ID of the market
     let (_, collateral_id) = IMarkets.get_asset_collateral_from_market(
-        contract_address=market_contract_, market_id_=[net_positions_].market_id
+        contract_address=market_contract_, market_id_=[positions_].market_id
     );
 
     // Get the abr value
     let (abr: felt, price: felt, timestamp: felt) = IABR_Calculations.get_abr_value(
-        contract_address=abr_contract_, market_id=[net_positions_].market_id
+        contract_address=abr_contract_, market_id=[positions_].market_id
     );
 
     // Find if the abr_rate is +ve or -ve
-    let (position_value) = Math64x61_mul(price, [net_positions_].position_size);
+    let (position_value) = Math64x61_mul(price, [positions_].position_size);
     let (payment_amount) = Math64x61_mul(abr, position_value);
-    let abs_payment_amount = abs_value(payment_amount);
     let is_negative = is_le(abr, 0);
-    let is_negative_net_size = is_le([net_positions_].position_size, 0);
 
     // If the abr is negative
     if (is_negative == TRUE) {
-        if (is_negative_net_size == 1) {
+        if ([positions_].direction == SHORT) {
             // user pays
             user_pays(
                 account_address_,
                 abr_funding_,
                 collateral_id,
-                [net_positions_].market_id,
-                abs_payment_amount,
+                [positions_].market_id,
+                payment_amount,
             );
         } else {
             // user receives
@@ -212,20 +212,20 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 account_address_,
                 abr_funding_,
                 collateral_id,
-                [net_positions_].market_id,
-                abs_payment_amount,
+                [positions_].market_id,
+                payment_amount,
             );
         }
         // If the abr is positive
     } else {
-        if (is_negative_net_size == 1) {
+        if ([positions_].direction == SHORT) {
             // user receives
             user_receives(
                 account_address_,
                 abr_funding_,
                 collateral_id,
-                [net_positions_].market_id,
-                abs_payment_amount,
+                [positions_].market_id,
+                payment_amount,
             );
         } else {
             // user pays
@@ -233,19 +233,22 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 account_address_,
                 abr_funding_,
                 collateral_id,
-                [net_positions_].market_id,
-                abs_payment_amount,
+                [positions_].market_id,
+                payment_amount,
             );
         }
     }
 
     abr_payment_called_user_position.emit(
-        market_id=[net_positions_].market_id, account_address=account_address_, timestamp=timestamp_
+        market_id=[positions_].market_id,
+        direction=[positions_].direction,
+        account_address=account_address_,
+        timestamp=timestamp_,
     );
     return pay_abr_users_positions(
         account_address_,
-        net_positions_len_ - 1,
-        net_positions_ + NetPositions.SIZE,
+        positions_len_ - 1,
+        positions_ + SimplifiedPosition.SIZE,
         market_contract_,
         abr_contract_,
         abr_funding_,
@@ -273,15 +276,15 @@ func pay_abr_users{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     }
 
     // Get all the open positions of the user
-    let (net_positions_len: felt, net_positions: NetPositions*) = IAccountManager.get_net_positions(
-        contract_address=[account_addresses_]
-    );
+    let (
+        positions_len: felt, positions: SimplifiedPosition*
+    ) = IAccountManager.get_simplified_positions(contract_address=[account_addresses_]);
 
     // Do abr payments for each position
     pay_abr_users_positions(
         [account_addresses_],
-        net_positions_len,
-        net_positions,
+        positions_len,
+        positions,
         market_contract_,
         abr_contract_,
         abr_funding_contract_,
