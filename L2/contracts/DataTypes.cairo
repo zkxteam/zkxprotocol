@@ -98,6 +98,9 @@ struct PositionDetails {
     margin_amount: felt,
     borrowed_amount: felt,
     leverage: felt,
+    created_timestamp: felt,
+    modified_timestamp: felt,
+    realized_pnl: felt,
 }
 
 // Struct to be used for liquidation calls

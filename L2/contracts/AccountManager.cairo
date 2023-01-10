@@ -627,8 +627,10 @@ func execute_order{
     margin_amount: felt,
     borrowed_amount: felt,
     market_id: felt,
+    pnl: felt,
 ) -> (res: felt) {
     alloc_locals;
+
     local order_id;
     assert order_id = request.order_id;
 
@@ -677,15 +679,21 @@ func execute_order{
         portion_executed.write(order_id=request.order_id, value=new_position_executed);
     }
 
+    let (local current_timestamp) = get_block_timestamp();
+
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position
     if (request.life_cycle == OPEN) {
+        local created_timestamp;
+
         if (position_details.position_size == 0) {
             add_to_market_array(market_id);
+            created_timestamp = current_timestamp;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
+            created_timestamp = position_details.created_timestamp;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -701,6 +709,7 @@ func execute_order{
         // New leverage
         let total_value = margin_amount + borrowed_amount;
         let (new_leverage) = Math64x61_div(total_value, margin_amount);
+        let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
 
         // Create a new struct with the updated details
         let updated_position = PositionDetails(
@@ -709,6 +718,9 @@ func execute_order{
             margin_amount=margin_amount,
             borrowed_amount=borrowed_amount,
             leverage=new_leverage,
+            created_timestamp=created_timestamp,
+            modified_timestamp=current_timestamp,
+            realized_pnl=current_pnl,
         );
 
         // Write to the mapping
@@ -721,6 +733,8 @@ func execute_order{
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     } else {
         local parent_direction;
+        // Calculate the new leverage if it's a deleveraging order
+        local new_leverage;
 
         if (request.direction == LONG) {
             assert parent_direction = SHORT;
@@ -738,9 +752,6 @@ func execute_order{
         with_attr error_message("0003: {order_id} {size}") {
             assert_nn(new_position_size);
         }
-
-        // Calculate the new leverage if it's a deleveraging order
-        local new_leverage;
 
         // Check if it's liq/delveraging order
         let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
@@ -804,21 +815,12 @@ func execute_order{
                 tempvar range_check_ptr = range_check_ptr;
             }
         } else {
-            new_leverage = parent_position_details.leverage;
+            assert new_leverage = parent_position_details.leverage;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
         tempvar range_check_ptr = range_check_ptr;
-
-        // Create a new struct with the updated details
-        let updated_position = PositionDetails(
-            avg_execution_price=execution_price,
-            position_size=new_position_size,
-            margin_amount=margin_amount,
-            borrowed_amount=borrowed_amount,
-            leverage=new_leverage,
-        );
 
         if (new_position_size == 0) {
             if (position_details.position_size == 0) {
@@ -827,12 +829,50 @@ func execute_order{
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
+
+            // Write to the mapping
+            position_mapping.write(
+                market_id=market_id,
+                direction=parent_direction,
+                value=PositionDetails(
+                avg_execution_price=0,
+                position_size=0,
+                margin_amount=0,
+                borrowed_amount=0,
+                leverage=0,
+                created_timestamp=0,
+                modified_timestamp=0,
+                realized_pnl=0
+                ),
+            );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            let (current_pnl: felt) = Math64x61_add(parent_position_details.realized_pnl, pnl);
+
+            // Create a new struct with the updated details
+            let updated_position = PositionDetails(
+                avg_execution_price=execution_price,
+                position_size=new_position_size,
+                margin_amount=margin_amount,
+                borrowed_amount=borrowed_amount,
+                leverage=new_leverage,
+                created_timestamp=parent_position_details.created_timestamp,
+                modified_timestamp=current_timestamp,
+                realized_pnl=current_pnl,
+            );
+
+            position_mapping.write(
+                market_id=market_id, direction=parent_direction, value=updated_position
+            );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
 
-        // Write to the mapping
-        position_mapping.write(
-            market_id=market_id, direction=parent_direction, value=updated_position
-        );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
