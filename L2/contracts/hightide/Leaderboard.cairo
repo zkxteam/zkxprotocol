@@ -19,7 +19,7 @@ from contracts.libraries.Utils import verify_caller_authority
 
 // Event emitted whenever collateral is transferred from account by trading
 @event
-func leaderboard_update(season_id: felt, pair_id: felt, epoch: felt, timestamp: felt) {
+func leaderboard_update(season_id: felt, market_id: felt, epoch: felt, timestamp: felt) {
 }
 
 // Event emitted whenever the number_of_traders variable is changed
@@ -38,19 +38,19 @@ func time_between_calls_update(old_value: felt, new_value: felt) {
 
 // This stores the leaderboard data in a mapping
 @storage_var
-func leaderboard_mapping(season_id: felt, pair_id: felt, epoch: felt, index: felt) -> (
+func leaderboard_mapping(season_id: felt, market_id: felt, epoch: felt, index: felt) -> (
     value: LeaderboardStat
 ) {
 }
 
 // Stores the number of epochs
 @storage_var
-func epoch_length(season_id: felt, pair_id: felt) -> (length: felt) {
+func epoch_length(season_id: felt, market_id: felt) -> (length: felt) {
 }
 
 // This stores the mapping from an epoch to its timestamp
 @storage_var
-func epoch_mapping(season_id: felt, pair_id: felt, epoch: felt) -> (timestamp: felt) {
+func epoch_mapping(season_id: felt, market_id: felt, epoch: felt) -> (timestamp: felt) {
 }
 
 // Stores the number of traders that must be stored in an epoch
@@ -65,7 +65,7 @@ func time_between_calls() -> (res: felt) {
 
 // Stores the timestamp at which the last call was made
 @storage_var
-func last_call_timestamp(season_id: felt, pair_id: felt) -> (timestamp: felt) {
+func last_call_timestamp(season_id: felt, market_id: felt) -> (timestamp: felt) {
 }
 
 // //////////////
@@ -94,7 +94,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @dev returns x => Can make call after x seconds
 @view
 func get_next_call{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id_: felt
+    market_id_: felt
 ) -> (remaining_seconds: felt) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -119,7 +119,7 @@ func get_next_call{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
     // Get the last timestamp recorded
     let (current_last_call_timestamp: felt) = last_call_timestamp.read(
-        season_id=season_id, pair_id=pair_id_
+        season_id=season_id, market_id=market_id_
     );
 
     // If it's the first call
@@ -150,19 +150,19 @@ func get_next_call{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
 // @notice Provides the leaderboard at a particular epoch
 // @param season_id_ - Season id
-// @param pair_id_ - Pair id of the market
+// @param market_id_ - Id of the market
 // @parma epoch - Epoch at which the leaderboard is to be fetched
 // @returns leaderboard_array_len - Length of the leaderboard array
 // @returns leaderboard_array - Array of Leaderboard stats
 @view
 func get_leaderboard_epoch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, epoch_: felt
+    season_id_: felt, market_id_: felt, epoch_: felt
 ) -> (leaderboard_array_len: felt, leaderboard_array: LeaderboardStat*) {
     alloc_locals;
     let leaderboard_array: LeaderboardStat* = alloc();
     let (array_length: felt) = get_leaderboard_epoch_recurse(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         epoch_=epoch_,
         iterator_=0,
         leaderboard_array_=leaderboard_array,
@@ -171,9 +171,9 @@ func get_leaderboard_epoch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return (array_length, leaderboard_array);
 }
 
-// @notice Provides the status of a pair
+// @notice Provides the status of a market
 // @param season_id_ - Season id
-// @param pair_id_ - Pair id of the market
+// @param market_id_ - Id of the market
 // @parma epoch - Epoch at which the leaderboard is to be fetched
 // @returns leaderboard_array_len - Length of the leaderboard array
 // @returns leaderboard_array - Array of Leaderboard stats
@@ -181,9 +181,9 @@ func get_leaderboard_epoch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @dev status - 0 => Cool down period (Can't make a call rn)
 @view
 func get_call_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id_: felt
+    market_id_: felt
 ) -> (status: felt) {
-    let (get_remaining_time: felt) = get_next_call(pair_id_=pair_id_);
+    let (get_remaining_time: felt) = get_next_call(market_id_=market_id_);
     if (get_remaining_time == 0) {
         return (1,);
     } else {
@@ -193,16 +193,16 @@ func get_call_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
 // @notice Returns the timestamp associated to an epoch of a market
 // @param season_id_ - Season id
-// @param pair_id_ - Pair id of the market
+// @param market_id_ - Id of the market
 // @param epoch_ - Epoch for which the timestamp is to be fetched
 // @returns timestamp - Timestamp of the corresponding epoch
 // @dev - It returns 0 if the leaderboard is not set for a configuration
 @view
 func get_epoch_to_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, epoch_: felt
+    season_id_: felt, market_id_: felt, epoch_: felt
 ) -> (timestamp: felt) {
     let (timestamp: felt) = epoch_mapping.read(
-        season_id=season_id_, pair_id=pair_id_, epoch=epoch_
+        season_id=season_id_, market_id=market_id_, epoch=epoch_
     );
 
     return (timestamp,);
@@ -296,7 +296,7 @@ func set_number_of_top_traders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 }
 
 // @notice External function to set the leaderboard for a market
-// @param pair_id_ - Pair id of the market
+// @param market_id_ - Id of the market
 // @param leaderboard_array_len - Length of the leaderboard array
 // @param leaderboard_array - Array of leaderboard stats
 // @returns status
@@ -304,11 +304,11 @@ func set_number_of_top_traders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 // @dev returns 1 => Succesfully set the leaderboard
 @external
 func set_leaderboard{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id_: felt, leaderboard_array_len: felt, leaderboard_array: LeaderboardStat*
+    market_id_: felt, leaderboard_array_len: felt, leaderboard_array: LeaderboardStat*
 ) -> (res: felt) {
     alloc_locals;
     // Get status
-    let (status: felt) = get_call_status(pair_id_=pair_id_);
+    let (status: felt) = get_call_status(market_id_=market_id_);
 
     // If it's not time yet, return -1
     with_attr error_message("Leaderboard: Cool down period") {
@@ -337,20 +337,20 @@ func set_leaderboard{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (season_id: felt) = IHighTide.get_current_season_id(contract_address=hightide_address);
 
     // Get current epoch
-    let (current_epoch: felt) = epoch_length.read(season_id=season_id, pair_id=pair_id_);
+    let (current_epoch: felt) = epoch_length.read(season_id=season_id, market_id=market_id_);
 
     // Get current timestamp
     let (current_timestamp: felt) = get_block_timestamp();
 
     // Update the epoch mapping
     epoch_mapping.write(
-        season_id=season_id, pair_id=pair_id_, epoch=current_epoch, value=current_timestamp
+        season_id=season_id, market_id=market_id_, epoch=current_epoch, value=current_timestamp
     );
 
     // Recursively write the leaderboard stats to state
     set_leaderboard_recurse(
         season_id_=season_id,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         epoch_=current_epoch,
         iterator_=0,
         leaderboard_array_len_=leaderboard_array_len,
@@ -358,13 +358,13 @@ func set_leaderboard{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     );
 
     // Update the length of the epoch
-    epoch_length.write(season_id=season_id, pair_id=pair_id_, value=current_epoch + 1);
+    epoch_length.write(season_id=season_id, market_id=market_id_, value=current_epoch + 1);
 
     // Update the last called timestamp
-    last_call_timestamp.write(season_id=season_id, pair_id=pair_id_, value=current_timestamp);
+    last_call_timestamp.write(season_id=season_id, market_id=market_id_, value=current_timestamp);
 
     leaderboard_update.emit(
-        season_id=season_id, pair_id=pair_id_, epoch=current_epoch, timestamp=current_timestamp
+        season_id=season_id, market_id=market_id_, epoch=current_epoch, timestamp=current_timestamp
     );
     return (1,);
 }
@@ -375,20 +375,20 @@ func set_leaderboard{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
 // @notice Internal function to get leaderboard stats for a market
 // @param season_id_ - Season id
-// @param pair_id_ - Pair id for the market
+// @param market_id_ - Id for the market
 // @param epoch_ - Epoch for which we are returning leaderboard
 // @param iterator_ - Iterator to set the array
 // @param leaderboard_array_ - Array of the set leaderboard stats
 // @returns array_length - Array size of the leaderboard array
 func get_leaderboard_epoch_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     epoch_: felt,
     iterator_: felt,
     leaderboard_array_: LeaderboardStat*,
 ) -> (array_length: felt) {
     let (current_position: LeaderboardStat) = leaderboard_mapping.read(
-        season_id=season_id_, pair_id=pair_id_, epoch=epoch_, index=iterator_
+        season_id=season_id_, market_id=market_id_, epoch=epoch_, index=iterator_
     );
 
     if (current_position.user_address == 0) {
@@ -399,7 +399,7 @@ func get_leaderboard_epoch_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 
     return get_leaderboard_epoch_recurse(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         epoch_=epoch_,
         iterator_=iterator_ + 1,
         leaderboard_array_=leaderboard_array_,
@@ -408,14 +408,14 @@ func get_leaderboard_epoch_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 
 // @notice Internal function to set leaderboard stats for a market
 // @param season_id_ - Season id
-// @param pair_id_ - Pair id for the market
+// @param market_id_ - Id for the market
 // @param epoch_ - Epoch for which we are setting leaderboard
 // @param iterator_ - Iterator to set the array
 // @param leaderboard_array_len_ - Length of the leaderboard array
 // @param leaderboard_array_ - Array of the set leaderboard stats
 func set_leaderboard_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     epoch_: felt,
     iterator_: felt,
     leaderboard_array_len_: felt,
@@ -433,7 +433,7 @@ func set_leaderboard_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     // Write to leaderboard mapping
     leaderboard_mapping.write(
         season_id=season_id_,
-        pair_id=pair_id_,
+        market_id=market_id_,
         epoch=epoch_,
         index=iterator_,
         value=[leaderboard_array_],
@@ -442,7 +442,7 @@ func set_leaderboard_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     // Set the next value
     return set_leaderboard_recurse(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         epoch_=epoch_,
         iterator_=iterator_ + 1,
         leaderboard_array_len_=leaderboard_array_len_,

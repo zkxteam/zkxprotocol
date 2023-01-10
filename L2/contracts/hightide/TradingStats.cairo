@@ -28,25 +28,34 @@ from contracts.libraries.CommonLibrary import (
 )
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_add, Math64x61_div, Math64x61_fromIntFelt
 
+// /////////
+// Events //
+// /////////
+
 // This contract can be used as a source of truth for all consumers of trade stats off-chain/on-chain
 // This does not have functions to calculate any of the hightide formulas
 // This contract just does on-chain trade stats storage and reporting
 // The consumers of these stats should perform necessary calculations
-// pair_id as used in this contract refers to market_id - it can be supplied by caller or retrieved from Market contract
+// market_id as used in this contract refers to market_id - it can be supplied by caller or retrieved from Market contract
 // if the asset / collateral id is supplied
 
 @event
 func trade_recorded(
     season_id: felt,
-    pair_id: felt,
+    market_id: felt,
     trader_address: felt,
     order_type: felt,
     order_size_64x61: felt,
     order_price_64x61: felt,
 ) {
 }
+
+// //////////
+// Storage //
+// //////////
+
 // this var stores the total number of recorded trades for a volume_type
-// this is identified by VolumeMetaData (season, pair, order_type)
+// this is identified by VolumeMetaData (season, market, order_type)
 @storage_var
 func num_orders(volume_type: VolumeMetaData) -> (res: felt) {
 }
@@ -56,30 +65,46 @@ func num_orders(volume_type: VolumeMetaData) -> (res: felt) {
 func order_volume(volume_type: VolumeMetaData) -> (res_64x61: felt) {
 }
 
-// this stores the number of trades in a day for a pair in a season
+// this stores the number of trades in a day for a market in a season
 @storage_var
-func trade_frequency(season_id: felt, pair_id: felt, day: felt) -> (res: felt) {
+func trade_frequency(season_id: felt, market_id: felt, day: felt) -> (res: felt) {
 }
 
-// this stores number of traders for a pair in a season
+// this stores number of traders for a market in a season
 @storage_var
-func num_traders(season_id: felt, pair_id: felt) -> (res: felt) {
+func num_traders(season_id: felt, market_id: felt) -> (res: felt) {
 }
 
-// stores list of trader addresses for a pair in a season - retrievable by index in the list
-// currently this is maintained but not used
+// stores list of trader addresses for a market in a season - retrievable by index in the list
 @storage_var
-func traders_in_pair(season_id: felt, pair_id: felt, index: felt) -> (trader_address: felt) {
+func traders_in_market(season_id: felt, market_id: felt, index: felt) -> (trader_address: felt) {
 }
 
-// stores whether a trader is an active trader for a pair in a season i.e. has traded at least once
+// stores whether a trader is an active trader for a market in a season i.e. has traded at least once
 @storage_var
-func trader_for_pair(season_id: felt, pair_id: felt, trader_address: felt) -> (is_trader: felt) {
+func trader_for_market(season_id: felt, market_id: felt, trader_address: felt) -> (
+    is_trader: felt
+) {
 }
 
-//##############
-// Constructor #
-//##############
+// this stores number of traders who traded listed hightides in a season
+@storage_var
+func num_traders_in_season(season_id: felt) -> (res: felt) {
+}
+
+// stores list of trader addresses who traded listed hightides in a season - retrievable by index in the list
+@storage_var
+func traders_in_season(season_id: felt, index: felt) -> (trader_address: felt) {
+}
+
+// stores whether a trader is an active trader who traded listed hightides in a season i.e. has traded at least once
+@storage_var
+func trader_for_season(season_id: felt, trader_address: felt) -> (is_trader: felt) {
+}
+
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -92,9 +117,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @dev - This function returns current running total for VolumeMetaData
 // It supports pagination through the use of num_order_required_ and index_from_ params
@@ -110,48 +135,48 @@ func get_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (current_num_orders, current_total_volume_64x61);
 }
 
-// @dev - Returns current active trader count for given <season_id, pair_id>
+// @dev - Returns current active trader count for given <season_id, market_id>
 // This might be used to calculate x_4 according to the hightide algorithm
 @view
 func get_num_active_traders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
+    season_id_: felt, market_id_: felt
 ) -> (res: felt) {
-    let (current_num_traders) = num_traders.read(season_id_, pair_id_);
+    let (current_num_traders) = num_traders.read(season_id_, market_id_);
     return (current_num_traders,);
 }
 
-// @dev - Returns frequency(no. of trades in a day) table(list) for <season_id, pair_id>
+// @dev - Returns frequency(no. of trades in a day) table(list) for <season_id, market_id>
 // this might be used for calculating x_2 according to the hightide algorithm
 @view
 func get_season_trade_frequency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
+    season_id_: felt, market_id_: felt
 ) -> (frequency_len: felt, frequency: felt*) {
     alloc_locals;
-    let number_of_days = get_current_days_in_season(season_id_, pair_id_);
+    let number_of_days = get_current_days_in_season(season_id_, market_id_);
     local ref_number_of_days = number_of_days;
     let frequency_list: felt* = alloc();
 
-    let max_trades = get_frequencies(season_id_, pair_id_, number_of_days, 0, frequency_list, 0);
+    let max_trades = get_frequencies(season_id_, market_id_, number_of_days, 0, frequency_list, 0);
     return (ref_number_of_days, frequency_list);
 }
 
-// @dev - This function returns the max number of trades in a day for season_id, pair_id
+// @dev - This function returns the max number of trades in a day for season_id, market_id
 // this might be used for calculating x_2 according to the hightide algorithm
 @view
 func get_max_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
+    season_id_: felt, market_id_: felt
 ) -> (res: felt) {
-    let number_of_days = get_current_days_in_season(season_id_, pair_id_);
+    let number_of_days = get_current_days_in_season(season_id_, market_id_);
 
     let frequency_list: felt* = alloc();
-    let max_trades = get_frequencies(season_id_, pair_id_, number_of_days, 0, frequency_list, 0);
+    let max_trades = get_frequencies(season_id_, market_id_, number_of_days, 0, frequency_list, 0);
     return (max_trades,);
 }
 
 // @dev - this function returns the number of trades recorded for a particular day upto the timestamp of call
 @view
 func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, day_number_: felt
+    season_id_: felt, market_id_: felt, day_number_: felt
 ) -> (res: felt) {
     let (registry_address) = get_registry_address();
     let (version) = get_contract_version();
@@ -165,7 +190,7 @@ func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         assert_lt(day_number_, season.num_trading_days);
     }
 
-    let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, day_number_);
+    let (current_daily_count) = trade_frequency.read(season_id_, market_id_, day_number_);
     return (current_daily_count,);
 }
 
@@ -173,40 +198,40 @@ func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // This is used for calculating x_3 according to the hightide algorithm
 @view
 func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
+    season_id_: felt, market_id_: felt
 ) -> (res: felt) {
-    let number_of_days = get_current_days_in_season(season_id_, pair_id_);
+    let number_of_days = get_current_days_in_season(season_id_, market_id_);
 
     // The 4th argument of the following function call keeeps a running total of days traded
-    let count = count_num_days_traded(season_id_, pair_id_, number_of_days, 0);
+    let count = count_num_days_traded(season_id_, market_id_, number_of_days, 0);
     return (count,);
 }
 
-// @dev - Function called by HighTideCalc, this calculates the average volume for the pair
+// @dev - Function called by HighTideCalc, this calculates the average volume for the market
 @view
 func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
+    season_id_: felt, market_id_: felt
 ) -> (average_volume_64x61: felt) {
     alloc_locals;
 
     // Create a VolumeMetadata struct for open orders
-    let volume_metadata_pair_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, life_cycle=OPEN
+    let volume_metadata_market_open: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, market_id=market_id_, life_cycle=OPEN
     );
 
     // Create a VolumeMetadata struct for close orders
-    let volume_metadata_pair_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, life_cycle=CLOSE
+    let volume_metadata_market_close: VolumeMetaData = VolumeMetaData(
+        season_id=season_id_, market_id=market_id_, life_cycle=CLOSE
     );
 
     // Get the order volume for open orders
     let (current_num_orders_open: felt, current_total_volume_open_64x61: felt) = get_order_volume(
-        volume_type_=volume_metadata_pair_open
+        volume_type_=volume_metadata_market_open
     );
 
     // Get the order volume for close orders
     let (current_num_orders_close: felt, current_total_volume_close_64x61: felt) = get_order_volume(
-        volume_type_=volume_metadata_pair_close
+        volume_type_=volume_metadata_market_close
     );
 
     // Find total volume by adding open and close order volume
@@ -230,16 +255,16 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     return (average_volume,);
 }
 
-// @notice View function to get the list of traders in a pair
+// @notice View function to get the list of traders in a market
 // @param season_id_ - id of the season
-// @param pair_id_ - id of the market pair
+// @param market_id_ - id of the market pair
 // @param starting_index_ - Index from which to fetch the array
 // @param num_traders_ - Number of traders to fetch from the array
 // @return trader_list_len - length of trader's list
 // @return trader_list - list of trader's
 @view
-func get_traders_in_pair{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, starting_index_: felt, num_traders_: felt
+func get_traders_in_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, market_id_: felt, starting_index_: felt, num_traders_: felt
 ) -> (trader_list_len: felt, trader_list: felt*) {
     alloc_locals;
 
@@ -252,25 +277,25 @@ func get_traders_in_pair{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     }
 
     let ending_index = starting_index_ + num_traders_;
-    let (trader_list_len) = num_traders.read(season_id_, pair_id_);
+    let (trader_list_len) = num_traders.read(season_id_, market_id_);
     with_attr error_message("TradingStats: Cannot retrieve the specified num of traders") {
         assert_le(ending_index, trader_list_len);
     }
 
     let (trader_list: felt*) = alloc();
     return populate_trader_list_recurse(
-        season_id_, pair_id_, 0, starting_index_, ending_index, trader_list
+        season_id_, market_id_, 0, starting_index_, ending_index, trader_list
     );
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @dev - Function called by trading contract after trade execution
 @external
 func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    pair_id_: felt,
+    market_id_: felt,
     execution_price_64x61_: felt,
     request_list_len: felt,
     request_list: MultipleOrder*,
@@ -317,7 +342,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     IUserStats.record_trader_stats(
         contract_address=user_stats_address,
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         trader_stats_list_len=trader_stats_list_len,
         trader_stats_list=trader_stats_list,
     );
@@ -328,21 +353,26 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     // Get the current day according to the season
     let current_day = get_current_day(season.start_timestamp);
 
-    let (current_daily_count) = trade_frequency.read(season_id_, pair_id_, current_day);
+    let (current_daily_count) = trade_frequency.read(season_id_, market_id_, current_day);
 
     // Increment number of trades for current_day
     trade_frequency.write(
-        season_id_, pair_id_, current_day, current_daily_count + request_list_len
+        season_id_, market_id_, current_day, current_daily_count + request_list_len
+    );
+
+    let (is_market_listed) = IHighTide.is_market_under_hightide(
+        hightide_address, season_id_, market_id_
     );
 
     // Recursively set the trading stats for each order
     record_trade_batch_stats_recurse(
         season_id_=season_id_,
-        pair_id_=pair_id_,
+        market_id_=market_id_,
         execution_price_64x61_=execution_price_64x61_,
         request_list_len_=request_list_len,
         request_list_=request_list,
         executed_sizes_list_=executed_sizes_list,
+        is_market_listed_=is_market_listed,
     );
 
     return ();
@@ -357,11 +387,12 @@ func record_trade_batch_stats_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     execution_price_64x61_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
     executed_sizes_list_: felt*,
+    is_market_listed_: felt,
 ) {
     alloc_locals;
 
@@ -371,7 +402,7 @@ func record_trade_batch_stats_recurse{
 
     // Update running total of order volume
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, pair_id=pair_id_, life_cycle=[request_list_].life_cycle
+        season_id=season_id_, market_id=market_id_, life_cycle=[request_list_].life_cycle
     );
 
     let (current_len) = num_orders.read(volume_metadata);
@@ -388,19 +419,21 @@ func record_trade_batch_stats_recurse{
     // increment number of trades storage_var
     num_orders.write(volume_metadata, current_len + 1);
 
-    // Update number of unique active traders for a pair in a season
-    let (trader_status) = trader_for_pair.read(season_id_, pair_id_, [request_list_].user_address);
+    // Update number of unique active traders for a market in a season
+    let (trader_status) = trader_for_market.read(
+        season_id_, market_id_, [request_list_].user_address
+    );
 
-    // If trader was not active for pair in this season
+    // If trader was not active for market in this season
     if (trader_status == 0) {
         // Mark trader as active
-        trader_for_pair.write(season_id_, pair_id_, [request_list_].user_address, 1);
-        let (current_num_traders) = num_traders.read(season_id_, pair_id_);
-        // Increment count of unique active traders for pair in season
-        num_traders.write(season_id_, pair_id_, current_num_traders + 1);
-        // Store trader address for pair in this season at current index
-        traders_in_pair.write(
-            season_id_, pair_id_, current_num_traders, [request_list_].user_address
+        trader_for_market.write(season_id_, market_id_, [request_list_].user_address, 1);
+        let (current_num_traders) = num_traders.read(season_id_, market_id_);
+        // Increment count of unique active traders for market in season
+        num_traders.write(season_id_, market_id_, current_num_traders + 1);
+        // Store trader address for market in this season at current index
+        traders_in_market.write(
+            season_id_, market_id_, current_num_traders, [request_list_].user_address
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -411,10 +444,37 @@ func record_trade_batch_stats_recurse{
         tempvar range_check_ptr = range_check_ptr;
     }
 
+    if (is_market_listed_ == 1) {
+        // Get the trader status in a season
+        let (trader_status) = trader_for_season.read(season_id_, [request_list_].user_address);
+
+        // If trader was not active for a market listed under hightide in this season
+        if (trader_status == 0) {
+            // Mark trader as active
+            trader_for_season.write(season_id_, [request_list_].user_address, 1);
+            let (current_num_traders) = num_traders_in_season.read(season_id_);
+            // Increment count of unique active traders for market listed under hightide in season
+            num_traders_in_season.write(season_id_, current_num_traders + 1);
+            // Store trader address for a market listed under hightide in this season at current index
+            traders_in_season.write(season_id_, current_num_traders, [request_list_].user_address);
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
     // emit event for off-chain consumers
     trade_recorded.emit(
         season_id_,
-        pair_id_,
+        market_id_,
         [request_list_].user_address,
         [request_list_].life_cycle,
         [executed_sizes_list_],
@@ -423,11 +483,12 @@ func record_trade_batch_stats_recurse{
 
     return record_trade_batch_stats_recurse(
         season_id_,
-        pair_id_,
+        market_id_,
         execution_price_64x61_,
         request_list_len_ - 1,
         request_list_ + MultipleOrder.SIZE,
         executed_sizes_list_,
+        is_market_listed_,
     );
 }
 
@@ -468,10 +529,10 @@ func get_current_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 }
 
 // @dev - This function recursively calculates the trade count for each day in the season so far and also returns the max trades
-// in a day for the season, pair
+// in a day for the season, market
 func get_frequencies{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     total_frequencies: felt,
     current_index_: felt,
     frequency_list: felt*,
@@ -481,14 +542,14 @@ func get_frequencies{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         return max_num_trades;
     }
 
-    let (current_trade_count) = trade_frequency.read(season_id_, pair_id_, current_index_);
+    let (current_trade_count) = trade_frequency.read(season_id_, market_id_, current_index_);
     assert frequency_list[current_index_] = current_trade_count;
 
     let cmp_res = is_le(max_num_trades, current_trade_count);
     if (cmp_res == 1) {
         return get_frequencies(
             season_id_,
-            pair_id_,
+            market_id_,
             total_frequencies - 1,
             current_index_ + 1,
             frequency_list,
@@ -498,7 +559,7 @@ func get_frequencies{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     return get_frequencies(
         season_id_,
-        pair_id_,
+        market_id_,
         total_frequencies - 1,
         current_index_ + 1,
         frequency_list,
@@ -510,24 +571,24 @@ func get_frequencies{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // It checks and counts those days for which trade frequency(count) recorded was atleast 1
 // @param days_traded - keeps a running total of the number of days in which there was trade recorded in the season
 func count_num_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt, num_days_: felt, days_traded: felt
+    season_id_: felt, market_id_: felt, num_days_: felt, days_traded: felt
 ) -> felt {
     if (num_days_ == 0) {
         return days_traded;
     }
 
-    let (current_trade_count) = trade_frequency.read(season_id_, pair_id_, num_days_ - 1);
+    let (current_trade_count) = trade_frequency.read(season_id_, market_id_, num_days_ - 1);
     // If there was no trade recorded, then do not increment days_traded
     if (current_trade_count == 0) {
-        return count_num_days_traded(season_id_, pair_id_, num_days_ - 1, days_traded);
+        return count_num_days_traded(season_id_, market_id_, num_days_ - 1, days_traded);
     }
     // else increment days_traded to update running total and make the recursive call
-    return count_num_days_traded(season_id_, pair_id_, num_days_ - 1, days_traded + 1);
+    return count_num_days_traded(season_id_, market_id_, num_days_ - 1, days_traded + 1);
 }
 
 // @dev - This function calculates number of days that have elapsed in the season so far
 func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, pair_id_: felt
+    season_id_: felt, market_id_: felt
 ) -> felt {
     alloc_locals;
 
@@ -558,10 +619,10 @@ func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     return number_of_days;
 }
 
-// @dev - This function populates trader list for a pair in the season
+// @dev - This function populates trader list for a market in the season
 func populate_trader_list_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt,
-    pair_id_: felt,
+    market_id_: felt,
     iterator_: felt,
     starting_index_: felt,
     ending_index_: felt,
@@ -571,9 +632,9 @@ func populate_trader_list_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
         return (iterator_, trader_list_);
     }
 
-    let (trader_address) = traders_in_pair.read(season_id_, pair_id_, iterator_);
+    let (trader_address) = traders_in_market.read(season_id_, market_id_, iterator_);
     assert trader_list_[iterator_] = trader_address;
     return populate_trader_list_recurse(
-        season_id_, pair_id_, iterator_ + 1, starting_index_ + 1, ending_index_, trader_list_
+        season_id_, market_id_, iterator_ + 1, starting_index_ + 1, ending_index_, trader_list_
     );
 }

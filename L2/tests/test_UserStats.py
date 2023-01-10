@@ -330,35 +330,35 @@ async def test_record_trader_stats_with_two_open_orders(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_1
+    market_id = market_id_1
 
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_fee.result.fee_64x61) == 0.9699999999999964
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_1*oracle_price_1
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_1*oracle_price_1
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 0
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 0
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 0
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 0
 
 
@@ -394,36 +394,36 @@ async def test_record_trader_stats_with_two_close_orders(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_1
+    market_id = market_id_1
 
     # Recorded fee is not changed as we placed close orders
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_fee.result.fee_64x61) == 0.9699999999999964
 
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_1*oracle_price_1
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_1*oracle_price_1
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 500
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 2500
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 500
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 2500
 
 
@@ -458,36 +458,36 @@ async def test_record_trader_stats_with_one_open_order_and_one_close_order(admin
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
 
     season_id = 1
-    pair_id = market_id_1
+    market_id = market_id_1
 
     # Recorded fee is changed for Alice as it is a open order
-    trader1_fee = await user_stats.get_trader_fee(season_id, pair_id, alice.contract_address).call()
+    trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     print("alice fee",  from64x61(trader1_fee.result.fee_64x61))
     assert from64x61(trader1_fee.result.fee_64x61) == 2.424999999999996
 
     # Recorded fee is not changed for bob as it is a close order
-    trader2_fee = await user_stats.get_trader_fee(season_id, pair_id, bob.contract_address).call()
+    trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     print("bob fee",  from64x61(trader2_fee.result.fee_64x61))
     assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
 
-    total_fee = await user_stats.get_total_fee(season_id, pair_id).call()
+    total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     print("total fee", from64x61(total_fee.result.total_fee_64x61))
     assert from64x61(total_fee.result.total_fee_64x61) == 4.849999999999994
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, pair_id, order_life_cycles["open"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
     assert trader1_order_volume.result.number_of_orders == 2
     assert from64x61(trader1_order_volume.result.total_volume_64x61) == 8000
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, pair_id, order_life_cycles["close"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
     assert trader2_order_volume.result.number_of_orders == 2
     assert from64x61(trader2_order_volume.result.total_volume_64x61) == 6000
 
-    trader1_pnl = await user_stats.get_trader_pnl(season_id, pair_id, alice.contract_address).call()
+    trader1_pnl = await user_stats.get_trader_pnl(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_pnl.result.pnl_64x61) == 500
-    trader1_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, alice.contract_address).call()
+    trader1_margin = await user_stats.get_trader_margin_amount(season_id, market_id, alice.contract_address).call()
     assert from64x61(trader1_margin.result.margin_amount_64x61) == 2500
 
-    trader2_pnl = await user_stats.get_trader_pnl(season_id, pair_id, bob.contract_address).call()
+    trader2_pnl = await user_stats.get_trader_pnl(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_pnl.result.pnl_64x61) == 1000
-    trader2_margin = await user_stats.get_trader_margin_amount(season_id, pair_id, bob.contract_address).call()
+    trader2_margin = await user_stats.get_trader_margin_amount(season_id, market_id, bob.contract_address).call()
     assert from64x61(trader2_margin.result.margin_amount_64x61) == 5000

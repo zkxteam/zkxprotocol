@@ -2,16 +2,15 @@
 
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import abs_value, assert_not_zero
+from starkware.cairo.common.math import abs_value, assert_not_zero, assert_not_equal
 from starkware.cairo.common.math_cmp import is_le
-from starkware.starknet.common.syscalls import get_block_timestamp
+from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import MasterAdmin_ACTION
-from contracts.interfaces.IABR import IABR
-from contracts.interfaces.IABRFund import IABRFund
+from contracts.Constants import MasterAdmin_ACTION, ABR_Core_Index
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
+from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_div,
@@ -20,7 +19,7 @@ from contracts.Math_64x61 import (
     Math64x61_mul,
     Math64x61_sqrt,
     Math64x61_sub,
-    Math64x61_ONE
+    Math64x61_ONE,
 )
 
 //############
@@ -37,11 +36,6 @@ const HOURS_8 = 28800;
 // @notice Mapping of marketID to abr value
 @storage_var
 func abr_value(market_id) -> (abr: felt) {
-}
-
-// @notice Mapping of marketID to the timestamp of last updated value
-@storage_var
-func last_updated(market_id) -> (value: felt) {
 }
 
 @storage_var
@@ -81,11 +75,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 @view
 func get_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt
-) -> (abr: felt, price: felt, timestamp: felt) {
+) -> (abr: felt, price: felt) {
     let (abr: felt) = abr_value.read(market_id=market_id_);
     let (price: felt) = last_mark_price.read(market_id=market_id_);
-    let (timestamp) = last_updated.read(market_id=market_id_);
-    return (abr, price, timestamp);
+    return (abr, price);
 }
 
 //#####################
@@ -130,29 +123,32 @@ func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // @returns res - ABR of the mark & index prices
 @external
 func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt, perp_index_len: felt, perp_index: felt*, perp_mark_len: felt, perp_mark: felt*
+    market_id_: felt,
+    perp_index_len: felt,
+    perp_index: felt*,
+    perp_mark_len: felt,
+    perp_mark: felt*,
+    timestamp_: felt,
 ) -> (result: felt) {
     alloc_locals;
-    // Get the latest block
-    let (block_timestamp) = get_block_timestamp();
 
-    // Fetch the last updated time
-    let (last_call) = last_updated.read(market_id=market_id_);
+    // Make sure that the caller is the authorized ABR Core contracts
+    let (caller) = get_caller_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
-    // Minimum time before the second call
-    let min_time = last_call + HOURS_8;
-    let is_eight_hours = is_le(block_timestamp, min_time);
+    let (ABR_core_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=ABR_Core_Index, version=version
+    );
 
-    // If 8 hours have not passed yet
-    if (is_eight_hours == 1) {
-        with_attr error_message("ABR: 8 hours not passed") {
-            assert 1 = 0;
-        }
+    with_attr error_message("ABRCalculations: Unauthorized call") {
+        assert caller = ABR_core_address;
     }
 
     if (perp_mark_len == perp_index_len) {
     } else {
-        with_attr error_message("ABR: arguments mismatch") {
+        with_attr error_message(
+                "ABRCalculations: Index array length must be equal to Perp array length") {
             assert 1 = 0;
         }
     }
@@ -205,17 +201,14 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         0,
     );
 
-    // # Find the effective ABR rate
+    // Find the effective ABR rate
     let (base_abr_) = base_abr.read();
     let (rate_sum) = find_abr(reduced_array_length, ABRdyn_jump, 0, base_abr_);
 
     let (array_size) = Math64x61_fromIntFelt(reduced_array_length);
     let (rate) = Math64x61_div(rate_sum, array_size);
 
-    // Store the result and the timestamp in their storage vars
-    let (block_timestamp) = get_block_timestamp();
     abr_value.write(market_id=market_id_, value=rate);
-    last_updated.write(market_id=market_id_, value=block_timestamp);
 
     return (rate,);
 }

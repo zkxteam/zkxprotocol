@@ -20,6 +20,7 @@ namespace IAccountManager {
         margin_amount: felt,
         borrowed_amount: felt,
         market_id: felt,
+        pnl: felt,
     ) -> (res: felt) {
     }
 

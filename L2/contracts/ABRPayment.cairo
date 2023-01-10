@@ -5,18 +5,19 @@ from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import abs_value, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
-from starkware.starknet.common.syscalls import get_block_timestamp
+from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Math_64x61 import Math64x61_mul
 from contracts.Constants import (
+    ABR_Core_Index,
     ABR_FUNDS_INDEX,
-    ABR_INDEX,
+    ABR_Calculations_INDEX,
     AccountRegistry_INDEX,
     Market_INDEX,
     SHORT,
 )
 
 from contracts.DataTypes import NetPositions
-from contracts.interfaces.IABR import IABR
+from contracts.interfaces.IABR_Calculations import IABR_Calculations
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
@@ -57,16 +58,20 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param account_addresses_ - Account addresses array
 @external
 func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    account_addresses_len: felt, account_addresses: felt*
+    account_addresses_len: felt, account_addresses: felt*, timestamp_: felt
 ) {
-    // ## Signature checks go here ####
-
-    // Get the account registry smart-contract
+    // Make sure that the caller is the authorized ABR Core contracts
+    let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
-    let (account_registry) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AccountRegistry_INDEX, version=version
+
+    let (ABR_core_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=ABR_Core_Index, version=version
     );
+
+    with_attr error_message("ABRCalculations: Unauthorized call") {
+        assert caller = ABR_core_address;
+    }
 
     // Get the market smart-contract
     let (market_contract) = IAuthorizedRegistry.get_contract_address(
@@ -75,7 +80,7 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 
     // Get the ABR smart-contract
     let (abr_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_INDEX, version=version
+        contract_address=registry, index=ABR_Calculations_INDEX, version=version
     );
     // Get the ABR-funding smart-contract
     let (abr_funding_contract) = IAuthorizedRegistry.get_contract_address(
@@ -84,10 +89,10 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return pay_abr_users(
         account_addresses_len,
         account_addresses,
-        account_registry,
         market_contract,
         abr_contract,
         abr_funding_contract,
+        timestamp_,
     );
 }
 
@@ -165,6 +170,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     market_contract_: felt,
     abr_contract_: felt,
     abr_funding_: felt,
+    timestamp_: felt,
 ) {
     alloc_locals;
 
@@ -172,29 +178,13 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         return ();
     }
 
-    // Check if abr already collected
-    let (is_called) = IAccountManager.timestamp_check(
-        contract_address=account_address_, market_id_=[net_positions_].market_id
-    );
-
     // Get the collateral ID of the market
     let (_, collateral_id) = IMarkets.get_asset_collateral_from_market(
         contract_address=market_contract_, market_id_=[net_positions_].market_id
     );
 
-    if (is_called == 1) {
-        return pay_abr_users_positions(
-            account_address_,
-            net_positions_len_ - 1,
-            net_positions_ + NetPositions.SIZE,
-            market_contract_,
-            abr_contract_,
-            abr_funding_,
-        );
-    }
-
     // Get the abr value
-    let (abr: felt, price: felt, timestamp: felt) = IABR.get_abr_value(
+    let (abr: felt, price: felt, timestamp: felt) = IABR_Calculations.get_abr_value(
         contract_address=abr_contract_, market_id=[net_positions_].market_id
     );
 
@@ -249,13 +239,8 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         }
     }
 
-    // Get the latest block
-    let (block_timestamp) = get_block_timestamp();
-
     abr_payment_called_user_position.emit(
-        market_id=[net_positions_].market_id,
-        account_address=account_address_,
-        timestamp=block_timestamp,
+        market_id=[net_positions_].market_id, account_address=account_address_, timestamp=timestamp_
     );
     return pay_abr_users_positions(
         account_address_,
@@ -264,6 +249,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         market_contract_,
         abr_contract_,
         abr_funding_,
+        timestamp_,
     );
 }
 
@@ -277,30 +263,13 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 func pay_abr_users{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_addresses_len_: felt,
     account_addresses_: felt*,
-    account_registry_: felt,
     market_contract_: felt,
     abr_contract_: felt,
     abr_funding_contract_: felt,
+    timestamp_: felt,
 ) {
     if (account_addresses_len_ == 0) {
         return ();
-    }
-
-    // Check if the user is added to Account Registry
-    let (is_registered_user) = IAccountRegistry.is_registered_user(
-        contract_address=account_registry_, address_=[account_addresses_]
-    );
-
-    // If not, skip the current iteration
-    if (is_registered_user == FALSE) {
-        return pay_abr_users(
-            account_addresses_len_ - 1,
-            account_addresses_ + 1,
-            account_registry_,
-            market_contract_,
-            abr_contract_,
-            abr_funding_contract_,
-        );
     }
 
     // Get all the open positions of the user
@@ -316,14 +285,15 @@ func pay_abr_users{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         market_contract_,
         abr_contract_,
         abr_funding_contract_,
+        timestamp_,
     );
 
     return pay_abr_users(
         account_addresses_len_ - 1,
         account_addresses_ + 1,
-        account_registry_,
         market_contract_,
         abr_contract_,
         abr_funding_contract_,
+        timestamp_,
     );
 }

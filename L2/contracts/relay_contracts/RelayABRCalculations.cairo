@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.interfaces.IABR import IABR
+from contracts.interfaces.IABR_Calculations import IABR_Calculations
 from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
@@ -37,8 +37,8 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     record_call_details('calculate_abr');
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
     let (inner_address) = get_inner_contract();
-    let (res) = IABR.calculate_abr(
-        inner_address, market_id_, perp_index_len, perp_index, perp_mark_len, perp_mark
+    let (res) = IABR_Calculations.calculate_abr(
+        inner_address, market_id_, perp_index_len, perp_index, perp_mark_len, perp_mark, 0
     );
 
     return (res,);
@@ -49,6 +49,6 @@ func get_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     market_id_: felt
 ) -> (abr: felt, price: felt, timestamp: felt) {
     let (inner_address) = get_inner_contract();
-    let (abr, price, timestamp) = IABR.get_abr_value(inner_address, market_id_);
+    let (abr, price, timestamp) = IABR_Calculations.get_abr_value(inner_address, market_id_);
     return (abr, price, timestamp);
 }

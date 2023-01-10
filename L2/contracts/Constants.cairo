@@ -60,6 +60,7 @@ const ManageGovernanceToken_ACTION = 6;
 const ManageCollateralPrices_ACTION = 7;
 const ManageHighTide_ACTION = 8;
 const ManageSettings_ACTION = 9;
+const TokenLister_ACTION = 10;
 
 const POSITION_OPENED = 1;
 const POSITION_TO_BE_DELEVERAGED = 2;
@@ -81,8 +82,8 @@ const TAKER = 2;
 const WITHDRAWAL_INITIATED = 0;
 const WITHDRAWAL_SUCCEEDED = 1;
 
-const HIGHTIDE_INITIATED = 0;
-const HIGHTIDE_ACTIVE = 1;
+const HIGHTIDE_INITIATED = 1;
+const HIGHTIDE_ACTIVE = 2;
 
 const FoK = 2;
 const IoC = 3;
@@ -93,3 +94,7 @@ const CLOSE = 2;
 const STATE_0 = 0;
 const STATE_1 = 1;
 const STATE_2 = 2;
+
+const SEASON_CREATED = 1;
+const SEASON_STARTED = 2;
+const SEASON_ENDED = 3;
