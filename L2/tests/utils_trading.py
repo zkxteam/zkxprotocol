@@ -281,10 +281,6 @@ class User:
         self.deleveragable_or_liquidatable_position = liquidatable_position
 
     def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int, timestamp: int, pnl: int):
-        created_timestamp = 0
-        modified_timestamp = 0
-        current_pnl = 0
-
         position = self.get_position(
             market_id=order["market_id"], direction=order["direction"])
         order_portion_executed = self.get_portion_executed(
@@ -301,6 +297,9 @@ class User:
             order_id=order["order_id"], new_amount=new_portion_executed)
 
         if order["life_cycle"] == 1:
+            current_pnl = 0
+            created_timestamp = 0
+
             if position["position_size"] == 0:
                 self.__add_to_market_array(new_market_id=order["market_id"])
                 created_timestamp = timestamp
@@ -334,6 +333,8 @@ class User:
                 market_id=order["market_id"], direction=order["direction"], updated_dict=updated_dict, updated_position=updated_position)
 
         else:
+            new_leverage = 0
+
             parent_direction = order_direction["short"] if order[
                 "direction"] == order_direction["long"] else order_direction["long"]
 
@@ -345,19 +346,6 @@ class User:
             if new_position_size < 0:
                 print("Cannot close more thant the positionSize")
                 return
-
-            if new_position_size == 0:
-                if position["position_size"] == 0:
-                    self.__remove_from_market_array(market_id=market_id)
-                created_timestamp = 0
-                modified_timestamp = 0
-                current_pnl = 0
-            else:
-                created_timestamp = parent_position["created_timestamp"]
-                modified_timestamp = timestamp
-                current_pnl = parent_position["realized_pnl"] + pnl
-
-            new_leverage = 0
 
             if order["order_type"] > 3:
                 liq_position = self.get_deleveragable_or_liquidatable_position()
@@ -391,16 +379,33 @@ class User:
             else:
                 new_leverage = parent_position["leverage"]
 
-            updated_position = {
-                "avg_execution_price": price,
-                "position_size": new_position_size,
-                "margin_amount": margin_amount,
-                "borrowed_amount": borrowed_amount,
-                "leverage": new_leverage,
-                "created_timestamp": created_timestamp,
-                "modified_timestamp": modified_timestamp,
-                "realized_pnl": current_pnl,
-            }
+            updated_position = {}
+            if new_position_size == 0:
+                if position["position_size"] == 0:
+                    self.__remove_from_market_array(market_id=market_id)
+
+                updated_position = {
+                    "avg_execution_price": 0,
+                    "position_size": 0,
+                    "margin_amount": 0,
+                    "borrowed_amount": 0,
+                    "leverage": 0,
+                    "created_timestamp": 0,
+                    "modified_timestamp": 0,
+                    "realized_pnl": 0,
+                }
+            else:
+                current_pnl = parent_position["realized_pnl"] + pnl
+                updated_position = {
+                    "avg_execution_price": price,
+                    "position_size": new_position_size,
+                    "margin_amount": margin_amount,
+                    "borrowed_amount": borrowed_amount,
+                    "leverage": new_leverage,
+                    "created_timestamp": parent_position["created_timestamp"],
+                    "modified_timestamp": timestamp,
+                    "realized_pnl": current_pnl,
+                }
 
             updated_dict = {
                 parent_direction: updated_position,
