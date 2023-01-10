@@ -192,6 +192,21 @@ func hightide_by_season_id(season_id: felt, index: felt) -> (hightide_id: felt) 
 func market_under_hightide(season_id: felt, market_id: felt) -> (is_listed: felt) {
 }
 
+// Stores no.of users per batch
+@storage_var
+func no_of_users_per_batch() -> (no_of_users: felt) {
+}
+
+// Stores the no.of batches fetched for a market in a season
+@storage_var
+func batches_fetched_by_market(season_id: felt, market_id: felt) -> (batches_fetched: felt) {
+}
+
+// Stores the no.of batches for a market in a season
+@storage_var
+func no_of_batches_by_market(season_id: felt, market_id: felt) -> (no_of_batches: felt) {
+}
+
 // //////////////
 // Constructor //
 // //////////////
@@ -404,6 +419,28 @@ func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     } else {
         return (season_id, TRUE, 0);
     }
+
+// @notice view function to get the number of batches for a season by a market
+// @param season_id_ - Id of the season
+// @param market_id_ - Market Id of the market
+// @return no_of_batches - returns no of batches per season per market
+@view
+func get_no_of_batches_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, market_id_: felt
+) -> (no_of_batches: felt) {
+    let (no_of_batches) = no_of_batches_by_market.read(season_id_, market_id_);
+
+    return (no_of_batches,);
+}
+
+// @notice view function to get the number of users in a batch
+// @return no_of_users - returns no.of users per batch
+@view
+func get_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ) -> (no_of_users: felt) {
+    let (no_of_users) = no_of_users_per_batch.read();
+
+    return (no_of_users,);
 }
 
 // @notice View function to verify the existence of a season
@@ -423,6 +460,24 @@ func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // ///////////
 // External //
 // ///////////
+
+// @notice Function to set the number of users in a batch
+// @param new_no_of_users_per_batch_ - no.of users per batch
+@external
+func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_no_of_users_per_batch_: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("HighTideCalc: Unauthorized call to set no of users per batch") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    no_of_users_per_batch.write(new_no_of_users_per_batch_);
+    return ();
+}
 
 // @notice - This function is used for setting up trade season
 // @param start_timestamp_ - start timestamp of the season

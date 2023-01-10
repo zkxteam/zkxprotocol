@@ -10,7 +10,6 @@ from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import (
     CLOSE,
     Hightide_INDEX,
-    ManageHighTide_ACTION,
     Market_INDEX,
     OPEN,
     RewardsCalculation_INDEX,
@@ -44,7 +43,6 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
-from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_div,
