@@ -1202,11 +1202,11 @@ async def set_balance(admin_signer: Signer, admin: StarknetContract, users: List
 
 
 async def set_abr_value(market_id, node_signer, node, abr_core, abr_executor, spot, perp, spot_64x61, perp_64x61):
-    arguments_64x61 = [market_id, 480, *perp_64x61, 480, *spot_64x61]
+    arguments_64x61 = [market_id, 480, *spot_64x61, 480, *perp_64x61]
     await node_signer.send_transaction(node, abr_core.contract_address, 'set_abr_value', arguments_64x61)
     print("reached here")
     abr_executor.set_abr(
-        market_id, price=spot[479], perp_spot=spot, perp=perp, base_rate=0.0000125, boll_width=2.0)
+        market_id, price=perp[479], perp_spot=spot, perp=perp, base_rate=0.0000125, boll_width=2.0)
 
 
 # Function to assert that the reverted tx has the required error_message
@@ -1392,4 +1392,5 @@ async def compare_abr_values(market_id: int, abr_calculations: StarknetContract,
           from64x61(abr_query.result.price))
 
     (value, price) = abr_executor.get_abr(market_id)
-    print("abr python", value, price)
+    assert value == pytest.approx(from64x61(abr_query.result.abr), abs=1e-4)
+    assert price == from64x61(abr_query.result.price)
