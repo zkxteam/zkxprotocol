@@ -47,8 +47,8 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 @view
 func get_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt
-) -> (abr: felt, price: felt, timestamp: felt) {
+) -> (abr: felt, price: felt) {
     let (inner_address) = get_inner_contract();
-    let (abr, price, timestamp) = IABR_Calculations.get_abr_value(inner_address, market_id_);
-    return (abr, price, timestamp);
+    let (abr, price) = IABR_Calculations.get_abr_value(inner_address, market_id_);
+    return (abr, price);
 }

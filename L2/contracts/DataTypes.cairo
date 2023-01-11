@@ -127,7 +127,6 @@ struct SimplifiedPosition {
     market_id: felt,
     direction: felt,
     position_size: felt,
-    created_timestamp: felt,
 }
 
 // Struct for passing signature to Account Contract

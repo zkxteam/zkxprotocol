@@ -2,7 +2,7 @@
 
 @contract_interface
 namespace IABR_Calculations {
-    func get_abr_value(market_id: felt) -> (abr: felt, price: felt, timestamp: felt) {
+    func get_abr_value(market_id: felt) -> (abr: felt, price: felt) {
     }
 
     func calculate_abr(

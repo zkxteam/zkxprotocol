@@ -358,6 +358,7 @@ func make_abr_payments{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         contract_address=abr_payments_address,
         account_addresses_len=users_list_len,
         account_addresses=users_list,
+        timestamp_=current_timestamp,
     );
 
     return ();

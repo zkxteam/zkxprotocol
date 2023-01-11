@@ -946,12 +946,16 @@ class ABR:
         self.abr_values = {}
         self.abr_last_price = {}
         self.abr_fund = {}
+        self.abr_timestamp = 0
 
     def get_abr(self, market_id: int) -> Tuple[float, float]:
         try:
             return (self.abr_values[market_id], self.abr_last_price[market_id])
         except KeyError:
             return (0, 0)
+
+    def set_abr_timestamp(self, timestmap: int):
+        self.abr_timestamp = timestmap
 
     def fund_abr(self, market_id: int, amount: float):
         asset_id = market_to_asset_mapping[market_id]
@@ -1192,7 +1196,15 @@ async def check_liquidation(zkx_node_signer: Signer, zkx_node: StarknetContract,
         starknet_result=starknet_result, python_result=python_result)
 
 
+async def make_abr_payments(admin_signer: Signer, admin: StarknetContract, abr_core: StarknetContract, abr_executor: ABR, user_test_list: List[User]):
+    abr_tx = await admin_signer.send_transaction(admin, abr_core.contract_address, "make_abr_payments", [])
+    abr_executor.pay_abr(users_list=user_test_list)
+
+    return abr_tx
+
 # Set balance for a list of users in python and starkent
+
+
 async def set_balance(admin_signer: Signer, admin: StarknetContract, users: List[StarknetContract], users_test: List[User], balance_array: List[float], asset_id: int):
     for i in range(len(users)):
         await set_balance_starknet(admin_signer=admin_signer, admin=admin, user=users[i], asset_id=asset_id, new_balance=balance_array[i])

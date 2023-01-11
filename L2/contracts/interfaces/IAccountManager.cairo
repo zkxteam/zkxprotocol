@@ -7,7 +7,7 @@ from contracts.DataTypes import (
     PositionDetails,
     PositionDetailsWithMarket,
     Signature,
-    SimplifiedPosition
+    SimplifiedPosition,
 )
 
 @contract_interface
@@ -42,7 +42,7 @@ namespace IAccountManager {
     func get_positions() -> (array_list_len: felt, array_list: PositionDetailsWithMarket*) {
     }
 
-    func get_simplified_positions() -> (
+    func get_simplified_positions(timestamp_filter_: felt) -> (
         positions_array_len: felt, positions_array: SimplifiedPosition*
     ) {
     }

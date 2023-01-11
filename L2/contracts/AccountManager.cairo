@@ -16,7 +16,7 @@ from starkware.cairo.common.math import (
     assert_not_equal,
     assert_not_zero,
 )
-from starkware.cairo.common.math_cmp import is_le
+from starkware.cairo.common.math_cmp import is_le, is_not_zero
 from starkware.cairo.common.pow import pow
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
@@ -524,13 +524,18 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @returns net_positions_array - Required array of net positions
 @view
 func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    ) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
+    timestamp_filter_: felt
+) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
     alloc_locals;
 
     let (positions_array: SimplifiedPosition*) = alloc();
     let (array_len: felt) = index_to_market_array_len.read();
     return populate_simplified_positions(
-        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        iterator_=0,
+        final_len_=array_len,
+        timestamp_filter_=timestamp_filter_,
     );
 }
 
@@ -1184,6 +1189,7 @@ func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     positions_array_: SimplifiedPosition*,
     iterator_: felt,
     final_len_: felt,
+    timestamp_filter_: felt,
 ) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
     alloc_locals;
     // If reached the end of the array, then return
@@ -1207,32 +1213,32 @@ func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     local is_long;
     local is_short;
 
-    if (long_position.position_size == 0) {
-        assert is_long = 0;
-    } else {
+    let within_timestamp_long = is_le(long_position.created_timestamp, timestamp_filter_);
+    let is_not_zero_long = is_not_zero(long_position.position_size);
+
+    let within_timestamp_short = is_le(short_position.created_timestamp, timestamp_filter_);
+    let is_not_zero_short = is_not_zero(short_position.position_size);
+
+    if (within_timestamp_long - is_not_zero_long == 0) {
         // Create the struct with the details
         let position_struct_long: SimplifiedPosition = SimplifiedPosition(
-            market_id=curr_market_id,
-            direction=LONG,
-            position_size=long_position.position_size,
-            created_timestamp=long_position.created_timestamp,
+            market_id=curr_market_id, direction=LONG, position_size=long_position.position_size
         );
         assert positions_array_[positions_array_len_] = position_struct_long;
         assert is_long = 1;
+    } else {
+        assert is_long = 0;
     }
 
-    if (short_position.position_size == 0) {
-        assert is_short = 0;
-    } else {
+    if (within_timestamp_short - is_not_zero_short == 0) {
         // Create the struct with the details
         let position_struct_short: SimplifiedPosition = SimplifiedPosition(
-            market_id=curr_market_id,
-            direction=SHORT,
-            position_size=short_position.position_size,
-            created_timestamp=short_position.created_timestamp,
+            market_id=curr_market_id, direction=SHORT, position_size=short_position.position_size
         );
         assert positions_array_[positions_array_len_ + is_long] = position_struct_short;
         assert is_short = 1;
+    } else {
+        assert is_short = 0;
     }
 
     // Recursively call the next market_id
@@ -1241,6 +1247,7 @@ func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
         positions_array_=positions_array_,
         iterator_=iterator_ + 1,
         final_len_=final_len_,
+        timestamp_filter_=timestamp_filter_,
     );
 }
 

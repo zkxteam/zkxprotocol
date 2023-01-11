@@ -186,7 +186,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     );
 
     // Get the abr value
-    let (abr: felt, price: felt, timestamp: felt) = IABR_Calculations.get_abr_value(
+    let (abr: felt, price: felt) = IABR_Calculations.get_abr_value(
         contract_address=abr_contract_, market_id=[positions_].market_id
     );
 
@@ -278,7 +278,9 @@ func pay_abr_users{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     // Get all the open positions of the user
     let (
         positions_len: felt, positions: SimplifiedPosition*
-    ) = IAccountManager.get_simplified_positions(contract_address=[account_addresses_]);
+    ) = IAccountManager.get_simplified_positions(
+        contract_address=[account_addresses_], timestamp_filter_=timestamp_
+    );
 
     // Do abr payments for each position
     pay_abr_users_positions(
