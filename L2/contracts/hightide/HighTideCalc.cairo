@@ -126,6 +126,11 @@ func batches_fetched_by_market(season_id: felt, market_id: felt) -> (batches_fet
 func no_of_batches_by_market(season_id: felt, market_id: felt) -> (no_of_batches: felt) {
 }
 
+// Stores the state of hightide for a market in a season
+@storage_var
+func hightide_state_by_market(season_id: felt, market_id: felt) -> (state: felt) {
+}
+
 // //////////////
 // Constructor //
 // //////////////
@@ -147,7 +152,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 // @notice view function to get the hightide factors of a market
 // @param season_id_ - Id of the season
-// @param market_id - Market Id of the market
+// @param market_id - Id of the market
 // @return res - A struct of type HighTideFactors
 @view
 func get_hightide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -207,7 +212,7 @@ func find_top_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 
 // @notice view function to get trader score of a market
 // @param season_id_ - Id of the season
-// @param market_id_ - Market Id of the market
+// @param market_id_ - Id of the market
 // @param trader_address_ - Address of the trader
 // @return trader_score - returns traders score of a market
 @view
@@ -220,7 +225,7 @@ func get_trader_score_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
 // @notice view function to get funds flow of a market
 // @param season_id_ - Id of the season
-// @param market_id_ - Market Id of the market
+// @param market_id_ - Id of the market
 // @return funds_flow - returns the funds transferred from liquidity pool to reward pool for a market
 @view
 func get_funds_flow_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -232,7 +237,7 @@ func get_funds_flow_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
 // @notice view function to get the number of batches for a season by a market
 // @param season_id_ - Id of the season
-// @param market_id_ - Market Id of the market
+// @param market_id_ - Id of the market
 // @return no_of_batches - returns no of batches per season per market
 @view
 func get_no_of_batches_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -251,6 +256,18 @@ func get_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     let (no_of_users) = no_of_users_per_batch.read();
 
     return (no_of_users,);
+}
+
+// @notice view function to get the state of hightide for a market in a season
+// @param season_id_ - Id of the season
+// @param market_id - Id of the market
+// @return state - returns the state of hightide
+@view
+func get_hightide_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, market_id_: felt
+) -> (state: felt) {
+    let (state) = hightide_state_by_market.read(season_id=season_id_, market_id=market_id_);
+    return (state,);
 }
 
 // ///////////
@@ -317,11 +334,9 @@ func calculate_high_tide_factors{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 // @notice external function to calculate w
 // @param season_id_ - Season Id for which to calculate the w for traders
 // @param market_id_ - market Id for which to calculate w
-// @param trader_list_len - length of trader's list
-// @param trader_list - list of trader's
 @external
 func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, market_id_: felt, trader_list_len: felt, trader_list: felt*
+    season_id_: felt, market_id_: felt
 ) {
     // To-do: Need to integrate signature infra for the authentication
     alloc_locals;
@@ -358,8 +373,12 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     );
 
     let (current_no_of_users_per_batch: felt) = no_of_users_per_batch.read();
-    let (no_of_batches: felt) = no_of_batches_by_market.read(season_id=season_id_, market_id=market_id_);
-    let (local batches_fetched: felt) = batches_fetched_by_market.read(season_id=season_id_, market_id=market_id_);
+    let (no_of_batches: felt) = no_of_batches_by_market.read(
+        season_id=season_id_, market_id=market_id_
+    );
+    let (local batches_fetched: felt) = batches_fetched_by_market.read(
+        season_id=season_id_, market_id=market_id_
+    );
 
     if (no_of_batches == batches_fetched) {
         with_attr error_message("HighTideCalc: Invalid batch id") {
@@ -367,15 +386,17 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         }
     }
 
-    let (users_list_len, users_list) = get_batch(
-        season_id_=season_id_, 
+    let (trader_list_len: felt, trader_list: felt*) = get_batch(
+        season_id_=season_id_,
         market_id_=market_id_,
         batch_id_=batches_fetched,
         no_of_users_per_batch_=current_no_of_users_per_batch,
         trading_stats_address_=trading_stats_address,
     );
 
-    batches_fetched_by_market.write(season_id=season_id_, market_id=market_id_, value=batches_fetched+1);
+    batches_fetched_by_market.write(
+        season_id=season_id_, market_id=market_id_, value=batches_fetched + 1
+    );
 
     // Get Constants to calculate traders individual trader score
     let (constants: Constants) = IHighTide.get_constants(contract_address=hightide_address);
@@ -488,9 +509,9 @@ func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 // @notice external function to calculate the funds flowing from LP (Liquidity Pool) to RP (Rewards Pool)
 // @param season_id_ - Season Id for which to calculate the flow of a market
 @external
-func update_no_of_batches_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt
-) {
+func update_no_of_batches_per_market{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(season_id_: felt) {
     let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -1267,6 +1288,11 @@ func calculate_no_of_batches_per_market_recurse{
     );
 
     return calculate_no_of_batches_per_market_recurse(
-        iterator_ + 1, season_id_, hightide_address_, trading_stats_address_, hightide_list_len, hightide_list
+        iterator_ + 1,
+        season_id_,
+        hightide_address_,
+        trading_stats_address_,
+        hightide_list_len,
+        hightide_list,
     );
 }
