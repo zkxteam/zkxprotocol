@@ -452,7 +452,7 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         }
     }
 
-    let (users_list_len, users_list) = get_batch(
+    let (trader_list_len: felt, trader_list: felt*) = get_batch(
         season_id_=season_id_,
         market_id_=market_id_,
         batch_id_=batches_fetched,
