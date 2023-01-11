@@ -73,12 +73,14 @@ fund_mode = {
 
 market_to_collateral_mapping = {
     BTC_USD_ID: AssetID.USDC,
+    BTC_UST_ID: AssetID.UST,
     ETH_USD_ID: AssetID.USDC,
     TSLA_USD_ID: AssetID.USDC
 }
 
 market_to_asset_mapping = {
     BTC_USD_ID: AssetID.BTC,
+    BTC_UST_ID: AssetID.BTC,
     ETH_USD_ID: AssetID.ETH,
     TSLA_USD_ID: AssetID.TSLA
 }
@@ -942,16 +944,23 @@ class Liquidator:
 class ABR:
     def __init__(self):
         self.abr_values = {}
+        self.abr_last_price = {}
         self.abr_fund = {}
 
-    def fund_abr(self, market_id, amount):
+    def get_abr(self, market_id: int) -> Tuple[float, float]:
+        try:
+            return (self.abr_values[market_id], self.abr_last_price[market_id])
+        except KeyError:
+            return (0, 0)
+
+    def fund_abr(self, market_id: int, amount: float):
         asset_id = market_to_asset_mapping[market_id]
         try:
             self.abr_fund[asset_id] += amount
         except KeyError:
             self.abr_fund[asset_id] = amount
 
-    def defund_abr(self, market_id, amount):
+    def defund_abr(self, market_id: int, amount: float):
         asset_id = market_to_asset_mapping[market_id]
         try:
             self.abr_fund[asset_id] -= amount
@@ -960,7 +969,7 @@ class ABR:
 
     def set_abr(self, market_id: int, price: float, perp_spot: List[float], perp: List[float], base_rate: float, boll_width: float):
         abr_rate = calculate_abr(
-            perp_spot=perp_spot, perp=perp, base_rate=0.0000125, boll_width=2.0)
+            perp_spot=perp_spot, perp=perp, base_rate=base_rate, boll_width=boll_width)
 
         self.abr_values[market_id] = abr_rate
         self.abr_last_price[market_id] = price
@@ -1192,6 +1201,14 @@ async def set_balance(admin_signer: Signer, admin: StarknetContract, users: List
     return
 
 
+async def set_abr_value(market_id, node_signer, node, abr_core, abr_executor, spot, perp, spot_64x61, perp_64x61):
+    arguments_64x61 = [market_id, 480, *perp_64x61, 480, *spot_64x61]
+    await node_signer.send_transaction(node, abr_core.contract_address, 'set_abr_value', arguments_64x61)
+    print("reached here")
+    abr_executor.set_abr(
+        market_id, price=spot[479], perp_spot=spot, perp=perp, base_rate=0.0000125, boll_width=2.0)
+
+
 # Function to assert that the reverted tx has the required error_message
 async def execute_batch_reverted(zkx_node_signer: Signer, zkx_node: StarknetContract, trading: StarknetContract, execute_batch_params: List[int], error_message: str):
     # Send execute_batch transaction
@@ -1367,3 +1384,12 @@ async def compare_liquidatable_position(user: StarknetContract, user_test: User)
     for i in range(len(liquidatable_position_python)):
         assert liquidatable_position_python[i] == pytest.approx(
             liquidatable_position_starknet[i], abs=1e-3)
+
+
+async def compare_abr_values(market_id: int, abr_calculations: StarknetContract, abr_executor: ABR):
+    abr_query = await abr_calculations.get_abr_value(market_id).call()
+    print("abr starknet", from64x61(abr_query.result.abr),
+          from64x61(abr_query.result.price))
+
+    (value, price) = abr_executor.get_abr(market_id)
+    print("abr python", value, price)

@@ -80,7 +80,6 @@ func get_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     let (price: felt) = last_mark_price.read(market_id=market_id_);
     return (abr, price);
 }
-
 //#####################
 // External Functions #
 //#####################

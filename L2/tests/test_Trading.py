@@ -46,6 +46,7 @@ def event_loop():
 @pytest.fixture(scope='module')
 async def trading_test_initializer(starknet_service: StarknetService):
     global timestamp
+
     # Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
         admin1_signer.public_key
