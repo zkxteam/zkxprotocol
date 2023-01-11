@@ -1816,8 +1816,9 @@ async def test_next_season_to_start_and_end_with_active_trade_season(hightide_te
 
     # Setup a trade season
     season_id_4 = 4
+    timestamp_4 = timestamp*15*24*60*60
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
-        timestamp*15*24*60*60, 30])
+        timestamp_4, 30])
     execution_info = await hightide.get_all_pending_seasons().call()
     season_list = execution_info.result.season_list
     print("season_list", season_list)
@@ -1825,8 +1826,9 @@ async def test_next_season_to_start_and_end_with_active_trade_season(hightide_te
 
     # Setup a trade season
     season_id_5 = 5
+    timestamp_5 = timestamp
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
-        timestamp, 10])
+        timestamp_5, 10])
     execution_info = await hightide.get_all_pending_seasons().call()
     season_list = execution_info.result.season_list
     print("season_list", season_list)

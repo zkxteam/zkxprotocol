@@ -331,7 +331,12 @@ func get_all_pending_seasons{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     alloc_locals;
     let (season_list: felt*) = alloc();
     let (local num_seasons) = seasons_array_len.read();
-    let (season_list_len) = populate_pending_season_list_recurse(1, num_seasons, 0, season_list);
+    let (current_season_id) = get_current_season_id();
+
+    // season id starts from 1. So, we populate pending season list by iterating from 1 to total no.of seasons available
+    let (season_list_len) = populate_pending_season_list_recurse(
+        1, current_season_id, num_seasons, 0, season_list
+    );
     return (season_list_len, season_list);
 }
 
@@ -1162,33 +1167,36 @@ func distribute_rewards_per_trader_recurse{
 
 func populate_pending_season_list_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(index_: felt, num_seasons_: felt, season_list_len: felt, season_list: felt*) -> (
-    season_list_len: felt
-) {
-    if (index_ == num_seasons_ + 1) {
+}(
+    season_id_: felt,
+    current_season_id_: felt,
+    num_seasons_: felt,
+    season_list_len: felt,
+    season_list: felt*,
+) -> (season_list_len: felt) {
+    if (season_id_ == num_seasons_ + 1) {
         return (season_list_len,);
     }
     // Get season expiry state. It returns false for the seasons which are not yet started
     // and also for ongoing seasons
-    let (is_expired) = get_season_expiry_state(index_);
+    let (is_expired) = get_season_expiry_state(season_id_);
     if (is_expired == FALSE) {
-        let (current_season_id) = get_current_season_id();
-        if (current_season_id == index_) {
+        if (current_season_id_ == season_id_) {
             // Don't include the current active season id in the list
             return populate_pending_season_list_recurse(
-                index_ + 1, num_seasons_, season_list_len, season_list
+                season_id_ + 1, current_season_id_, num_seasons_, season_list_len, season_list
             );
         } else {
             // Include the season which are not expired to the list
-            assert season_list[season_list_len] = index_;
+            assert season_list[season_list_len] = season_id_;
             return populate_pending_season_list_recurse(
-                index_ + 1, num_seasons_, season_list_len + 1, season_list
+                season_id_ + 1, current_season_id_, num_seasons_, season_list_len + 1, season_list
             );
         }
     } else {
         // Don't include the expired seasons to the list
         return populate_pending_season_list_recurse(
-            index_ + 1, num_seasons_, season_list_len, season_list
+            season_id_ + 1, current_season_id_, num_seasons_, season_list_len, season_list
         );
     }
 }
@@ -1205,7 +1213,7 @@ func fetch_next_season_to_start_recurse{
     if (index_ == season_list_len) {
         let (trading_season: TradingSeason) = get_season(season_to_start);
         let (current_timestamp) = get_block_timestamp();
-        if (is_le(trading_season.start_timestamp, current_timestamp) == 1) {
+        if (is_le(trading_season.start_timestamp, current_timestamp) == TRUE) {
             return (season_to_start, TRUE, 0);
         } else {
             return (season_to_start, FALSE, trading_season.start_timestamp - current_timestamp);
@@ -1213,7 +1221,7 @@ func fetch_next_season_to_start_recurse{
     }
     let (trading_season: TradingSeason) = get_season(season_list[index_]);
     let current_season_timestamp = trading_season.start_timestamp;
-    if (is_le(current_season_timestamp, min_timestamp) == 1) {
+    if (is_le(current_season_timestamp, min_timestamp) == TRUE) {
         return fetch_next_season_to_start_recurse(
             index_ + 1, season_list_len, season_list, season_list[index_], current_season_timestamp
         );
