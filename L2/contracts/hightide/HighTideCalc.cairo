@@ -9,6 +9,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import (
     CLOSE,
     Hightide_INDEX,
+    ManageHighTide_ACTION,
     Market_INDEX,
     OPEN,
     RewardsCalculation_INDEX,
@@ -24,6 +25,7 @@ from contracts.DataTypes import (
     TradingSeason,
     VolumeMetaData,
 )
+from contracts.hightide.libraries.UserBatches import calculate_no_of_batches, get_batch
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.interfaces.IMarkets import IMarkets
@@ -37,6 +39,7 @@ from contracts.libraries.CommonLibrary import (
     set_contract_version,
     set_registry_address,
 )
+from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_div,
@@ -106,6 +109,21 @@ func trader_score_by_market(season_id: felt, market_id: felt, trader_address: fe
 // Stores funds flow per market in a season
 @storage_var
 func funds_flow_by_market(season_id: felt, market_id: felt) -> (funds_flow_64x61: felt) {
+}
+
+// Stores no.of users per batch
+@storage_var
+func no_of_users_per_batch() -> (no_of_users: felt) {
+}
+
+// Stores the no.of batches fetched for a market in a season
+@storage_var
+func batches_fetched_by_market(season_id: felt, market_id: felt) -> (batches_fetched: felt) {
+}
+
+// Stores the no.of batches for a market in a season
+@storage_var
+func no_of_batches_by_market(season_id: felt, market_id: felt) -> (no_of_batches: felt) {
 }
 
 // //////////////
@@ -212,6 +230,29 @@ func get_funds_flow_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return (funds_flow,);
 }
 
+// @notice view function to get the number of batches for a season by a market
+// @param season_id_ - Id of the season
+// @param market_id_ - Market Id of the market
+// @return no_of_batches - returns no of batches per season per market
+@view
+func get_no_of_batches_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt, market_id_: felt
+) -> (no_of_batches: felt) {
+    let (no_of_batches) = no_of_batches_by_market.read(season_id_, market_id_);
+
+    return (no_of_batches,);
+}
+
+// @notice view function to get the number of users in a batch
+// @return no_of_users - returns no.of users per batch
+@view
+func get_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ) -> (no_of_users: felt) {
+    let (no_of_users) = no_of_users_per_batch.read();
+
+    return (no_of_users,);
+}
+
 // ///////////
 // External //
 // ///////////
@@ -283,7 +324,7 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     season_id_: felt, market_id_: felt, trader_list_len: felt, trader_list: felt*
 ) {
     // To-do: Need to integrate signature infra for the authentication
-
+    alloc_locals;
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
@@ -310,6 +351,31 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     with_attr error_message("HighTideCalc: Season still ongoing") {
         assert is_expired = TRUE;
     }
+
+    // Get Trading Stats contract address from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
+    let (current_no_of_users_per_batch: felt) = no_of_users_per_batch.read();
+    let (no_of_batches: felt) = no_of_batches_by_market.read(season_id=season_id_, market_id=market_id_);
+    let (local batches_fetched: felt) = batches_fetched_by_market.read(season_id=season_id_, market_id=market_id_);
+
+    if (no_of_batches == batches_fetched) {
+        with_attr error_message("HighTideCalc: Invalid batch id") {
+            assert 1 = 0;
+        }
+    }
+
+    let (users_list_len, users_list) = get_batch(
+        season_id_=season_id_, 
+        market_id_=market_id_,
+        batch_id_=batches_fetched,
+        no_of_users_per_batch_=current_no_of_users_per_batch,
+        trading_stats_address_=trading_stats_address,
+    );
+
+    batches_fetched_by_market.write(season_id=season_id_, market_id=market_id_, value=batches_fetched+1);
 
     // Get Constants to calculate traders individual trader score
     let (constants: Constants) = IHighTide.get_constants(contract_address=hightide_address);
@@ -398,6 +464,60 @@ func calculate_funds_flow{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         hightide_address_=hightide_address,
         hightide_list_len=hightide_list_len,
         hightide_list=hightide_list,
+    );
+}
+
+// @notice Function to set the number of users in a batch
+// @param new_no_of_users_per_batch_ - no.of users per batch
+@external
+func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_no_of_users_per_batch_: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("HighTideCalc: Unauthorized call to set no of users per batch") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    no_of_users_per_batch.write(new_no_of_users_per_batch_);
+    return ();
+}
+
+// @notice external function to calculate the funds flowing from LP (Liquidity Pool) to RP (Rewards Pool)
+// @param season_id_ - Season Id for which to calculate the flow of a market
+@external
+func update_no_of_batches_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) {
+    let (caller) = get_caller_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Hightide contract address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Get trading stats contract from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
+    // Check that this call originated from Hightide contract
+    with_attr error_message("HighTideCalc: Caller is not hightide contract") {
+        assert caller = hightide_address;
+    }
+
+    // Fetch list of hightides in a season
+    let (hightide_list_len: felt, hightide_list: felt*) = IHighTide.get_hightides_by_season_id(
+        contract_address=hightide_address, season_id=season_id_
+    );
+
+    // Store no.of batches in a season per market
+    return calculate_no_of_batches_per_market_recurse(
+        0, season_id_, hightide_address, trading_stats_address, hightide_list_len, hightide_list
     );
 }
 
@@ -1111,5 +1231,42 @@ func calculate_funds_flow_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
         hightide_address_=hightide_address_,
         hightide_list_len=hightide_list_len - 1,
         hightide_list=hightide_list + 1,
+    );
+}
+
+func calculate_no_of_batches_per_market_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    iterator_: felt,
+    season_id_: felt,
+    hightide_address_: felt,
+    trading_stats_address_: felt,
+    hightide_list_len: felt,
+    hightide_list: felt*,
+) {
+    if (iterator_ == hightide_list_len) {
+        return ();
+    }
+
+    let (hightide_metadata: HighTideMetaData) = IHighTide.get_hightide(
+        contract_address=hightide_address_, hightide_id=hightide_list[iterator_]
+    );
+
+    let (current_no_of_users_per_batch) = no_of_users_per_batch.read();
+
+    let (no_of_batches) = calculate_no_of_batches(
+        season_id_=season_id_,
+        market_id_=hightide_metadata.market_id,
+        current_no_of_users_per_batch_=current_no_of_users_per_batch,
+        trading_stats_address_=trading_stats_address_,
+    );
+
+    // Set the number of batches
+    no_of_batches_by_market.write(
+        season_id=season_id_, market_id=hightide_metadata.market_id, value=no_of_batches
+    );
+
+    return calculate_no_of_batches_per_market_recurse(
+        iterator_ + 1, season_id_, hightide_address_, trading_stats_address_, hightide_list_len, hightide_list
     );
 }

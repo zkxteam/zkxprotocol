@@ -23,4 +23,7 @@ namespace IHighTideCalc {
 
     func calculate_funds_flow(season_id_: felt) {
     }
+
+    func update_no_of_batches_per_market(season_id_: felt) {
+    }
 }

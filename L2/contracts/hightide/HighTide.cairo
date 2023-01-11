@@ -41,7 +41,6 @@ from contracts.DataTypes import (
     RewardToken,
     TradingSeason,
 )
-from contracts.hightide.libraries.UserBatches import calculate_no_of_batches
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
 from contracts.interfaces.IHighTideCalc import IHighTideCalc
@@ -520,12 +519,9 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         contract_address=hightide_calc_address, season_id_=season_id_
     );
 
-    // Fetch list of hightides in a season
-    let (hightide_list_len: felt, hightide_list: felt*) = get_hightides_by_season_id(season_id_);
-
-    // Store no.of batches in a season per market
-    calculate_no_of_batches_per_market_recurse(
-        0, season_id_, trading_stats_address, hightide_list_len, hightide_list
+    // Update no.of batches per market in a season
+    IHighTideCalc.update_no_of_batches_per_market(
+        contract_address=hightide_calc_address, season_id_=season_id_
     );
 
     // Update status in trading season
