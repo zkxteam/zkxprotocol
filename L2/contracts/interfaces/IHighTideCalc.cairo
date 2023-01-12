@@ -40,4 +40,12 @@ namespace IHighTideCalc {
 
     func update_no_of_batches_per_market(season_id_: felt) {
     }
+
+    func update_hightide_state_per_market(season_id_: felt, market_id_: felt, state_: felt) {
+    }
+
+    func update_no_of_batches_fetched_per_market(
+        season_id_: felt, market_id_: felt, batches_fetched_: felt
+    ) {
+    }
 }

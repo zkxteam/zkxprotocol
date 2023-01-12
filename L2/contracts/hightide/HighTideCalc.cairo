@@ -431,6 +431,7 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         season_id=season_id_, market_id=market_id_, value=batches_fetched + 1
     );
 
+    // Since this is the last batch to be fetched for a market in a season,
     // Update the state of hightide to W_CALCULATION_COMPLETED
     if (batches_fetched + 1 == no_of_batches) {
         hightide_state_by_market.write(
@@ -542,6 +543,7 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         season_id=season_id_, market_id=market_id_, value=batches_fetched + 1
     );
 
+    // Since this is the last batch to be fetched for a market in a season,
     // Update the state of hightide to TRADER_SCORE_CALCULATION_COMPLETED
     if (batches_fetched + 1 == no_of_batches) {
         hightide_state_by_market.write(
@@ -626,8 +628,8 @@ func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return ();
 }
 
-// @notice external function to calculate the funds flowing from LP (Liquidity Pool) to RP (Rewards Pool)
-// @param season_id_ - Season Id for which to calculate the flow of a market
+// @notice external function to update no.of batches in a season per market
+// @param season_id_ - Id of the season
 @external
 func update_no_of_batches_per_market{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
@@ -660,6 +662,58 @@ func update_no_of_batches_per_market{
     return calculate_no_of_batches_per_market_recurse(
         0, season_id_, hightide_address, trading_stats_address, hightide_list_len, hightide_list
     );
+}
+
+// @notice external function to update hightide state
+// @param season_id_ - Id of the season
+// @param market_id_ - Id of the market
+@external
+func update_hightide_state_per_market{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(season_id_: felt, market_id_: felt, state_: felt) {
+    let (caller) = get_caller_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Hightide contract address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Check that this call originated from Hightide contract
+    with_attr error_message("HighTideCalc: Caller is not hightide contract") {
+        assert caller = hightide_address;
+    }
+
+    hightide_state_by_market.write(season_id=season_id_, market_id=market_id_, value=state_);
+    return ();
+}
+
+// @notice external function to update no.of batches fetched per market in a season
+// @param season_id_ - Id of the season
+// @param market_id_ - Id of the market
+@external
+func update_no_of_batches_fetched_per_market{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(season_id_: felt, market_id_: felt, batches_fetched_: felt) {
+    let (caller) = get_caller_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Hightide contract address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Check that this call originated from Hightide contract
+    with_attr error_message("HighTideCalc: Caller is not hightide contract") {
+        assert caller = hightide_address;
+    }
+
+    batches_fetched_by_market.write(
+        season_id=season_id_, market_id=market_id_, value=batches_fetched_
+    );
+    return ();
 }
 
 // ///////////
