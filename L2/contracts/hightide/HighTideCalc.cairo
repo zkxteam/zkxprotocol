@@ -465,11 +465,9 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @notice external function to calculate trader score
 // @param season_id_ - Season Id for which to calculate the w for a trader per market
 // @param market_id_ - market Id for which to calculate traders score
-// @param trader_list_len - length of trader's list
-// @param trader_list - list of trader's
 @external
 func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, market_id_: felt, trader_list_len: felt, trader_list: felt*
+    season_id_: felt, market_id_: felt
 ) {
     // To-do: Need to integrate signature infra for the authentication
     alloc_locals;
