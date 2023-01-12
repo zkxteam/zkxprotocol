@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_in_range
+from starkware.cairo.common.math import assert_in_range, assert_lt
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 
@@ -250,7 +250,6 @@ func get_no_of_batches_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     season_id_: felt, market_id_: felt
 ) -> (no_of_batches: felt) {
     let (no_of_batches) = no_of_batches_by_market.read(season_id_, market_id_);
-
     return (no_of_batches,);
 }
 
@@ -260,8 +259,17 @@ func get_no_of_batches_per_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
 func get_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     ) -> (no_of_users: felt) {
     let (no_of_users) = no_of_users_per_batch.read();
-
     return (no_of_users,);
+}
+
+// @notice view function to get the number of batches fetched per market in a season
+// @return batches_fetched - returns no.of batches_fetched per market in a season
+@view
+func get_no_of_batches_fetched_per_market{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(season_id_: felt, market_id_: felt) -> (batches_fetched: felt) {
+    let (batches_fetched) = batches_fetched_by_market.read(season_id_, market_id_);
+    return (batches_fetched,);
 }
 
 // @notice view function to get the state of hightide for a market in a season
@@ -608,6 +616,10 @@ func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // Auth check
     with_attr error_message("HighTideCalc: Unauthorized call to set no of users per batch") {
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    with_attr error_message("ABRCore: No of users in a batch must be > 0") {
+        assert_lt(0, new_no_of_users_per_batch_);
     }
 
     no_of_users_per_batch.write(new_no_of_users_per_batch_);
