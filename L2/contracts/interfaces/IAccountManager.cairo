@@ -50,10 +50,12 @@ namespace IAccountManager {
     func get_portion_executed(order_id_: felt) -> (res: felt) {
     }
 
-    func transfer_from_abr(collateral_id_: felt, market_id_: felt, amount_: felt) {
+    func transfer_from_abr(
+        collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
+    ) {
     }
 
-    func transfer_abr(collateral_id_: felt, market_id_: felt, amount_: felt) {
+    func transfer_abr(collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt) {
     }
 
     func timestamp_check(market_id_: felt) -> (is_eight_hours: felt) {

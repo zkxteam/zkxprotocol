@@ -83,38 +83,51 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ////////
 // View //
 // ////////
+
+// @notice View function to get the current state of the ABRCore contract
+// @returns res - Current state
 @view
 func get_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (res: felt) {
     let (current_state) = state.read();
     return (current_state,);
 }
 
+// @notice View function to get the current epoch of the ABRCore contract
+// @returns res - Current epoch
 @view
 func get_epoch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (res: felt) {
     let (current_epoch) = epoch.read();
     return (current_epoch,);
 }
 
+// @notice View function that returns the list of markets for which the abr value is not set
+// @returns remaining_markets_list_len - Length of the remaining markets array
+// @returns remaining_markets_list - Remaining markets array
 @view
 func get_markets_remaining{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     remaining_markets_list_len: felt, remaining_markets_list: felt*
 ) {
     alloc_locals;
+    // Get the registry and version
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
+    // Get current state and alloc
     let (current_state) = state.read();
     let (current_epoch) = epoch.read();
     let (remaining_markets_list: felt*) = alloc();
 
+    // Get hthe markets contract address from Auth Registry
     let (markets_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Market_INDEX, version=version
     );
 
+    // Get all tradable markets in the system
     let (markets_list_len: felt, markets_list: Market*) = IMarkets.get_all_markets_by_state(
         contract_address=markets_address, is_tradable_=TRUE, is_archived_=FALSE
     );
 
+    // Return the list of markets for which the abr value is not set
     if (current_state == STATE_1) {
         return populate_remaining_markets(
             current_epoch_=current_epoch,
@@ -128,13 +141,17 @@ func get_markets_remaining{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     }
 }
 
+// @notice View function that returns the number of batches in the current epoch
+// @returns res- Number of batches
 @view
 func get_no_of_batches_for_current_epoch{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }() -> (res: felt) {
+    // Get the current state and epoch
     let (current_state) = state.read();
     let (current_epoch) = epoch.read();
 
+    // Return number_of_batches if in state 2
     if (current_state == STATE_2) {
         let (no_of_batches) = no_of_batches_for_epoch.read(epoch=current_epoch);
         return (no_of_batches,);
@@ -143,6 +160,8 @@ func get_no_of_batches_for_current_epoch{
     }
 }
 
+// @notice View function that returns the number of users in a batch
+// @returns res - Number of users in a batch
 @view
 func get_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     ) -> (res: felt) {
@@ -150,11 +169,16 @@ func get_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return (current_no_of_users_per_batch,);
 }
 
+// @notice View function that returns the number of pay abr calls remaining to be executed
+// @returns res- remaining calls
 @view
 func get_remaining_pay_abr_calls{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     ) -> (res: felt) {
+    // Get current state and epoch
     let (current_state) = state.read();
     let (current_epoch) = epoch.read();
+
+    // Get the no of batches and batches fetched
     let (no_of_batches) = no_of_batches_for_epoch.read(epoch=current_epoch);
     let (batches_fetched) = batches_fetched_for_epoch.read(epoch=current_epoch);
 
@@ -166,6 +190,8 @@ func get_remaining_pay_abr_calls{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     }
 }
 
+// @notice View function that returns the timestamp at which the next abr call is to be made
+// @return res- timestamp
 @view
 func get_next_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     res: felt
@@ -180,7 +206,7 @@ func get_next_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // External //
 // ///////////
 
-// @notice Function to set the number of users in a batch
+// @notice Function to set the number of users in a batch; callable by masteradmin
 // @param new_no_of_users_per_batch
 @external
 func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -199,6 +225,9 @@ func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return ();
 }
 
+// @notice Function to set the current abr_timestamp
+// @requirements - Contract must be in state 0
+// @param new_timestmap - New ABR timestmap
 @external
 func set_current_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_timestamp: felt
@@ -251,6 +280,13 @@ func set_current_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return ();
 }
 
+// @notice Function to set the abr for a market
+// @requirements - Contract must be in state 1
+// @param market_id_ - Market Id for which the abr value is to be set
+// @param perp_index_len - Length of the perp_index array
+// @param perp_index - Perp Index array
+// @param perp_mark_len - Length of the perp_mark array
+// @param perp_mark - Perp Marke array
 @external
 func set_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, perp_index_len: felt, perp_index: felt*, perp_mark_len: felt, perp_mark: felt*
@@ -327,6 +363,8 @@ func set_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return ();
 }
 
+// @notice Function to make abr payments between users
+// @requirements - Contract must be in state 2
 @external
 func make_abr_payments{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
     alloc_locals;
@@ -368,6 +406,14 @@ func make_abr_payments{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // Internal //
 // ///////////
 
+// @notice Recursive function to make a list of markets for which the abr is not set
+// @param current_epoch_ - Current epoch of the ABR Core contract
+// @param remaining_markets_list_len_ - Length of the new array
+// @param remaining_markets_list_ - New array of remaining markets
+// @param markets_list_len_ - Length of all the tradable markets array
+// @param markets_list_ - Tradable markets array
+// @returns remaining_markets_list_len - Length of the new remaining markets array
+// @returns remaining_markets_list - New remaining array
 func populate_remaining_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     current_epoch_: felt,
     remaining_markets_list_len_: felt,
@@ -375,17 +421,22 @@ func populate_remaining_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     markets_list_len_: felt,
     markets_list_: Market*,
 ) -> (remaining_markets_list_len: felt, remaining_markets_list: felt*) {
+    // base condition
     if (markets_list_len_ == 0) {
         return (remaining_markets_list_len_, remaining_markets_list_);
     }
 
+    // Get the market status; i.e if the abr value is set or not
     let (market_status) = abr_market_status.read(
         epoch=current_epoch_, market_id=[markets_list_].id
     );
 
-    if (market_status == 0) {
+    // If the abr_value is not set
+    if (market_status == FALSE) {
+        // Add it to the array
         assert remaining_markets_list_[remaining_markets_list_len_] = [markets_list_].id;
 
+        // Call the next market
         return populate_remaining_markets(
             current_epoch_=current_epoch_,
             remaining_markets_list_len_=remaining_markets_list_len_ + 1,
@@ -395,6 +446,7 @@ func populate_remaining_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         );
     }
 
+    // Call the next market
     return populate_remaining_markets(
         current_epoch_=current_epoch_,
         remaining_markets_list_len_=remaining_markets_list_len_,
@@ -404,19 +456,24 @@ func populate_remaining_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     );
 }
 
+// @notice Recursive function that return TRUE if all the market's abr value is set
+// @param current_epoch_ - Current epoch of the ABRCore contract
+// @param markets_list_len_ - Length of markets array
+// @param markets_list_ - Markets array
+// @returns res - 1 if all markets are set, 0 if one of them is not set
 func check_abr_markets_status_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(current_epoch_: felt, markets_list_len_: felt, markets_list_: Market*) -> (res: felt) {
-    if (markets_list_len_ == 0) {
-        return (1,);
+    if (markets_list_len_ == FALSE) {
+        return (TRUE,);
     }
 
     let (market_status) = abr_market_status.read(
         epoch=current_epoch_, market_id=[markets_list_].id
     );
 
-    if (market_status == 0) {
-        return (0,);
+    if (market_status == FALSE) {
+        return (FALSE,);
     }
 
     return check_abr_markets_status_recurse(
@@ -426,6 +483,10 @@ func check_abr_markets_status_recurse{
     );
 }
 
+// @notice Function that increments the state if all the markets are set
+// @param current_epoch_ - Current epoch of the ABRCore contract
+// @param markets_list_len_ - Length of markets array
+// @param markets_list_ - Markets array
 func check_abr_markets_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     current_epoch_: felt, markets_list_len_: felt, markets_list_: Market*
 ) {
@@ -436,7 +497,8 @@ func check_abr_markets_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         markets_list_=markets_list_,
     );
 
-    if (status == 1) {
+    // Increment the state if all markets are set
+    if (status == TRUE) {
         state.write(value=STATE_2);
         return ();
     } else {
@@ -445,6 +507,8 @@ func check_abr_markets_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 }
 
 // @notice Function to get the current batch (reverts if it crosses the set number of batches)
+// @param current_epoch_ - Current epoch of ABRCore
+// @param account_registry_address_ - Address of the account registry
 // @returns users_list_len - Length of the user batch
 // @returns users_list - Users batch
 func get_current_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -452,20 +516,23 @@ func get_current_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) -> (users_list_len: felt, users_list: felt*) {
     alloc_locals;
 
-    // Current Index
+    // Get the current batch details
     let (current_no_of_users_per_batch) = no_of_users_per_batch.read();
     let (batches_fetched) = batches_fetched_for_epoch.read(epoch=current_epoch_);
     let (no_of_batches) = no_of_batches_for_epoch.read(epoch=current_epoch_);
 
-    let (users_list_len, users_list) = get_batch(
+    // Get the current batch
+    let (users_list_len: felt, users_list: felt*) = get_batch(
         batch_id=batches_fetched,
         no_of_users_per_batch=current_no_of_users_per_batch,
         account_registry_address=account_registry_address_,
     );
 
+    // Increment batches_fetched
     let new_batches_fetched = batches_fetched + 1;
-    batches_fetched_for_epoch.write(epoch=current_epoch_, value=batches_fetched + 1);
+    batches_fetched_for_epoch.write(epoch=current_epoch_, value=new_batches_fetched);
 
+    // If all batches are fetched, increment state
     if (new_batches_fetched == no_of_batches) {
         state.write(value=STATE_0);
         return (users_list_len, users_list);

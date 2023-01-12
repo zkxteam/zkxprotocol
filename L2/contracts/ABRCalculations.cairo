@@ -115,10 +115,12 @@ func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 }
 
 // @notice Function to calculate the ABR for the current period
+// @param market_id_ - Market id for which the calculate abr is called
 // @param perp_index_len - Size of the perp index prices array
 // @param perp_index - Perp index prices array
 // @param perp_mark_len - Size of the perp mark prices array
 // @param perp_mark - Perp Mark prices array
+// @param timestamp_ - Timestamp of the ABR
 // @returns res - ABR of the mark & index prices
 @external
 func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(

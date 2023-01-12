@@ -59,19 +59,19 @@ async def abr_factory(starknet_service: StarknetService):
         starknet_service, L1_dummy_address, registry.contract_address, 1)
 
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
-    print(alice.contract_address)
+    print("alice", hex(alice.contract_address))
     alice_test = User(123456789987654323, alice.contract_address)
 
     bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
-    print(bob.contract_address)
+    print("bob", hex(bob.contract_address))
     bob_test = User(123456789987654324, bob.contract_address)
 
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
-    print(charlie.contract_address)
+    print("charlie", hex(charlie.contract_address))
     charlie_test = User(123456789987654325, charlie.contract_address)
 
     dave = await account_factory.deploy_ZKX_account(dave_signer.public_key)
-    print(dave.contract_address)
+    print("dave", hex(dave.contract_address))
     dave_test = User(123456789987654326, dave.contract_address)
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
@@ -607,7 +607,6 @@ async def test_set_timestamp(abr_factory):
 
     await admin1_signer.send_transaction(
         admin1, abr_core.contract_address, 'set_current_abr_timestamp', [timestamp_1])
-    abr_executor.set_abr_timestamp(timestamp_1)
 
 
 @pytest.mark.asyncio
@@ -639,8 +638,7 @@ async def test_view_functions_state_1(abr_factory):
 async def test_set_abr_1(abr_factory):
     starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
     # Set BTC_USD ABR
-    await set_abr_value(market_id=BTC_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=abr_core, abr_executor=abr_executor, spot=ABR_data.btc_usd_perp_spot_1, perp=ABR_data.btc_usd_perp_1, spot_64x61=convertTo64x61(ABR_data.btc_usd_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.btc_usd_perp_1))
-    await compare_abr_values(market_id=BTC_USD_ID, abr_calculations=abr_calculations, abr_executor=abr_executor)
+    await set_abr_value(market_id=BTC_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=abr_core, abr_calculations=abr_calculations, abr_executor=abr_executor, timestamp=from64x61(timestamp_1), spot=ABR_data.btc_usd_perp_spot_1, perp=ABR_data.btc_usd_perp_1, spot_64x61=convertTo64x61(ABR_data.btc_usd_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.btc_usd_perp_1))
 
     remaining_markets_query = await abr_core.get_markets_remaining().call()
     assert remaining_markets_query.result.remaining_markets_list == [
@@ -687,12 +685,9 @@ async def test_set_abr_untradable_market(abr_factory):
 async def test_set_abr_2(abr_factory):
     starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
     # Set ETH_USD ABR
-    await set_abr_value(market_id=ETH_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=abr_core, abr_executor=abr_executor, spot=ABR_data.eth_usd_perp_spot_1, perp=ABR_data.eth_usd_perp_1, spot_64x61=convertTo64x61(ABR_data.eth_usd_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.eth_usd_perp_1))
-    await compare_abr_values(market_id=ETH_USD_ID, abr_calculations=abr_calculations, abr_executor=abr_executor)
+    await set_abr_value(market_id=ETH_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=abr_core, abr_calculations=abr_calculations, abr_executor=abr_executor, timestamp=from64x61(timestamp_1), spot=ABR_data.eth_usd_perp_spot_1, perp=ABR_data.eth_usd_perp_1, spot_64x61=convertTo64x61(ABR_data.eth_usd_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.eth_usd_perp_1))
 
     remaining_markets_query = await abr_core.get_markets_remaining().call()
-    print("Eth remaining markets",
-          remaining_markets_query.result.remaining_markets_list)
     assert remaining_markets_query.result.remaining_markets_list == [
         BTC_UST_ID]
 
@@ -712,8 +707,7 @@ async def test_pay_abr_state_1(abr_factory):
 async def test_set_abr_3(abr_factory):
     starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
     # Set BTC_UST ABR
-    await set_abr_value(market_id=BTC_UST_ID, node_signer=admin1_signer, node=admin1, abr_core=abr_core, abr_executor=abr_executor, spot=ABR_data.btc_ust_perp_spot_1, perp=ABR_data.btc_ust_perp_1, spot_64x61=convertTo64x61(ABR_data.btc_ust_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.btc_ust_perp_1))
-    await compare_abr_values(market_id=BTC_UST_ID, abr_calculations=abr_calculations, abr_executor=abr_executor)
+    await set_abr_value(market_id=BTC_UST_ID, node_signer=admin1_signer, node=admin1, abr_core=abr_core, abr_calculations=abr_calculations, abr_executor=abr_executor, timestamp=from64x61(timestamp_1), spot=ABR_data.btc_ust_perp_spot_1, perp=ABR_data.btc_ust_perp_1, spot_64x61=convertTo64x61(ABR_data.btc_ust_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.btc_ust_perp_1))
 
     remaining_markets_query = await abr_core.get_markets_remaining().call()
     assert remaining_markets_query.result.remaining_markets_list == []
@@ -803,25 +797,30 @@ async def test_trade_new_market(abr_factory):
 async def test_pay_abr_call_1(abr_factory):
     starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
-    pos_query = await alice.get_simplified_positions(timestamp_1).call()
-    print(pos_query.result.positions_array)
+    await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=abr_core,
+                            abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=from64x61(timestamp_2))
 
-    pos_query = await bob.get_simplified_positions(timestamp_1).call()
-    print(pos_query.result.positions_array)
+    remaining_pay_abr_calls_query = await abr_core.get_remaining_pay_abr_calls().call()
+    print("remaining_pay_abr_calls_query",
+          remaining_pay_abr_calls_query.result.res)
+    assert remaining_pay_abr_calls_query.result.res == 1
 
-    pos_query = await charlie.get_simplified_positions(timestamp_1).call()
-    print(pos_query.result.positions_array)
+    state_query = await abr_core.get_state().call()
+    print("state_query", state_query.result.res)
 
-    charlie_pos_query = await charlie.get_positions().call()
-    print(charlie_pos_query.result.positions_array)
 
-    pos_query = await dave.get_simplified_positions(timestamp_1).call()
-    print(pos_query.result.positions_array)
+@pytest.mark.asyncio
+async def test_pay_abr_call_2(abr_factory):
+    starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
-    charlie_pos_query = await dave.get_positions().call()
-    print(charlie_pos_query.result.positions_array)
+    await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=abr_core,
+                            abr_executor=abr_executor, users_test=[charlie_test, dave_test], timestamp=from64x61(timestamp_2))
 
-    await admin1_signer.send_transaction(admin1, abr_core.contract_address, "make_abr_payments", [])
+    remaining_pay_abr_calls_query = await abr_core.get_remaining_pay_abr_calls().call()
+    print("remaining_pay_abr_calls_query",
+          remaining_pay_abr_calls_query.result.res)
+    assert remaining_pay_abr_calls_query.result.res == 0
 
-    abr_tx = await admin1_signer.send_transaction(admin1, abr_core.contract_address, "make_abr_payments", [])
-    assert_no_events_emitted(abr_tx)
+    state_query = await abr_core.get_state().call()
+    print("state_query", state_query.result.res)
+    assert state_query.result.res == 0

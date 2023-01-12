@@ -94,12 +94,12 @@ func transferred(asset_id: felt, amount: felt) {
 
 // Event emitted whenever collateral is transferred to account by abr payment
 @event
-func transferred_abr(market_id: felt, amount: felt, timestamp: felt) {
+func transferred_abr(market_id: felt, direction: felt, amount: felt, timestamp: felt) {
 }
 
 // Event emitted whenever collateral is transferred from account by abr payment
 @event
-func transferred_from_abr(market_id: felt, amount: felt, timestamp: felt) {
+func transferred_from_abr(market_id: felt, direction: felt, amount: felt, timestamp: felt) {
 }
 
 // Event emitted whenver a new withdrawal request is made
@@ -463,7 +463,7 @@ func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    collateral_id_: felt, market_id_: felt, amount_: felt
+    collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
 ) {
     // Check if the caller is ABR Payment
     let (caller) = get_caller_address();
@@ -482,9 +482,36 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (balance_) = balance.read(assetID=collateral_id_);
     balance.write(assetID=collateral_id_, value=balance_ - amount_);
 
+    // Get curent block_timestamp
     let (block_timestamp) = get_block_timestamp();
 
-    transferred_from_abr.emit(market_id=market_id_, amount=amount_, timestamp=block_timestamp);
+    // Get the details of the position
+    let (position_details: PositionDetails) = position_mapping.read(
+        market_id=market_id_, direction=direction_
+    );
+
+    // Calculate the new pnl
+    let (new_realized_pnl) = Math64x61_sub(position_details.realized_pnl, amount_);
+
+    // Create a new struct with the updated details
+    let updated_position = PositionDetails(
+        avg_execution_price=position_details.avg_execution_price,
+        position_size=position_details.position_size,
+        margin_amount=position_details.margin_amount,
+        borrowed_amount=position_details.borrowed_amount,
+        leverage=position_details.leverage,
+        created_timestamp=position_details.created_timestamp,
+        modified_timestamp=position_details.modified_timestamp,
+        realized_pnl=new_realized_pnl,
+    );
+
+    // Write it to the position mapping
+    position_mapping.write(market_id=market_id_, direction=direction_, value=updated_position);
+
+    // Emit transfer from event
+    transferred_from_abr.emit(
+        market_id=market_id_, direction=direction_, amount=amount_, timestamp=block_timestamp
+    );
     return ();
 }
 
@@ -494,7 +521,7 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param amount_ - Amount of funds to transfer from this contract
 @external
 func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    collateral_id_: felt, market_id_: felt, amount_: felt
+    collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
 ) {
     // Check if the caller is trading contract
     let (caller) = get_caller_address();
@@ -515,13 +542,40 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     // Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp();
 
-    transferred_abr.emit(market_id=market_id_, amount=amount_, timestamp=block_timestamp);
+    // Get the details of the position
+    let (position_details: PositionDetails) = position_mapping.read(
+        market_id=market_id_, direction=direction_
+    );
+
+    // Calculate the new pnl
+    let (new_realized_pnl) = Math64x61_add(position_details.realized_pnl, amount_);
+
+    // Create a new struct with the updated details
+    let updated_position = PositionDetails(
+        avg_execution_price=position_details.avg_execution_price,
+        position_size=position_details.position_size,
+        margin_amount=position_details.margin_amount,
+        borrowed_amount=position_details.borrowed_amount,
+        leverage=position_details.leverage,
+        created_timestamp=position_details.created_timestamp,
+        modified_timestamp=position_details.modified_timestamp,
+        realized_pnl=new_realized_pnl,
+    );
+
+    // Write it to the position mapping
+    position_mapping.write(market_id=market_id_, direction=direction_, value=updated_position);
+
+    // Emit transfer event
+    transferred_abr.emit(
+        market_id=market_id_, direction=direction_, amount=amount_, timestamp=block_timestamp
+    );
     return ();
 }
 
-// @notice External function called by the ABR Contract to get the array of net positions of the user
-// @returns net_positions_array_len - Length of the array
-// @returns net_positions_array - Required array of net positions
+// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
+// @param timestmap_filter_ - Timestmap by which to filter the array
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of net positions
 @view
 func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     timestamp_filter_: felt
@@ -1179,11 +1233,12 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 }
 
 // @notice External function called by the ABR Contract to get the array of net positions of the user
-// @param net_positions_array_len_ - Length of the array
-// @param net_positions_array_ - Required array of net positions
+// @param positions_array_len_ - Length of the array
+// @param positions_array_ - Required array of net positions
 // @param final_len_ - Length of the final array
-// @returns net_positions_array_len - Length of the net positions array
-// @returns net_positions_array - Array with the net positions
+// @param timestamp_filter_ - Timestamp by which to filter the array
+// @returns positions_array_len - Length of the net positions array
+// @returns positions_array - Array with the net positions
 func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     positions_array_len_: felt,
     positions_array_: SimplifiedPosition*,

@@ -107,18 +107,21 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 // @param abr_funding_ - Address of the ABR Fund contract
 // @param collateral_id_ - Collateral id of the position
 // @param market_id_ - Market id of the position
+// @param direction_ - Direction of the position
 // @param abs_payment_amount_ - Absolute value of ABR payment
 func user_pays{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address_: felt,
     abr_funding_: felt,
     collateral_id_: felt,
     market_id_: felt,
+    direction_: felt,
     abs_payment_amount_: felt,
 ) {
     IAccountManager.transfer_from_abr(
         contract_address=account_address_,
         collateral_id_=collateral_id_,
         market_id_=market_id_,
+        direction_=direction_,
         amount_=abs_payment_amount_,
     );
     IABRFund.deposit(
@@ -135,12 +138,14 @@ func user_pays{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 // @param abr_funding_ - Address of the ABR Fund contract
 // @param collateral_id_ - Collateral id of the position
 // @param market_id_ - Market id of the position
+// @param direction_ - Direction of the position
 // @param abs_payment_amount_ - Absolute value of ABR payment
 func user_receives{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address_: felt,
     abr_funding_: felt,
     collateral_id_: felt,
     market_id_: felt,
+    direction_: felt,
     abs_payment_amount_: felt,
 ) {
     IABRFund.withdraw(
@@ -153,6 +158,7 @@ func user_receives{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         contract_address=account_address_,
         collateral_id_=collateral_id_,
         market_id_=market_id_,
+        direction_=direction_,
         amount_=abs_payment_amount_,
     );
     return ();
@@ -204,6 +210,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 abr_funding_,
                 collateral_id,
                 [positions_].market_id,
+                [positions_].direction,
                 payment_amount,
             );
         } else {
@@ -213,6 +220,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 abr_funding_,
                 collateral_id,
                 [positions_].market_id,
+                [positions_].direction,
                 payment_amount,
             );
         }
@@ -225,6 +233,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 abr_funding_,
                 collateral_id,
                 [positions_].market_id,
+                [positions_].direction,
                 payment_amount,
             );
         } else {
@@ -234,6 +243,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 abr_funding_,
                 collateral_id,
                 [positions_].market_id,
+                [positions_].direction,
                 payment_amount,
             );
         }
@@ -263,6 +273,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // @param market_contract_ - Address of the Market contract
 // @param abr_contract_ - Address of the ABR contract
 // @param abr_funding_contract_ - Address of the ABR Funding contract
+// @param timestamp_ - Timestamp of the ABR
 func pay_abr_users{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_addresses_len_: felt,
     account_addresses_: felt*,
