@@ -634,7 +634,7 @@ func populate_trader_list_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
         return (iterator_, trader_list_);
     }
 
-    let (trader_address) = traders_in_market.read(season_id_, market_id_, iterator_);
+    let (trader_address) = traders_in_market.read(season_id_, market_id_, starting_index_);
     assert trader_list_[iterator_] = trader_address;
     return populate_trader_list_recurse(
         iterator_ + 1, season_id_, market_id_, starting_index_ + 1, ending_index_, trader_list_
