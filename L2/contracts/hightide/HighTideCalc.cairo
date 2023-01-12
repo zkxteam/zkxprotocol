@@ -3,6 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.cairo.common.math import assert_in_range
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 
@@ -13,8 +14,13 @@ from contracts.Constants import (
     Market_INDEX,
     OPEN,
     RewardsCalculation_INDEX,
+    TRADER_SCORE_CALCULATION_COMPLETED,
+    TRADER_SCORE_CALCULATION_IN_PROGRESS,
     TradingStats_INDEX,
     UserStats_INDEX,
+    W_CALCULATION_COMPLETED,
+    W_CALCULATION_IN_PROGRESS,
+    W_CALCULATION_NOT_STARTED,
 )
 from contracts.DataTypes import (
     Constants,
@@ -344,18 +350,8 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     let (version) = CommonLib.get_contract_version();
 
     // Get HightideAdmin address from Authorized Registry
-    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+    let (local hightide_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Hightide_INDEX, version=version
-    );
-
-    // Get user stats contract from Authorized Registry
-    let (user_stats_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=UserStats_INDEX, version=version
-    );
-
-    // Get rewards calculation contract from Authorized Registry
-    let (rewards_calculation_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=RewardsCalculation_INDEX, version=version
     );
 
     // Get the current day according to the season
@@ -367,6 +363,44 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         assert is_expired = TRUE;
     }
 
+    // Fetch hightide state
+    let (hightide_state: felt) = hightide_state_by_market.read(
+        season_id=season_id_, market_id=market_id_
+    );
+
+    with_attr error_message("HighTideCalc: W calculation is done") {
+        assert_in_range(hightide_state, W_CALCULATION_NOT_STARTED, W_CALCULATION_COMPLETED);
+    }
+
+    let (batches_fetched: felt) = batches_fetched_by_market.read(
+        season_id=season_id_, market_id=market_id_
+    );
+
+    // This would be the first call, if hightide state is 0 and batches fetched is 0.
+    // So, change highitde state to W_CALCULATION_IN_PROGRESS
+    if (batches_fetched == 0) {
+        hightide_state_by_market.write(
+            season_id=season_id_, market_id=market_id_, value=W_CALCULATION_IN_PROGRESS
+        );
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    // Get user stats contract from Authorized Registry
+    let (user_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=UserStats_INDEX, version=version
+    );
+
+    // Get rewards calculation contract from Authorized Registry
+    let (rewards_calculation_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=RewardsCalculation_INDEX, version=version
+    );
+
     // Get Trading Stats contract address from Authorized Registry
     let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=TradingStats_INDEX, version=version
@@ -376,15 +410,6 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     let (no_of_batches: felt) = no_of_batches_by_market.read(
         season_id=season_id_, market_id=market_id_
     );
-    let (local batches_fetched: felt) = batches_fetched_by_market.read(
-        season_id=season_id_, market_id=market_id_
-    );
-
-    if (no_of_batches == batches_fetched) {
-        with_attr error_message("HighTideCalc: Invalid batch id") {
-            assert 1 = 0;
-        }
-    }
 
     let (trader_list_len: felt, trader_list: felt*) = get_batch(
         season_id_=season_id_,
@@ -397,6 +422,21 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     batches_fetched_by_market.write(
         season_id=season_id_, market_id=market_id_, value=batches_fetched + 1
     );
+
+    // Update the state of hightide to W_CALCULATION_COMPLETED
+    if (batches_fetched + 1 == no_of_batches) {
+        hightide_state_by_market.write(
+            season_id=season_id_, market_id=market_id_, value=W_CALCULATION_COMPLETED
+        );
+        batches_fetched_by_market.write(season_id=season_id_, market_id=market_id_, value=0);
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
 
     // Get Constants to calculate traders individual trader score
     let (constants: Constants) = IHighTide.get_constants(contract_address=hightide_address);
@@ -423,7 +463,7 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     season_id_: felt, market_id_: felt, trader_list_len: felt, trader_list: felt*
 ) {
     // To-do: Need to integrate signature infra for the authentication
-
+    alloc_locals;
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
@@ -439,6 +479,74 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     with_attr error_message("HighTideCalc: Season still ongoing") {
         assert is_expired = TRUE;
+    }
+
+    // Fetch hightide state
+    let (hightide_state: felt) = hightide_state_by_market.read(
+        season_id=season_id_, market_id=market_id_
+    );
+
+    with_attr error_message(
+            "HighTideCalc: State is not valid to call trader score calculation function") {
+        assert_in_range(
+            hightide_state, W_CALCULATION_COMPLETED, TRADER_SCORE_CALCULATION_COMPLETED
+        );
+    }
+
+    let (batches_fetched: felt) = batches_fetched_by_market.read(
+        season_id=season_id_, market_id=market_id_
+    );
+
+    // This would be the first call, if hightide state is W_CALCULATION_COMPLETED and batches fetched is 0.
+    // So, change hightide state to TRADER_SCORE_CALCULATION_IN_PROGRESS
+    if (batches_fetched == 0) {
+        hightide_state_by_market.write(
+            season_id=season_id_, market_id=market_id_, value=TRADER_SCORE_CALCULATION_IN_PROGRESS
+        );
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    // Get Trading Stats contract address from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
+    let (current_no_of_users_per_batch: felt) = no_of_users_per_batch.read();
+    let (no_of_batches: felt) = no_of_batches_by_market.read(
+        season_id=season_id_, market_id=market_id_
+    );
+
+    let (trader_list_len: felt, trader_list: felt*) = get_batch(
+        season_id_=season_id_,
+        market_id_=market_id_,
+        batch_id_=batches_fetched,
+        no_of_users_per_batch_=current_no_of_users_per_batch,
+        trading_stats_address_=trading_stats_address,
+    );
+
+    batches_fetched_by_market.write(
+        season_id=season_id_, market_id=market_id_, value=batches_fetched + 1
+    );
+
+    // Update the state of hightide to TRADER_SCORE_CALCULATION_COMPLETED
+    if (batches_fetched + 1 == no_of_batches) {
+        hightide_state_by_market.write(
+            season_id=season_id_, market_id=market_id_, value=TRADER_SCORE_CALCULATION_COMPLETED
+        );
+        batches_fetched_by_market.write(season_id=season_id_, market_id=market_id_, value=0);
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Recursively calculate trader score for market
