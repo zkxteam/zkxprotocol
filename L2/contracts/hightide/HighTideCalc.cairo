@@ -19,7 +19,7 @@ from contracts.Constants import (
     TRADER_SCORE_CALCULATION_IN_PROGRESS,
     TradingStats_INDEX,
     UserStats_INDEX,
-    W_CALCULATION_IN_PROGRESS,
+    W_CALCULATION_IN_PROGRESS, 
 )
 from contracts.DataTypes import (
     Constants,
@@ -432,37 +432,6 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-
-    // Get Trading Stats contract address from Authorized Registry
-    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=TradingStats_INDEX, version=version
-    );
-
-    let (current_no_of_users_per_batch: felt) = no_of_users_per_batch.read();
-    let (no_of_batches: felt) = no_of_batches_by_market.read(
-        season_id=season_id_, market_id=market_id_
-    );
-    let (local batches_fetched: felt) = batches_fetched_by_market.read(
-        season_id=season_id_, market_id=market_id_
-    );
-
-    if (no_of_batches == batches_fetched) {
-        with_attr error_message("HighTideCalc: Invalid batch id") {
-            assert 1 = 0;
-        }
-    }
-
-    let (trader_list_len: felt, trader_list: felt*) = get_batch(
-        season_id_=season_id_,
-        market_id_=market_id_,
-        batch_id_=batches_fetched,
-        no_of_users_per_batch_=current_no_of_users_per_batch,
-        trading_stats_address_=trading_stats_address,
-    );
-
-    batches_fetched_by_market.write(
-        season_id=season_id_, market_id=market_id_, value=batches_fetched + 1
-    );
 
     // Get Constants to calculate traders individual trader score
     let (constants: Constants) = IHighTide.get_constants(contract_address=hightide_address);
