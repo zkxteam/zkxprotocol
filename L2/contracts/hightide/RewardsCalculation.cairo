@@ -13,8 +13,9 @@ from starkware.cairo.common.math import (
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_number, get_caller_address
 
-from contracts.Constants import Hightide_INDEX, ManageHighTide_ACTION
+from contracts.Constants import Hightide_INDEX, ManageHighTide_ACTION, TradingStats_INDEX
 from contracts.DataTypes import TradingSeason, XpValues
+from contracts.hightide.libraries.UserBatches import calculate_no_of_batches, get_batch
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
@@ -320,6 +321,45 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     block_number_set.emit(season_id=season_id_, block_number=block_number_);
 
+    return ();
+}
+
+// @notice external function to update no.of batches in a season
+// @param season_id_ - Id of the season
+@external
+func update_no_of_batches_in_season{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(season_id_: felt) {
+    let (caller) = get_caller_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Hightide contract address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Get trading stats contract from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
+    // Check that this call originated from Hightide contract
+    with_attr error_message("HighTideCalc: Caller is not hightide contract") {
+        assert caller = hightide_address;
+    }
+
+    let (current_no_of_users_per_batch) = no_of_users_per_batch.read();
+
+    let (no_of_batches) = calculate_no_of_batches(
+        season_id_=season_id_,
+        market_id_=0,
+        current_no_of_users_per_batch_=current_no_of_users_per_batch,
+        trading_stats_address_=trading_stats_address,
+    );
+
+    // Set the number of batches
+    no_of_batches_by_season.write(season_id=season_id_, value=no_of_batches);
     return ();
 }
 
