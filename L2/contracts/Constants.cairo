@@ -93,3 +93,5 @@ const CLOSE = 2;
 const SEASON_CREATED = 1;
 const SEASON_STARTED = 2;
 const SEASON_ENDED = 3;
+
+const ONE_DAY = 24 * 60 * 60;

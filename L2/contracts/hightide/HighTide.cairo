@@ -25,6 +25,7 @@ from contracts.Constants import (
     HighTideCalc_INDEX,
     ManageHighTide_ACTION,
     Market_INDEX,
+    ONE_DAY,
     SEASON_CREATED,
     SEASON_ENDED,
     SEASON_STARTED,
@@ -284,7 +285,7 @@ func get_season_expiry_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // calculates current trading seasons end timestamp
     let (current_season: TradingSeason) = get_season(season_id_);
-    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
+    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * ONE_DAY;
     let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
 
     let within_season = is_le(current_timestamp, current_seasons_end_timestamp);
@@ -381,7 +382,7 @@ func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     // Get current active trade season's metadata
     let (current_season: TradingSeason) = get_season(season_id);
-    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
+    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * ONE_DAY;
     let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
 
     let (current_timestamp) = get_block_timestamp();
@@ -853,7 +854,7 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     verify_season_id_exists(season_id_);
     // calculates new trading seasons end timestamp
     let (new_season: TradingSeason) = get_season(season_id_);
-    let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * 24 * 60 * 60;
+    let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * ONE_DAY;
     let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
 
     with_attr error_message("HighTide: Invalid Timestamp") {
