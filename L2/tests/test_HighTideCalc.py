@@ -37,11 +37,12 @@ UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 class_hash = 0
 
 initial_timestamp = int(time.time())
-timestamp2 = int(time.time()) + (60*60*24) + 60
-timestamp3 = int(time.time()) + (60*60*24)*2 + 60
-timestamp4 = int(time.time()) + (60*60*24)*3 + 60
-timestamp5 = int(time.time()) + (60*60*24)*4 + 60
-timestamp6 = int(time.time()) + (60*60*24)*5 + 60
+DAY_DURATION = 24 * 60 * 60
+timestamp2 = int(time.time()) + (DAY_DURATION) + 60
+timestamp3 = int(time.time()) + (DAY_DURATION)*2 + 60
+timestamp4 = int(time.time()) + (DAY_DURATION)*3 + 60
+timestamp5 = int(time.time()) + (DAY_DURATION)*4 + 60
+timestamp6 = int(time.time()) + (DAY_DURATION)*5 + 60
 
 
 @pytest.fixture(scope='module')

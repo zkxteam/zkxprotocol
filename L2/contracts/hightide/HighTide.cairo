@@ -25,6 +25,7 @@ from contracts.Constants import (
     HighTideCalc_INDEX,
     ManageHighTide_ACTION,
     Market_INDEX,
+    ONE_DAY,
     SEASON_CREATED,
     SEASON_ENDED,
     SEASON_STARTED,
@@ -284,7 +285,7 @@ func get_season_expiry_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // calculates current trading seasons end timestamp
     let (current_season: TradingSeason) = get_season(season_id_);
-    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
+    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * ONE_DAY;
     let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
 
     let within_season = is_le(current_timestamp, current_seasons_end_timestamp);
@@ -319,6 +320,77 @@ func is_market_under_hightide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 ) -> (is_listed: felt) {
     let (is_listed) = market_under_hightide.read(season_id_, market_id_);
     return (is_listed,);
+}
+
+// @notice View function to get the list of all pending seasons
+// @return season_list_len - length of season list
+// @return season_list - list of season id's
+@view
+func get_all_pending_seasons{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    season_list_len: felt, season_list: felt*
+) {
+    alloc_locals;
+    let (season_list: felt*) = alloc();
+    let (local num_seasons) = seasons_array_len.read();
+    let (current_season_id) = get_current_season_id();
+
+    // season id starts from 1. So, we populate pending season list by iterating from 1 to total no.of seasons available
+    let (season_list_len) = populate_pending_season_list_recurse(
+        1, current_season_id, num_seasons, 0, season_list
+    );
+    return (season_list_len, season_list);
+}
+
+// @notice View function to get next trade season to start
+// @return season_id - id of the season
+// @return can_be_started - returns TRUE, if start timestamp of the season has reached else returns FALSE
+// @return time_remaining - returns the time remaining to start the trade season
+@view
+func get_next_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    ) -> (season_id: felt, can_be_started: felt, time_remaining: felt) {
+    alloc_locals;
+    // Fetch all pending trade seasons
+    let (local season_list_len: felt, season_list: felt*) = get_all_pending_seasons();
+
+    if (season_list_len == 0) {
+        return (0, 0, 0);
+    }
+
+    // Get first pending trade season metadata
+    let (trading_season: TradingSeason) = get_season(season_list[0]);
+
+    return fetch_next_season_to_start_recurse(
+        1, season_list_len, season_list, season_list[0], trading_season.start_timestamp
+    );
+}
+
+// @notice View function to get next trade season to end
+// @return season_id - id of the season
+// @return can_be_ended - returns TRUE, if end timestamp of the season has reached else returns FALSE
+// @return time_remaining - returns the time remaining to end the trade season
+@view
+func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    season_id: felt, can_be_ended: felt, time_remaining: felt
+) {
+    alloc_locals;
+    // Fetch current active season id
+    let (local season_id: felt) = get_current_season_id();
+
+    if (season_id == 0) {
+        return (0, 0, 0);
+    }
+
+    // Get current active trade season's metadata
+    let (current_season: TradingSeason) = get_season(season_id);
+    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * ONE_DAY;
+    let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
+
+    let (current_timestamp) = get_block_timestamp();
+    if (is_le(current_timestamp, current_seasons_end_timestamp - 1) == TRUE) {
+        return (season_id, FALSE, current_seasons_end_timestamp - current_timestamp);
+    } else {
+        return (season_id, TRUE, 0);
+    }
 }
 
 // ///////////
@@ -774,15 +846,15 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         return ();
     }
 
-    let (is_expired) = get_season_expiry_state(current_season_id);
-    with_attr error_message("HighTide: Current trading season is still active") {
-        assert is_expired = TRUE;
+    let (current_season: TradingSeason) = get_season(current_season_id);
+    with_attr error_message("HighTide: Current trading season should be ended") {
+        assert current_season.status = SEASON_ENDED;
     }
 
     verify_season_id_exists(season_id_);
     // calculates new trading seasons end timestamp
     let (new_season: TradingSeason) = get_season(season_id_);
-    let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * 24 * 60 * 60;
+    let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * ONE_DAY;
     let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
 
     with_attr error_message("HighTide: Invalid Timestamp") {
@@ -1092,4 +1164,71 @@ func distribute_rewards_per_trader_recurse{
         reward_tokens_list_len=reward_tokens_list_len - 1,
         reward_tokens_list=reward_tokens_list + RewardToken.SIZE,
     );
+}
+
+func populate_pending_season_list_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    season_id_: felt,
+    current_season_id_: felt,
+    num_seasons_: felt,
+    season_list_len: felt,
+    season_list: felt*,
+) -> (season_list_len: felt) {
+    if (season_id_ == num_seasons_ + 1) {
+        return (season_list_len,);
+    }
+    // Get season expiry state. It returns false for the seasons which are not yet started
+    // and also for ongoing seasons
+    let (is_expired) = get_season_expiry_state(season_id_);
+    if (is_expired == FALSE) {
+        if (current_season_id_ == season_id_) {
+            // Don't include the current active season id in the list
+            return populate_pending_season_list_recurse(
+                season_id_ + 1, current_season_id_, num_seasons_, season_list_len, season_list
+            );
+        } else {
+            // Include the season which are not expired to the list
+            assert season_list[season_list_len] = season_id_;
+            return populate_pending_season_list_recurse(
+                season_id_ + 1, current_season_id_, num_seasons_, season_list_len + 1, season_list
+            );
+        }
+    } else {
+        // Don't include the expired seasons to the list
+        return populate_pending_season_list_recurse(
+            season_id_ + 1, current_season_id_, num_seasons_, season_list_len, season_list
+        );
+    }
+}
+
+func fetch_next_season_to_start_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    index_: felt,
+    season_list_len: felt,
+    season_list: felt*,
+    season_to_start: felt,
+    min_timestamp: felt,
+) -> (season_id: felt, can_be_started: felt, time_remaining: felt) {
+    if (index_ == season_list_len) {
+        let (trading_season: TradingSeason) = get_season(season_to_start);
+        let (current_timestamp) = get_block_timestamp();
+        if (is_le(trading_season.start_timestamp, current_timestamp) == TRUE) {
+            return (season_to_start, TRUE, 0);
+        } else {
+            return (season_to_start, FALSE, trading_season.start_timestamp - current_timestamp);
+        }
+    }
+    let (trading_season: TradingSeason) = get_season(season_list[index_]);
+    let current_season_timestamp = trading_season.start_timestamp;
+    if (is_le(current_season_timestamp, min_timestamp) == TRUE) {
+        return fetch_next_season_to_start_recurse(
+            index_ + 1, season_list_len, season_list, season_list[index_], current_season_timestamp
+        );
+    } else {
+        return fetch_next_season_to_start_recurse(
+            index_ + 1, season_list_len, season_list, season_to_start, min_timestamp
+        );
+    }
 }

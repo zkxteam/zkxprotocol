@@ -40,6 +40,7 @@ whitelisted_usdc = None
 whitelisted_ust = None
 
 initial_timestamp = int(time.time())
+DAY_DURATION = 24 * 60 * 60
 
 
 @pytest.fixture(scope='module')
@@ -548,8 +549,9 @@ async def test_end_trade_season_after_expiry(hightide_test_initializer):
     num_trading_days = fetched_trading_season.num_trading_days
 
     timestamp = fetched_trading_season.start_timestamp + \
-        (num_trading_days*24*60*60) + 1
+        (num_trading_days*DAY_DURATION) + 1
 
+    # Set the block timestamp to the end of the trade season timestamp
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp, gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
@@ -771,8 +773,9 @@ async def test_activate_hightide_for_expired_trading_season(hightide_test_initia
     fetched_trading_season = execution_info.result.trading_season
     num_trading_days = fetched_trading_season.num_trading_days
     timestamp = fetched_trading_season.start_timestamp + \
-        (num_trading_days*24*60*60) + 1
+        (num_trading_days*DAY_DURATION) + 1
 
+    # Set the block timestamp to the end of the trade season timestamp
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp, gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
@@ -804,7 +807,7 @@ async def test_activate_hightide_with_native_and_non_native_tokens(hightide_test
     num_trading_days = fetched_trading_season.num_trading_days
 
     timestamp = fetched_trading_season.start_timestamp + \
-        (num_trading_days*24*60*60) + 1
+        (num_trading_days*DAY_DURATION) + 1
 
     #  1. Setup and start new season
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
@@ -1046,7 +1049,7 @@ async def test_closing_orders_day_1(hightide_test_initializer):
     execution_info = await hightide.get_season(season_id).call()
     fetched_trading_season = execution_info.result.trading_season
 
-    timestamp = fetched_trading_season.start_timestamp + (60*60*24) + 60
+    timestamp = fetched_trading_season.start_timestamp + DAY_DURATION + 60
 
     # increment to next day
     starknet_service.starknet.state.state.block_info = BlockInfo(
@@ -1155,7 +1158,7 @@ async def test_opening_orders_day_2(hightide_test_initializer):
     execution_info = await hightide.get_season(season_id).call()
     fetched_trading_season = execution_info.result.trading_season
 
-    timestamp = fetched_trading_season.start_timestamp + (60*60*24)*2 + 60
+    timestamp = fetched_trading_season.start_timestamp + DAY_DURATION*2 + 60
 
     # here we check the scenario that there are multiple calls to record_trade_batch_stats in a single day
     # we also check that recording is handled properly when orders are executed partially
@@ -1228,7 +1231,7 @@ async def test_opening_closing_orders_day_3(hightide_test_initializer):
     execution_info = await hightide.get_season(season_id).call()
     fetched_trading_season = execution_info.result.trading_season
 
-    timestamp = fetched_trading_season.start_timestamp + (60*60*24)*3 + 60
+    timestamp = fetched_trading_season.start_timestamp + DAY_DURATION*3 + 60
 
     # here we test with new traders in request_list
     # we also test a batch of trades with open as well as close type orders
@@ -1315,7 +1318,7 @@ async def test_opening_closing_orders_day_4(hightide_test_initializer):
     execution_info = await hightide.get_season(season_id).call()
     fetched_trading_season = execution_info.result.trading_season
 
-    timestamp = fetched_trading_season.start_timestamp + (60*60*24)*4 + 60
+    timestamp = fetched_trading_season.start_timestamp + DAY_DURATION*4 + 60
 
     # increment to a later date
     starknet_service.starknet.state.state.block_info = BlockInfo(
@@ -1367,8 +1370,9 @@ async def test_calculating_factors(hightide_test_initializer):
     num_trading_days = fetched_trading_season.num_trading_days
 
     timestamp = fetched_trading_season.start_timestamp + \
-        (num_trading_days*24*60*60) + 1
+        (num_trading_days*DAY_DURATION) + 1
 
+    # Set the block timestamp to the end of the trade season timestamp
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp, gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
@@ -1779,3 +1783,91 @@ async def test_distribute_rewards(hightide_test_initializer):
     assert lp_whitelisted_ust_balance.result.balance == (0, 0)
     assert lp_native_usdc_balance.result.balance == (0, 0)
     assert lp_native_ust_balance.result.balance == (0, 0)
+
+@pytest.mark.asyncio
+async def test_next_season_to_start_and_end_with_no_active_trade_season(hightide_test_initializer):
+    starknet_service, python_executor, admin1, admin2, alice, bob, charlie, dave, _, alice_test, bob_test, charlie_test, _, trading, hightide, hightideCalc, rewardsCalculation, native_erc20_usdc, native_erc20_ust, starkway, trading_stats = hightide_test_initializer
+
+    # There is no active trade season
+    execution_info = await hightide.get_current_season_id().call()
+    fetched_season_id = execution_info.result.season_id
+    assert fetched_season_id == 0
+
+    # Since there are no pending seasons to start next, It returns 0
+    season_to_start_info = await hightide.get_next_season_to_start().call()
+    assert season_to_start_info.result.season_id == 0
+    assert season_to_start_info.result.can_be_started == 0
+    assert season_to_start_info.result.time_remaining ==  0
+
+    # Since there are no active trade seasons to end, It returns 0
+    season_to_end_info = await hightide.get_next_season_to_end().call()
+    assert season_to_end_info.result.season_id == 0
+    assert season_to_end_info.result.can_be_ended == 0
+    assert season_to_end_info.result.time_remaining == 0
+
+@pytest.mark.asyncio
+async def test_next_season_to_start_and_end_with_active_trade_season(hightide_test_initializer):
+    starknet_service, python_executor, admin1, admin2, alice, bob, charlie, dave, _, alice_test, bob_test, charlie_test, _, trading, hightide, hightideCalc, rewardsCalculation, native_erc20_usdc, native_erc20_ust, starkway, trading_stats = hightide_test_initializer
+
+    # Fetch previous season's end timestamp
+    execution_info = await hightide.get_season(3).call()
+    fetched_trading_season = execution_info.result.trading_season
+
+    num_trading_days = fetched_trading_season.num_trading_days
+
+    timestamp = fetched_trading_season.start_timestamp + \
+        (num_trading_days*DAY_DURATION) + 1
+
+    # Setup a trade season which starts after 15 days. This covers a case where even though season 4 is created first
+    # It will not be the next season to start becuase it's start timestamp is after 15 days of ending the current season.
+    season_id_4 = 4
+    timestamp_4 = timestamp+15*DAY_DURATION
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
+        timestamp_4, 30])
+    execution_info = await hightide.get_all_pending_seasons().call()
+    season_list = execution_info.result.season_list
+    print("season_list", season_list)
+    assert season_list[0] == season_id_4
+
+    # Setup a trade season which starts immediatly. So, among season 4 and 5. 5th season's start timestamp is already met.
+    # So, 5th season would be the next season to start.
+    season_id_5 = 5
+    timestamp_5 = timestamp
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
+        timestamp_5, 10])
+    execution_info = await hightide.get_all_pending_seasons().call()
+    season_list = execution_info.result.season_list
+    print("season_list", season_list)
+    assert season_list[0] == season_id_4
+    assert season_list[1] == season_id_5
+
+    # Since there is a pending season to start next, It returns the season_id as 5 to start next
+    season_to_start_info = await hightide.get_next_season_to_start().call()
+    assert season_to_start_info.result.season_id == season_id_5
+    assert season_to_start_info.result.can_be_started == 1
+    assert season_to_start_info.result.time_remaining ==  0
+
+    # Set current block timestamp
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1,
+        block_timestamp=timestamp,
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version=STARKNET_VERSION
+    )
+
+    # Start the trade season
+    await admin1_signer.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [season_id_5])
+    execution_info = await hightide.get_current_season_id().call()
+    assert execution_info.result.season_id == season_id_5
+
+    # Get current season's end timestamp
+    execution_info = await hightide.get_season(season_id_5).call()
+    fetched_trading_season = execution_info.result.trading_season
+    end_timestamp = fetched_trading_season.start_timestamp + fetched_trading_season.num_trading_days*DAY_DURATION
+
+    # Since there is an active trade seasons to end, It returns current active season's id
+    season_to_end_info = await hightide.get_next_season_to_end().call()
+    assert season_to_end_info.result.season_id == season_id_5
+    assert season_to_end_info.result.can_be_ended == 0
+    assert season_to_end_info.result.time_remaining == (end_timestamp - timestamp)

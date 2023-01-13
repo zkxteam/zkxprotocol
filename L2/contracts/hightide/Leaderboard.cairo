@@ -1,6 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.bool import TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
@@ -139,7 +140,7 @@ func get_next_call{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         let is_delayed = is_le(remaining_time, 0);
 
         // If it's delayed return 0
-        if (is_delayed == 1) {
+        if (is_delayed == TRUE) {
             return (0,);
             // Else return remaining time
         } else {
