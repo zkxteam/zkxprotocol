@@ -496,7 +496,7 @@ func record_trade_batch_stats_recurse{
 func min_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     x: felt, y: felt
 ) -> felt {
-    if (is_le(x, y) == 1) {
+    if (is_le(x, y) == TRUE) {
         return x;
     }
     return y;
@@ -506,7 +506,7 @@ func min_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     x: felt, y: felt
 ) -> felt {
-    if (is_le(x, y) == 1) {
+    if (is_le(x, y) == TRUE) {
         return y;
     }
     return x;
@@ -546,7 +546,7 @@ func get_frequencies{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     assert frequency_list[current_index_] = current_trade_count;
 
     let cmp_res = is_le(max_num_trades, current_trade_count);
-    if (cmp_res == 1) {
+    if (cmp_res == TRUE) {
         return get_frequencies(
             season_id_,
             market_id_,
@@ -611,7 +611,7 @@ func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     let within_season = is_le(current_day, season.num_trading_days - 1);
 
     // If within season, return current_day else return total_trading_days in season
-    if (within_season == 1) {
+    if (within_season == TRUE) {
         assert number_of_days = current_day + 1;
     } else {
         assert number_of_days = season.num_trading_days;

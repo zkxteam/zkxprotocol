@@ -385,7 +385,7 @@ func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
 
     let (current_timestamp) = get_block_timestamp();
-    if (is_le(current_timestamp, current_seasons_end_timestamp - 1) == 1) {
+    if (is_le(current_timestamp, current_seasons_end_timestamp - 1) == TRUE) {
         return (season_id, FALSE, current_seasons_end_timestamp - current_timestamp);
     } else {
         return (season_id, TRUE, 0);

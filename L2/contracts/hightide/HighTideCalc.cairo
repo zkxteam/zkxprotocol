@@ -885,7 +885,7 @@ func calculate_w_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     x_: felt, y_: felt
 ) -> (res: felt) {
-    if (is_le(x_, y_) == 1) {
+    if (is_le(x_, y_) == TRUE) {
         return (y_,);
     }
     return (x_,);
@@ -1014,19 +1014,19 @@ func find_top_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let is_larger_trades = is_le(max_trades_top_market_64x61_, max_trades_64x61);
     let is_larger_traders = is_le(number_of_traders_top_market_64x61_, number_of_traders_64x61);
 
-    if (is_larger_volume == 1) {
+    if (is_larger_volume == TRUE) {
         assert current_top_average_volume = average_volume_64x61;
     } else {
         assert current_top_average_volume = average_volume_top_market_64x61_;
     }
 
-    if (is_larger_trades == 1) {
+    if (is_larger_trades == TRUE) {
         assert current_max_trades_market = max_trades_64x61;
     } else {
         assert current_max_trades_market = max_trades_top_market_64x61_;
     }
 
-    if (is_larger_traders == 1) {
+    if (is_larger_traders == TRUE) {
         assert current_top_number_of_traders = number_of_traders_64x61;
     } else {
         assert current_top_number_of_traders = number_of_traders_top_market_64x61_;
