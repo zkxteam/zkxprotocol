@@ -1821,7 +1821,7 @@ async def test_next_season_to_start_and_end_with_active_trade_season(hightide_te
     # Setup a trade season which starts after 15 days. This covers a case where even though season 4 is created first
     # It will not be the next season to start becuase it's start timestamp is after 15 days of ending the current season.
     season_id_4 = 4
-    timestamp_4 = timestamp*15*DAY_DURATION
+    timestamp_4 = timestamp+15*DAY_DURATION
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
         timestamp_4, 30])
     execution_info = await hightide.get_all_pending_seasons().call()
