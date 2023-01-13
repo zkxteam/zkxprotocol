@@ -63,6 +63,26 @@ func block_interval() -> (res: felt) {
 func season_last_block_number(season_id: felt) -> (res: felt) {
 }
 
+// Stores no.of users per batch
+@storage_var
+func no_of_users_per_batch() -> (no_of_users: felt) {
+}
+
+// Stores the no.of batches fetched in a season
+@storage_var
+func batches_fetched_by_season(season_id: felt) -> (batches_fetched: felt) {
+}
+
+// Stores the no.of batches in a season
+@storage_var
+func no_of_batches_by_season(season_id: felt) -> (no_of_batches: felt) {
+}
+
+// Stores the state of xp in a season
+@storage_var
+func xp_state(season_id: felt) -> (state: felt) {
+}
+
 // //////////////
 // Constructor //
 // //////////////
