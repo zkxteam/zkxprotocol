@@ -3,14 +3,21 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero, unsigned_div_rem
+from starkware.cairo.common.math import (
+    assert_in_range,
+    assert_le,
+    assert_lt,
+    assert_not_zero,
+    unsigned_div_rem,
+)
 from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import Hightide_INDEX
+from contracts.Constants import Hightide_INDEX, ManageHighTide_ACTION
 from contracts.DataTypes import TradingSeason, XpValues
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
+from contracts.libraries.Utils import verify_caller_authority
 
 // /////////
 // Events //
@@ -32,23 +39,27 @@ func xp_value_set(season_id: felt, user_address: felt, xp_value: felt) {
 
 // This stores the block numbers set by the Nodes
 @storage_var
-func block_number_array(index: felt) -> (res: felt) {
+func block_number_array(season_id: felt, index: felt) -> (res: felt) {
 }
 
 // This stores the length of the block_number_array
 @storage_var
-func block_number_array_len() -> (res: felt) {
-}
-
-// This stores the starting index of block_number_array where the block numbers are stored for that season
-// season_id -> staring_block_number
-@storage_var
-func block_number_start(season_id: felt) -> (res: felt) {
+func block_number_array_len(season_id: felt) -> (res: felt) {
 }
 
 // Stores the Xp value for a user for that season
 @storage_var
 func xp_value(season_id, user_address: felt) -> (res: felt) {
+}
+
+// Stores block number interval
+@storage_var
+func block_interval() -> (res: felt) {
+}
+
+// Stores current season's block number up to which values were set
+@storage_var
+func current_season_block_number(season_id: felt) -> (res: felt) {
 }
 
 // //////////////
@@ -70,10 +81,60 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // View //
 // ///////
 
+// @notice Function to get block number range within which node needs to select a random block number
+// @return start_block - starting block number range (inclusive)
+// @return end_block - ending block number range (inclusive)
+@view
+func get_block_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    start_block: felt, end_block: felt
+) {
+    let (current_block_interval) = block_interval.read();
+    with_attr error_message("RewardsCalculation: Block interval is not set") {
+        assert_lt(0, current_block_interval);
+    }
+
+    let (registry) = get_registry_address();
+    let (version) = get_contract_version();
+
+    // Get Hightide address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Get trading season data
+    let (season_id: felt) = IHighTide.get_current_season_id(contract_address=hightide_address);
+
+    with_attr error_message("RewardsCalculations: No ongoing season") {
+        assert_not_zero(season_id);
+    }
+
+    let (current_block_number) = current_season_block_number.read(season_id);
+
+    if (current_block_number == 0) {
+        let (registry) = get_registry_address();
+        let (version) = get_contract_version();
+
+        // Verify whether season id is valid
+        let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+            contract_address=registry, index=Hightide_INDEX, version=version
+        );
+
+        // Get current season's starting block number
+        let (current_season) = IHighTide.get_season(
+            contract_address=hightide_address, season_id=season_id
+        );
+        let start_block_number = current_season.start_block_number;
+
+        return (start_block_number, start_block_number + current_block_interval - 1);
+    }
+
+    return (current_block_number + 1, current_block_number + current_block_interval);
+}
+
 // @notice This function is used to get block numbers in a season
 // @param season_id_ - Season id for which to return block numbers
-// @returns block_numbers_len - Length of the final block_numbers array
-// @returns block_numbers - Array of the block_numbers
+// @return block_numbers_len - Length of the final block_numbers array
+// @return block_numbers - Array of the block_numbers
 @view
 func get_block_numbers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
@@ -84,22 +145,23 @@ func get_block_numbers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_lt(0, season_id_);
     }
 
-    // Get starting index
-    let (starting_index: felt) = block_number_start.read(season_id=season_id_);
+    let (registry) = get_registry_address();
+    let (version) = get_contract_version();
+
+    // Verify whether season id is valid
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+    IHighTide.verify_season_id_exists(contract_address=hightide_address, season_id_=season_id_);
 
     // Initialize an array
     let (block_numbers: felt*) = alloc();
 
-    if (starting_index == 0) {
-        return (0, block_numbers);
-    }
-
-    // Get the starting index of the next season_id (if it's not set, it returns 0)
-    let (ending_index: felt) = block_number_start.read(season_id=season_id_ + 1);
+    let (current_array_len: felt) = block_number_array_len.read(season_id_);
 
     // Recursively fill the array and return it
     let (block_numbers_len: felt) = get_block_number_recurse(
-        block_numbers, starting_index, ending_index, 0
+        season_id_, block_numbers, 0, current_array_len
     );
 
     return (block_numbers_len, block_numbers);
@@ -108,7 +170,7 @@ func get_block_numbers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @notice This function is gets the xp value for a user in a season
 // @param season_id_ - id of the season
 // @param user_address_ - Address of the user
-// @returns xp_value - Xp value for that user in the required season
+// @return xp_value - Xp value for that user in the required season
 @view
 func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, user_address_: felt
@@ -129,6 +191,25 @@ func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // ///////////
 // External //
 // ///////////
+
+// @notice Function to set block interval by admin
+// block_interval_ - block interval value to be set
+@external
+func set_block_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    block_interval_: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("RewardsCalculation: Unauthorized call to set block number") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    block_interval.write(block_interval_);
+
+    return ();
+}
 
 // @notice This function is used to record final xp values for users
 // @param season_id_ - id of the season
@@ -168,7 +249,6 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     block_number_: felt
 ) {
     alloc_locals;
-    // Auth check
     let (registry) = get_registry_address();
     let (version) = get_contract_version();
 
@@ -184,40 +264,18 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         assert_not_zero(season_id);
     }
 
-    // Get the starting index of the season
-    let (season_starting_index: felt) = block_number_start.read(season_id=season_id);
+    // Verify whether the block number is valid
+    let (start_block, end_block) = get_block_range();
+    with_attr error_message("RewardsCalculations: Block number is not in range") {
+        assert_in_range(block_number_, start_block, end_block + 1);
+    }
 
     // Get the current length of the array
-    let (current_array_len: felt) = block_number_array_len.read();
+    let (current_array_len: felt) = block_number_array_len.read(season_id);
 
-    // If it's a new season, initialize the starting index
-    if (season_starting_index == 0) {
-        if (season_id == 1) {
-            // Set the starting index for the new season
-            block_number_start.write(season_id=season_id, value=1);
-
-            // Write the new block number
-            block_number_array.write(index=1, value=block_number_);
-
-            // Update the length of the array
-            block_number_array_len.write(1);
-        } else {
-            // Set the starting index for the new season
-            block_number_start.write(season_id=season_id, value=current_array_len + 1);
-
-            // Write the new block number
-            block_number_array.write(index=current_array_len + 1, value=block_number_);
-
-            // Update the length of the array
-            block_number_array_len.write(current_array_len + 1);
-        }
-    } else {
-        // Write the new block number
-        block_number_array.write(index=current_array_len + 1, value=block_number_);
-
-        // Update the length of the array
-        block_number_array_len.write(current_array_len + 1);
-    }
+    block_number_array.write(season_id, current_array_len, block_number_);
+    block_number_array_len.write(season_id, current_array_len + 1);
+    current_season_block_number.write(season_id, end_block);
 
     block_number_set.emit(season_id=season_id, block_number=block_number_);
 
@@ -229,35 +287,26 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 // ///////////
 
 // @notice This function is called by get_block_numbers
+// @param season_id_ - season id for which block numbers need to be fetched
 // @param block_numbers_ - Array of populated block numbers
-// @param current_index_ - Index at which the block number is currently pointing to
-// @param ending_index_ - Index at which to stop
 // @param iterator_ - Stores the current length of the populated array
-// @returns block_numbers_len - Length of the final block_numbers array
+// @param len_ - length of the block number array for this season
+// @return block_numbers_len - Length of the final block_numbers array
 func get_block_number_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    block_numbers_: felt*, current_index_: felt, ending_index_: felt, iterator_: felt
+    season_id_: felt, block_numbers_: felt*, iterator_: felt, len_: felt
 ) -> (block_numbers_len: felt) {
-    // Return condition 1, return if we reach the starting index of the next season_id
-    if (current_index_ == ending_index_) {
+    if (iterator_ == len_) {
         return (iterator_,);
     }
 
-    let (current_block_number: felt) = block_number_array.read(index=current_index_);
-
-    // Return condition 2, return if we reach an index where the blocknumber is not set
-    if (current_block_number == 0) {
-        return (iterator_,);
-    }
+    let (current_block_number: felt) = block_number_array.read(season_id_, iterator_);
 
     // Set the blocknumber in our array
     assert block_numbers_[iterator_] = current_block_number;
 
     // Recursively call the next index
     return get_block_number_recurse(
-        block_numbers_=block_numbers_,
-        current_index_=current_index_ + 1,
-        ending_index_=ending_index_,
-        iterator_=iterator_ + 1,
+        season_id_=season_id_, block_numbers_=block_numbers_, iterator_=iterator_ + 1, len_=len_
     );
 }
 

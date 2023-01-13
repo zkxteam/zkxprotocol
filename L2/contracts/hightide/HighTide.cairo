@@ -296,8 +296,9 @@ func get_season_expiry_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // calculates current trading seasons end timestamp
     let (current_season: TradingSeason) = get_season(season_id_);
-    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * ONE_DAY;
-    let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
+    let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * 24 * 60 * 60;
+    let current_seasons_end_timestamp = current_season.start_timestamp +
+        current_seasons_num_trading_days_in_secs;
 
     let within_season = is_le(current_timestamp, current_seasons_end_timestamp);
     if (within_season == TRUE) {
@@ -394,7 +395,8 @@ func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     // Get current active trade season's metadata
     let (current_season: TradingSeason) = get_season(season_id);
     let current_seasons_num_trading_days_in_secs = current_season.num_trading_days * ONE_DAY;
-    let current_seasons_end_timestamp = current_season.start_timestamp + current_seasons_num_trading_days_in_secs;
+    let current_seasons_end_timestamp = current_season.start_timestamp +
+        current_seasons_num_trading_days_in_secs;
 
     let (current_timestamp) = get_block_timestamp();
     if (is_le(current_timestamp, current_seasons_end_timestamp - 1) == TRUE) {
@@ -402,6 +404,20 @@ func get_next_season_to_end{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     } else {
         return (season_id, TRUE, 0);
     }
+}
+
+// @notice View function to verify the existence of a season
+// @param season_id_ - id of the season
+@view
+func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) {
+    with_attr error_message("HighTide: Trading season id existence mismatch") {
+        assert_lt(0, season_id_);
+        let (seasons_len) = seasons_array_len.read();
+        assert_le(season_id_, seasons_len);
+    }
+    return ();
 }
 
 // ///////////
@@ -912,17 +928,6 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // Internal //
 // ///////////
 
-func verify_season_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt
-) {
-    with_attr error_message("HighTide: Trading season id existence mismatch") {
-        assert_lt(0, season_id_);
-        let (seasons_len) = seasons_array_len.read();
-        assert_le(season_id_, seasons_len);
-    }
-    return ();
-}
-
 func verify_hightide_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     hightide_id_: felt
 ) {
@@ -956,8 +961,9 @@ func validate_season_to_start{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     verify_season_id_exists(season_id_);
     // calculates new trading seasons end timestamp
     let (new_season: TradingSeason) = get_season(season_id_);
-    let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * ONE_DAY;
-    let new_seasons_end_timestamp = new_season.start_timestamp + new_seasons_num_trading_days_in_secs;
+    let new_seasons_num_trading_days_in_secs = new_season.num_trading_days * 24 * 60 * 60;
+    let new_seasons_end_timestamp = new_season.start_timestamp +
+        new_seasons_num_trading_days_in_secs;
 
     with_attr error_message("HighTide: Invalid Timestamp") {
         assert_le(new_season.start_timestamp, current_timestamp);

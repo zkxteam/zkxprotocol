@@ -34,4 +34,7 @@ namespace IHighTide {
 
     func is_market_under_hightide(season_id_: felt, market_id_: felt) -> (is_listed: felt) {
     }
+
+    func verify_season_id_exists(season_id_: felt) -> () {
+    }
 }
