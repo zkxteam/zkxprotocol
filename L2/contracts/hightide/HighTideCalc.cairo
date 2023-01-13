@@ -618,7 +618,7 @@ func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
 
-    with_attr error_message("ABRCore: No of users in a batch must be > 0") {
+    with_attr error_message("HighTideCalc: No of users in a batch must be > 0") {
         assert_lt(0, new_no_of_users_per_batch_);
     }
 
