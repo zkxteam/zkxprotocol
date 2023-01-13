@@ -43,7 +43,10 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def abr_factory(starknet_service: StarknetService):
-
+    print("Amount", from64x61(42528324536356912))
+    print("BTC_USD", BTC_USD_ID)
+    print("ETH_USD", ETH_USD_ID)
+    print("BTC_UST", BTC_UST_ID)
     # Deploy admin accounts
     admin1 = await starknet_service.deploy(ContractType.Account, [admin1_signer.public_key])
     admin2 = await starknet_service.deploy(ContractType.Account, [admin2_signer.public_key])
@@ -646,6 +649,42 @@ async def test_set_abr_1(abr_factory):
 
 
 @pytest.mark.asyncio
+async def test_set_inequal_length(abr_factory):
+    starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    arguments_64x61 = [ETH_USD_ID, 480, *convertTo64x61(
+        ABR_data.eth_usd_perp_spot_1), 479, *convertTo64x61(ABR_data.eth_usd_perp_1[:479])]
+    # Set BTC_USD ABR
+    await assert_revert(
+        admin1_signer.send_transaction(
+            admin1, abr_core.contract_address, 'set_abr_value', arguments_64x61),
+        "ABRCalculations: Index array length must be equal to Perp array length"
+    )
+
+    remaining_markets_query = await abr_core.get_markets_remaining().call()
+    assert remaining_markets_query.result.remaining_markets_list == [
+        BTC_UST_ID, ETH_USD_ID]
+
+
+@pytest.mark.asyncio
+async def test_set_invalid_length(abr_factory):
+    starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    arguments_64x61 = [ETH_USD_ID, 479, *convertTo64x61(
+        ABR_data.eth_usd_perp_spot_1[:479]), 479, *convertTo64x61(ABR_data.eth_usd_perp_1[:479])]
+    # Set BTC_USD ABR
+    await assert_revert(
+        admin1_signer.send_transaction(
+            admin1, abr_core.contract_address, 'set_abr_value', arguments_64x61),
+        "ABRCalculations: Invalid length for the input arrays"
+    )
+
+    remaining_markets_query = await abr_core.get_markets_remaining().call()
+    assert remaining_markets_query.result.remaining_markets_list == [
+        BTC_UST_ID, ETH_USD_ID]
+
+
+@pytest.mark.asyncio
 async def test_set_abr_already_set_market(abr_factory):
     starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
@@ -797,16 +836,45 @@ async def test_trade_new_market(abr_factory):
 async def test_pay_abr_call_1(abr_factory):
     starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
-    await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=abr_core,
-                            abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=from64x61(timestamp_2))
+    abr_tx = await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=abr_core,
+                                     abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=from64x61(timestamp_2))
+
+    # market_id_1 = BTC_USD_ID
+    # market_id_2 = ETH_USD_ID
+
+    # abr_payment_1 = to64x61(0.11592309206227451)
+    # abr_payment_2 = to64x61(0.0184437207417947)
+    # assert_events_emitted_from_all_calls(
+    #     abr_tx,
+    #     [
+    #         [0, alice.contract_address, 'transferred_abr', [
+    #             market_id_1, abr_payment_1, timestamp_2]],
+    #         [1, abr_fund.contract_address, 'deposit_ABR_called', [
+    #             alice.contract_address, market_id_1, abr_payment_1, timestamp_2]],
+    #         [2, alice.contract_address, 'transferred_abr', [
+    #             market_id_2, abr_payment_2, timestamp_2]],
+    #         [3, abr_fund.contract_address, 'deposit_ABR_called', [
+    #             alice.contract_address, market_id_2, abr_payment_2, timestamp_2]],
+    #         [4, bob.contract_address, 'transferred_from_abr', [
+    #             market_id_1, abr_payment_1, timestamp_2]],
+    #         [5, abr_fund.contract_address, 'withdraw_ABR_called', [
+    #             bob.contract_address, market_id_1, abr_payment_1, timestamp_2]],
+    #         [6, bob.contract_address, 'transferred_abr', [
+    #             market_id_2, abr_payment_2, timestamp_2]],
+    #         [7, abr_fund.contract_address, 'withdraw_ABR_called', [
+    #             bob.contract_address, market_id_2, abr_payment_2, timestamp_2]],
+    #     ]
+    # )
+
+    await compare_user_balances(users=[alice, bob], user_tests=[alice_test, bob_test], asset_id=AssetID.USDC)
+    await compare_user_positions(users=[alice, bob], users_test=[alice_test, bob_test], market_id=BTC_USD_ID)
+    await compare_user_positions(users=[alice, bob], users_test=[alice_test, bob_test], market_id=ETH_USD_ID)
 
     remaining_pay_abr_calls_query = await abr_core.get_remaining_pay_abr_calls().call()
-    print("remaining_pay_abr_calls_query",
-          remaining_pay_abr_calls_query.result.res)
     assert remaining_pay_abr_calls_query.result.res == 1
 
     state_query = await abr_core.get_state().call()
-    print("state_query", state_query.result.res)
+    assert state_query.result.res == 2
 
 
 @pytest.mark.asyncio
@@ -816,11 +884,11 @@ async def test_pay_abr_call_2(abr_factory):
     await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=abr_core,
                             abr_executor=abr_executor, users_test=[charlie_test, dave_test], timestamp=from64x61(timestamp_2))
 
+    await compare_user_balances(users=[charlie, dave], user_tests=[charlie_test, dave_test], asset_id=AssetID.UST)
+    await compare_user_positions(users=[charlie, dave], users_test=[charlie_test, dave_test], market_id=BTC_UST_ID)
+
     remaining_pay_abr_calls_query = await abr_core.get_remaining_pay_abr_calls().call()
-    print("remaining_pay_abr_calls_query",
-          remaining_pay_abr_calls_query.result.res)
     assert remaining_pay_abr_calls_query.result.res == 0
 
     state_query = await abr_core.get_state().call()
-    print("state_query", state_query.result.res)
     assert state_query.result.res == 0

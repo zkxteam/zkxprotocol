@@ -226,7 +226,7 @@ class User:
             return 0
 
     def transfer_abr(self, market_id: int, direction: int, amount: float, timestamp: int):
-        asset_id = market_to_asset_mapping[market_id]
+        asset_id = market_to_collateral_mapping[market_id]
 
         self.modify_balance(
             mode=fund_mode["fund"], asset_id=asset_id, amount=amount)
@@ -245,8 +245,6 @@ class User:
             "realized_pnl": new_realized_pnl,
         }
 
-        print("Transfer abr:", market_id, direction, amount, timestamp)
-
         updated_dict = {
             direction: updated_position,
         }
@@ -255,8 +253,7 @@ class User:
             market_id=market_id, direction=direction, updated_dict=updated_dict, updated_position=updated_position)
 
     def transfer_from_abr(self, market_id: int, direction: int, amount: float, timestamp: int):
-        asset_id = market_to_asset_mapping[market_id]
-
+        asset_id = market_to_collateral_mapping[market_id]
         self.modify_balance(
             mode=fund_mode["defund"], asset_id=asset_id, amount=amount)
 
@@ -273,8 +270,6 @@ class User:
             "modified_timestamp": timestamp,
             "realized_pnl": new_realized_pnl,
         }
-
-        print("Transfer from abr:", market_id, direction, amount, timestamp)
 
         updated_dict = {
             direction: updated_position,
@@ -1001,14 +996,14 @@ class ABR:
             return (0, 0)
 
     def fund_abr(self, market_id: int, amount: float):
-        asset_id = market_to_asset_mapping[market_id]
+        asset_id = market_to_collateral_mapping[market_id]
         try:
             self.abr_fund[asset_id] += amount
         except KeyError:
             self.abr_fund[asset_id] = amount
 
     def defund_abr(self, market_id: int, amount: float):
-        asset_id = market_to_asset_mapping[market_id]
+        asset_id = market_to_collateral_mapping[market_id]
         try:
             self.abr_fund[asset_id] -= amount
         except KeyError:
@@ -1045,7 +1040,6 @@ class ABR:
                 abr_value = self.abr_values[market_id]
                 payment_amount = self.abr_last_price[market_id] * \
                     position["position_size"] * abr_value
-
                 if position["created_timestamp"] > self.abr_timestamp:
                     continue
 
@@ -1054,8 +1048,9 @@ class ABR:
                         self.user_pays(
                             user=user, market_id=market_id,  direction=direction, amount=payment_amount, timestamp=timestamp)
                     else:
-                        self. user_receives(
+                        self.user_receives(
                             user=user, market_id=market_id,  direction=direction, amount=payment_amount, timestamp=timestamp)
+
                 else:
                     if direction == order_direction["short"]:
                         self. user_receives(
@@ -1172,6 +1167,7 @@ def get_fund_balance_python(executor: OrderExecutor, fund: int, asset_id: int) -
 def get_user_position_python(user: User, market_id: int, direction: int) -> List[float]:
     user_python_query = user.get_position(
         market_id=market_id, direction=direction)
+    # print(user_python_query)
     return list(user_python_query.values())
 
 
@@ -1249,9 +1245,9 @@ async def check_liquidation(zkx_node_signer: Signer, zkx_node: StarknetContract,
 
 
 async def make_abr_payments(admin_signer: Signer, admin: StarknetContract, abr_core: StarknetContract, abr_executor: ABR, users_test: List[User], timestamp: int):
-    await admin_signer.send_transaction(admin, abr_core.contract_address, "make_abr_payments", [])
     abr_executor.pay_abr(users_list=users_test, timestamp=timestamp)
-
+    abr_tx = await admin_signer.send_transaction(admin, abr_core.contract_address, "make_abr_payments", [])
+    return abr_tx
 
 # Set balance for a list of users in python and starkent
 
@@ -1387,7 +1383,6 @@ async def check_batch_status(batch_id: int, trading: StarknetContract, is_execut
 async def compare_user_balances(users: List[StarknetContract], user_tests: List[User], asset_id: int):
     for i in range(len(users)):
         user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
-
         user_balance_python = get_user_balance_python(
             user=user_tests[i], asset_id=asset_id)
 
@@ -1407,12 +1402,6 @@ async def compare_user_positions(users: List[StarknetContract], users_test: List
             user=users[i], market_id=market_id, direction=order_direction["long"])
         user_position_starknet_short = await get_user_position(
             user=users[i], market_id=market_id, direction=order_direction["short"])
-
-        print("User position python long", user_position_python_long)
-        print("User position starknet long", user_position_starknet_long)
-
-        print("User position python short", user_position_python_short)
-        print("User position starknet short", user_position_starknet_short)
 
         for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
             assert element_1 == pytest.approx(element_2, abs=1e-6)
@@ -1460,12 +1449,9 @@ async def compare_liquidatable_position(user: StarknetContract, user_test: User)
 
 async def compare_abr_values(market_id: int, abr_calculations: StarknetContract, abr_executor: ABR, timestamp: int, python_abr: float):
     abr_query = await abr_calculations.get_abr_value(market_id).call()
-    print("abr starknet", from64x61(abr_query.result.abr),
-          from64x61(abr_query.result.price))
-    print("abr python", python_abr)
 
     abr_executor.set_abr(market_id=market_id, new_abr=from64x61(
-        abr_query.result.abr), timestamp=from64x61(timestamp))
+        abr_query.result.abr), timestamp=timestamp)
 
     (_, price) = abr_executor.get_abr(market_id)
     assert python_abr == pytest.approx(

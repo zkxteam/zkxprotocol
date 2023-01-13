@@ -28,6 +28,7 @@ from contracts.Math_64x61 import (
 
 const NUM_8 = 18446744073709551616;
 const HOURS_8 = 28800;
+const DATA_POINTS = 480;
 
 //##########
 // Storage #
@@ -152,6 +153,10 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
                 "ABRCalculations: Index array length must be equal to Perp array length") {
             assert 1 = 0;
         }
+    }
+
+    with_attr error_message("ABRCalculations: Invalid length for the input arrays") {
+        assert perp_index_len = DATA_POINTS;
     }
 
     // Reduce the array size by factor of 8

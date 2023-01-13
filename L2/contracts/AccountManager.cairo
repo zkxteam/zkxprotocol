@@ -478,6 +478,10 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert caller = abr_payment_address;
     }
 
+    with_attr error_message("AccountManager: Amount cannot be negative") {
+        assert_le(0, amount_);
+    }
+
     // Reduce the amount from balance
     let (balance_) = balance.read(assetID=collateral_id_);
     balance.write(assetID=collateral_id_, value=balance_ - amount_);
@@ -533,6 +537,10 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     );
     with_attr error_message("AccountManager: Unauthorized caller for transfer_abr") {
         assert caller = abr_payment_address;
+    }
+
+    with_attr error_message("AccountManager: Amount cannot be negative") {
+        assert_le(0, amount_);
     }
 
     // Add amount to balance
