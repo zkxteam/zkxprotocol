@@ -273,7 +273,7 @@ func get_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let is_longer = is_le(trader_list_len, ending_index_);
 
     // Check if batch must be truncated
-    if (is_longer == 1) {
+    if (is_longer == TRUE) {
         ending_index = trader_list_len;
     } else {
         ending_index = ending_index_;

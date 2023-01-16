@@ -40,7 +40,6 @@ from contracts.Constants import (
     SEASON_STARTED,
     Starkway_INDEX,
     TokenLister_ACTION,
-    TRADER_SCORE_CALCULATION_COMPLETED,
     TradingStats_INDEX,
 )
 from contracts.DataTypes import (
@@ -797,6 +796,16 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Get percentage of funds transferred from liquidity pool to reward pool
     let (local hightide_metadata: HighTideMetaData) = get_hightide(hightide_id_);
+
+    // Get season's metadata that specified hightide belongs to
+    let (trading_season: TradingSeason) = trading_season_by_id.read(
+        season_id=hightide_metadata.season_id
+    );
+
+    with_attr error_message("HighTide: Season still ongoing") {
+        assert trading_season.status = SEASON_ENDED;
+    }
+
     let (funds_flow_64x61) = IHighTideCalc.get_funds_flow_per_market(
         contract_address=hightide_calc_address,
         season_id_=hightide_metadata.season_id,
@@ -811,7 +820,7 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     with_attr error_message("HighTide: State is not valid to call distribute rewards function") {
         assert_in_range(
-            hightide_state, TRADER_SCORE_CALCULATION_COMPLETED, REWARD_DISTRIBUTION_COMPLETED
+            hightide_state, REWARD_DISTRIBUTION_IN_PROGRESS, REWARD_DISTRIBUTION_COMPLETED
         );
     }
 
@@ -820,24 +829,6 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         season_id_=hightide_metadata.season_id,
         market_id_=hightide_metadata.market_id,
     );
-
-    // This would be the first call, if hightide state is TRADER_SCORE_CALCULATION_COMPLETED and batches fetched is 0.
-    // So, change highitde state to REWARD_DISTRIBUTION_IN_PROGRESS
-    if (batches_fetched == 0) {
-        IHighTideCalc.update_hightide_state_per_market(
-            contract_address=hightide_calc_address,
-            season_id_=hightide_metadata.season_id,
-            market_id_=hightide_metadata.market_id,
-            state_=REWARD_DISTRIBUTION_IN_PROGRESS,
-        );
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    }
 
     // Get Trading Stats contract address from Authorized Registry
     let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(

@@ -14,13 +14,12 @@ from contracts.Constants import (
     Market_INDEX,
     OPEN,
     RewardsCalculation_INDEX,
-    TRADER_SCORE_CALCULATION_COMPLETED,
+    REWARD_DISTRIBUTION_IN_PROGRESS,
+    SEASON_ENDED,
     TRADER_SCORE_CALCULATION_IN_PROGRESS,
     TradingStats_INDEX,
     UserStats_INDEX,
-    W_CALCULATION_COMPLETED,
     W_CALCULATION_IN_PROGRESS,
-    W_CALCULATION_NOT_STARTED,
 )
 from contracts.DataTypes import (
     Constants,
@@ -362,13 +361,13 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    // Get the current day according to the season
-    let (is_expired: felt) = IHighTide.get_season_expiry_state(
+    // Get supplied season's metadata
+    let (trading_season: TradingSeason) = IHighTide.get_season(
         contract_address=hightide_address, season_id=season_id_
     );
 
     with_attr error_message("HighTideCalc: Season still ongoing") {
-        assert is_expired = TRUE;
+        assert trading_season.status = SEASON_ENDED;
     }
 
     // Fetch hightide state
@@ -376,28 +375,15 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         season_id=season_id_, market_id=market_id_
     );
 
-    with_attr error_message("HighTideCalc: W calculation is done") {
-        assert_in_range(hightide_state, W_CALCULATION_NOT_STARTED, W_CALCULATION_COMPLETED);
+    with_attr error_message("HighTideCalc: W calculation is completed") {
+        assert_in_range(
+            hightide_state, W_CALCULATION_IN_PROGRESS, TRADER_SCORE_CALCULATION_IN_PROGRESS
+        );
     }
 
     let (batches_fetched: felt) = batches_fetched_by_market.read(
         season_id=season_id_, market_id=market_id_
     );
-
-    // This would be the first call, if hightide state is 0 and batches fetched is 0.
-    // So, change highitde state to W_CALCULATION_IN_PROGRESS
-    if (batches_fetched == 0) {
-        hightide_state_by_market.write(
-            season_id=season_id_, market_id=market_id_, value=W_CALCULATION_IN_PROGRESS
-        );
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    }
 
     // Get user stats contract from Authorized Registry
     let (user_stats_address) = IAuthorizedRegistry.get_contract_address(
@@ -432,10 +418,10 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     );
 
     // Since this is the last batch to be fetched for a market in a season,
-    // Update the state of hightide to W_CALCULATION_COMPLETED
+    // Update the state of hightide to TRADER_SCORE_CALCULATION_IN_PROGRESS
     if (batches_fetched + 1 == no_of_batches) {
         hightide_state_by_market.write(
-            season_id=season_id_, market_id=market_id_, value=W_CALCULATION_COMPLETED
+            season_id=season_id_, market_id=market_id_, value=TRADER_SCORE_CALCULATION_IN_PROGRESS
         );
         batches_fetched_by_market.write(season_id=season_id_, market_id=market_id_, value=0);
         tempvar syscall_ptr = syscall_ptr;
@@ -479,13 +465,13 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    // Get the current day according to the season
-    let (is_expired: felt) = IHighTide.get_season_expiry_state(
+    // Get supplied season's metadata
+    let (trading_season: TradingSeason) = IHighTide.get_season(
         contract_address=hightide_address, season_id=season_id_
     );
 
     with_attr error_message("HighTideCalc: Season still ongoing") {
-        assert is_expired = TRUE;
+        assert trading_season.status = SEASON_ENDED;
     }
 
     // Fetch hightide state
@@ -496,28 +482,13 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     with_attr error_message(
             "HighTideCalc: State is not valid to call trader score calculation function") {
         assert_in_range(
-            hightide_state, W_CALCULATION_COMPLETED, TRADER_SCORE_CALCULATION_COMPLETED
+            hightide_state, TRADER_SCORE_CALCULATION_IN_PROGRESS, REWARD_DISTRIBUTION_IN_PROGRESS
         );
     }
 
     let (batches_fetched: felt) = batches_fetched_by_market.read(
         season_id=season_id_, market_id=market_id_
     );
-
-    // This would be the first call, if hightide state is W_CALCULATION_COMPLETED and batches fetched is 0.
-    // So, change hightide state to TRADER_SCORE_CALCULATION_IN_PROGRESS
-    if (batches_fetched == 0) {
-        hightide_state_by_market.write(
-            season_id=season_id_, market_id=market_id_, value=TRADER_SCORE_CALCULATION_IN_PROGRESS
-        );
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    }
 
     // Get Trading Stats contract address from Authorized Registry
     let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
@@ -542,10 +513,10 @@ func calculate_trader_score{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     );
 
     // Since this is the last batch to be fetched for a market in a season,
-    // Update the state of hightide to TRADER_SCORE_CALCULATION_COMPLETED
+    // Update the state of hightide to REWARD_DISTRIBUTION_IN_PROGRESS
     if (batches_fetched + 1 == no_of_batches) {
         hightide_state_by_market.write(
-            season_id=season_id_, market_id=market_id_, value=TRADER_SCORE_CALCULATION_COMPLETED
+            season_id=season_id_, market_id=market_id_, value=REWARD_DISTRIBUTION_IN_PROGRESS
         );
         batches_fetched_by_market.write(season_id=season_id_, market_id=market_id_, value=0);
         tempvar syscall_ptr = syscall_ptr;

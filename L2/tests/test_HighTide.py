@@ -42,13 +42,10 @@ whitelisted_ust = None
 initial_timestamp = int(time.time())
 DAY_DURATION = 24 * 60 * 60
 
-W_CALCULATION_NOT_STARTED = 0
-W_CALCULATION_IN_PROGRESS = 1
-W_CALCULATION_COMPLETED = 2
-TRADER_SCORE_CALCULATION_IN_PROGRESS = 3
-TRADER_SCORE_CALCULATION_COMPLETED = 4
-REWARD_DISTRIBUTION_IN_PROGRESS = 5
-REWARD_DISTRIBUTION_COMPLETED = 6
+W_CALCULATION_IN_PROGRESS = 0
+TRADER_SCORE_CALCULATION_IN_PROGRESS = 1
+REWARD_DISTRIBUTION_IN_PROGRESS = 2
+REWARD_DISTRIBUTION_COMPLETED = 3
 
 
 @pytest.fixture(scope='module')
@@ -1451,18 +1448,18 @@ async def test_calculating_factors(hightide_test_initializer):
         ETH_USD_ID,
     ])
 
-    # Hightide state would change to w calcualtion completed for ETH_USD market
+    # Hightide state would change to trader score calculation in progress for ETH_USD market
     hightide_state = await hightideCalc.get_hightide_state(season_id, ETH_USD_ID).call()
-    assert hightide_state.result.state == W_CALCULATION_COMPLETED
+    assert hightide_state.result.state == TRADER_SCORE_CALCULATION_IN_PROGRESS
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
         season_id,
         ETH_USD_ID,
     ])
 
-    # Hightide state would change to trader score calculation completed for ETH_USD market
+    # Hightide state would change to reward distribution in progress for ETH_USD market
     hightide_state = await hightideCalc.get_hightide_state(season_id, ETH_USD_ID).call()
-    assert hightide_state.result.state == TRADER_SCORE_CALCULATION_COMPLETED
+    assert hightide_state.result.state == REWARD_DISTRIBUTION_IN_PROGRESS
 
     # Here, Trader score for charlie is zero. Becuase, he didn't trade ETH_USD_ID
     alice_w_ETH_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, ETH_USD_ID, alice.contract_address).call()
@@ -1474,9 +1471,9 @@ async def test_calculating_factors(hightide_test_initializer):
     charlie_w_ETH_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, ETH_USD_ID, charlie.contract_address).call()
     assert from64x61(charlie_w_ETH_USD_ID.result.trader_score) == 0
 
-    # Since calculate w function is not yet called. State would be in w_calculation_not_started for TSLA_USD market
+    # Since calculate w function is not yet called. State would be in w_calculation_in_progress by default for TSLA_USD market
     hightide_state = await hightideCalc.get_hightide_state(season_id, TSLA_USD_ID).call()
-    assert hightide_state.result.state == W_CALCULATION_NOT_STARTED
+    assert hightide_state.result.state == W_CALCULATION_IN_PROGRESS
 
     # Since batch size is 2 and there are 3 traders for TSLA_USD pair. we need to make 2 calls to compute w for all traders
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
@@ -1484,7 +1481,7 @@ async def test_calculating_factors(hightide_test_initializer):
         TSLA_USD_ID,
     ])
 
-    # Hightide state would change to w_calculation_in_progress state for TSLA_USD market
+    # Hightide state would still be in w_calculation_in_progress state for TSLA_USD market
     hightide_state = await hightideCalc.get_hightide_state(season_id, TSLA_USD_ID).call()
     assert hightide_state.result.state == W_CALCULATION_IN_PROGRESS
 
@@ -1506,9 +1503,9 @@ async def test_calculating_factors(hightide_test_initializer):
         TSLA_USD_ID,
     ])
 
-    # Hightide state would change to w_calculation_completed state for TSLA_USD market
+    # Hightide state would change to trader score calculation in progress state for TSLA_USD market
     hightide_state = await hightideCalc.get_hightide_state(season_id, TSLA_USD_ID).call()
-    assert hightide_state.result.state == W_CALCULATION_COMPLETED
+    assert hightide_state.result.state == TRADER_SCORE_CALCULATION_IN_PROGRESS
 
     # Since w calculation is completed for all batch of traders. We can invoke calculate_trader_score function
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
@@ -1516,7 +1513,7 @@ async def test_calculating_factors(hightide_test_initializer):
         TSLA_USD_ID,
     ])
 
-    # Hightide state would change to trader score calculation in progress state for TSLA_USD market
+    # Hightide state would still be in trader score calculation in progress state for TSLA_USD market
     hightide_state = await hightideCalc.get_hightide_state(season_id, TSLA_USD_ID).call()
     assert hightide_state.result.state == TRADER_SCORE_CALCULATION_IN_PROGRESS
 
@@ -1537,9 +1534,9 @@ async def test_calculating_factors(hightide_test_initializer):
         TSLA_USD_ID,
     ])
 
-    # Hightide state would change to trader score calculation completed state for TSLA_USD market
+    # Hightide state would change to reward distribution in progress state for TSLA_USD market
     hightide_state = await hightideCalc.get_hightide_state(season_id, TSLA_USD_ID).call()
-    assert hightide_state.result.state == TRADER_SCORE_CALCULATION_COMPLETED
+    assert hightide_state.result.state == REWARD_DISTRIBUTION_IN_PROGRESS
 
     # Get the trader score for all traders
     alice_w_TSLA_USD_ID = await hightideCalc.get_trader_score_per_market(season_id, TSLA_USD_ID, alice.contract_address).call()
@@ -1719,7 +1716,7 @@ async def test_distribute_rewards(hightide_test_initializer):
         hightide_list[1],
     ])
 
-    # Hightide state would change to reward distribution in progress state for TSLA_USD market
+    # Hightide state would still be in reward distribution in progress state for TSLA_USD market
     hightide_state = await hightideCalc.get_hightide_state(season_id, TSLA_USD_ID).call()
     assert hightide_state.result.state == REWARD_DISTRIBUTION_IN_PROGRESS
 
