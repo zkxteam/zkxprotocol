@@ -229,6 +229,32 @@ func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (xp_value_user,);
 }
 
+@view
+func get_traders_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) -> (trader_list_len: felt, trader_list: felt*) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Trading Stats contract address from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
+    let (batches_fetched: felt) = batches_fetched_by_season.read(season_id=season_id_);
+    let (current_no_of_users_per_batch: felt) = no_of_users_per_batch.read();
+    let (no_of_batches: felt) = no_of_batches_by_season.read(season_id=season_id_);
+
+    let (trader_list_len: felt, trader_list: felt*) = get_batch(
+        season_id_=season_id_,
+        market_id_=0,
+        batch_id_=batches_fetched,
+        no_of_users_per_batch_=current_no_of_users_per_batch,
+        trading_stats_address_=trading_stats_address,
+    );
+    return (trader_list_len, trader_list);
+}
+
 // ///////////
 // External //
 // ///////////
@@ -321,6 +347,28 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     block_number_set.emit(season_id=season_id_, block_number=block_number_);
 
+    return ();
+}
+
+// @notice Function to set the number of users in a batch
+// @param new_no_of_users_per_batch_ - no.of users per batch
+@external
+func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_no_of_users_per_batch_: felt
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Auth check
+    with_attr error_message("RewardsCalculation: Unauthorized call to set no of users per batch") {
+        verify_caller_authority(registry, version, ManageHighTide_ACTION);
+    }
+
+    with_attr error_message("RewardsCalculation: No of users in a batch must be > 0") {
+        assert_lt(0, new_no_of_users_per_batch_);
+    }
+
+    no_of_users_per_batch.write(new_no_of_users_per_batch_);
     return ();
 }
 
