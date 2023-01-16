@@ -56,7 +56,6 @@ REWARD_DISTRIBUTION_COMPLETED = 3
 def event_loop():
     return asyncio.new_event_loop()
 
-
 @pytest.fixture(scope='module')
 async def hightide_test_initializer(starknet_service: StarknetService):
     # Deploy infrastructure (Part 1)

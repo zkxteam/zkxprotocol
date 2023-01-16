@@ -1419,10 +1419,6 @@ async def test_calculating_factors(adminAuth_factory):
     xp_state = await rewardsCalculation.get_xp_state(season_id).call()
     assert xp_state.result.state == SET_XP_NOT_STARTED
 
-    # Get no.of batches info
-    no_of_batches_info = await rewardsCalculation.get_no_of_batches_per_season(season_id).call()
-    assert no_of_batches_info.result.no_of_batches == 1
-
     await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address, "set_user_xp_values",
                                          [
                                              season_id,
@@ -1435,6 +1431,13 @@ async def test_calculating_factors(adminAuth_factory):
                                              300,
                                          ],
                                          )
+
+    no_of_active_traders_info = await trading_stats.get_num_active_traders(season_id, 0).call()
+    assert no_of_active_traders_info.result.res == 3
+
+    # Get no.of batches info
+    no_of_batches_info = await rewardsCalculation.get_no_of_batches_per_season(season_id).call()
+    assert no_of_batches_info.result.no_of_batches == 1
 
     # Get Xp state
     xp_state = await rewardsCalculation.get_xp_state(season_id).call()
