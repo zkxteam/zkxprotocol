@@ -13,7 +13,14 @@ from starkware.cairo.common.math import (
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_number, get_caller_address
 
-from contracts.Constants import Hightide_INDEX, ManageHighTide_ACTION, TradingStats_INDEX
+from contracts.Constants import (
+    Hightide_INDEX,
+    ManageHighTide_ACTION,
+    SET_XP_COMPLETED,
+    SET_XP_IN_PROGRESS,
+    SET_XP_NOT_STARTED,
+    TradingStats_INDEX,
+)
 from contracts.DataTypes import TradingSeason, XpValues
 from contracts.hightide.libraries.UserBatches import calculate_no_of_batches, get_batch
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -81,7 +88,7 @@ func no_of_batches_by_season(season_id: felt) -> (no_of_batches: felt) {
 
 // Stores the state of xp in a season
 @storage_var
-func xp_state(season_id: felt) -> (state: felt) {
+func xp_state_by_season(season_id: felt) -> (state: felt) {
 }
 
 // //////////////
@@ -255,6 +262,28 @@ func get_traders_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (trader_list_len, trader_list);
 }
 
+// @notice view function to get the number of batches for a season
+// @param season_id_ - Id of the season
+// @return no_of_batches - returns no of batches per season
+@view
+func get_no_of_batches_per_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) -> (no_of_batches: felt) {
+    let (no_of_batches) = no_of_batches_by_season.read(season_id_);
+    return (no_of_batches,);
+}
+
+// @notice view function to get the state of xp in a season
+// @param season_id_ - Id of the season
+// @return state - returns the state of xp
+@view
+func get_xp_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) -> (state: felt) {
+    let (state) = xp_state_by_season.read(season_id=season_id_);
+    return (state,);
+}
+
 // ///////////
 // External //
 // ///////////
@@ -310,6 +339,46 @@ func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Recursively update the users' xp value
     set_user_xp_values_recurse(season_id_, xp_values_len, xp_values);
+
+    // Fetch xp state
+    let (xp_state: felt) = xp_state_by_season.read(season_id=season_id_);
+
+    with_attr error_message("RewardsCalculation: Set user xp is completed") {
+        assert_in_range(xp_state, SET_XP_NOT_STARTED, SET_XP_COMPLETED);
+    }
+
+    let (batches_fetched: felt) = batches_fetched_by_season.read(season_id=season_id_);
+
+    // This would be the first call, if xp state is 0 and batches fetched is 0.
+    // So, change xp state to SET_XP_IN_PROGRESS
+    if (batches_fetched == 0) {
+        xp_state_by_season.write(season_id=season_id_, value=SET_XP_IN_PROGRESS);
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    batches_fetched_by_season.write(season_id=season_id_, value=batches_fetched + 1);
+
+    let (no_of_batches: felt) = no_of_batches_by_season.read(season_id=season_id_);
+
+    // Since this is the last batch to be fetched in a season,
+    // Update the state of xp to SET_XP_COMPLETED
+    if (batches_fetched + 1 == no_of_batches) {
+        xp_state_by_season.write(season_id=season_id_, value=SET_XP_COMPLETED);
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
     return ();
 }
 

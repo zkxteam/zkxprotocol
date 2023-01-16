@@ -44,6 +44,9 @@ timestamp4 = int(time.time()) + (DAY_DURATION)*3 + 60
 timestamp5 = int(time.time()) + (DAY_DURATION)*4 + 60
 timestamp6 = int(time.time()) + (DAY_DURATION)*5 + 60
 
+SET_XP_NOT_STARTED = 0
+SET_XP_IN_PROGRESS = 1
+SET_XP_COMPLETED = 2
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -412,8 +415,11 @@ async def adminAuth_factory(starknet_service: StarknetService):
     # Set the threshold for oracle price in Trading contract
     await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
 
-    # set the no.of users in a batch
+    # set the no.of users in a batch for Trader's score calculation and reward distribution
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, 'set_no_of_users_per_batch', [10])
+
+    # set the no.of users in a batch for xp
+    await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address, 'set_no_of_users_per_batch', [10])
 
     return starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate, trading_stats, hightide, hightideCalc, user_stats, rewardsCalculation, alice_test, bob_test, charlie_test, python_executor
 
@@ -1409,6 +1415,14 @@ async def test_calculating_factors(adminAuth_factory):
     assert from64x61(TSLA_parsed[2]) == (3/5)
     assert from64x61(TSLA_parsed[3]) == (3/3)
 
+    # Get Xp state
+    xp_state = await rewardsCalculation.get_xp_state(season_id).call()
+    assert xp_state.result.state == SET_XP_NOT_STARTED
+
+    # Get no.of batches info
+    no_of_batches_info = await rewardsCalculation.get_no_of_batches_per_season(season_id).call()
+    assert no_of_batches_info.result.no_of_batches == 1
+
     await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address, "set_user_xp_values",
                                          [
                                              season_id,
@@ -1421,6 +1435,10 @@ async def test_calculating_factors(adminAuth_factory):
                                              300,
                                          ],
                                          )
+
+    # Get Xp state
+    xp_state = await rewardsCalculation.get_xp_state(season_id).call()
+    assert xp_state.result.state == SET_XP_COMPLETED
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,

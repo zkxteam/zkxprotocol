@@ -16,6 +16,7 @@ from contracts.Constants import (
     RewardsCalculation_INDEX,
     REWARD_DISTRIBUTION_IN_PROGRESS,
     SEASON_ENDED,
+    SET_XP_COMPLETED,
     TRADER_SCORE_CALCULATION_IN_PROGRESS,
     TradingStats_INDEX,
     UserStats_INDEX,

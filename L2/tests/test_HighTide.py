@@ -42,10 +42,24 @@ whitelisted_ust = None
 initial_timestamp = int(time.time())
 DAY_DURATION = 24 * 60 * 60
 
+<<<<<<< HEAD
 W_CALCULATION_IN_PROGRESS = 0
 TRADER_SCORE_CALCULATION_IN_PROGRESS = 1
 REWARD_DISTRIBUTION_IN_PROGRESS = 2
 REWARD_DISTRIBUTION_COMPLETED = 3
+=======
+
+SET_XP_NOT_STARTED = 0
+W_CALCULATION_NOT_STARTED = 0
+SET_XP_IN_PROGRESS = 1
+SET_XP_COMPLETED = 2
+W_CALCULATION_IN_PROGRESS = 3
+W_CALCULATION_COMPLETED = 4
+TRADER_SCORE_CALCULATION_IN_PROGRESS = 5
+TRADER_SCORE_CALCULATION_COMPLETED = 6
+REWARD_DISTRIBUTION_IN_PROGRESS = 7
+REWARD_DISTRIBUTION_COMPLETED = 8
+>>>>>>> 855dac6 (ZKX-1255 fixes tests wip)
 
 
 @pytest.fixture(scope='module')
@@ -395,8 +409,11 @@ async def hightide_test_initializer(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, starkway.contract_address, 'add_native_token_l2_address', [USDC_L1_address, native_erc20_usdc.contract_address])
     await admin1_signer.send_transaction(admin1, starkway.contract_address, 'add_native_token_l2_address', [UST_L1_address, native_erc20_ust.contract_address])
 
-    # set the no.of users in a batch
+    # set the no.of users in a batch for Trader's score calculation and reward distribution
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, 'set_no_of_users_per_batch', [2])
+
+    # set the no.of users in a batch for xp
+    await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address, 'set_no_of_users_per_batch', [2])
 
     return starknet_service, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, alice_test, bob_test, charlie_test, adminAuth, trading, hightide, hightideCalc, rewardsCalculation, native_erc20_usdc, native_erc20_ust, starkway, trading_stats
 
@@ -1396,6 +1413,10 @@ async def test_calculating_factors(hightide_test_initializer):
     top_stats = await hightideCalc.find_top_stats(season_id).call()
     print(top_stats.result)
 
+    # Get no.of batches info
+    no_of_batches_info = await rewardsCalculation.get_no_of_batches_per_season(season_id).call()
+    assert no_of_batches_info.result.no_of_batches == 2
+
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'set_constants', [
         to64x61(0.8),
         to64x61(0.15),
@@ -1431,18 +1452,35 @@ async def test_calculating_factors(hightide_test_initializer):
     assert from64x61(TSLA_parsed[2]) == (3/5)
     assert from64x61(TSLA_parsed[3]) == (3/3)
 
+    # Get Xp state
+    xp_state = await rewardsCalculation.get_xp_state(season_id).call()
+    assert xp_state.result.state == SET_XP_NOT_STARTED
+
     await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address, "set_user_xp_values",
                                          [
                                              season_id,
-                                             3,
+                                             2,
                                              alice.contract_address,
                                              100,
                                              bob.contract_address,
                                              200,
+                                         ])
+    
+    # Get Xp state
+    xp_state = await rewardsCalculation.get_xp_state(season_id).call()
+    assert xp_state.result.state == SET_XP_IN_PROGRESS
+
+    await admin1_signer.send_transaction(admin1, rewardsCalculation.contract_address, "set_user_xp_values",
+                                         [
+                                             season_id,
+                                             1,
                                              charlie.contract_address,
                                              300,
-                                         ],
-                                         )
+                                         ])
+                                    
+    # Get Xp state
+    xp_state = await rewardsCalculation.get_xp_state(season_id).call()
+    assert xp_state.result.state == SET_XP_COMPLETED
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,
