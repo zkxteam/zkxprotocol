@@ -16,6 +16,7 @@ from starkware.starknet.common.syscalls import get_block_number, get_caller_addr
 from contracts.Constants import (
     Hightide_INDEX,
     ManageHighTide_ACTION,
+    SEASON_ENDED,
     SET_XP_COMPLETED,
     SET_XP_IN_PROGRESS,
     SET_XP_NOT_STARTED,
@@ -328,16 +329,16 @@ func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    let (is_expired: felt) = IHighTide.get_season_expiry_state(
+    // Get supplied season's metadata
+    let (trading_season: TradingSeason) = IHighTide.get_season(
         contract_address=hightide_address, season_id=season_id_
     );
 
-    // Revert if season is still ongoing
     with_attr error_message("RewardsCalculation: Season still ongoing") {
-        assert is_expired = TRUE;
+        assert trading_season.status = SEASON_ENDED;
     }
 
-    // Recursively update the users' xp value
+    // Recursively update the user's xp value
     set_user_xp_values_recurse(season_id_, xp_values_len, xp_values);
 
     // Fetch xp state
@@ -362,8 +363,6 @@ func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    batches_fetched_by_season.write(season_id=season_id_, value=batches_fetched + 1);
-
     let (no_of_batches: felt) = no_of_batches_by_season.read(season_id=season_id_);
 
     // Since this is the last batch to be fetched in a season,
@@ -379,6 +378,7 @@ func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         tempvar range_check_ptr = range_check_ptr;
     }
 
+    batches_fetched_by_season.write(season_id=season_id_, value=batches_fetched + 1);
     return ();
 }
 
