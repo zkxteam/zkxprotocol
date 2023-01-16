@@ -101,6 +101,7 @@ const SEASON_ENDED = 3;
 
 const ONE_DAY = 24 * 60 * 60;
 
+const W_CALCULATION_NOT_STARTED = 0;
 const SET_XP_NOT_STARTED = 0;
 const SET_XP_IN_PROGRESS = 1;
 const SET_XP_COMPLETED = 2;
