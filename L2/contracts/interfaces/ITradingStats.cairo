@@ -29,6 +29,11 @@ namespace ITradingStats {
     ) {
     }
 
+    func get_batch(
+        season_id_: felt, market_id_: felt, starting_index_: felt, ending_index_: felt
+    ) -> (trader_list_len: felt, trader_list: felt*) {
+    }
+
     // external functions
     func record_trade_batch_stats(
         market_id_: felt,

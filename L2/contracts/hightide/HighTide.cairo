@@ -3,7 +3,14 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero, split_felt
+from starkware.cairo.common.math import (
+    assert_in_range,
+    assert_le,
+    assert_lt,
+    assert_nn,
+    assert_not_zero,
+    split_felt,
+)
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import (
     deploy,
@@ -26,11 +33,14 @@ from contracts.Constants import (
     ManageHighTide_ACTION,
     Market_INDEX,
     ONE_DAY,
+    REWARD_DISTRIBUTION_COMPLETED,
+    REWARD_DISTRIBUTION_IN_PROGRESS,
     SEASON_CREATED,
     SEASON_ENDED,
     SEASON_STARTED,
     Starkway_INDEX,
     TokenLister_ACTION,
+    TradingStats_INDEX,
 )
 from contracts.DataTypes import (
     Constants,
@@ -40,6 +50,7 @@ from contracts.DataTypes import (
     RewardToken,
     TradingSeason,
 )
+from contracts.hightide.libraries.UserBatches import get_batch
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
 from contracts.interfaces.IHighTideCalc import IHighTideCalc
@@ -498,6 +509,11 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         assert is_expired = TRUE;
     }
 
+    // Get Trading Stats contract address from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
     // Get HightideCalc contract address from Authorized Registry
     let (hightide_calc_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=HighTideCalc_INDEX, version=version
@@ -510,6 +526,11 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     // Calculate R (Funds flow)
     IHighTideCalc.calculate_funds_flow(
+        contract_address=hightide_calc_address, season_id_=season_id_
+    );
+
+    // Update no.of batches per market in a season
+    IHighTideCalc.update_no_of_batches_per_market(
         contract_address=hightide_calc_address, season_id_=season_id_
     );
 
@@ -758,11 +779,9 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
 // @notice - This function is used to distribute rewards
 // @param hightide_id_ - id of hightide
-// @param trader_list_len - length of trader's list
-// @param trader_list - list of trader's
 @external
 func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    hightide_id_: felt, trader_list_len: felt, trader_list: felt*
+    hightide_id_: felt
 ) {
     alloc_locals;
     // To-do: Need to integrate signature infra for the authentication
@@ -777,10 +796,67 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Get percentage of funds transferred from liquidity pool to reward pool
     let (local hightide_metadata: HighTideMetaData) = get_hightide(hightide_id_);
+
+    // Get season's metadata that specified hightide belongs to
+    let (trading_season: TradingSeason) = trading_season_by_id.read(
+        season_id=hightide_metadata.season_id
+    );
+
+    with_attr error_message("HighTide: Season still ongoing") {
+        assert trading_season.status = SEASON_ENDED;
+    }
+
     let (funds_flow_64x61) = IHighTideCalc.get_funds_flow_per_market(
         contract_address=hightide_calc_address,
         season_id_=hightide_metadata.season_id,
         market_id_=hightide_metadata.market_id,
+    );
+
+    let (hightide_state: felt) = IHighTideCalc.get_hightide_state(
+        contract_address=hightide_calc_address,
+        season_id_=hightide_metadata.season_id,
+        market_id_=hightide_metadata.market_id,
+    );
+
+    with_attr error_message("HighTide: State is not valid to call distribute rewards function") {
+        assert_in_range(
+            hightide_state, REWARD_DISTRIBUTION_IN_PROGRESS, REWARD_DISTRIBUTION_COMPLETED
+        );
+    }
+
+    let (batches_fetched: felt) = IHighTideCalc.get_no_of_batches_fetched_per_market(
+        contract_address=hightide_calc_address,
+        season_id_=hightide_metadata.season_id,
+        market_id_=hightide_metadata.market_id,
+    );
+
+    // Get Trading Stats contract address from Authorized Registry
+    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingStats_INDEX, version=version
+    );
+
+    let (current_no_of_users_per_batch: felt) = IHighTideCalc.get_no_of_users_per_batch(
+        contract_address=hightide_calc_address
+    );
+    let (no_of_batches: felt) = IHighTideCalc.get_no_of_batches_per_market(
+        contract_address=hightide_calc_address,
+        season_id_=hightide_metadata.season_id,
+        market_id_=hightide_metadata.market_id,
+    );
+
+    let (trader_list_len: felt, trader_list: felt*) = get_batch(
+        season_id_=hightide_metadata.season_id,
+        market_id_=hightide_metadata.market_id,
+        batch_id_=batches_fetched,
+        no_of_users_per_batch_=current_no_of_users_per_batch,
+        trading_stats_address_=trading_stats_address,
+    );
+
+    IHighTideCalc.update_no_of_batches_fetched_per_market(
+        contract_address=hightide_calc_address,
+        season_id_=hightide_metadata.season_id,
+        market_id_=hightide_metadata.market_id,
+        batches_fetched_=batches_fetched + 1,
     );
 
     // Get reward tokens associated with the hightide
@@ -799,10 +875,36 @@ func distribute_rewards{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         reward_tokens_list=reward_tokens_list,
     );
 
-    ILiquidityPool.perform_return_or_burn(
-        contract_address=hightide_metadata.liquidity_pool_address
-    );
+    // Since this is the last batch to be fetched for a market in a season,
+    // Update the state of hightide to REWARD_DISTRIBUTION_COMPLETED
+    if (batches_fetched + 1 == no_of_batches) {
+        IHighTideCalc.update_hightide_state_per_market(
+            contract_address=hightide_calc_address,
+            season_id_=hightide_metadata.season_id,
+            market_id_=hightide_metadata.market_id,
+            state_=REWARD_DISTRIBUTION_COMPLETED,
+        );
 
+        IHighTideCalc.update_no_of_batches_fetched_per_market(
+            contract_address=hightide_calc_address,
+            season_id_=hightide_metadata.season_id,
+            market_id_=hightide_metadata.market_id,
+            batches_fetched_=0,
+        );
+
+        // Transfer or burn the left over tokens in the liquidity pool
+        // according to the option selected by the token lister
+        ILiquidityPool.perform_return_or_burn(
+            contract_address=hightide_metadata.liquidity_pool_address
+        );
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
     return ();
 }
 

@@ -411,6 +411,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     # Set the threshold for oracle price in Trading contract
     await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
+
+    # set the no.of users in a batch
+    await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, 'set_no_of_users_per_batch', [10])
+
     return starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate, trading_stats, hightide, hightideCalc, user_stats, rewardsCalculation, alice_test, bob_test, charlie_test, python_executor
 
 
@@ -684,17 +688,11 @@ async def test_placing_orders_day_0(adminAuth_factory):
     await assert_revert(admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,
         market_id,
-        2,
-        alice.contract_address,
-        bob.contract_address
     ]), "HighTideCalc: Season still ongoing")
 
     await assert_revert(admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
         season_id,
         market_id,
-        2,
-        alice.contract_address,
-        bob.contract_address
     ]), "HighTideCalc: Season still ongoing")
 
 
@@ -1427,35 +1425,21 @@ async def test_calculating_factors(adminAuth_factory):
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,
         ETH_USD_ID,
-        2,
-        alice.contract_address,
-        bob.contract_address,
     ])
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
         season_id,
         ETH_USD_ID,
-        2,
-        alice.contract_address,
-        bob.contract_address,
     ])
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_w", [
         season_id,
         TSLA_USD_ID,
-        3,
-        alice.contract_address,
-        bob.contract_address,
-        charlie.contract_address,
     ])
 
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, "calculate_trader_score", [
         season_id,
         TSLA_USD_ID,
-        3,
-        alice.contract_address,
-        bob.contract_address,
-        charlie.contract_address,
     ])
 
     a = await rewardsCalculation.get_user_xp_value(season_id, alice.contract_address).call()
