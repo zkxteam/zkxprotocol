@@ -6,11 +6,7 @@ from starkware.cairo.common.math import abs_value, assert_not_zero, assert_not_e
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import MasterAdmin_ACTION, ABR_Core_Index
-from contracts.interfaces.IMarkets import IMarkets
-from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_div,
@@ -56,14 +52,8 @@ func last_mark_price(market_id) -> (price: felt) {
 // Constructor #
 //##############
 
-// @notice Constructor of the smart-contract
-// @param registry_address_ Address of the AuthorizedRegistry contract
-// @param version_ Version of this contract
 @constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address_: felt, version_: felt
-) {
-    CommonLib.initialize(registry_address_, version_);
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
     base_abr.write(28823037615171);
     bollinger_width.write(4611686018427387904);
     return ();
@@ -89,12 +79,6 @@ func get_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func modify_base_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_base_abr_: felt
 ) {
-    with_attr error_message("ABR: Unauthorized") {
-        let (registry) = CommonLib.get_registry_address();
-        let (version) = CommonLib.get_contract_version();
-        verify_caller_authority(registry, version, MasterAdmin_ACTION);
-    }
-
     base_abr.write(new_base_abr_);
 
     return ();
@@ -104,12 +88,6 @@ func modify_base_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_bollinger_width_: felt
 ) {
-    with_attr error_message("ABR: Unauthorized") {
-        let (registry) = CommonLib.get_registry_address();
-        let (version) = CommonLib.get_contract_version();
-        verify_caller_authority(registry, version, MasterAdmin_ACTION);
-    }
-
     bollinger_width.write(new_bollinger_width_);
 
     return ();
@@ -136,16 +114,6 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
     // Make sure that the caller is the authorized ABR Core contracts
     let (caller) = get_caller_address();
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
-
-    let (ABR_core_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_Core_Index, version=version
-    );
-
-    with_attr error_message("ABRCalculations: Unauthorized call") {
-        assert caller = ABR_core_address;
-    }
 
     if (perp_mark_len == perp_index_len) {
     } else {
@@ -156,7 +124,7 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     }
 
     with_attr error_message("ABRCalculations: Invalid length for the input arrays") {
-        assert perp_index_len = 480;
+        assert perp_index_len = DATA_POINTS;
     }
 
     // Reduce the array size by factor of 8

@@ -69,23 +69,29 @@ async def trading_test_initializer(starknet_service: StarknetService):
         1
     )
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    print("alice", hex(alice.contract_address))
     alice_test = User(123456789987654323, alice.contract_address)
 
     bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
+    print("bob", hex(bob.contract_address))
     bob_test = User(123456789987654324, bob.contract_address)
 
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
+    print("charlie", hex(charlie.contract_address))
     charlie_test = User(123456789987654325, charlie.contract_address)
 
     dave = await account_factory.deploy_account(dave_signer.public_key)
+    print("dave", hex(dave.contract_address))
 
     eduard = await account_factory.deploy_ZKX_account(eduard_signer.public_key)
     eduard_test = User(123456789987654327, eduard.contract_address)
 
     felix = await account_factory.deploy_ZKX_account(felix_signer.public_key)
+    print("felix", hex(felix.contract_address))
     felix_test = User(123456789987654328, felix.contract_address)
 
     gary = await account_factory.deploy_ZKX_account(gary_signer.public_key)
+    print("gary", hex(gary.contract_address))
     gary_test = User(123456789987654329, gary.contract_address)
 
     timestamp = int(time.time())
@@ -368,6 +374,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
 
     # Set the threshold for oracle price in Trading contract
     await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
+
+    print("Trading contract:", hex(trading.contract_address))
+    print("liquidate contract:", hex(liquidate.contract_address))
     return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance
 
 

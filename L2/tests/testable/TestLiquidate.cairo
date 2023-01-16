@@ -23,7 +23,7 @@
 //     MultipleOrder,
 //     PriceData,
 //     PositionDetails,
-//     PositionDetailsWithMarket,
+//     PositionDetailsForRiskManagement,
 // )
 // from contracts.interfaces.IAccountManager import IAccountManager
 // from contracts.interfaces.IAsset import IAsset
@@ -58,7 +58,7 @@
 // func check_liquidation_called(
 //     account_address: felt,
 //     liq_result: felt,
-//     least_collateral_ratio_position: PositionDetailsWithMarket,
+//     least_collateral_ratio_position: PositionDetailsForRiskManagement,
 // ) {
 // }
 
@@ -69,7 +69,7 @@
 
 // // Event emitted whenever position can be deleveraged
 // @event
-// func position_to_be_deleveraged(position: PositionDetailsWithMarket, amount_to_be_sold: felt) {
+// func position_to_be_deleveraged(position: PositionDetailsForRiskManagement, amount_to_be_sold: felt) {
 // }
 
 // //##############
@@ -130,38 +130,38 @@
 // @external
 // func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 //     account_address: felt, prices_len: felt, prices: PriceData*
-// ) -> (liq_result: felt, least_collateral_ratio_position: PositionDetailsWithMarket) {
+// ) -> (liq_result: felt, least_collateral_ratio_position: PositionDetailsForRiskManagement) {
 //     alloc_locals;
 //     // Check if the caller is the liquidator contract
 //     let (caller) = get_caller_address();
 
-//     // Check if the list is empty
+// // Check if the list is empty
 //     with_attr error_message("Liquidate: Prices array cannot be empty") {
 //         assert_not_zero(prices_len);
 //     }
 
-//     // Fetch all the positions from the Account contract
+// // Fetch all the positions from the Account contract
 //     let (
-//         positions_len: felt, positions: PositionDetailsWithMarket*
+//         positions_len: felt, positions: PositionDetailsForRiskManagement*
 //     ) = IAccountManager.get_positions(contract_address=account_address);
 
-//     // Check if the list is empty
+// // Check if the list is empty
 //     with_attr error_message("Liquidate: User's positions array is empty") {
 //         assert_not_zero(positions_len);
 //     }
 
-//     // Get the market & asset addresses
+// // Get the market & asset addresses
 //     let (registry) = CommonLib.get_registry_address();
 //     let (version) = CommonLib.get_contract_version();
 
-//     let (asset_address) = IAuthorizedRegistry.get_contract_address(
+// let (asset_address) = IAuthorizedRegistry.get_contract_address(
 //         contract_address=registry, index=Asset_INDEX, version=version
 //     );
 //     let (market_address) = IAuthorizedRegistry.get_contract_address(
 //         contract_address=registry, index=Market_INDEX, version=version
 //     );
 
-//     // Recurse through all positions to see if it needs to liquidated
+// // Recurse through all positions to see if it needs to liquidated
 //     let (
 //         liq_result,
 //         least_collateral_ratio_position,
@@ -178,12 +178,12 @@
 //         asset_address=asset_address,
 //         total_maintenance_requirement=0,
 //         least_collateral_ratio=2305843009213693952,
-//         least_collateral_ratio_position=PositionDetailsWithMarket(0, 0, 0, 0, 0, 0, 0),
+//         least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
 //         least_collateral_ratio_position_collateral_price=0,
 //         least_collateral_ratio_position_asset_price=0,
 //     );
 
-//     if (liq_result == TRUE) {
+// if (liq_result == TRUE) {
 //         let (amount_to_be_sold) = check_deleveraging(
 //             account_address,
 //             asset_address,
@@ -206,14 +206,14 @@
 //         tempvar range_check_ptr = range_check_ptr;
 //     }
 
-//     // check_liquidation_called event is emitted
+// // check_liquidation_called event is emitted
 //     check_liquidation_called.emit(
 //         account_address=account_address,
 //         liq_result=liq_result,
 //         least_collateral_ratio_position=least_collateral_ratio_position,
 //     );
 
-//     return (liq_result, least_collateral_ratio_position);
+// return (liq_result, least_collateral_ratio_position);
 // }
 
 // // @notice Function to check if order can be opened
@@ -226,10 +226,10 @@
 // ) {
 //     let (prices_len: felt, prices: PriceData*) = get_asset_prices(order.user_address);
 
-//     // can_order_be_opened event is emitted
+// // can_order_be_opened event is emitted
 //     can_order_be_opened.emit(order=order);
 
-//     if (prices_len != 0) {
+// if (prices_len != 0) {
 //         check_for_risk(order, size, execution_price, prices_len, prices);
 //         return ();
 //     }
@@ -259,7 +259,7 @@
 //         return (total_value,);
 //     }
 
-//     // Create a temporary struct to read data from the array element of prices
+// // Create a temporary struct to read data from the array element of prices
 //     tempvar price_details: PriceData = PriceData(
 //         assetID=[prices].assetID,
 //         collateralID=[prices].collateralID,
@@ -267,7 +267,7 @@
 //         collateralPrice=[prices].collateralPrice
 //         );
 
-//     // Create a temporary struct to read data from the array element of collaterals
+// // Create a temporary struct to read data from the array element of collaterals
 //     tempvar collateral_details: CollateralBalance = CollateralBalance(
 //         assetID=[collaterals].assetID,
 //         balance=[collaterals].balance
@@ -279,14 +279,14 @@
 //         assert price_details.assetPrice = 0;
 //     }
 
-//     // Calculate the value of the current collateral
+// // Calculate the value of the current collateral
 //     let (collateral_value_usd) = Math64x61_mul(
 //         collateral_details.balance, price_details.collateralPrice
 //     );
 
-//     let (new_total_account_value) = Math64x61_add(total_value, collateral_value_usd);
+// let (new_total_account_value) = Math64x61_add(total_value, collateral_value_usd);
 
-//     // Recurse over the next element
+// // Recurse over the next element
 //     return find_collateral_balance(
 //         prices_len=prices_len - 1,
 //         prices=prices + PriceData.SIZE,
@@ -317,7 +317,7 @@
 // func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 //     account_address: felt,
 //     positions_len: felt,
-//     positions: PositionDetailsWithMarket*,
+//     positions: PositionDetailsForRiskManagement*,
 //     prices_len: felt,
 //     prices: PriceData*,
 //     total_account_value: felt,
@@ -325,25 +325,25 @@
 //     asset_address: felt,
 //     total_maintenance_requirement: felt,
 //     least_collateral_ratio: felt,
-//     least_collateral_ratio_position: PositionDetailsWithMarket,
+//     least_collateral_ratio_position: PositionDetailsForRiskManagement,
 //     least_collateral_ratio_position_collateral_price: felt,
 //     least_collateral_ratio_position_asset_price: felt,
 // ) -> (
 //     is_liquidation: felt,
-//     least_collateral_ratio_position: PositionDetailsWithMarket,
+//     least_collateral_ratio_position: PositionDetailsForRiskManagement,
 //     least_collateral_ratio_position_collateral_price: felt,
 //     least_collateral_ratio_position_asset_price: felt,
 // ) {
 //     alloc_locals;
 
-//     // Check if the list is empty, if yes return the result
+// // Check if the list is empty, if yes return the result
 //     if (positions_len == 0) {
 //         // Fetch all the collaterals that the user holds
 //         let (
 //             collaterals_len: felt, collaterals: CollateralBalance*
 //         ) = IAccountManager.return_array_collaterals(contract_address=account_address);
 
-//         // Calculate the value of all the collaterals in usd
+// // Calculate the value of all the collaterals in usd
 //         let (user_balance) = find_collateral_balance(
 //             prices_len=prices_len,
 //             prices=prices,
@@ -352,19 +352,19 @@
 //             total_value=0,
 //         );
 
-//         // Add the collateral value to the total_account_value
+// // Add the collateral value to the total_account_value
 //         local total_account_value_collateral = total_account_value + user_balance;
 
-//         // # # To Remove
+// // # # To Remove
 //         // #######################
 //         maintenance.write(total_maintenance_requirement);
 //         acc_value.write(total_account_value_collateral);
 //         // #######################
 
-//         // Check if the maintenance margin is not satisfied
+// // Check if the maintenance margin is not satisfied
 //         let is_liquidation = is_le(total_account_value_collateral, total_maintenance_requirement);
 
-//         // Return if the account should be liquidated or not and the orderId of the least colalteralized position
+// // Return if the account should be liquidated or not and the orderId of the least colalteralized position
 //         return (
 //             is_liquidation,
 //             least_collateral_ratio_position,
@@ -373,8 +373,8 @@
 //         );
 //     }
 
-//     // Create a temporary struct to read data from the array element of positions
-//     tempvar position_details: PositionDetailsWithMarket = PositionDetailsWithMarket(
+// // Create a temporary struct to read data from the array element of positions
+//     tempvar position_details: PositionDetailsForRiskManagement = PositionDetailsForRiskManagement(
 //         market_id=[positions].market_id,
 //         direction=[positions].direction,
 //         avg_execution_price=[positions].avg_execution_price,
@@ -384,12 +384,12 @@
 //         leverage=[positions].leverage
 //         );
 
-//     // Get the asset ID and collateral ID of the position
+// // Get the asset ID and collateral ID of the position
 //     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
 //         contract_address=market_address, market_id=position_details.market_id
 //     );
 
-//     // Create a temporary struct to read data from the array element of prices
+// // Create a temporary struct to read data from the array element of prices
 //     tempvar price_details: PriceData = PriceData(
 //         assetID=[prices].assetID,
 //         collateralID=[prices].collateralID,
@@ -397,22 +397,22 @@
 //         collateralPrice=[prices].collateralPrice
 //         );
 
-//     // Check if there is a mismatch in prices array and positions array
+// // Check if there is a mismatch in prices array and positions array
 //     with_attr error_message("Liquidate: AssetID and collateralID mismatch") {
 //         assert asset_id = price_details.assetID;
 //         assert collateral_id = price_details.collateralID;
 //     }
 
-//     // Check if the prices are not negative
+// // Check if the prices are not negative
 //     with_attr error("Liquidate: Invalid prices for collateral/asset") {
 //         assert_nn(price_details.collateralPrice);
 //         assert_nn(price_details.assetPrice);
 //     }
 
-//     // Get the maintanence margin from Asset contract
+// // Get the maintanence margin from Asset contract
 //     let (req_margin) = IAsset.get_maintenance_margin(contract_address=asset_address, id=asset_id);
 
-//     // Calculate the required margin in usd
+// // Calculate the required margin in usd
 //     let (maintenance_position) = Math64x61_mul(
 //         position_details.avg_execution_price, position_details.position_size
 //     );
@@ -421,7 +421,7 @@
 //         maintenance_requirement, price_details.collateralPrice
 //     );
 
-//     // Calculate pnl to check if it is the least collateralized position
+// // Calculate pnl to check if it is the least collateralized position
 //     local price_diff_;
 //     if (position_details.direction == 1) {
 //         tempvar price_diff = price_details.assetPrice - position_details.avg_execution_price;
@@ -431,24 +431,24 @@
 //         price_diff_ = price_diff;
 //     }
 
-//     let (pnl) = Math64x61_mul(price_diff_, position_details.position_size);
+// let (pnl) = Math64x61_mul(price_diff_, position_details.position_size);
 
-//     // Calculate the value of the current account margin in usd
+// // Calculate the value of the current account margin in usd
 //     local position_value = maintenance_position - position_details.borrowed_amount + pnl;
 //     let (net_position_value_usd: felt) = Math64x61_mul(
 //         position_value, price_details.collateralPrice
 //     );
 
-//     // Margin ratio calculation
+// // Margin ratio calculation
 //     local numerator = position_details.margin_amount + pnl;
 //     let (denominator) = Math64x61_mul(position_details.position_size, price_details.assetPrice);
 //     let (collateral_ratio_position) = Math64x61_div(numerator, denominator);
 
-//     let if_lesser = is_le(collateral_ratio_position, least_collateral_ratio);
+// let if_lesser = is_le(collateral_ratio_position, least_collateral_ratio);
 
-//     // If it is the lowest, update least_collateral_ratio and least_collateral_ratio_position
+// // If it is the lowest, update least_collateral_ratio and least_collateral_ratio_position
 //     local least_collateral_ratio_;
-//     local least_collateral_ratio_position_: PositionDetailsWithMarket;
+//     local least_collateral_ratio_position_: PositionDetailsForRiskManagement;
 //     local least_collateral_ratio_position_collateral_price_;
 //     local least_collateral_ratio_position_asset_price_;
 //     if (if_lesser == TRUE) {
@@ -463,11 +463,11 @@
 //         assert least_collateral_ratio_position_asset_price_ = least_collateral_ratio_position_asset_price;
 //     }
 
-//     // Recurse over to the next position
+// // Recurse over to the next position
 //     return check_liquidation_recurse(
 //         account_address=account_address,
 //         positions_len=positions_len - 1,
-//         positions=positions + PositionDetailsWithMarket.SIZE,
+//         positions=positions + PositionDetailsForRiskManagement.SIZE,
 //         prices_len=prices_len - 1,
 //         prices=prices + PriceData.SIZE,
 //         total_account_value=total_account_value + net_position_value_usd,
@@ -494,23 +494,23 @@
 //     account_address_: felt,
 //     asset_address_: felt,
 //     market_address_: felt,
-//     position_: PositionDetailsWithMarket,
+//     position_: PositionDetailsForRiskManagement,
 //     collateral_price_: felt,
 //     asset_price_: felt,
 // ) -> (amount_to_be_sold: felt) {
 //     alloc_locals;
 
-//     let (asset_id: felt, market_id: felt) = IMarkets.get_asset_collateral_from_market(
+// let (asset_id: felt, market_id: felt) = IMarkets.get_asset_collateral_from_market(
 //         contract_address=market_address_, market_id=position_.market_id
 //     );
 //     // Fetch the maintatanence margin requirement from asset contract
 //     let (req_margin) = IAsset.get_maintenance_margin(contract_address=asset_address_, id=asset_id);
 
-//     let margin_amount = position_.margin_amount;
+// let margin_amount = position_.margin_amount;
 //     let borrowed_amount = position_.borrowed_amount;
 //     let position_size = position_.position_size;
 
-//     local price_diff;
+// local price_diff;
 //     if (position_.direction == 1) {
 //         let (diff) = Math64x61_sub(asset_price_, position_.avg_execution_price);
 //         price_diff = diff;
@@ -519,14 +519,14 @@
 //         price_diff = diff;
 //     }
 
-//     // Calcculate amount to be sold for deleveraging
+// // Calcculate amount to be sold for deleveraging
 //     let (margin_amount_in_usd) = Math64x61_mul(margin_amount, collateral_price_);
 //     let (maintenance_requirement_in_usd) = Math64x61_mul(req_margin, asset_price_);
 //     let (price_diff_in_usd) = Math64x61_sub(maintenance_requirement_in_usd, price_diff);
 //     let (amount_to_be_present) = Math64x61_div(margin_amount_in_usd, price_diff_in_usd);
 //     let (amount_to_be_sold) = Math64x61_sub(position_size, amount_to_be_present);
 
-//     // Calculate the leverage after deleveraging
+// // Calculate the leverage after deleveraging
 //     let (position_value) = Math64x61_add(margin_amount, borrowed_amount);
 //     let (position_value_in_usd) = Math64x61_mul(position_value, collateral_price_);
 //     let (amount_to_be_sold_value_in_usd) = Math64x61_mul(amount_to_be_sold, asset_price_);
@@ -537,7 +537,7 @@
 //         remaining_position_value_in_usd, margin_amount_in_usd
 //     );
 
-//     // to64x61(2) == 4611686018427387904
+// // to64x61(2) == 4611686018427387904
 //     let can_be_liquidated = is_le(leverage_after_deleveraging, 4611686018427387904);
 //     if (can_be_liquidated == TRUE) {
 //         return (0,);
@@ -559,51 +559,51 @@
 // ) {
 //     alloc_locals;
 
-//     let (registry) = CommonLib.get_registry_address();
+// let (registry) = CommonLib.get_registry_address();
 //     let (version) = CommonLib.get_contract_version();
 
-//     // Fetch all the positions from the Account contract
+// // Fetch all the positions from the Account contract
 //     let (
-//         positions_len: felt, positions: PositionDetailsWithMarket*
+//         positions_len: felt, positions: PositionDetailsForRiskManagement*
 //     ) = IAccountManager.get_positions(contract_address=order.user_address);
 
-//     // Fetch the maintanence margin requirement from asset contract
+// // Fetch the maintanence margin requirement from asset contract
 //     let (asset_address) = IAuthorizedRegistry.get_contract_address(
 //         contract_address=registry, index=Asset_INDEX, version=version
 //     );
 
-//     let (market_address) = IAuthorizedRegistry.get_contract_address(
+// let (market_address) = IAuthorizedRegistry.get_contract_address(
 //         contract_address=registry, index=Market_INDEX, version=version
 //     );
 
-//     let (req_margin) = IAsset.get_maintenance_margin(
+// let (req_margin) = IAsset.get_maintenance_margin(
 //         contract_address=asset_address, id=order.assetID
 //     );
 
-//     // Get collateral price contract address
+// // Get collateral price contract address
 //     let (collateral_price_address) = IAuthorizedRegistry.get_contract_address(
 //         contract_address=registry, index=CollateralPrices_INDEX, version=version
 //     );
 
-//     let (collateral_price: CollateralPrice) = ICollateralPrices.get_collateral_price(
+// let (collateral_price: CollateralPrice) = ICollateralPrices.get_collateral_price(
 //         contract_address=collateral_price_address, id=order.collateralID
 //     );
 
-//     let (leveraged_position_value) = Math64x61_mul(execution_price, size);
+// let (leveraged_position_value) = Math64x61_mul(execution_price, size);
 
-//     let (leveraged_position_value_collateral) = Math64x61_mul(
+// let (leveraged_position_value_collateral) = Math64x61_mul(
 //         leveraged_position_value, collateral_price.price_in_usd
 //     );
 
-//     let (total_position_value) = Math64x61_div(leveraged_position_value_collateral, order.leverage);
+// let (total_position_value) = Math64x61_div(leveraged_position_value_collateral, order.leverage);
 //     let (amount_to_be_borrowed) = Math64x61_sub(
 //         leveraged_position_value_collateral, total_position_value
 //     );
 
-//     let (account_value) = Math64x61_sub(leveraged_position_value_collateral, amount_to_be_borrowed);
+// let (account_value) = Math64x61_sub(leveraged_position_value_collateral, amount_to_be_borrowed);
 //     let (maintenance_requirement) = Math64x61_mul(req_margin, leveraged_position_value_collateral);
 
-//     // Recurse through all positions to see if it needs to liquidated
+// // Recurse through all positions to see if it needs to liquidated
 //     let (
 //         liq_result,
 //         least_collateral_ratio_position,
@@ -620,12 +620,12 @@
 //         asset_address=asset_address,
 //         total_maintenance_requirement=maintenance_requirement,
 //         least_collateral_ratio=2305843009213693952,
-//         least_collateral_ratio_position=PositionDetailsWithMarket(0, 0, 0, 0, 0, 0, 0),
+//         least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
 //         least_collateral_ratio_position_collateral_price=0,
 //         least_collateral_ratio_position_asset_price=0,
 //     );
 
-//     if (liq_result == TRUE) {
+// if (liq_result == TRUE) {
 //         with_attr error_message("Liquidate: Position doesn't satisfy maintanence margin") {
 //             assert liq_result = FALSE;
 //         }
@@ -650,7 +650,7 @@
 //     collateral_price_address: felt,
 //     iterator: felt,
 //     positions_len: felt,
-//     positions: PositionDetailsWithMarket*,
+//     positions: PositionDetailsForRiskManagement*,
 //     prices_len: felt,
 //     prices: PriceData*,
 // ) -> (prices_len: felt, prices: PriceData*) {
@@ -659,32 +659,32 @@
 //         return (prices_len, prices);
 //     }
 
-//     // Get the asset & collateral ID from market contract
+// // Get the asset & collateral ID from market contract
 //     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
 //         contract_address=market_contract_address, market_id=[positions].market_id
 //     );
 
-//     let (market_price: MarketPrice) = IMarketPrices.get_market_price(
+// let (market_price: MarketPrice) = IMarketPrices.get_market_price(
 //         contract_address=market_price_address, id=[positions].market_id
 //     );
 
-//     // Get the market ttl from the market contract
+// // Get the market ttl from the market contract
 //     let (market_ttl: felt) = IMarkets.get_ttl_from_market(
 //         contract_address=market_contract_address, market_id=[positions].market_id
 //     );
 
-//     // Get the collateral price from the CollateralPrice contract
+// // Get the collateral price from the CollateralPrice contract
 //     let (collateral_price: CollateralPrice) = ICollateralPrices.get_collateral_price(
 //         contract_address=collateral_price_address, id=collateral_id
 //     );
 
-//     // Calculate the timestamp
+// // Calculate the timestamp
 //     let (current_timestamp) = get_block_timestamp();
 //     tempvar ttl = market_ttl;
 //     tempvar timestamp = market_price.timestamp;
 //     tempvar time_difference = current_timestamp - timestamp;
 
-//     let status = is_le(time_difference, ttl);
+// let status = is_le(time_difference, ttl);
 //     if (status == TRUE) {
 //         let (asset_price_in_usd) = Math64x61_mul(market_price.price, collateral_price.price_in_usd);
 //         let price_data = PriceData(
@@ -695,13 +695,13 @@
 //         );
 //         assert prices[prices_len] = price_data;
 
-//         return populate_asset_prices_recurse(
+// return populate_asset_prices_recurse(
 //             market_contract_address,
 //             market_price_address,
 //             collateral_price_address,
 //             iterator + 1,
 //             positions_len,
-//             positions + PositionDetailsWithMarket.SIZE,
+//             positions + PositionDetailsForRiskManagement.SIZE,
 //             prices_len + 1,
 //             prices,
 //         );
@@ -734,18 +734,18 @@
 //         return (prices_len, prices);
 //     }
 
-//     let (collateral_price: CollateralPrice) = ICollateralPrices.get_collateral_price(
+// let (collateral_price: CollateralPrice) = ICollateralPrices.get_collateral_price(
 //         contract_address=collateral_price_address, id=[collaterals].assetID
 //     );
 
-//     let price_data = PriceData(
+// let price_data = PriceData(
 //         assetID=0,
 //         collateralID=[collaterals].assetID,
 //         assetPrice=0,
 //         collateralPrice=collateral_price.price_in_usd,
 //     );
 
-//     assert prices[prices_len] = price_data;
+// assert prices[prices_len] = price_data;
 //     return populate_collateral_prices_recurse(
 //         collateral_price_address,
 //         iterator + 1,
@@ -765,31 +765,31 @@
 // ) -> (prices_len: felt, prices: PriceData*) {
 //     alloc_locals;
 
-//     let (registry) = CommonLib.get_registry_address();
+// let (registry) = CommonLib.get_registry_address();
 //     let (version) = CommonLib.get_contract_version();
 //     let (prices: PriceData*) = alloc();
 
-//     // Get market price contract address
+// // Get market price contract address
 //     let (market_prices_address) = IAuthorizedRegistry.get_contract_address(
 //         contract_address=registry, index=MarketPrices_INDEX, version=version
 //     );
 
-//     // Get market contract address
+// // Get market contract address
 //     let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
 //         contract_address=registry, index=Market_INDEX, version=version
 //     );
 
-//     // Get collateral price contract address
+// // Get collateral price contract address
 //     let (collateral_prices_address) = IAuthorizedRegistry.get_contract_address(
 //         contract_address=registry, index=CollateralPrices_INDEX, version=version
 //     );
 
-//     // Fetch all the positions from the Account contract
+// // Fetch all the positions from the Account contract
 //     let (
-//         positions_len: felt, positions: PositionDetailsWithMarket*
+//         positions_len: felt, positions: PositionDetailsForRiskManagement*
 //     ) = IAccountManager.get_positions(contract_address=account_address);
 
-//     let (prices_array_len: felt, prices_array: PriceData*) = populate_asset_prices_recurse(
+// let (prices_array_len: felt, prices_array: PriceData*) = populate_asset_prices_recurse(
 //         market_contract_address=market_contract_address,
 //         market_price_address=market_prices_address,
 //         collateral_price_address=collateral_prices_address,
@@ -804,17 +804,17 @@
 //         return (0, empty_price_array);
 //     }
 
-//     // Fetch all the collaterals that the user holds
+// // Fetch all the collaterals that the user holds
 //     let (
 //         collaterals_len: felt, collaterals: CollateralBalance*
 //     ) = IAccountManager.return_array_collaterals(contract_address=account_address);
 
-//     if (collaterals_len == 0) {
+// if (collaterals_len == 0) {
 //         let (empty_collateral_array: PriceData*) = alloc();
 //         return (0, empty_collateral_array);
 //     }
 
-//     return populate_collateral_prices_recurse(
+// return populate_collateral_prices_recurse(
 //         collateral_price_address=collateral_prices_address,
 //         iterator=0,
 //         collaterals_len=collaterals_len,

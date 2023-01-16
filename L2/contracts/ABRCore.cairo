@@ -8,9 +8,9 @@ from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.UserBatches import calculate_no_of_batches, get_batch
 from contracts.Constants import (
-    STATE_0,
-    STATE_1,
-    STATE_2,
+    ABR_STATE_0,
+    ABR_STATE_1,
+    ABR_STATE_2,
     ABR_PAYMENT_INDEX,
     ABR_Calculations_INDEX,
     AccountRegistry_INDEX,
@@ -128,7 +128,7 @@ func get_markets_remaining{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     );
 
     // Return the list of markets for which the abr value is not set
-    if (current_state == STATE_1) {
+    if (current_state == ABR_STATE_1) {
         return populate_remaining_markets(
             current_epoch_=current_epoch,
             remaining_markets_list_len_=0,
@@ -152,7 +152,7 @@ func get_no_of_batches_for_current_epoch{
     let (current_epoch) = epoch.read();
 
     // Return number_of_batches if in state 2
-    if (current_state == STATE_2) {
+    if (current_state == ABR_STATE_2) {
         let (no_of_batches) = no_of_batches_for_epoch.read(epoch=current_epoch);
         return (no_of_batches,);
     } else {
@@ -182,7 +182,7 @@ func get_remaining_pay_abr_calls{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     let (no_of_batches) = no_of_batches_for_epoch.read(epoch=current_epoch);
     let (batches_fetched) = batches_fetched_for_epoch.read(epoch=current_epoch);
 
-    if (current_state == STATE_2) {
+    if (current_state == ABR_STATE_2) {
         let remaining_batches = no_of_batches - batches_fetched;
         return (remaining_batches,);
     } else {
@@ -245,7 +245,7 @@ func set_current_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
     // Contract must be in state 0
     with_attr error_message("ABRCore: Invalid State") {
-        assert current_state = STATE_0;
+        assert current_state = ABR_STATE_0;
     }
 
     with_attr error_message("ABRCore: New Timstamp must be > last timestamp") {
@@ -256,7 +256,7 @@ func set_current_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     let new_epoch = current_epoch + 1;
 
     // Write to state
-    state.write(value=STATE_1);
+    state.write(value=ABR_STATE_1);
     epoch.write(value=new_epoch);
     epcoch_to_timestamp.write(epoch=new_epoch, value=new_timestamp);
 
@@ -322,7 +322,7 @@ func set_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
     // ABRCore must be in State_1
     with_attr error_message("ABRCore: Invalid State") {
-        assert current_state = STATE_1;
+        assert current_state = ABR_STATE_1;
     }
 
     // Market must be tradable
@@ -376,7 +376,7 @@ func make_abr_payments{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (current_timestamp) = epcoch_to_timestamp.read(epoch=current_epoch);
 
     with_attr error_message("ABRCore: Invalid State") {
-        assert current_state = STATE_2;
+        assert current_state = ABR_STATE_2;
     }
 
     // Get account Registry address
@@ -499,7 +499,7 @@ func check_abr_markets_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     // Increment the state if all markets are set
     if (status == TRUE) {
-        state.write(value=STATE_2);
+        state.write(value=ABR_STATE_2);
         return ();
     } else {
         return ();
@@ -534,7 +534,7 @@ func get_current_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // If all batches are fetched, increment state
     if (new_batches_fetched == no_of_batches) {
-        state.write(value=STATE_0);
+        state.write(value=ABR_STATE_0);
         return (users_list_len, users_list);
     } else {
         return (users_list_len, users_list);

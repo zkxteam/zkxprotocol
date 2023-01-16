@@ -104,7 +104,7 @@ struct PositionDetails {
 }
 
 // Struct to be used for liquidation calls
-struct PositionDetailsWithMarket {
+struct PositionDetailsForRiskManagement {
     market_id: felt,
     direction: felt,
     avg_execution_price: felt,
@@ -112,6 +112,19 @@ struct PositionDetailsWithMarket {
     margin_amount: felt,
     borrowed_amount: felt,
     leverage: felt,
+}
+
+struct PositionDetailsWithMarket{
+    market_id:felt,
+    direction: felt,
+    avg_execution_price: felt,
+    position_size: felt,
+    margin_amount: felt,
+    borrowed_amount: felt,
+    leverage: felt,
+    created_timestamp: felt,
+    modified_timestamp: felt,
+    realized_pnl: felt,
 }
 
 // Struct to store the position that is to be Liquidated/Deleveraged

@@ -5,6 +5,7 @@ from contracts.DataTypes import (
     LiquidatablePosition,
     OrderRequest,
     PositionDetails,
+    PositionDetailsForRiskManagement,
     PositionDetailsWithMarket,
     Signature,
     SimplifiedPosition,
@@ -39,7 +40,10 @@ namespace IAccountManager {
     func get_balance(assetID_: felt) -> (res: felt) {
     }
 
-    func get_positions() -> (array_list_len: felt, array_list: PositionDetailsWithMarket*) {
+    func get_positions() -> (positions_array_len: felt, positions_array: PositionDetailsWithMarket*) {
+    }
+
+    func get_positions_for_risk_management() -> (positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*) {
     }
 
     func get_simplified_positions(timestamp_filter_: felt) -> (
@@ -67,7 +71,7 @@ namespace IAccountManager {
     func return_array_collaterals() -> (array_list_len: felt, array_list: CollateralBalance*) {
     }
 
-    func liquidate_position(position_: PositionDetailsWithMarket, amount_to_be_sold_: felt) {
+    func liquidate_position(position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt) {
     }
 
     func get_deleveragable_or_liquidatable_position() -> (position: LiquidatablePosition) {

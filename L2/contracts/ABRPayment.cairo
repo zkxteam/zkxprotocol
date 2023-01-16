@@ -171,6 +171,7 @@ func user_receives{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param market_contract_ - Address of the Market contract
 // @param abr_contract_ - Address of the ABR contract
 // @param abr_funding_contract_ - Address of the ABR Funding contract
+// @param timestamp_ - Timestamp of the last abr
 func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address_: felt,
     positions_len_: felt,

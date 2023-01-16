@@ -56,6 +56,7 @@ from contracts.DataTypes import (
     Message,
     OrderRequest,
     PositionDetails,
+    PositionDetailsForRiskManagement,
     PositionDetailsWithMarket,
     SimplifiedPosition,
     Signature,
@@ -605,6 +606,22 @@ func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of positions
 @view
+func get_positions_for_risk_management{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*
+) {
+    alloc_locals;
+
+    let (positions_array: PositionDetailsForRiskManagement*) = alloc();
+    let (array_len: felt) = index_to_market_array_len.read();
+    return populate_positions_risk_management(
+        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
+    );
+}
+
+// @notice External function called by the Liquidate Contract to get the array of net positions of the user
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of positions
+@view
 func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     positions_array_len: felt, positions_array: PositionDetailsWithMarket*
 ) {
@@ -616,6 +633,7 @@ func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     );
 }
+
 
 // @notice External function called by the Trading Contract to transfer funds from account contract
 // @param assetID_ - asset ID of the collateral that needs to be transferred
@@ -872,14 +890,14 @@ func execute_order{
                 market_id=market_id,
                 direction=parent_direction,
                 value=PositionDetails(
-                avg_execution_price=0,
-                position_size=0,
-                margin_amount=0,
-                borrowed_amount=0,
-                leverage=0,
-                created_timestamp=0,
-                modified_timestamp=0,
-                realized_pnl=0
+                    avg_execution_price=0,
+                    position_size=0,
+                    margin_amount=0,
+                    borrowed_amount=0,
+                    leverage=0,
+                    created_timestamp=0,
+                    modified_timestamp=0,
+                    realized_pnl=0,
                 ),
             );
 
@@ -982,10 +1000,8 @@ func withdraw{
     assert signature_[1] = sig_s_;
     // Create withdrawal request for hashing
     local hash_withdrawal_request_: WithdrawalRequestForHashing = WithdrawalRequestForHashing(
-        request_id=request_id_,
-        collateral_id=collateral_id_,
-        amount=amount_,
-        );
+        request_id=request_id_, collateral_id=collateral_id_, amount=amount_
+    );
     // hash the parameters
     let (hash) = hash_withdrawal_request(&hash_withdrawal_request_);
     // check if Tx is signed by the user
@@ -1059,8 +1075,8 @@ func withdraw{
         timestamp=timestamp_,
         node_operator_L2_address=node_operator_L2_address_,
         fee=standard_fee,
-        status=WITHDRAWAL_INITIATED
-        );
+        status=WITHDRAWAL_INITIATED,
+    );
     // Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read();
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_);
@@ -1076,7 +1092,7 @@ func withdraw{
 // @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
 @external
 func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    position_: PositionDetailsWithMarket, amount_to_be_sold_: felt
+    position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt
 ) {
     alloc_locals;
 
@@ -1162,6 +1178,84 @@ func populate_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     return populate_array_collaterals(array_list_len_ + 1, array_list_, final_len_);
 }
 
+// @notice Internal Function called by get_positions_for_risk_management to recursively add active positions to the array and return it
+// @param positions_array_len_ - Length of the array
+// @param positions_array_ - Required array of positions
+// @param iterator_ - Current length of traversed array
+// @param final_len_ - Length of the final array
+// @returns positions_array_len - Length of the positions array
+// @returns positions_array - Array with the positions
+func populate_positions_risk_management{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    positions_array_len_: felt,
+    positions_array_: PositionDetailsForRiskManagement*,
+    iterator_: felt,
+    final_len_: felt,
+) -> (positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*) {
+    alloc_locals;
+
+    // If we reached the end of the array, then return
+    if (final_len_ == iterator_) {
+        return (positions_array_len_, positions_array_);
+    }
+
+    // Get the market id at that position
+    let (curr_market_id: felt) = index_to_market_array.read(index=iterator_);
+
+    // Get Long position
+    let (long_position: PositionDetails) = position_mapping.read(
+        market_id=curr_market_id, direction=LONG
+    );
+
+    // Get Short position
+    let (short_position: PositionDetails) = position_mapping.read(
+        market_id=curr_market_id, direction=SHORT
+    );
+
+    local is_long;
+    local is_short;
+
+    if (long_position.position_size == 0) {
+        assert is_long = 0;
+    } else {
+        // Store it in the array
+        let curr_position = PositionDetailsForRiskManagement(
+            market_id=curr_market_id,
+            direction=LONG,
+            avg_execution_price=long_position.avg_execution_price,
+            position_size=long_position.position_size,
+            margin_amount=long_position.margin_amount,
+            borrowed_amount=long_position.borrowed_amount,
+            leverage=long_position.leverage,
+        );
+        assert positions_array_[positions_array_len_] = curr_position;
+        assert is_long = 1;
+    }
+
+    if (short_position.position_size == 0) {
+        assert is_short = 0;
+    } else {
+        // Store it in the array
+        let curr_position = PositionDetailsForRiskManagement(
+            market_id=curr_market_id,
+            direction=SHORT,
+            avg_execution_price=short_position.avg_execution_price,
+            position_size=short_position.position_size,
+            margin_amount=short_position.margin_amount,
+            borrowed_amount=short_position.borrowed_amount,
+            leverage=short_position.leverage,
+        );
+        assert positions_array_[positions_array_len_ + is_long] = curr_position;
+        assert is_short = 1;
+    }
+
+    return populate_positions_risk_management(
+        positions_array_len_=positions_array_len_ + is_long + is_short,
+        positions_array_=positions_array_,
+        iterator_=iterator_ + 1,
+        final_len_=final_len_,
+    );
+}
+
 // @notice Internal Function called by get_positions to recursively add active positions to the array and return it
 // @param positions_array_len_ - Length of the array
 // @param positions_array_ - Required array of positions
@@ -1210,6 +1304,9 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             margin_amount=long_position.margin_amount,
             borrowed_amount=long_position.borrowed_amount,
             leverage=long_position.leverage,
+            created_timestamp=long_position.created_timestamp,
+            modified_timestamp=long_position.modified_timestamp,
+            realized_pnl=long_position.realized_pnl,
         );
         assert positions_array_[positions_array_len_] = curr_position;
         assert is_long = 1;
@@ -1227,6 +1324,9 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             margin_amount=short_position.margin_amount,
             borrowed_amount=short_position.borrowed_amount,
             leverage=short_position.leverage,
+            created_timestamp=short_position.created_timestamp,
+            modified_timestamp=short_position.modified_timestamp,
+            realized_pnl=short_position.realized_pnl,
         );
         assert positions_array_[positions_array_len_ + is_long] = curr_position;
         assert is_short = 1;

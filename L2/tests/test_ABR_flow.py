@@ -4,7 +4,7 @@ import time
 import asyncio
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, str_to_felt, assert_event_emitted, to64x61, convertTo64x61, assert_revert, from64x61
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, assert_event_emitted, to64x61, convertTo64x61, assert_revert, from64x61, PRIME
 from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, User, ABR, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, compare_abr_values, check_batch_status, set_abr_value, make_abr_payments
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
@@ -43,10 +43,6 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def abr_factory(starknet_service: StarknetService):
-    print("Amount", from64x61(42528324536356912))
-    print("BTC_USD", BTC_USD_ID)
-    print("ETH_USD", ETH_USD_ID)
-    print("BTC_UST", BTC_UST_ID)
     # Deploy admin accounts
     admin1 = await starknet_service.deploy(ContractType.Account, [admin1_signer.public_key])
     admin2 = await starknet_service.deploy(ContractType.Account, [admin2_signer.public_key])
@@ -617,7 +613,6 @@ async def test_view_functions_state_1(abr_factory):
     starknet_service, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment,  timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
     epoch_query = await abr_core.get_epoch().call()
-    print("epoch", epoch_query.result)
     assert epoch_query.result.res == 1
 
     state_query = await abr_core.get_state().call()
@@ -838,33 +833,6 @@ async def test_pay_abr_call_1(abr_factory):
 
     abr_tx = await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=abr_core,
                                      abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=from64x61(timestamp_2))
-
-    # market_id_1 = BTC_USD_ID
-    # market_id_2 = ETH_USD_ID
-
-    # abr_payment_1 = to64x61(0.11592309206227451)
-    # abr_payment_2 = to64x61(0.0184437207417947)
-    # assert_events_emitted_from_all_calls(
-    #     abr_tx,
-    #     [
-    #         [0, alice.contract_address, 'transferred_abr', [
-    #             market_id_1, abr_payment_1, timestamp_2]],
-    #         [1, abr_fund.contract_address, 'deposit_ABR_called', [
-    #             alice.contract_address, market_id_1, abr_payment_1, timestamp_2]],
-    #         [2, alice.contract_address, 'transferred_abr', [
-    #             market_id_2, abr_payment_2, timestamp_2]],
-    #         [3, abr_fund.contract_address, 'deposit_ABR_called', [
-    #             alice.contract_address, market_id_2, abr_payment_2, timestamp_2]],
-    #         [4, bob.contract_address, 'transferred_from_abr', [
-    #             market_id_1, abr_payment_1, timestamp_2]],
-    #         [5, abr_fund.contract_address, 'withdraw_ABR_called', [
-    #             bob.contract_address, market_id_1, abr_payment_1, timestamp_2]],
-    #         [6, bob.contract_address, 'transferred_abr', [
-    #             market_id_2, abr_payment_2, timestamp_2]],
-    #         [7, abr_fund.contract_address, 'withdraw_ABR_called', [
-    #             bob.contract_address, market_id_2, abr_payment_2, timestamp_2]],
-    #     ]
-    # )
 
     await compare_user_balances(users=[alice, bob], user_tests=[alice_test, bob_test], asset_id=AssetID.USDC)
     await compare_user_positions(users=[alice, bob], users_test=[alice_test, bob_test], market_id=BTC_USD_ID)

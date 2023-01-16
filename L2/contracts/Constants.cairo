@@ -91,9 +91,9 @@ const IoC = 3;
 const OPEN = 1;
 const CLOSE = 2;
 
-const STATE_0 = 0;
-const STATE_1 = 1;
-const STATE_2 = 2;
+const ABR_STATE_0 = 0;
+const ABR_STATE_1 = 1;
+const ABR_STATE_2 = 2;
 
 const SEASON_CREATED = 1;
 const SEASON_STARTED = 2;

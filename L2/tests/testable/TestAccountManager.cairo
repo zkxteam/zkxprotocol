@@ -11,6 +11,7 @@ from contracts.AccountManager import (
     get_position_data,
     get_L1_address,
     get_deleveragable_or_liquidatable_position,
+    get_positions_for_risk_management,
     get_portion_executed,
     return_array_collaterals,
     get_withdrawal_history,
