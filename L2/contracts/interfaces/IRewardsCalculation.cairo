@@ -8,6 +8,9 @@ namespace IRewardsCalculation {
     func get_xp_state(season_id_: felt) -> (state: felt) {
     }
 
+    func get_no_of_batches_per_season(season_id_: felt) -> (no_of_batches: felt) {
+    }
+
     func update_no_of_batches_in_season(season_id_: felt) {
     }
 }
