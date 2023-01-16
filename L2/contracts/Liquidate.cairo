@@ -24,7 +24,7 @@ from contracts.DataTypes import (
     MultipleOrder,
     PriceData,
     PositionDetails,
-    PositionDetailsWithMarket,
+    PositionDetailsForRiskManagement,
 )
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAsset import IAsset
@@ -78,7 +78,7 @@ func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func check_liquidation_called(
     account_address: felt,
     liq_result: felt,
-    least_collateral_ratio_position: PositionDetailsWithMarket,
+    least_collateral_ratio_position: PositionDetailsForRiskManagement,
 ) {
 }
 
@@ -89,7 +89,9 @@ func can_order_be_opened(order: MultipleOrder) {
 
 // Event emitted whenever position can be deleveraged
 @event
-func position_to_be_deleveraged(position: PositionDetailsWithMarket, amount_to_be_sold: felt) {
+func position_to_be_deleveraged(
+    position: PositionDetailsForRiskManagement, amount_to_be_sold: felt
+) {
 }
 
 // ///////////////
@@ -119,7 +121,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 @external
 func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address: felt, prices_len: felt, prices: PriceData*
-) -> (liq_result: felt, least_collateral_ratio_position: PositionDetailsWithMarket) {
+) -> (liq_result: felt, least_collateral_ratio_position: PositionDetailsForRiskManagement) {
     alloc_locals;
     // Check if the caller is a node
 
@@ -130,8 +132,8 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Fetch all the positions from the Account contract
     let (
-        positions_len: felt, positions: PositionDetailsWithMarket*
-    ) = IAccountManager.get_positions(contract_address=account_address);
+        positions_len: felt, positions: PositionDetailsForRiskManagement*
+    ) = IAccountManager.get_positions_for_risk_management(contract_address=account_address);
 
     // Check if the list is empty
     with_attr error_message("Liquidate: User's positions array is empty") {
@@ -161,7 +163,7 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         total_account_value=0,
         total_maintenance_requirement=0,
         least_collateral_ratio=Math64x61_ONE,
-        least_collateral_ratio_position=PositionDetailsWithMarket(0, 0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_collateral_price=0,
         least_collateral_ratio_position_asset_price=0,
     );
@@ -245,14 +247,13 @@ func find_collateral_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         assetID=[prices].assetID,
         collateralID=[prices].collateralID,
         assetPrice=[prices].assetPrice,
-        collateralPrice=[prices].collateralPrice
-        );
+        collateralPrice=[prices].collateralPrice,
+    );
 
     // Create a temporary struct to read data from the array element of collaterals
     tempvar collateral_details: CollateralBalance = CollateralBalance(
-        assetID=[collaterals].assetID,
-        balance=[collaterals].balance
-        );
+        assetID=[collaterals].assetID, balance=[collaterals].balance
+    );
     // Check if the passed prices list is in proper order and the price is not negative
     with_attr error_message("Liquidate: AssetID and collateralID mismatch") {
         assert price_details.collateralID = collateral_details.assetID;
@@ -298,18 +299,18 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     account_address: felt,
     market_address: felt,
     positions_len: felt,
-    positions: PositionDetailsWithMarket*,
+    positions: PositionDetailsForRiskManagement*,
     prices_len: felt,
     prices: PriceData*,
     total_account_value: felt,
     total_maintenance_requirement: felt,
     least_collateral_ratio: felt,
-    least_collateral_ratio_position: PositionDetailsWithMarket,
+    least_collateral_ratio_position: PositionDetailsForRiskManagement,
     least_collateral_ratio_position_collateral_price: felt,
     least_collateral_ratio_position_asset_price: felt,
 ) -> (
     is_liquidation: felt,
-    least_collateral_ratio_position: PositionDetailsWithMarket,
+    least_collateral_ratio_position: PositionDetailsForRiskManagement,
     least_collateral_ratio_position_collateral_price: felt,
     least_collateral_ratio_position_asset_price: felt,
 ) {
@@ -353,15 +354,15 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     }
 
     // Create a temporary struct to read data from the array element of positions
-    tempvar position_details: PositionDetailsWithMarket = PositionDetailsWithMarket(
+    tempvar position_details: PositionDetailsForRiskManagement = PositionDetailsForRiskManagement(
         market_id=[positions].market_id,
         direction=[positions].direction,
         avg_execution_price=[positions].avg_execution_price,
         position_size=[positions].position_size,
         margin_amount=[positions].margin_amount,
         borrowed_amount=[positions].borrowed_amount,
-        leverage=[positions].leverage
-        );
+        leverage=[positions].leverage,
+    );
 
     // Get the asset ID and collateral ID of the position
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
@@ -373,8 +374,8 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         assetID=[prices].assetID,
         collateralID=[prices].collateralID,
         assetPrice=[prices].assetPrice,
-        collateralPrice=[prices].collateralPrice
-        );
+        collateralPrice=[prices].collateralPrice,
+    );
 
     // Check if there is a mismatch in prices array and positions array
     with_attr error_message("Liquidate: AssetID and collateralID mismatch") {
@@ -442,7 +443,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
     // If it is the lowest, update least_collateral_ratio and least_collateral_ratio_position
     local least_collateral_ratio_;
-    local least_collateral_ratio_position_: PositionDetailsWithMarket;
+    local least_collateral_ratio_position_: PositionDetailsForRiskManagement;
     local least_collateral_ratio_position_collateral_price_;
     local least_collateral_ratio_position_asset_price_;
     if (is_lesser == TRUE) {
@@ -462,7 +463,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         account_address=account_address,
         market_address=market_address,
         positions_len=positions_len - 1,
-        positions=positions + PositionDetailsWithMarket.SIZE,
+        positions=positions + PositionDetailsForRiskManagement.SIZE,
         prices_len=prices_len - 1,
         prices=prices + PriceData.SIZE,
         total_account_value=total_account_value + net_position_value_usd,
@@ -485,7 +486,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address_: felt,
     market_address_: felt,
-    position_: PositionDetailsWithMarket,
+    position_: PositionDetailsForRiskManagement,
     collateral_price_: felt,
     asset_price_: felt,
 ) -> (amount_to_be_sold: felt) {
@@ -554,8 +555,8 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 
     // Get a list with all positions from AccountManager contract
     let (
-        positions_len: felt, positions: PositionDetailsWithMarket*
-    ) = IAccountManager.get_positions(contract_address=order.user_address);
+        positions_len: felt, positions: PositionDetailsForRiskManagement*
+    ) = IAccountManager.get_positions_for_risk_management(contract_address=order.user_address);
 
     // Fetch the maintanence margin requirement from Markets contract
     let (market_address) = IAuthorizedRegistry.get_contract_address(
@@ -608,7 +609,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         total_account_value=account_value,
         total_maintenance_requirement=maintenance_requirement,
         least_collateral_ratio=Math64x61_ONE,
-        least_collateral_ratio_position=PositionDetailsWithMarket(0, 0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_collateral_price=0,
         least_collateral_ratio_position_asset_price=0,
     );
@@ -639,7 +640,7 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     collateral_price_address: felt,
     iterator: felt,
     positions_len: felt,
-    positions: PositionDetailsWithMarket*,
+    positions: PositionDetailsForRiskManagement*,
     prices_len: felt,
     prices: PriceData*,
 ) -> (prices_len: felt, prices: PriceData*) {
@@ -690,7 +691,7 @@ func populate_asset_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
             collateral_price_address,
             iterator + 1,
             positions_len,
-            positions + PositionDetailsWithMarket.SIZE,
+            positions + PositionDetailsForRiskManagement.SIZE,
             prices_len + 1,
             prices,
         );
@@ -775,8 +776,8 @@ func get_asset_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     // Fetch all the positions from the Account contract
     let (
-        positions_len: felt, positions: PositionDetailsWithMarket*
-    ) = IAccountManager.get_positions(contract_address=account_address);
+        positions_len: felt, positions: PositionDetailsForRiskManagement*
+    ) = IAccountManager.get_positions_for_risk_management(contract_address=account_address);
 
     let (prices_array_len: felt, prices_array: PriceData*) = populate_asset_prices_recurse(
         market_contract_address=market_contract_address,

@@ -3,11 +3,12 @@
 from contracts.DataTypes import (
     CollateralBalance,
     LiquidatablePosition,
-    NetPositions,
     OrderRequest,
     PositionDetails,
+    PositionDetailsForRiskManagement,
     PositionDetailsWithMarket,
     Signature,
+    SimplifiedPosition,
 )
 
 @contract_interface
@@ -39,21 +40,26 @@ namespace IAccountManager {
     func get_balance(assetID_: felt) -> (res: felt) {
     }
 
-    func get_positions() -> (array_list_len: felt, array_list: PositionDetailsWithMarket*) {
+    func get_positions() -> (positions_array_len: felt, positions_array: PositionDetailsWithMarket*) {
     }
 
-    func get_net_positions() -> (
-        net_positions_array_len: felt, net_positions_array: NetPositions*
+    func get_positions_for_risk_management() -> (positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*) {
+    }
+
+    func get_simplified_positions(timestamp_filter_: felt) -> (
+        positions_array_len: felt, positions_array: SimplifiedPosition*
     ) {
     }
 
     func get_portion_executed(order_id_: felt) -> (res: felt) {
     }
 
-    func transfer_from_abr(collateral_id_: felt, market_id_: felt, amount_: felt) {
+    func transfer_from_abr(
+        collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
+    ) {
     }
 
-    func transfer_abr(collateral_id_: felt, market_id_: felt, amount_: felt) {
+    func transfer_abr(collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt) {
     }
 
     func timestamp_check(market_id_: felt) -> (is_eight_hours: felt) {
@@ -65,7 +71,7 @@ namespace IAccountManager {
     func return_array_collaterals() -> (array_list_len: felt, array_list: CollateralBalance*) {
     }
 
-    func liquidate_position(position_: PositionDetailsWithMarket, amount_to_be_sold_: felt) {
+    func liquidate_position(position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt) {
     }
 
     func get_deleveragable_or_liquidatable_position() -> (position: LiquidatablePosition) {

@@ -104,7 +104,7 @@ struct PositionDetails {
 }
 
 // Struct to be used for liquidation calls
-struct PositionDetailsWithMarket {
+struct PositionDetailsForRiskManagement {
     market_id: felt,
     direction: felt,
     avg_execution_price: felt,
@@ -112,6 +112,19 @@ struct PositionDetailsWithMarket {
     margin_amount: felt,
     borrowed_amount: felt,
     leverage: felt,
+}
+
+struct PositionDetailsWithMarket{
+    market_id:felt,
+    direction: felt,
+    avg_execution_price: felt,
+    position_size: felt,
+    margin_amount: felt,
+    borrowed_amount: felt,
+    leverage: felt,
+    created_timestamp: felt,
+    modified_timestamp: felt,
+    realized_pnl: felt,
 }
 
 // Struct to store the position that is to be Liquidated/Deleveraged
@@ -123,8 +136,9 @@ struct LiquidatablePosition {
 }
 
 // @notice struct for sending the array of positions for ABR calculations
-struct NetPositions {
+struct SimplifiedPosition {
     market_id: felt,
+    direction: felt,
     position_size: felt,
 }
 
@@ -225,7 +239,7 @@ struct TradingSeason {
     start_block_number: felt,
     start_timestamp: felt,
     num_trading_days: felt,
-    status: felt,  //Either Initialized, Started or Ended
+    status: felt,  // Either Initialized, Started or Ended
 }
 
 // Struct to store multipliers used to calculate total reward to be split between traders

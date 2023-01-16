@@ -32,13 +32,13 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    account_addresses_len: felt, account_addresses: felt*
+    account_addresses_len: felt, account_addresses: felt*, timestamp_: felt
 ) {
     alloc_locals;
 
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
     record_call_details('pay_abr');
     let (inner_address) = get_inner_contract();
-    IABRPayment.pay_abr(inner_address, account_addresses_len, account_addresses);
+    IABRPayment.pay_abr(inner_address, account_addresses_len, account_addresses, timestamp_);
     return ();
 }

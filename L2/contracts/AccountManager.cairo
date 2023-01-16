@@ -16,7 +16,7 @@ from starkware.cairo.common.math import (
     assert_not_equal,
     assert_not_zero,
 )
-from starkware.cairo.common.math_cmp import is_le
+from starkware.cairo.common.math_cmp import is_le, is_not_zero
 from starkware.cairo.common.pow import pow
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
@@ -54,10 +54,11 @@ from contracts.DataTypes import (
     CollateralBalance,
     LiquidatablePosition,
     Message,
-    NetPositions,
     OrderRequest,
     PositionDetails,
+    PositionDetailsForRiskManagement,
     PositionDetailsWithMarket,
+    SimplifiedPosition,
     Signature,
     WithdrawalHistory,
     WithdrawalRequestForHashing,
@@ -94,12 +95,12 @@ func transferred(asset_id: felt, amount: felt) {
 
 // Event emitted whenever collateral is transferred to account by abr payment
 @event
-func transferred_abr(market_id: felt, amount: felt, timestamp: felt) {
+func transferred_abr(market_id: felt, direction: felt, amount: felt, timestamp: felt) {
 }
 
 // Event emitted whenever collateral is transferred from account by abr payment
 @event
-func transferred_from_abr(market_id: felt, amount: felt, timestamp: felt) {
+func transferred_from_abr(market_id: felt, direction: felt, amount: felt, timestamp: felt) {
 }
 
 // Event emitted whenver a new withdrawal request is made
@@ -139,11 +140,6 @@ func position_mapping(market_id: felt, direction: felt) -> (res: PositionDetails
 // Mapping of orderID to portionExecuted of that order
 @storage_var
 func portion_executed(order_id: felt) -> (res: felt) {
-}
-
-// Mapping of orderID to the timestamp of last updated value
-@storage_var
-func last_updated(market_id) -> (value: felt) {
 }
 
 // Stores L1 address associated with the account
@@ -373,27 +369,6 @@ func get_withdrawal_history{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     return populate_withdrawals_array(0, withdrawal_list);
 }
 
-// @notice view function to check if eight hours is complete or not
-// @param market_id_ - ID of a market
-// @return res - true if it is complete, else false
-@view
-func timestamp_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt
-) -> (is_eight_hours: felt) {
-    alloc_locals;
-    // Get the latest block
-    let (block_timestamp) = get_block_timestamp();
-
-    // Fetch the last updated time
-    let (last_call) = last_updated.read(market_id=market_id_);
-
-    // Minimum time before the second call
-    let min_time = last_call + 28800;
-    let is_eight_hours = is_le(block_timestamp, min_time);
-
-    return (is_eight_hours,);
-}
-
 // //////////////
 // L1 Handler //
 // //////////////
@@ -489,7 +464,7 @@ func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    collateral_id_: felt, market_id_: felt, amount_: felt
+    collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
 ) {
     // Check if the caller is ABR Payment
     let (caller) = get_caller_address();
@@ -504,15 +479,44 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert caller = abr_payment_address;
     }
 
+    with_attr error_message("AccountManager: Amount cannot be negative") {
+        assert_le(0, amount_);
+    }
+
     // Reduce the amount from balance
     let (balance_) = balance.read(assetID=collateral_id_);
     balance.write(assetID=collateral_id_, value=balance_ - amount_);
 
-    // Update the timestamp of last called
+    // Get curent block_timestamp
     let (block_timestamp) = get_block_timestamp();
-    last_updated.write(market_id=market_id_, value=block_timestamp);
 
-    transferred_from_abr.emit(market_id=market_id_, amount=amount_, timestamp=block_timestamp);
+    // Get the details of the position
+    let (position_details: PositionDetails) = position_mapping.read(
+        market_id=market_id_, direction=direction_
+    );
+
+    // Calculate the new pnl
+    let (new_realized_pnl) = Math64x61_sub(position_details.realized_pnl, amount_);
+
+    // Create a new struct with the updated details
+    let updated_position = PositionDetails(
+        avg_execution_price=position_details.avg_execution_price,
+        position_size=position_details.position_size,
+        margin_amount=position_details.margin_amount,
+        borrowed_amount=position_details.borrowed_amount,
+        leverage=position_details.leverage,
+        created_timestamp=position_details.created_timestamp,
+        modified_timestamp=position_details.modified_timestamp,
+        realized_pnl=new_realized_pnl,
+    );
+
+    // Write it to the position mapping
+    position_mapping.write(market_id=market_id_, direction=direction_, value=updated_position);
+
+    // Emit transfer from event
+    transferred_from_abr.emit(
+        market_id=market_id_, direction=direction_, amount=amount_, timestamp=block_timestamp
+    );
     return ();
 }
 
@@ -522,7 +526,7 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param amount_ - Amount of funds to transfer from this contract
 @external
 func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    collateral_id_: felt, market_id_: felt, amount_: felt
+    collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
 ) {
     // Check if the caller is trading contract
     let (caller) = get_caller_address();
@@ -536,31 +540,81 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         assert caller = abr_payment_address;
     }
 
+    with_attr error_message("AccountManager: Amount cannot be negative") {
+        assert_le(0, amount_);
+    }
+
     // Add amount to balance
     let (balance_) = balance.read(assetID=collateral_id_);
     balance.write(assetID=collateral_id_, value=balance_ + amount_);
 
     // Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp();
-    last_updated.write(market_id=market_id_, value=block_timestamp);
 
-    transferred_abr.emit(market_id=market_id_, amount=amount_, timestamp=block_timestamp);
+    // Get the details of the position
+    let (position_details: PositionDetails) = position_mapping.read(
+        market_id=market_id_, direction=direction_
+    );
+
+    // Calculate the new pnl
+    let (new_realized_pnl) = Math64x61_add(position_details.realized_pnl, amount_);
+
+    // Create a new struct with the updated details
+    let updated_position = PositionDetails(
+        avg_execution_price=position_details.avg_execution_price,
+        position_size=position_details.position_size,
+        margin_amount=position_details.margin_amount,
+        borrowed_amount=position_details.borrowed_amount,
+        leverage=position_details.leverage,
+        created_timestamp=position_details.created_timestamp,
+        modified_timestamp=position_details.modified_timestamp,
+        realized_pnl=new_realized_pnl,
+    );
+
+    // Write it to the position mapping
+    position_mapping.write(market_id=market_id_, direction=direction_, value=updated_position);
+
+    // Emit transfer event
+    transferred_abr.emit(
+        market_id=market_id_, direction=direction_, amount=amount_, timestamp=block_timestamp
+    );
     return ();
 }
 
-// @notice External function called by the ABR Contract to get the array of net positions of the user
-// @returns net_positions_array_len - Length of the array
-// @returns net_positions_array - Required array of net positions
+// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
+// @param timestmap_filter_ - Timestmap by which to filter the array
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of net positions
 @view
-func get_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    net_positions_array_len: felt, net_positions_array: NetPositions*
+func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    timestamp_filter_: felt
+) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
+    alloc_locals;
+
+    let (positions_array: SimplifiedPosition*) = alloc();
+    let (array_len: felt) = index_to_market_array_len.read();
+    return populate_simplified_positions(
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        iterator_=0,
+        final_len_=array_len,
+        timestamp_filter_=timestamp_filter_,
+    );
+}
+
+// @notice External function called by the Liquidate Contract to get the array of net positions of the user
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of positions
+@view
+func get_positions_for_risk_management{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*
 ) {
     alloc_locals;
 
-    let (net_positions_array: NetPositions*) = alloc();
+    let (positions_array: PositionDetailsForRiskManagement*) = alloc();
     let (array_len: felt) = index_to_market_array_len.read();
-    return populate_net_positions(
-        net_positions_array_len_=0, net_positions_array_=net_positions_array, final_len_=array_len
+    return populate_positions_risk_management(
+        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     );
 }
 
@@ -579,6 +633,7 @@ func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     );
 }
+
 
 // @notice External function called by the Trading Contract to transfer funds from account contract
 // @param assetID_ - asset ID of the collateral that needs to be transferred
@@ -835,14 +890,14 @@ func execute_order{
                 market_id=market_id,
                 direction=parent_direction,
                 value=PositionDetails(
-                avg_execution_price=0,
-                position_size=0,
-                margin_amount=0,
-                borrowed_amount=0,
-                leverage=0,
-                created_timestamp=0,
-                modified_timestamp=0,
-                realized_pnl=0
+                    avg_execution_price=0,
+                    position_size=0,
+                    margin_amount=0,
+                    borrowed_amount=0,
+                    leverage=0,
+                    created_timestamp=0,
+                    modified_timestamp=0,
+                    realized_pnl=0,
                 ),
             );
 
@@ -945,10 +1000,8 @@ func withdraw{
     assert signature_[1] = sig_s_;
     // Create withdrawal request for hashing
     local hash_withdrawal_request_: WithdrawalRequestForHashing = WithdrawalRequestForHashing(
-        request_id=request_id_,
-        collateral_id=collateral_id_,
-        amount=amount_,
-        );
+        request_id=request_id_, collateral_id=collateral_id_, amount=amount_
+    );
     // hash the parameters
     let (hash) = hash_withdrawal_request(&hash_withdrawal_request_);
     // check if Tx is signed by the user
@@ -1022,8 +1075,8 @@ func withdraw{
         timestamp=timestamp_,
         node_operator_L2_address=node_operator_L2_address_,
         fee=standard_fee,
-        status=WITHDRAWAL_INITIATED
-        );
+        status=WITHDRAWAL_INITIATED,
+    );
     // Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read();
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_);
@@ -1039,7 +1092,7 @@ func withdraw{
 // @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
 @external
 func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    position_: PositionDetailsWithMarket, amount_to_be_sold_: felt
+    position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt
 ) {
     alloc_locals;
 
@@ -1125,6 +1178,84 @@ func populate_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     return populate_array_collaterals(array_list_len_ + 1, array_list_, final_len_);
 }
 
+// @notice Internal Function called by get_positions_for_risk_management to recursively add active positions to the array and return it
+// @param positions_array_len_ - Length of the array
+// @param positions_array_ - Required array of positions
+// @param iterator_ - Current length of traversed array
+// @param final_len_ - Length of the final array
+// @returns positions_array_len - Length of the positions array
+// @returns positions_array - Array with the positions
+func populate_positions_risk_management{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    positions_array_len_: felt,
+    positions_array_: PositionDetailsForRiskManagement*,
+    iterator_: felt,
+    final_len_: felt,
+) -> (positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*) {
+    alloc_locals;
+
+    // If we reached the end of the array, then return
+    if (final_len_ == iterator_) {
+        return (positions_array_len_, positions_array_);
+    }
+
+    // Get the market id at that position
+    let (curr_market_id: felt) = index_to_market_array.read(index=iterator_);
+
+    // Get Long position
+    let (long_position: PositionDetails) = position_mapping.read(
+        market_id=curr_market_id, direction=LONG
+    );
+
+    // Get Short position
+    let (short_position: PositionDetails) = position_mapping.read(
+        market_id=curr_market_id, direction=SHORT
+    );
+
+    local is_long;
+    local is_short;
+
+    if (long_position.position_size == 0) {
+        assert is_long = 0;
+    } else {
+        // Store it in the array
+        let curr_position = PositionDetailsForRiskManagement(
+            market_id=curr_market_id,
+            direction=LONG,
+            avg_execution_price=long_position.avg_execution_price,
+            position_size=long_position.position_size,
+            margin_amount=long_position.margin_amount,
+            borrowed_amount=long_position.borrowed_amount,
+            leverage=long_position.leverage,
+        );
+        assert positions_array_[positions_array_len_] = curr_position;
+        assert is_long = 1;
+    }
+
+    if (short_position.position_size == 0) {
+        assert is_short = 0;
+    } else {
+        // Store it in the array
+        let curr_position = PositionDetailsForRiskManagement(
+            market_id=curr_market_id,
+            direction=SHORT,
+            avg_execution_price=short_position.avg_execution_price,
+            position_size=short_position.position_size,
+            margin_amount=short_position.margin_amount,
+            borrowed_amount=short_position.borrowed_amount,
+            leverage=short_position.leverage,
+        );
+        assert positions_array_[positions_array_len_ + is_long] = curr_position;
+        assert is_short = 1;
+    }
+
+    return populate_positions_risk_management(
+        positions_array_len_=positions_array_len_ + is_long + is_short,
+        positions_array_=positions_array_,
+        iterator_=iterator_ + 1,
+        final_len_=final_len_,
+    );
+}
+
 // @notice Internal Function called by get_positions to recursively add active positions to the array and return it
 // @param positions_array_len_ - Length of the array
 // @param positions_array_ - Required array of positions
@@ -1173,6 +1304,9 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             margin_amount=long_position.margin_amount,
             borrowed_amount=long_position.borrowed_amount,
             leverage=long_position.leverage,
+            created_timestamp=long_position.created_timestamp,
+            modified_timestamp=long_position.modified_timestamp,
+            realized_pnl=long_position.realized_pnl,
         );
         assert positions_array_[positions_array_len_] = curr_position;
         assert is_long = 1;
@@ -1190,6 +1324,9 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             margin_amount=short_position.margin_amount,
             borrowed_amount=short_position.borrowed_amount,
             leverage=short_position.leverage,
+            created_timestamp=short_position.created_timestamp,
+            modified_timestamp=short_position.modified_timestamp,
+            realized_pnl=short_position.realized_pnl,
         );
         assert positions_array_[positions_array_len_ + is_long] = curr_position;
         assert is_short = 1;
@@ -1204,21 +1341,27 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 }
 
 // @notice External function called by the ABR Contract to get the array of net positions of the user
-// @param net_positions_array_len_ - Length of the array
-// @param net_positions_array_ - Required array of net positions
+// @param positions_array_len_ - Length of the array
+// @param positions_array_ - Required array of net positions
 // @param final_len_ - Length of the final array
-// @returns net_positions_array_len - Length of the net positions array
-// @returns net_positions_array - Array with the net positions
-func populate_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    net_positions_array_len_: felt, net_positions_array_: NetPositions*, final_len_: felt
-) -> (net_positions_array_len: felt, net_positions_array: NetPositions*) {
+// @param timestamp_filter_ - Timestamp by which to filter the array
+// @returns positions_array_len - Length of the net positions array
+// @returns positions_array - Array with the net positions
+func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    positions_array_len_: felt,
+    positions_array_: SimplifiedPosition*,
+    iterator_: felt,
+    final_len_: felt,
+    timestamp_filter_: felt,
+) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
+    alloc_locals;
     // If reached the end of the array, then return
-    if (net_positions_array_len_ == final_len_) {
-        return (net_positions_array_len_, net_positions_array_);
+    if (final_len_ == iterator_) {
+        return (positions_array_len_, positions_array_);
     }
 
     // Get the market id at that position
-    let (curr_market_id: felt) = index_to_market_array.read(index=net_positions_array_len_);
+    let (curr_market_id: felt) = index_to_market_array.read(index=iterator_);
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
@@ -1230,22 +1373,44 @@ func populate_net_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         market_id=curr_market_id, direction=SHORT
     );
 
-    // Calculate the net position
-    let (net_size: felt) = Math64x61_sub(long_position.position_size, short_position.position_size);
+    local is_long;
+    local is_short;
 
-    // Create the struct with the details
-    let net_position_struct: NetPositions = NetPositions(
-        market_id=curr_market_id, position_size=net_size
-    );
+    let within_timestamp_long = is_le(long_position.created_timestamp, timestamp_filter_);
+    let is_not_zero_long = is_not_zero(long_position.position_size);
 
-    // Store it in the array
-    assert net_positions_array_[net_positions_array_len_] = net_position_struct;
+    let within_timestamp_short = is_le(short_position.created_timestamp, timestamp_filter_);
+    let is_not_zero_short = is_not_zero(short_position.position_size);
+
+    if (within_timestamp_long - is_not_zero_long == 0) {
+        // Create the struct with the details
+        let position_struct_long: SimplifiedPosition = SimplifiedPosition(
+            market_id=curr_market_id, direction=LONG, position_size=long_position.position_size
+        );
+        assert positions_array_[positions_array_len_] = position_struct_long;
+        assert is_long = 1;
+    } else {
+        assert is_long = 0;
+    }
+
+    if (within_timestamp_short - is_not_zero_short == 0) {
+        // Create the struct with the details
+        let position_struct_short: SimplifiedPosition = SimplifiedPosition(
+            market_id=curr_market_id, direction=SHORT, position_size=short_position.position_size
+        );
+        assert positions_array_[positions_array_len_ + is_long] = position_struct_short;
+        assert is_short = 1;
+    } else {
+        assert is_short = 0;
+    }
 
     // Recursively call the next market_id
-    return populate_net_positions(
-        net_positions_array_len_=net_positions_array_len_ + 1,
-        net_positions_array_=net_positions_array_,
+    return populate_simplified_positions(
+        positions_array_len_=positions_array_len_ + is_long + is_short,
+        positions_array_=positions_array_,
+        iterator_=iterator_ + 1,
         final_len_=final_len_,
+        timestamp_filter_=timestamp_filter_,
     );
 }
 

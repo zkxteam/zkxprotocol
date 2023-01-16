@@ -17,7 +17,7 @@ const CollateralPrices_INDEX = 13;
 const AccountRegistry_INDEX = 14;
 const WithdrawalFeeBalance_INDEX = 15;
 const WithdrawalRequest_INDEX = 16;
-const ABR_INDEX = 17;
+const ABR_Calculations_INDEX = 17;
 const ABR_FUNDS_INDEX = 18;
 const ABR_PAYMENT_INDEX = 19;
 const AccountDeployer_INDEX = 20;
@@ -31,6 +31,7 @@ const Starkway_INDEX = 27;
 const Settings_INDEX = 28;
 const RewardsCalculation_INDEX = 29;
 const HighTideCalc_INDEX = 30;
+const ABR_Core_Index = 31;
 
 // Indices for Relay,  Relay_Index = (Underlying contract index) x 100
 
@@ -89,6 +90,10 @@ const IoC = 3;
 
 const OPEN = 1;
 const CLOSE = 2;
+
+const ABR_STATE_0 = 0;
+const ABR_STATE_1 = 1;
+const ABR_STATE_2 = 2;
 
 const SEASON_CREATED = 1;
 const SEASON_STARTED = 2;

@@ -45,7 +45,7 @@ class ContractIndex:
     AccountRegistry = 14
     WithdrawalFeeBalance = 15
     WithdrawalRequest = 16
-    ABR = 17
+    ABRCalculations = 17
     ABRFund = 18
     ABRPayment = 19
     AccountDeployer = 20
@@ -57,6 +57,7 @@ class ContractIndex:
     UserStats = 26
     Starkway = 27
     Settings = 28
+    ABRCore = 31
 
 
 class ManagerAction:
