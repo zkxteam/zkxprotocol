@@ -10,7 +10,8 @@ from starkware.cairo.common.math import (
     assert_not_zero,
     unsigned_div_rem,
 )
-from starkware.starknet.common.syscalls import get_caller_address
+from starkware.cairo.common.math_cmp import is_le
+from starkware.starknet.common.syscalls import get_block_number, get_caller_address
 
 from contracts.Constants import Hightide_INDEX, ManageHighTide_ACTION
 from contracts.DataTypes import TradingSeason, XpValues
@@ -59,7 +60,7 @@ func block_interval() -> (res: felt) {
 
 // Stores current season's block number up to which values were set
 @storage_var
-func current_season_block_number(season_id: felt) -> (res: felt) {
+func season_last_block_number(season_id: felt) -> (res: felt) {
 }
 
 // //////////////
@@ -82,12 +83,16 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ///////
 
 // @notice Function to get block number range within which node needs to select a random block number
+// @param season_id_ - season id for which block range is to be obtained
 // @return start_block - starting block number range (inclusive)
-// @return end_block - ending block number range (inclusive)
+// @return end_block - ending block number range (inclusive) (both values will be 0, if no more values to be set)
 @view
-func get_block_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    start_block: felt, end_block: felt
-) {
+func get_block_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    season_id_: felt
+) -> (start_block: felt, end_block: felt) {
+    alloc_locals;
+    local smaller_block_number;
+
     let (current_block_interval) = block_interval.read();
     with_attr error_message("RewardsCalculation: Block interval is not set") {
         assert_lt(0, current_block_interval);
@@ -101,34 +106,49 @@ func get_block_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    // Get trading season data
-    let (season_id: felt) = IHighTide.get_current_season_id(contract_address=hightide_address);
+    // Verify whether the season id exists
+    IHighTide.verify_season_id_exists(contract_address=hightide_address, season_id_=season_id_);
 
-    with_attr error_message("RewardsCalculations: No ongoing season") {
-        assert_not_zero(season_id);
-    }
+    // Get current season's starting block number
+    let (season) = IHighTide.get_season(contract_address=hightide_address, season_id=season_id_);
 
-    let (current_block_number) = current_season_block_number.read(season_id);
+    let (last_block_number) = season_last_block_number.read(season_id_);
 
-    if (current_block_number == 0) {
-        let (registry) = get_registry_address();
-        let (version) = get_contract_version();
-
-        // Verify whether season id is valid
-        let (hightide_address) = IAuthorizedRegistry.get_contract_address(
-            contract_address=registry, index=Hightide_INDEX, version=version
-        );
-
-        // Get current season's starting block number
-        let (current_season) = IHighTide.get_season(
-            contract_address=hightide_address, season_id=season_id
-        );
-        let start_block_number = current_season.start_block_number;
+    if (last_block_number == 0) {
+        let start_block_number = season.start_block_number;
 
         return (start_block_number, start_block_number + current_block_interval - 1);
     }
 
-    return (current_block_number + 1, current_block_number + current_block_interval);
+    // Find the smaller block number between season end block number and current block number
+    let (current_block_number) = get_block_number();
+    if (season.end_block_number != 0) {
+        if (is_le(current_block_number, season.end_block_number) == TRUE) {
+            smaller_block_number = current_block_number;
+        } else {
+            smaller_block_number = season.end_block_number;
+        }
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        smaller_block_number = current_block_number;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    // Check whether if we add block interval to last block number it goes beyond
+    // current block number or season end block number
+    if (is_le(last_block_number + current_block_interval, smaller_block_number) == TRUE) {
+        if (is_le(last_block_number + 1, last_block_number + current_block_interval) == TRUE) {
+            return (last_block_number + 1, last_block_number + current_block_interval);
+        } else {
+            return (0, 0);
+        }
+    } else {
+        if (is_le(last_block_number + 1, smaller_block_number) == TRUE) {
+            return (last_block_number + 1, smaller_block_number);
+        } else {
+            return (0, 0);
+        }
+    }
 }
 
 // @notice This function is used to get block numbers in a season
@@ -206,6 +226,10 @@ func set_block_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         verify_caller_authority(registry, version, ManageHighTide_ACTION);
     }
 
+    with_attr error_message("RewardsCalculation: Block interval should be more than 0") {
+        assert_lt(0, block_interval_);
+    }
+
     block_interval.write(block_interval_);
 
     return ();
@@ -243,10 +267,11 @@ func set_user_xp_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 }
 
 // @notice This function is used to record blocknumbers that'll be used for calculating xp
+// @param season_id_ - season id for which block number needs to be set
 // @param block_number_ - Block number to be set
 @external
 func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    block_number_: felt
+    season_id_: felt, block_number_: felt
 ) {
     alloc_locals;
     let (registry) = get_registry_address();
@@ -257,27 +282,23 @@ func set_block_number{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         contract_address=registry, index=Hightide_INDEX, version=version
     );
 
-    // Get trading season data
-    let (season_id: felt) = IHighTide.get_current_season_id(contract_address=hightide_address);
-
-    with_attr error_message("RewardsCalculations: No ongoing season") {
-        assert_not_zero(season_id);
-    }
+    // Verify whether season id exists
+    IHighTide.verify_season_id_exists(contract_address=hightide_address, season_id_=season_id_);
 
     // Verify whether the block number is valid
-    let (start_block, end_block) = get_block_range();
+    let (start_block, end_block) = get_block_range(season_id_);
     with_attr error_message("RewardsCalculations: Block number is not in range") {
         assert_in_range(block_number_, start_block, end_block + 1);
     }
 
     // Get the current length of the array
-    let (current_array_len: felt) = block_number_array_len.read(season_id);
+    let (current_array_len: felt) = block_number_array_len.read(season_id_);
 
-    block_number_array.write(season_id, current_array_len, block_number_);
-    block_number_array_len.write(season_id, current_array_len + 1);
-    current_season_block_number.write(season_id, end_block);
+    block_number_array.write(season_id_, current_array_len, block_number_);
+    block_number_array_len.write(season_id_, current_array_len + 1);
+    season_last_block_number.write(season_id_, end_block);
 
-    block_number_set.emit(season_id=season_id, block_number=block_number_);
+    block_number_set.emit(season_id=season_id_, block_number=block_number_);
 
     return ();
 }

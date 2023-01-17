@@ -449,6 +449,7 @@ func setup_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         start_timestamp=start_timestamp_,
         num_trading_days=num_trading_days_,
         status=SEASON_CREATED,
+        end_block_number=0,
     );
 
     trading_season_by_id.write(season_id, trading_season);
@@ -494,6 +495,7 @@ func start_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         start_timestamp=new_season.start_timestamp,
         num_trading_days=new_season.num_trading_days,
         status=SEASON_STARTED,
+        end_block_number=0,
     );
 
     trading_season_by_id.write(season_id_, trading_season);
@@ -550,12 +552,15 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         contract_address=hightide_calc_address, season_id_=season_id_
     );
 
+    let (current_block_number) = get_block_number();
+
     // Update status in trading season
     let trading_season: TradingSeason = TradingSeason(
         start_block_number=season.start_block_number,
         start_timestamp=season.start_timestamp,
         num_trading_days=season.num_trading_days,
         status=SEASON_ENDED,
+        end_block_number=current_block_number,
     );
     trading_season_by_id.write(season_id_, trading_season);
 

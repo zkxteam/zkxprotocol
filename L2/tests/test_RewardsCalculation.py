@@ -243,7 +243,17 @@ async def test_set_block_interval_unauthorized_call(adminAuth_factory):
     )
 
 @pytest.mark.asyncio
-async def test_set_block_numbers_invalid_value(adminAuth_factory):
+async def test_set_block_interval_invalid_value(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
+
+    await assert_revert(
+        signer1.send_transaction(admin1, rewardsCalculation.contract_address,
+        "set_block_interval", [0,],), "RewardsCalculation: Block interval should be more than 0"
+    )
+
+# Block number > current block number
+@pytest.mark.asyncio
+async def test_set_block_numbers_invalid_value_1(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
     await signer1.send_transaction(admin1,rewardsCalculation.contract_address,
@@ -252,7 +262,29 @@ async def test_set_block_numbers_invalid_value(adminAuth_factory):
 
     await assert_revert(
         signer1.send_transaction(admin1, rewardsCalculation.contract_address,
-        "set_block_number", [1001,],), "RewardsCalculations: Block number is not in range"
+        "set_block_number", [1, 1001,],), "RewardsCalculations: Block number is not in range"
+    )
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=4000, 
+        block_timestamp=initial_timestamp, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
+    )
+
+# Block number > next range
+@pytest.mark.asyncio
+async def test_set_block_numbers_invalid_value_2(adminAuth_factory):
+    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
+
+    await signer1.send_transaction(admin1,rewardsCalculation.contract_address,
+        "set_block_interval", [1000,],
+    )
+
+    await assert_revert(
+        signer1.send_transaction(admin1, rewardsCalculation.contract_address,
+        "set_block_number", [1, 1001,],), "RewardsCalculations: Block number is not in range"
     )
 
 @pytest.mark.asyncio
@@ -264,7 +296,7 @@ async def test_set_block_numbers_authorized_caller(adminAuth_factory):
         rewardsCalculation.contract_address,
         "set_block_number",
         [
-            999,
+            1, 999,
         ],
     )
 
@@ -291,7 +323,7 @@ async def test_set_block_numbers_authorized_caller_2(adminAuth_factory):
         rewardsCalculation.contract_address,
         "set_block_number",
         [
-            1050,
+            1, 1050,
         ],
     )
 
@@ -337,7 +369,7 @@ async def test_set_xp_values_authorized_caller_0_user_address(adminAuth_factory)
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
+        block_number=2800, 
         block_timestamp=timestamp1, 
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
@@ -424,20 +456,26 @@ async def test_set_xp_values_reset_xp(adminAuth_factory):
 async def test_set_block_numbers_after_season_end(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
-    await assert_revert(
-        signer1.send_transaction(
-            admin1,
-            rewardsCalculation.contract_address,
-            "set_block_number",
-            [
-                123243790,
-            ],
-        ),
-        "RewardsCalculations: No ongoing season"
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=2950, 
+        block_timestamp=timestamp1, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
     )
+
+    await assert_revert(signer1.send_transaction( admin1, rewardsCalculation.contract_address, "set_block_number", [1, 2900]),
+        "RewardsCalculations: Block number is not in range")
+
+    block_range = await rewardsCalculation.get_block_range(1).call()
+    assert block_range.result.start_block == 2001
+    assert block_range.result.end_block == 2800
+
+    await signer1.send_transaction( admin1, rewardsCalculation.contract_address, "set_block_number", [1, 2800])
+    
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
-    assert block_numbers.result.block_numbers == [999, 1050]
+    assert block_numbers.result.block_numbers == [999, 1050, 2800]
 
 @pytest.mark.asyncio
 async def test_set_block_numbers_season_2(adminAuth_factory):
@@ -465,13 +503,12 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
 
     assert block_numbers.result.block_numbers == []
 
-
     new_block_tx_1 = await signer1.send_transaction(
         admin1,
         rewardsCalculation.contract_address,
         "set_block_number",
         [
-            400,
+            2, 3000,
         ],
     )
 
@@ -481,8 +518,16 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
         name="block_number_set",
         data=[
             2,
-            400
+            3000
         ]
+    )
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=5000, 
+        block_timestamp=timestamp1, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
     )
 
     new_block_tx_2 = await signer1.send_transaction(
@@ -490,7 +535,7 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
         rewardsCalculation.contract_address,
         "set_block_number",
         [
-            1600,
+            2, 3955,
         ],
     )
 
@@ -500,7 +545,7 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
         name="block_number_set",
         data=[
             2,
-            1600
+            3955
         ]
     )
 
@@ -509,7 +554,7 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
         rewardsCalculation.contract_address,
         "set_block_number",
         [
-            2788,
+            2, 4978,
         ],
     )
 
@@ -519,17 +564,17 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
         name="block_number_set",
         data=[
             2,
-            2788
+            4978
         ]
     )
 
     block_numbers = await rewardsCalculation.get_block_numbers(2).call()
 
-    assert block_numbers.result.block_numbers == [400, 1600, 2788]
+    assert block_numbers.result.block_numbers == [3000, 3955, 4978]
 
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
-    assert block_numbers.result.block_numbers == [999, 1050]
+    assert block_numbers.result.block_numbers == [999, 1050, 2800]
 
 @pytest.mark.asyncio
 async def test_set_block_numbers_season_3(adminAuth_factory):
@@ -538,7 +583,7 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
     # end last season
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
+        block_number=5000, 
         block_timestamp=timestamp2, 
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
@@ -575,7 +620,7 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
         rewardsCalculation.contract_address,
         "set_block_number",
         [
-            1,
+            3, 5001
         ],
     )
 
@@ -585,8 +630,16 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
         name="block_number_set",
         data=[
             3,
-            1
+            5001
         ]
+    )
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=10000, 
+        block_timestamp=timestamp1, 
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version = STARKNET_VERSION
     )
 
     new_block_tx_2 = await signer1.send_transaction(
@@ -594,7 +647,7 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
         rewardsCalculation.contract_address,
         "set_block_number",
         [
-            1999,
+            3, 6500,
         ],
     )
 
@@ -604,7 +657,7 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
         name="block_number_set",
         data=[
             3,
-            1999
+            6500
         ]
     )
 
@@ -613,7 +666,7 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
         rewardsCalculation.contract_address,
         "set_block_number",
         [
-            2500,
+            3, 7999,
         ],
     )
 
@@ -623,19 +676,19 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
         name="block_number_set",
         data=[
             3,
-            2500
+            7999
         ]
     )
 
     block_numbers = await rewardsCalculation.get_block_numbers(3).call()
 
-    assert block_numbers.result.block_numbers == [1, 1999, 2500]
+    assert block_numbers.result.block_numbers == [5001, 6500, 7999]
 
     block_numbers = await rewardsCalculation.get_block_numbers(2).call()
 
-    assert block_numbers.result.block_numbers == [400, 1600, 2788]
+    assert block_numbers.result.block_numbers == [3000, 3955, 4978]
 
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
-    assert block_numbers.result.block_numbers == [999, 1050]
+    assert block_numbers.result.block_numbers == [999, 1050, 2800]
 

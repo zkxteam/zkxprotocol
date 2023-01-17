@@ -240,6 +240,7 @@ struct TradingSeason {
     start_timestamp: felt,
     num_trading_days: felt,
     status: felt,  // Either Initialized, Started or Ended
+    end_block_number: felt,
 }
 
 // Struct to store multipliers used to calculate total reward to be split between traders
