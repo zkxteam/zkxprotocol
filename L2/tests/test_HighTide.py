@@ -498,10 +498,11 @@ async def test_setup_trading_season_authorized_admin(hightide_test_initializer):
         name="trading_season_set_up",
         data=[
             admin1.contract_address,
-            0, # start_block_number
+            0, # start block number
             initial_timestamp, # start time stamp
             30, # number of trading days
             1, # season_created state
+            0, #end block number
         ]
     )
 
