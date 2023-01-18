@@ -241,8 +241,17 @@ func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func get_traders_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) -> (trader_list_len: felt, trader_list: felt*) {
+
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
+
+    // Get Hightide address from Authorized Registry
+    let (hightide_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Hightide_INDEX, version=version
+    );
+
+    // Verify whether the season id exists
+    IHighTide.verify_season_id_exists(contract_address=hightide_address, season_id_=season_id_);
 
     // Get Trading Stats contract address from Authorized Registry
     let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
@@ -270,6 +279,9 @@ func get_traders_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func get_no_of_batches_per_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) -> (no_of_batches: felt) {
+    with_attr error_message("RewardsCalculation: Invalid season_id") {
+        assert_lt(0, season_id_);
+    }
     let (no_of_batches) = no_of_batches_by_season.read(season_id_);
     return (no_of_batches,);
 }
@@ -281,6 +293,9 @@ func get_no_of_batches_per_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
 func get_xp_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) -> (state: felt) {
+    with_attr error_message("RewardsCalculation: Invalid season_id") {
+        assert_lt(0, season_id_);
+    }
     let (state) = xp_state_by_season.read(season_id=season_id_);
     return (state,);
 }
@@ -534,10 +549,6 @@ func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
         season_id=season_id_, user_address=[xp_values_].user_address
     );
 
-    // Check if the xp value is already set
-    with_attr error_message("RewardsCalculation: Xp value already set") {
-        assert current_xp_value = 0;
-    }
     // Write the value
     xp_value.write(
         season_id=season_id_,
