@@ -50,6 +50,8 @@ namespace IABRCore {
     func get_next_abr_timestamp() -> (res: felt) {
     }
 
-    func get_abr_details(epoch_: felt, market_id_: felt) -> (abr: felt, price: felt) {
+    func get_abr_details(epoch_: felt, market_id_: felt) -> (
+        abr_value: felt, abr_last_price: felt
+    ) {
     }
 }

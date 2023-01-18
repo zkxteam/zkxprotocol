@@ -234,10 +234,12 @@ func get_next_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 @view
 func get_abr_details{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     epoch_: felt, market_id_: felt
-) -> (abr_value: felt, price: felt) {
+) -> (abr_value: felt, abr_last_price: felt) {
     let (abr_value: felt) = epoch_market_to_abr_value.read(epoch=epoch_, market_id=market_id_);
-    let (price: felt) = epoch_market_to_last_price.read(epoch=epoch_, market_id=market_id_);
-    return (abr_value, price);
+    let (abr_last_price: felt) = epoch_market_to_last_price.read(
+        epoch=epoch_, market_id=market_id_
+    );
+    return (abr_value, abr_last_price);
 }
 
 // ///////////

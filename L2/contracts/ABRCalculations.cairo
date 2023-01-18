@@ -104,7 +104,7 @@ func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 @external
 func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     perp_index_len: felt, perp_index: felt*, perp_mark_len: felt, perp_mark: felt*
-) -> (abr_value: felt, last_price: felt) {
+) -> (abr_value: felt, abr_last_price: felt) {
     alloc_locals;
 
     // Make sure that the caller is the authorized ABR Core contracts
@@ -591,13 +591,15 @@ func reduce_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 ) -> (reduced_iterator: felt, last_price: felt) {
     alloc_locals;
 
+    local last_price_temp;
     // Store the last price in last_mark_price variable
     if (perp_iterator_ == 1) {
-        assert last_price_ = [perp_mark_];
+        assert last_price_temp = [perp_mark_];
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
+        assert last_price_temp = 0;
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -641,7 +643,7 @@ func reduce_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
             0,
             0,
             0,
-            last_price_,
+            last_price_temp,
         );
     } else {
         // Recursively call the next array element
@@ -656,7 +658,7 @@ func reduce_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
             window_iterator_ + 1,
             curr_index_sum,
             curr_mark_sum,
-            last_price_,
+            last_price_temp,
         );
     }
 }
