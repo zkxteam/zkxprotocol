@@ -185,6 +185,11 @@ async def trading_test_initializer(starknet_service: StarknetService):
         1,
         ContractIndex.FeeBalance
     ])
+    relay_ABRCore = await starknet_service.deploy(ContractType.RelayFeeBalance, [
+        registry.contract_address,
+        1,
+        ContractIndex.ABRCore
+    ])
 
     # Give permissions to relay contracts
     await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_asset.contract_address, ManagerAction.ManageAssets, True])

@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_lt
+from starkware.cairo.common.math import assert_lt, assert_le
 from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.UserBatches import calculate_no_of_batches, get_batch
@@ -20,7 +20,7 @@ from contracts.Constants import (
 
 from contracts.DataTypes import Market
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IABR_Calculations import IABR_Calculations
+from contracts.interfaces.IABRCalculations import IABRCalculations
 from contracts.interfaces.IABRPayment import IABRPayment
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.Utils import verify_caller_authority
@@ -44,7 +44,19 @@ func epoch() -> (epoch: felt) {
 }
 
 @storage_var
+func epoch_market_to_abr_value(epoch: felt, market_id: felt) -> (abr_value: felt) {
+}
+
+@storage_var
+func epoch_market_to_last_price(epoch: felt, market_id: felt) -> (last_price: felt) {
+}
+
+@storage_var
 func epcoch_to_timestamp(epoch: felt) -> (timestamp: felt) {
+}
+
+@storage_var
+func abr_interval() -> (res: felt) {
 }
 
 @storage_var
@@ -77,6 +89,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     CommonLib.initialize(registry_address_, version_);
     let (block_timestamp) = get_block_timestamp();
     epcoch_to_timestamp.write(epoch=0, value=block_timestamp);
+    abr_interval.write(value=28800);
     return ();
 }
 
@@ -98,6 +111,16 @@ func get_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 func get_epoch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (res: felt) {
     let (current_epoch) = epoch.read();
     return (current_epoch,);
+}
+
+// @notice View function to get the current interval of an ABR epoch
+// @returns res - Current epoch
+@view
+func get_abr_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (current_abr_interval) = abr_interval.read();
+    return (current_abr_interval,);
 }
 
 // @notice View function that returns the list of markets for which the abr value is not set
@@ -197,9 +220,24 @@ func get_next_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     res: felt
 ) {
     let (current_epoch) = epoch.read();
+    let (current_abr_interval) = abr_interval.read();
     let (last_timestamp) = epcoch_to_timestamp.read(epoch=current_epoch);
-    let next_timestamp = last_timestamp + HOURS_8;
+    let next_timestamp = last_timestamp + current_abr_interval;
     return (next_timestamp,);
+}
+
+// @notice View function that returns the abr_value and price
+// @epoch epoch_
+// @param market_id_
+// @returns abr_value - ABR value of the given market in the epoch
+// @returns price - Last price of the given market in the epoch
+@view
+func get_abr_details{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    epoch_: felt, market_id_: felt
+) -> (abr_value: felt, price: felt) {
+    let (abr_value: felt) = epoch_market_to_abr_value.read(epoch=epoch_, market_id=market_id_);
+    let (price: felt) = epoch_market_to_last_price.read(epoch=epoch_, market_id=market_id_);
+    return (abr_value, price);
 }
 
 // ///////////
@@ -239,6 +277,7 @@ func set_current_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // Get current state and epoch
     let (current_state) = state.read();
     let (current_epoch) = epoch.read();
+    let (current_abr_interval) = abr_interval.read();
 
     // Get last epoch's timestamp
     let (last_timestamp) = epcoch_to_timestamp.read(epoch=current_epoch);
@@ -248,8 +287,9 @@ func set_current_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         assert current_state = ABR_STATE_0;
     }
 
-    with_attr error_message("ABRCore: New Timstamp must be > last timestamp") {
-        assert_lt(last_timestamp, new_timestamp);
+    // Enforces last_abr_timestamp + abr_interval < new_timestamp
+    with_attr error_message("ABRCore: New Timstamp must be > last timestamp + abr_interval") {
+        assert_le(last_timestamp + current_abr_interval, new_timestamp);
     }
 
     // New epoch
@@ -336,14 +376,12 @@ func set_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     }
 
     // Calculate abr from the inputs
-    IABR_Calculations.calculate_abr(
+    let (abr_value: felt, abr_last_price: felt) = IABRCalculations.calculate_abr(
         contract_address=abr_calculations_address,
-        market_id_=market_id_,
         perp_index_len=perp_index_len,
         perp_index=perp_index,
         perp_mark_len=perp_mark_len,
         perp_mark=perp_mark,
-        timestamp_=current_timestamp,
     );
 
     // Get all the tradable markets in the system
@@ -353,13 +391,29 @@ func set_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
     // Set the market as set
     abr_market_status.write(epoch=current_epoch, market_id=market_id_, value=TRUE);
-
+    epoch_market_to_abr_value.write(epoch=current_epoch, market_id=market_id_, value=abr_value);
+    epoch_market_to_last_price.write(
+        epoch=current_epoch, market_id=market_id_, value=abr_last_price
+    );
     // Check if all markets are set, if yes change the state
     check_abr_markets_status(
         current_epoch_=current_epoch,
         markets_list_len_=markets_list_len_,
         markets_list_=markets_list_,
     );
+    return ();
+}
+
+@external
+func set_abr_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_abr_interval
+) {
+    with_attr error_message("ABRCore: new_abr_interval must be > 0") {
+        assert_le(60, new_abr_interval);
+    }
+
+    abr_interval.write(value=new_abr_interval);
+
     return ();
 }
 
@@ -394,6 +448,7 @@ func make_abr_payments{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     IABRPayment.pay_abr(
         contract_address=abr_payments_address,
+        epoch_=current_epoch,
         account_addresses_len=users_list_len,
         account_addresses=users_list,
         timestamp_=current_timestamp,

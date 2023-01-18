@@ -60,6 +60,7 @@ class ContractType(Enum):
     RelayLiquidate = "contracts/relay_contracts/RelayLiquidate.cairo"
     RelayMarkets = "contracts/relay_contracts/RelayMarkets.cairo"
     RelayFeeDiscount = "contracts/relay_contracts/RelayFeeDiscount.cairo"
+    RelayABRCore = "contracts/relay_contracts/RelayABRCore.cairo"
     WithdrawalRequest = "contracts/WithdrawalRequest.cairo"
     ZKXDeployer = "contracts/ZKXDeployer.cairo"
 

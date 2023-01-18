@@ -1260,7 +1260,7 @@ async def set_balance(admin_signer: Signer, admin: StarknetContract, users: List
     return
 
 
-async def set_abr_value(market_id, node_signer, node, abr_core, abr_calculations, abr_executor, timestamp, spot, perp, spot_64x61, perp_64x61):
+async def set_abr_value(market_id, node_signer, node, abr_core, abr_executor, timestamp, spot, perp, spot_64x61, perp_64x61):
     arguments_64x61 = [market_id, 480, *spot_64x61, 480, *perp_64x61]
     await node_signer.send_transaction(node, abr_core.contract_address, 'set_abr_value', arguments_64x61)
 
@@ -1268,7 +1268,7 @@ async def set_abr_value(market_id, node_signer, node, abr_core, abr_calculations
         market_id, price=perp[479], perp_spot=spot, perp=perp, base_rate=0.0000125, boll_width=2.0)
 
     await compare_abr_values(
-        market_id=market_id, abr_calculations=abr_calculations, abr_executor=abr_executor, timestamp=timestamp, python_abr=python_abr)
+        market_id=market_id, abr_executor=abr_executor, timestamp=timestamp, python_abr=python_abr)
 
 
 # Function to assert that the reverted tx has the required error_message
@@ -1447,8 +1447,8 @@ async def compare_liquidatable_position(user: StarknetContract, user_test: User)
             liquidatable_position_starknet[i], abs=1e-3)
 
 
-async def compare_abr_values(market_id: int, abr_calculations: StarknetContract, abr_executor: ABR, timestamp: int, python_abr: float):
-    abr_query = await abr_calculations.get_abr_value(market_id).call()
+async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_executor: ABR, timestamp: int, python_abr: float):
+    abr_query = await abr_core.get_abr_value(market_id).call()
 
     abr_executor.set_abr(market_id=market_id, new_abr=from64x61(
         abr_query.result.abr), timestamp=timestamp)

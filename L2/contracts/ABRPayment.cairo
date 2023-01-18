@@ -17,7 +17,7 @@ from contracts.Constants import (
 )
 
 from contracts.DataTypes import SimplifiedPosition
-from contracts.interfaces.IABR_Calculations import IABR_Calculations
+from contracts.interfaces.IABRCore import IABRCore
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
@@ -56,23 +56,25 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // //////////////////////
 
 // @notice Function to be called by the node
+// @param epoch - Epoch of the current abr
 // @param account_addresses_len_ - Length of the account_addresses array being passed
 // @param account_addresses_ - Account addresses array
+// @param timestamp_ - Timestamp of the current abr
 @external
 func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    account_addresses_len: felt, account_addresses: felt*, timestamp_: felt
+    epoch_: felt, account_addresses_len: felt, account_addresses: felt*, timestamp_: felt
 ) {
     // Make sure that the caller is the authorized ABR Core contracts
     let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
-    let (ABR_core_address) = IAuthorizedRegistry.get_contract_address(
+    let (abr_core_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=ABR_Core_Index, version=version
     );
 
     with_attr error_message("ABRCalculations: Unauthorized call") {
-        assert caller = ABR_core_address;
+        assert caller = abr_core_address;
     }
 
     // Get the market smart-contract
@@ -80,10 +82,6 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         contract_address=registry, index=Market_INDEX, version=version
     );
 
-    // Get the ABR smart-contract
-    let (abr_contract) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_Calculations_INDEX, version=version
-    );
     // Get the ABR-funding smart-contract
     let (abr_funding_contract) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=ABR_FUNDS_INDEX, version=version
@@ -92,9 +90,10 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         account_addresses_len,
         account_addresses,
         market_contract,
-        abr_contract,
+        abr_core_address,
         abr_funding_contract,
         timestamp_,
+        epoch_,
     );
 }
 
@@ -169,17 +168,19 @@ func user_receives{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param positions_len_ - Length of the positions array of the user
 // @param positions_ - Positions array of the user
 // @param market_contract_ - Address of the Market contract
-// @param abr_contract_ - Address of the ABR contract
+// @param abr_core_contract_ - Address of the ABR contract
 // @param abr_funding_contract_ - Address of the ABR Funding contract
-// @param timestamp_ - Timestamp of the last abr
+// @param timestamp_ - Timestamp of the current abr
+// @param epoch_ - Epoch the current abr
 func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address_: felt,
     positions_len_: felt,
     positions_: SimplifiedPosition*,
     market_contract_: felt,
-    abr_contract_: felt,
+    abr_core_contract_: felt,
     abr_funding_: felt,
     timestamp_: felt,
+    epoch_: felt,
 ) {
     alloc_locals;
 
@@ -193,8 +194,8 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     );
 
     // Get the abr value
-    let (abr: felt, price: felt) = IABR_Calculations.get_abr_value(
-        contract_address=abr_contract_, market_id=[positions_].market_id
+    let (abr: felt, price: felt) = IABRCore.get_abr_details(
+        contract_address=abr_core_contract_, epoch_=epoch_, market_id_=[positions_].market_id
     );
 
     // Find if the abr_rate is +ve or -ve
@@ -261,9 +262,10 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         positions_len_ - 1,
         positions_ + SimplifiedPosition.SIZE,
         market_contract_,
-        abr_contract_,
+        abr_core_contract_,
         abr_funding_,
         timestamp_,
+        epoch_,
     );
 }
 
@@ -272,16 +274,18 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // @param account_addresses_ - Account addresses array
 // @param account_registry_ - Address of the Account Registry contract
 // @param market_contract_ - Address of the Market contract
-// @param abr_contract_ - Address of the ABR contract
+// @param abr_core_contract_ - Address of the ABR contract
 // @param abr_funding_contract_ - Address of the ABR Funding contract
 // @param timestamp_ - Timestamp of the ABR
+// @param epoch_ - Epoch of the current ABR
 func pay_abr_users{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_addresses_len_: felt,
     account_addresses_: felt*,
     market_contract_: felt,
-    abr_contract_: felt,
+    abr_core_contract_: felt,
     abr_funding_contract_: felt,
     timestamp_: felt,
+    epoch_: felt,
 ) {
     if (account_addresses_len_ == 0) {
         return ();
@@ -300,17 +304,19 @@ func pay_abr_users{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         positions_len,
         positions,
         market_contract_,
-        abr_contract_,
+        abr_core_contract_,
         abr_funding_contract_,
         timestamp_,
+        epoch_,
     );
 
     return pay_abr_users(
         account_addresses_len_ - 1,
         account_addresses_ + 1,
         market_contract_,
-        abr_contract_,
+        abr_core_contract_,
         abr_funding_contract_,
         timestamp_,
+        epoch_,
     );
 }

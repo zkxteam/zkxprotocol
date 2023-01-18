@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.interfaces.IABRCalculations import IABRCalculations
+from contracts.interfaces.IABRCore import IABRCore
 from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
