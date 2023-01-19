@@ -141,7 +141,15 @@ func get_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func get_num_active_traders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, market_id_: felt
 ) -> (res: felt) {
-    let (current_num_traders) = num_traders.read(season_id_, market_id_);
+    alloc_locals;
+    local current_num_traders;
+    if (market_id_ == 0) {
+        let (active_num_traders) = num_traders_in_season.read(season_id_);
+        current_num_traders = active_num_traders;
+    } else {
+        let (active_num_traders) = num_traders.read(season_id_, market_id_);
+        current_num_traders = active_num_traders;
+    }
     return (current_num_traders,);
 }
 
@@ -267,9 +275,17 @@ func get_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, market_id_: felt, starting_index_: felt, ending_index_: felt
 ) -> (trader_list_len: felt, trader_list: felt*) {
     alloc_locals;
-
     local ending_index;
-    let (trader_list_len) = num_traders.read(season_id_, market_id_);
+    local trader_list_len;
+
+    if (market_id_ == 0) {
+        let (active_num_traders) = num_traders_in_season.read(season_id_);
+        trader_list_len = active_num_traders;
+    } else {
+        let (active_num_traders) = num_traders.read(season_id_, market_id_);
+        trader_list_len = active_num_traders;
+    }
+
     let is_longer = is_le(trader_list_len, ending_index_);
 
     // Check if batch must be truncated
@@ -280,14 +296,24 @@ func get_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     }
 
     let (trader_list: felt*) = alloc();
-    return populate_trader_list_recurse(
-        iterator_=0,
-        season_id_=season_id_,
-        market_id_=market_id_,
-        starting_index_=starting_index_,
-        ending_index_=ending_index,
-        trader_list_=trader_list,
-    );
+    if (market_id_ == 0) {
+        return populate_traders_in_season_recurse(
+            iterator_=0,
+            season_id_=season_id_,
+            starting_index_=starting_index_,
+            ending_index_=ending_index,
+            trader_list_=trader_list,
+        );
+    } else {
+        return populate_trader_list_recurse(
+            iterator_=0,
+            season_id_=season_id_,
+            market_id_=market_id_,
+            starting_index_=starting_index_,
+            ending_index_=ending_index,
+            trader_list_=trader_list,
+        );
+    }
 }
 
 // ///////////
@@ -638,5 +664,26 @@ func populate_trader_list_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     assert trader_list_[iterator_] = trader_address;
     return populate_trader_list_recurse(
         iterator_ + 1, season_id_, market_id_, starting_index_ + 1, ending_index_, trader_list_
+    );
+}
+
+// @dev - This function populates active trader list in the season
+func populate_traders_in_season_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    iterator_: felt,
+    season_id_: felt,
+    starting_index_: felt,
+    ending_index_: felt,
+    trader_list_: felt*,
+) -> (trader_list_len: felt, trader_list: felt*) {
+    if (starting_index_ == ending_index_) {
+        return (iterator_, trader_list_);
+    }
+
+    let (trader_address) = traders_in_season.read(season_id_, starting_index_);
+    assert trader_list_[iterator_] = trader_address;
+    return populate_traders_in_season_recurse(
+        iterator_ + 1, season_id_, starting_index_ + 1, ending_index_, trader_list_
     );
 }

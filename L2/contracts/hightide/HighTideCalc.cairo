@@ -16,10 +16,11 @@ from contracts.Constants import (
     RewardsCalculation_INDEX,
     REWARD_DISTRIBUTION_IN_PROGRESS,
     SEASON_ENDED,
+    SET_XP_COMPLETED,
     TRADER_SCORE_CALCULATION_IN_PROGRESS,
     TradingStats_INDEX,
     UserStats_INDEX,
-    W_CALCULATION_IN_PROGRESS,
+    W_CALCULATION_IN_PROGRESS, 
 )
 from contracts.DataTypes import (
     Constants,
@@ -375,7 +376,18 @@ func calculate_w{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
         season_id=season_id_, market_id=market_id_
     );
 
-    with_attr error_message("HighTideCalc: W calculation is completed") {
+    // Get reward calculation address from Authorized Registry
+    let (reward_calculation_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=RewardsCalculation_INDEX, version=version
+    );
+
+    // Fetch xp state
+    let (xp_state: felt) = IRewardsCalculation.get_xp_state(
+        contract_address=reward_calculation_address, season_id_=season_id_
+    );
+
+    with_attr error_message("HighTideCalc: State is not valid to call calculate w function") {
+        assert xp_state = SET_XP_COMPLETED;
         assert_in_range(
             hightide_state, W_CALCULATION_IN_PROGRESS, TRADER_SCORE_CALCULATION_IN_PROGRESS
         );

@@ -41,6 +41,7 @@ from contracts.hightide.HighTide import (
     assign_hightide_to_season,
     populate_hightide_list_recurse,
     previous_trading_season,
+    market_under_hightide,
     is_market_under_hightide
 )
 from starkware.cairo.common.cairo_builtins import HashBuiltin
@@ -70,6 +71,8 @@ func activate_high_tide{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     // Emit event
     let (caller) = get_caller_address();
     assign_hightide_to_season(hightide_id, hightide_metadata.season_id);
+
+    market_under_hightide.write(hightide_metadata.season_id, hightide_metadata.market_id, 1);
 
     return ();
 }

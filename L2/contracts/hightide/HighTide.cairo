@@ -33,6 +33,7 @@ from contracts.Constants import (
     ManageHighTide_ACTION,
     Market_INDEX,
     ONE_DAY,
+    RewardsCalculation_INDEX,
     REWARD_DISTRIBUTION_COMPLETED,
     REWARD_DISTRIBUTION_IN_PROGRESS,
     SEASON_CREATED,
@@ -50,12 +51,13 @@ from contracts.DataTypes import (
     RewardToken,
     TradingSeason,
 )
-from contracts.hightide.libraries.UserBatches import get_batch
+from contracts.hightide.libraries.UserBatches import calculate_no_of_batches, get_batch
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
 from contracts.interfaces.IHighTideCalc import IHighTideCalc
 from contracts.interfaces.ILiquidityPool import ILiquidityPool
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.IRewardsCalculation import IRewardsCalculation
 from contracts.interfaces.IStarkway import IStarkway
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
@@ -537,6 +539,11 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         contract_address=registry, index=HighTideCalc_INDEX, version=version
     );
 
+    // Get rewards calculation contract from Authorized Registry
+    let (rewards_calculation_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=RewardsCalculation_INDEX, version=version
+    );
+
     // Calculate hightide factors
     IHighTideCalc.calculate_high_tide_factors(
         contract_address=hightide_calc_address, season_id_=season_id_
@@ -550,6 +557,11 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     // Update no.of batches per market in a season
     IHighTideCalc.update_no_of_batches_per_market(
         contract_address=hightide_calc_address, season_id_=season_id_
+    );
+
+    // Update no.of batches in a season
+    IRewardsCalculation.update_no_of_batches_in_season(
+        contract_address=rewards_calculation_address, season_id_=season_id_
     );
 
     let (current_block_number) = get_block_number();

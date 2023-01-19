@@ -165,6 +165,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
     await signer1.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
 
+    # set the no.of users in a batch for xp
+    await signer1.send_transaction(admin1, rewardsCalculation.contract_address, 'set_no_of_users_per_batch', [10])
+
     return adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob
 
 @pytest.mark.asyncio
