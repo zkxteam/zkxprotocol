@@ -4,13 +4,6 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import abs_value, assert_not_zero, assert_not_equal
 from starkware.cairo.common.math_cmp import is_le
-from starkware.starknet.common.syscalls import get_caller_address
-
-from contracts.Constants import MasterAdmin_ACTION, ABR_Core_Index
-from contracts.interfaces.IMarkets import IMarkets
-from contracts.libraries.CommonLibrary import CommonLib
-from contracts.libraries.Utils import verify_caller_authority
-from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_div,
@@ -22,77 +15,16 @@ from contracts.Math_64x61 import (
     Math64x61_ONE,
 )
 
-//############
-// Constants #
-//############
+// ////////////
+// Constants //
+// ////////////
 
 // Used for window sizes
 const NUM_8 = 18446744073709551616;
 
-//
-//##########
-// Storage #
-//##########
-
-@storage_var
-func base_abr() -> (value: felt) {
-}
-
-@storage_var
-func bollinger_width() -> (value: felt) {
-}
-
-// @notice Stores the last mark price of an asset
-@storage_var
-func last_mark_price(market_id) -> (price: felt) {
-}
-
-//##############
-// Constructor #
-//##############
-
-// @notice Constructor of the smart-contract
-// @param registry_address_ Address of the AuthorizedRegistry contract
-// @param version_ Version of this contract
-@constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address_: felt, version_: felt
-) {
-    CommonLib.initialize(registry_address_, version_);
-    base_abr.write(28823037615171);
-    bollinger_width.write(4611686018427387904);
-    return ();
-}
-
-@external
-func modify_base_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_base_abr_: felt
-) {
-    with_attr error_message("ABR: Unauthorized") {
-        let (registry) = CommonLib.get_registry_address();
-        let (version) = CommonLib.get_contract_version();
-        verify_caller_authority(registry, version, MasterAdmin_ACTION);
-    }
-
-    base_abr.write(new_base_abr_);
-
-    return ();
-}
-
-@external
-func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_bollinger_width_: felt
-) {
-    with_attr error_message("ABR: Unauthorized") {
-        let (registry) = CommonLib.get_registry_address();
-        let (version) = CommonLib.get_contract_version();
-        verify_caller_authority(registry, version, MasterAdmin_ACTION);
-    }
-
-    bollinger_width.write(new_bollinger_width_);
-
-    return ();
-}
+// ///////////
+// External //
+// ///////////
 
 // @notice Function to calculate the ABR for the current period
 // @param perp_index_len - Size of the perp index prices array
@@ -101,24 +33,16 @@ func modify_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // @param perp_mark - Perp Mark prices array
 // @param timestamp_ - Timestamp of the ABR
 // @returns res - ABR of the mark & index prices
-@external
+@view
 func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    perp_index_len: felt, perp_index: felt*, perp_mark_len: felt, perp_mark: felt*
+    perp_index_len: felt,
+    perp_index: felt*,
+    perp_mark_len: felt,
+    perp_mark: felt*,
+    boll_width_: felt,
+    base_abr_: felt,
 ) -> (abr_value: felt, abr_last_price: felt) {
     alloc_locals;
-
-    // Make sure that the caller is the authorized ABR Core contracts
-    let (caller) = get_caller_address();
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
-
-    let (ABR_core_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=ABR_Core_Index, version=version
-    );
-
-    with_attr error_message("ABRCalculations: Unauthorized call") {
-        assert caller = ABR_core_address;
-    }
 
     if (perp_mark_len == perp_index_len) {
     } else {
@@ -142,7 +66,7 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     // Calculate the upper & lower band
     let (upper_array: felt*) = alloc();
     let (lower_array: felt*) = alloc();
-    let (boll_width: felt) = bollinger_width.read();
+
     calc_bollinger(
         reduced_array_length,
         upper_array,
@@ -152,7 +76,7 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         avg_array,
         8,
         0,
-        boll_width,
+        boll_width_,
     );
 
     // Calculate the diff b/w index and mark
@@ -177,7 +101,7 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     );
 
     // Find the effective ABR rate
-    let (base_abr_) = base_abr.read();
+
     let (rate_sum) = find_abr(reduced_array_length, ABRdyn_jump, 0, base_abr_);
 
     let (array_size) = Math64x61_fromIntFelt(reduced_array_length);
@@ -185,9 +109,9 @@ func calculate_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return (rate, last_price);
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// /////////////////////
+// Internal Functions //
+// /////////////////////
 
 // @notice Function to calculate the difference between index and mark prices
 // @param array_len_ - Length of the index and mark prices array

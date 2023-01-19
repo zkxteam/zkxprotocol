@@ -1038,11 +1038,13 @@ class ABR:
                 market_id = position["market_id"]
                 direction = position["direction"]
                 abr_value = self.abr_values[market_id]
-                payment_amount = self.abr_last_price[market_id] * \
-                    position["position_size"] * abr_value
+                payment_amount = abs(self.abr_last_price[market_id] *
+                                     position["position_size"] * abr_value)
                 if position["created_timestamp"] > self.abr_timestamp:
                     continue
 
+                print("ABR value:", abr_value)
+                print("Payment amount:", payment_amount)
                 if abr_value < 0:
                     if direction == order_direction["short"]:
                         self.user_pays(
@@ -1260,18 +1262,21 @@ async def set_balance(admin_signer: Signer, admin: StarknetContract, users: List
     return
 
 
-async def set_abr_value(market_id, node_signer, node, abr_core, abr_executor, timestamp, spot, perp, spot_64x61, perp_64x61, epoch):
+async def set_abr_value(market_id: int, node_signer: Signer, node: StarknetContract, abr_core: StarknetContract, abr_executor: StarknetContract, timestamp: int, spot: List[float], perp: List[float], spot_64x61: List[int], perp_64x61: List[int], epoch: int, base_rate: float, boll_width: float):
     arguments_64x61 = [market_id, 480, *spot_64x61, 480, *perp_64x61]
-    await node_signer.send_transaction(node, abr_core.contract_address, 'set_abr_value', arguments_64x61)
+    set_abr_value_tx = await node_signer.send_transaction(node, abr_core.contract_address, 'set_abr_value', arguments_64x61)
 
     python_abr = abr_executor.find_abr(
-        market_id, price=perp[479], perp_spot=spot, perp=perp, base_rate=0.0000125, boll_width=2.0)
+        market_id, price=perp[479], perp_spot=spot, perp=perp, base_rate=base_rate, boll_width=boll_width)
 
-    await compare_abr_values(
+    (abr_value, abr_last_price) = await compare_abr_values(
         market_id=market_id, abr_executor=abr_executor, abr_core=abr_core, timestamp=timestamp, python_abr=python_abr, epoch=epoch)
 
+    return (set_abr_value_tx, abr_value, abr_last_price)
 
 # Function to assert that the reverted tx has the required error_message
+
+
 async def execute_batch_reverted(zkx_node_signer: Signer, zkx_node: StarknetContract, trading: StarknetContract, execute_batch_params: List[int], error_message: str):
     # Send execute_batch transaction
     await assert_revert(
@@ -1457,3 +1462,5 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
     assert python_abr == pytest.approx(
         from64x61(abr_query.result.abr_value), abs=1e-4)
     assert price == from64x61(abr_query.result.abr_last_price)
+
+    return (abr_query.result.abr_value, abr_query.result.abr_last_price)

@@ -8,7 +8,7 @@ namespace IABRCore {
     func set_no_of_users_per_batch(new_no_of_users_per_batch: felt) {
     }
 
-    func set_current_abr_timestamp(new_timestamp: felt) {
+    func set_abr_timestamp(new_timestamp: felt) {
     }
 
     func set_abr_value(
@@ -23,11 +23,25 @@ namespace IABRCore {
     func make_abr_payments() {
     }
 
+    func set_abr_interval(new_abr_interval_: felt) {
+    }
+
+    func set_base_abr_rate(new_base_abr_: felt) {
+    }
+
+    func set_bollinger_width(new_bollinger_width_: felt) {
+    }
     // view
     func get_state() -> (res: felt) {
     }
 
     func get_epoch() -> (res: felt) {
+    }
+
+    func get_bollinger_width() -> (res: felt) {
+    }
+
+    func get_base_abr_rate() -> (res: felt) {
     }
 
     func get_abr_interval() -> (res: felt) {

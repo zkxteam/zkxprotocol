@@ -194,14 +194,15 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     );
 
     // Get the abr value
-    let (abr: felt, price: felt) = IABRCore.get_abr_details(
+    let (abr_value: felt, abr_last_price: felt) = IABRCore.get_abr_details(
         contract_address=abr_core_contract_, epoch_=epoch_, market_id_=[positions_].market_id
     );
 
     // Find if the abr_rate is +ve or -ve
-    let (position_value) = Math64x61_mul(price, [positions_].position_size);
-    let (payment_amount) = Math64x61_mul(abr, position_value);
-    let is_negative = is_le(abr, 0);
+    let (position_value) = Math64x61_mul(abr_last_price, [positions_].position_size);
+    let (payment_amount) = Math64x61_mul(abr_value, position_value);
+    let abs_payment_amount = abs_value(payment_amount);
+    let is_negative = is_le(abr_value, 0);
 
     // If the abr is negative
     if (is_negative == TRUE) {
@@ -213,7 +214,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 collateral_id,
                 [positions_].market_id,
                 [positions_].direction,
-                payment_amount,
+                abs_payment_amount,
             );
         } else {
             // user receives
@@ -223,7 +224,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 collateral_id,
                 [positions_].market_id,
                 [positions_].direction,
-                payment_amount,
+                abs_payment_amount,
             );
         }
         // If the abr is positive
@@ -236,7 +237,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 collateral_id,
                 [positions_].market_id,
                 [positions_].direction,
-                payment_amount,
+                abs_payment_amount,
             );
         } else {
             // user pays
@@ -246,7 +247,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 collateral_id,
                 [positions_].market_id,
                 [positions_].direction,
-                payment_amount,
+                abs_payment_amount,
             );
         }
     }
