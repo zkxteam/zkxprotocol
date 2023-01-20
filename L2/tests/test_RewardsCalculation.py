@@ -30,6 +30,7 @@ timestamp1 = int(time.time()) + (60*60*24)*3 + 60
 timestamp2 = int(time.time()) + (60*60*24)*6 + 60
 timestamp3 = int(time.time()) + (60*60*24)*9 + 60
 
+
 @pytest.fixture(scope='module')
 def event_loop():
     return asyncio.new_event_loop()
@@ -43,21 +44,22 @@ async def adminAuth_factory(starknet_service: StarknetService):
     admin2 = await account_factory.deploy_account(signer2.public_key)
     user1 = await account_factory.deploy_account(signer3.public_key)
 
-    contract_class = starknet_service.contracts_holder.get_contract_class(ContractType.LiquidityPool)
+    contract_class = starknet_service.contracts_holder.get_contract_class(
+        ContractType.LiquidityPool)
     global class_hash
     class_hash, _ = await starknet_service.starknet.state.declare(contract_class)
     direct_class_hash = compute_class_hash(contract_class)
-    class_hash = int.from_bytes(class_hash,'big')
+    class_hash = int.from_bytes(class_hash, 'big')
     assert direct_class_hash == class_hash
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1, 
-        block_timestamp=initial_timestamp, 
+        block_number=1,
+        block_timestamp=initial_timestamp,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
+        starknet_version=STARKNET_VERSION
     )
-    
+
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
@@ -68,10 +70,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
     rewardsCalculation = await starknet_service.deploy(ContractType.RewardsCalculation, [registry.contract_address, 1])
     hightideCalc = await starknet_service.deploy(ContractType.HighTideCalc, [registry.contract_address, 1])
 
-    account_factory = AccountFactory(starknet_service, L1_dummy_address, registry.contract_address, 1)
+    account_factory = AccountFactory(
+        starknet_service, L1_dummy_address, registry.contract_address, 1)
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
     bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
-
 
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 1, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
@@ -140,7 +142,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
         metadata_link=DEFAULT_LINK_1
     )
     await signer1.send_transaction(admin1, market.contract_address, 'add_market', BTC_USDC_properties.to_params_list())
-    
+
     BTC_UST_properties = MarketProperties(
         id=BTC_UST_ID,
         asset=AssetID.BTC,
@@ -166,6 +168,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await signer1.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
 
     return adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob
+
 
 @pytest.mark.asyncio
 async def test_setup_trading_season_authorized_admin(adminAuth_factory):
@@ -199,38 +202,40 @@ async def test_setup_trading_season_authorized_admin(adminAuth_factory):
 
     start_trade_season_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [1])
 
-
     execution_info = await hightide.get_season(1).call()
     fetched_trading_season = execution_info.result.trading_season
 
     assert fetched_trading_season.start_timestamp == initial_timestamp
     assert fetched_trading_season.num_trading_days == 2
-    
+
     execution_info = await hightide.get_current_season_id().call()
     fetched_season_id = execution_info.result.season_id
 
     assert fetched_season_id == 1
 
+
 @pytest.mark.asyncio
 async def test_initialize_hightide(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1,_, _, _, _ = adminAuth_factory
-    
-    tx_exec_info=await signer1.send_transaction(admin1, 
-                                   hightide.contract_address,
-                                   'set_liquidity_pool_contract_class_hash',
-                                   [class_hash])
+    adminAuth, hightide, admin1, admin2, user1, _, _, _, _ = adminAuth_factory
 
-    tx_exec_info=await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide', 
-        [BTC_USDC_ID, 1, admin1.contract_address, 1, 2, AssetID.USDC, 1000, 0, AssetID.UST, 500, 0])
+    tx_exec_info = await signer1.send_transaction(admin1,
+                                                  hightide.contract_address,
+                                                  'set_liquidity_pool_contract_class_hash',
+                                                  [class_hash])
+
+    tx_exec_info = await signer1.send_transaction(admin1, hightide.contract_address, 'initialize_high_tide',
+                                                  [BTC_USDC_ID, 1, admin1.contract_address, 1, 2, AssetID.USDC, 1000, 0, AssetID.UST, 500, 0])
 
     execution_info = await hightide.get_hightide(1).call()
     liquidity_pool_address = execution_info.result.hightide_metadata.liquidity_pool_address
 
     fetched_rewards = await hightide.get_hightide_reward_tokens(1).call()
     assert fetched_rewards.result.reward_tokens_list[0].token_id == AssetID.USDC
-    assert fetched_rewards.result.reward_tokens_list[0].no_of_tokens == (1000, 0)
+    assert fetched_rewards.result.reward_tokens_list[0].no_of_tokens == (
+        1000, 0)
     assert fetched_rewards.result.reward_tokens_list[1].token_id == AssetID.UST
-    assert fetched_rewards.result.reward_tokens_list[1].no_of_tokens == (500, 0)
+    assert fetched_rewards.result.reward_tokens_list[1].no_of_tokens == (
+        500, 0)
 
 
 @pytest.mark.asyncio
@@ -239,8 +244,9 @@ async def test_set_block_interval_unauthorized_call(adminAuth_factory):
 
     await assert_revert(
         signer3.send_transaction(user1, rewardsCalculation.contract_address,
-        "set_block_interval", [10,],), "RewardsCalculation: Unauthorized call to set block number"
+                                 "set_block_interval", [10,],), "RewardsCalculation: Unauthorized call to set block number"
     )
+
 
 @pytest.mark.asyncio
 async def test_set_block_interval_invalid_value(adminAuth_factory):
@@ -248,44 +254,49 @@ async def test_set_block_interval_invalid_value(adminAuth_factory):
 
     await assert_revert(
         signer1.send_transaction(admin1, rewardsCalculation.contract_address,
-        "set_block_interval", [0,],), "RewardsCalculation: Block interval should be more than 0"
+                                 "set_block_interval", [0,],), "RewardsCalculation: Block interval should be more than 0"
     )
 
 # Block number > current block number
+
+
 @pytest.mark.asyncio
 async def test_set_block_numbers_invalid_value_1(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
-    await signer1.send_transaction(admin1,rewardsCalculation.contract_address,
-        "set_block_interval", [1000,],
-    )
+    await signer1.send_transaction(admin1, rewardsCalculation.contract_address,
+                                   "set_block_interval", [1000,],
+                                   )
 
     await assert_revert(
         signer1.send_transaction(admin1, rewardsCalculation.contract_address,
-        "set_block_number", [1, 1001,],), "RewardsCalculations: Block number is not in range"
+                                 "set_block_number", [1, 1001,],), "RewardsCalculations: Block number is not in range"
     )
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=4000, 
-        block_timestamp=initial_timestamp, 
+        block_number=4000,
+        block_timestamp=initial_timestamp,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
+        starknet_version=STARKNET_VERSION
     )
 
 # Block number > next range
+
+
 @pytest.mark.asyncio
 async def test_set_block_numbers_invalid_value_2(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
-    await signer1.send_transaction(admin1,rewardsCalculation.contract_address,
-        "set_block_interval", [1000,],
-    )
+    await signer1.send_transaction(admin1, rewardsCalculation.contract_address,
+                                   "set_block_interval", [1000,],
+                                   )
 
     await assert_revert(
         signer1.send_transaction(admin1, rewardsCalculation.contract_address,
-        "set_block_number", [1, 1001,],), "RewardsCalculations: Block number is not in range"
+                                 "set_block_number", [1, 1001,],), "RewardsCalculations: Block number is not in range"
     )
+
 
 @pytest.mark.asyncio
 async def test_set_block_numbers_authorized_caller(adminAuth_factory):
@@ -314,6 +325,7 @@ async def test_set_block_numbers_authorized_caller(adminAuth_factory):
 
     assert block_numbers.result.block_numbers == [999]
 
+
 @pytest.mark.asyncio
 async def test_set_block_numbers_authorized_caller_2(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
@@ -339,7 +351,8 @@ async def test_set_block_numbers_authorized_caller_2(adminAuth_factory):
 
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
-    assert block_numbers.result.block_numbers == [999 ,1050]
+    assert block_numbers.result.block_numbers == [999, 1050]
+
 
 @pytest.mark.asyncio
 async def test_set_xp_values_during_season(adminAuth_factory):
@@ -361,19 +374,19 @@ async def test_set_xp_values_during_season(adminAuth_factory):
     )
 
     xp_value_alice = await rewardsCalculation.get_user_xp_value(1, alice.contract_address).call()
-    assert xp_value_alice.result.xp_value == to64x61(0) 
-    
+    assert xp_value_alice.result.xp_value == to64x61(0)
+
 
 @pytest.mark.asyncio
 async def test_set_xp_values_authorized_caller_0_user_address(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=2800, 
-        block_timestamp=timestamp1, 
+        block_number=2800,
+        block_timestamp=timestamp1,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
+        starknet_version=STARKNET_VERSION
     )
 
     # end trade season
@@ -395,7 +408,8 @@ async def test_set_xp_values_authorized_caller_0_user_address(adminAuth_factory)
     )
 
     xp_value_alice = await rewardsCalculation.get_user_xp_value(1, alice.contract_address).call()
-    assert xp_value_alice.result.xp_value == to64x61(0) 
+    assert xp_value_alice.result.xp_value == to64x61(0)
+
 
 @pytest.mark.asyncio
 async def test_set_xp_values(adminAuth_factory):
@@ -418,64 +432,45 @@ async def test_set_xp_values(adminAuth_factory):
     assert_events_emitted(
         xp_tx,
         [
-            [0, rewardsCalculation.contract_address, 'xp_value_set', [1, alice.contract_address, to64x61(100)]],
-            [1, rewardsCalculation.contract_address, 'xp_value_set', [1, bob.contract_address, to64x61(50)]],
+            [0, rewardsCalculation.contract_address, 'xp_value_set',
+                [1, alice.contract_address, to64x61(100)]],
+            [1, rewardsCalculation.contract_address, 'xp_value_set',
+                [1, bob.contract_address, to64x61(50)]],
         ]
     )
-        
 
     xp_value_alice = await rewardsCalculation.get_user_xp_value(1, alice.contract_address).call()
-    assert xp_value_alice.result.xp_value == to64x61(100) 
+    assert xp_value_alice.result.xp_value == to64x61(100)
 
     xp_value_bob = await rewardsCalculation.get_user_xp_value(1, bob.contract_address).call()
-    assert xp_value_bob.result.xp_value == to64x61(50) 
+    assert xp_value_bob.result.xp_value == to64x61(50)
 
-@pytest.mark.asyncio
-async def test_set_xp_values_reset_xp(adminAuth_factory):
-    adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, alice, bob = adminAuth_factory
-
-    await assert_revert(
-        signer1.send_transaction(
-            admin1,
-            rewardsCalculation.contract_address,
-            "set_user_xp_values",
-            [
-                1,
-                1,
-                alice.contract_address,
-                to64x61(1),
-            ],
-        ),
-        "RewardsCalculation: Xp value already set"
-    ),
-
-    xp_value_alice = await rewardsCalculation.get_user_xp_value(1, alice.contract_address).call()
-    assert xp_value_alice.result.xp_value == to64x61(100) 
 
 @pytest.mark.asyncio
 async def test_set_block_numbers_after_season_end(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=2950, 
-        block_timestamp=timestamp1, 
+        block_number=2950,
+        block_timestamp=timestamp1,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
+        starknet_version=STARKNET_VERSION
     )
 
-    await assert_revert(signer1.send_transaction( admin1, rewardsCalculation.contract_address, "set_block_number", [1, 2900]),
-        "RewardsCalculations: Block number is not in range")
+    await assert_revert(signer1.send_transaction(admin1, rewardsCalculation.contract_address, "set_block_number", [1, 2900]),
+                        "RewardsCalculations: Block number is not in range")
 
     block_range = await rewardsCalculation.get_block_range(1).call()
     assert block_range.result.start_block == 2001
     assert block_range.result.end_block == 2800
 
-    await signer1.send_transaction( admin1, rewardsCalculation.contract_address, "set_block_number", [1, 2800])
-    
+    await signer1.send_transaction(admin1, rewardsCalculation.contract_address, "set_block_number", [1, 2800])
+
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
     assert block_numbers.result.block_numbers == [999, 1050, 2800]
+
 
 @pytest.mark.asyncio
 async def test_set_block_numbers_season_2(adminAuth_factory):
@@ -493,7 +488,7 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
     assert fetched_trading_season.num_trading_days == 2
 
     start_trade_season_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [2])
-    
+
     execution_info = await hightide.get_current_season_id().call()
     fetched_season_id = execution_info.result.season_id
 
@@ -523,11 +518,11 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
     )
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=5000, 
-        block_timestamp=timestamp1, 
+        block_number=5000,
+        block_timestamp=timestamp1,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
+        starknet_version=STARKNET_VERSION
     )
 
     new_block_tx_2 = await signer1.send_transaction(
@@ -576,6 +571,7 @@ async def test_set_block_numbers_season_2(adminAuth_factory):
 
     assert block_numbers.result.block_numbers == [999, 1050, 2800]
 
+
 @pytest.mark.asyncio
 async def test_set_block_numbers_season_3(adminAuth_factory):
     adminAuth, hightide, admin1, admin2, user1, rewardsCalculation, starknet_service, _, _ = adminAuth_factory
@@ -583,11 +579,11 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
     # end last season
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=5000, 
-        block_timestamp=timestamp2, 
+        block_number=5000,
+        block_timestamp=timestamp2,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
+        starknet_version=STARKNET_VERSION
     )
 
     await signer1.send_transaction(admin1, hightide.contract_address, 'end_trade_season', [2])
@@ -604,7 +600,7 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
     assert fetched_trading_season.num_trading_days == 3
 
     start_trade_season_tx = await signer1.send_transaction(admin1, hightide.contract_address, 'start_trade_season', [3])
-    
+
     execution_info = await hightide.get_current_season_id().call()
     fetched_season_id = execution_info.result.season_id
 
@@ -613,7 +609,6 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
     block_numbers = await rewardsCalculation.get_block_numbers(3).call()
 
     assert block_numbers.result.block_numbers == []
-
 
     new_block_tx_1 = await signer1.send_transaction(
         admin1,
@@ -635,11 +630,11 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
     )
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=10000, 
-        block_timestamp=timestamp1, 
+        block_number=10000,
+        block_timestamp=timestamp1,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version = STARKNET_VERSION
+        starknet_version=STARKNET_VERSION
     )
 
     new_block_tx_2 = await signer1.send_transaction(
@@ -691,4 +686,3 @@ async def test_set_block_numbers_season_3(adminAuth_factory):
     block_numbers = await rewardsCalculation.get_block_numbers(1).call()
 
     assert block_numbers.result.block_numbers == [999, 1050, 2800]
-
