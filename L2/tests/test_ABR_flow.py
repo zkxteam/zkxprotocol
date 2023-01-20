@@ -900,6 +900,12 @@ async def test_pay_abr_call_1(abr_factory):
 
     abr_tx = await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=abr_core,
                                      abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=from64x61(timestamp_2))
+    assert_events_emitted_from_all_calls(
+        abr_tx,
+        [
+            [0, abr_core.contract_address, 'abr_payment_made', [1, 0]]
+        ]
+    )
 
     await compare_user_balances(users=[alice, bob], user_tests=[alice_test, bob_test], asset_id=AssetID.USDC)
     await compare_user_positions(users=[alice, bob], users_test=[alice_test, bob_test], market_id=BTC_USD_ID)
