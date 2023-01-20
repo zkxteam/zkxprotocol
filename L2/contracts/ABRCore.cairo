@@ -302,6 +302,7 @@ func get_abr_details{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // ///////////
 
 // @notice Function to set the abr interval
+// @param new_abr_interval_ - New value for abr_interval
 @external
 func set_abr_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_abr_interval_: felt
@@ -312,8 +313,8 @@ func set_abr_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    with_attr error_message("ABRCore: new_abr_interval must be > 0") {
-        assert_le(60, new_abr_interval_);
+    with_attr error_message("ABRCore: new_abr_interval must be > 1800") {
+        assert_le(1800, new_abr_interval_);
     }
 
     abr_interval.write(value=new_abr_interval_);
@@ -347,6 +348,9 @@ func set_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
+    }
+
+    if (new_bollinger_width_ == 2) {
     }
 
     bollinger_width.write(new_bollinger_width_);
