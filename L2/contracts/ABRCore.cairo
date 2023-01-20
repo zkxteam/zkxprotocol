@@ -29,7 +29,17 @@ from contracts.libraries.Utils import verify_caller_authority
 // Constants //
 // ////////////
 
-const HOURS_8 = 28800;
+// To do checks for bollinger width
+const BOLLINGER_WIDTH_15 = 3458764513820540928;
+const BOLLINGER_WIDTH_20 = 4611686018427387904;
+const BOLLINGER_WIDTH_25 = 5764607523034234880;
+
+// To do checks for base_abr_rate
+const BASE_ABR_MIN = 28823037615171;
+const BASE_ABR_MAX = 230584300921369;
+
+// Minimum ABR interval
+const ABR_INTERVAL_MIN = 3600;
 
 // //////////
 // Events //
@@ -313,8 +323,8 @@ func set_abr_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    with_attr error_message("ABRCore: new_abr_interval must be > 1800") {
-        assert_le(1800, new_abr_interval_);
+    with_attr error_message("ABRCore: new_abr_interval must be >= one hour") {
+        assert_le(ABR_INTERVAL_MIN, new_abr_interval_);
     }
 
     abr_interval.write(value=new_abr_interval_);
@@ -334,6 +344,14 @@ func set_base_abr_rate{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
+    with_attr error_message("ABRCore: new_base_abr_ exceeds the maximum allowed value") {
+        assert_le(new_base_abr_, BASE_ABR_MAX);
+    }
+
+    with_attr error_message("ABRCore: new_base_abr_ is below the minimum allowed value") {
+        assert_le(BASE_ABR_MIN, new_base_abr_);
+    }
+
     base_abr_rate.write(new_base_abr_);
     return ();
 }
@@ -344,13 +362,30 @@ func set_base_abr_rate{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func set_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_bollinger_width_: felt
 ) {
+    alloc_locals;
     with_attr error_message("ABRCore: Unauthorized Call") {
         let (registry) = CommonLib.get_registry_address();
         let (version) = CommonLib.get_contract_version();
         verify_caller_authority(registry, version, MasterAdmin_ACTION);
     }
 
-    if (new_bollinger_width_ == 2) {
+    local is_valid;
+
+    if (new_bollinger_width_ == BOLLINGER_WIDTH_15) {
+        is_valid = 1;
+    } else {
+        if (new_bollinger_width_ == BOLLINGER_WIDTH_20) {
+            is_valid = 1;
+        } else {
+            if (new_bollinger_width_ == BOLLINGER_WIDTH_25) {
+                is_valid = 1;
+            } else {
+                is_valid = 0;
+            }
+        }
+    }
+    with_attr error_message("ABRCore: Invalid value for new_bollinger_width_") {
+        assert is_valid = 1;
     }
 
     bollinger_width.write(new_bollinger_width_);

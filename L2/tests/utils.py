@@ -324,3 +324,7 @@ def print_parsed_collaterals(coll_array):
         print("collateral_id: ", felt_to_str(coll_array[i].assetID))
         print("balance: ", from64x61(coll_array[i].balance))
         print("\n")
+
+
+print(to64x61(0.0001))
+print(to64x61(0.0001/8))

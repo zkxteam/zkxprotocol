@@ -954,7 +954,7 @@ async def test_abr_interval_invalid(abr_factory):
     await assert_revert(
         admin2_signer.send_transaction(
             admin2, abr_core.contract_address, 'set_abr_interval', [0]),
-        "ABRCore: new_abr_interval must be > 0"
+        "ABRCore: new_abr_interval must be >= one hour"
     )
 
 
@@ -1066,6 +1066,34 @@ async def test_set_bollinger_width_unauthorized(abr_factory):
 
 
 @pytest.mark.asyncio
+async def test_set_bollinger_width_authorized_invalid_1(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    await assert_revert(
+        admin1_signer.send_transaction(
+            admin1, abr_core.contract_address, 'set_bollinger_width', [to64x61(2.01)]),
+        "ABRCore: Invalid value for new_bollinger_width_"
+    )
+
+    bollinger_width_query = await abr_core.get_bollinger_width().call()
+    assert from64x61(bollinger_width_query.result.res) == 2.0
+
+
+@pytest.mark.asyncio
+async def test_set_bollinger_width_authorized_invalid_2(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    await assert_revert(
+        admin1_signer.send_transaction(
+            admin1, abr_core.contract_address, 'set_bollinger_width', [to64x61(1.500001)]),
+        "ABRCore: Invalid value for new_bollinger_width_"
+    )
+
+    bollinger_width_query = await abr_core.get_bollinger_width().call()
+    assert from64x61(bollinger_width_query.result.res) == 2.0
+
+
+@pytest.mark.asyncio
 async def test_set_bollinger_width_authorized(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
@@ -1086,6 +1114,36 @@ async def test_set_base_abr_rate_unauthorized(abr_factory):
 
 
 @pytest.mark.asyncio
+async def test_set_base_abr_rate_authorized_invalid_1(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    await assert_revert(
+        admin1_signer.send_transaction(
+            admin1, abr_core.contract_address, 'set_base_abr_rate', [to64x61(0.00001)]),
+        "ABRCore: new_base_abr_ is below the minimum allowed value"
+    )
+
+    base_abr_rate_query = await abr_core.get_base_abr_rate().call()
+    assert from64x61(base_abr_rate_query.result.res) == pytest.approx(
+        0.0000125, abs=1e-3)
+
+
+@ pytest.mark.asyncio
+async def test_set_base_abr_rate_authorized_invalid_2(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    await assert_revert(
+        admin1_signer.send_transaction(
+            admin1, abr_core.contract_address, 'set_base_abr_rate', [to64x61(0.000101)]),
+        "ABRCore: new_base_abr_ exceeds the maximum allowed value"
+    )
+
+    base_abr_rate_query = await abr_core.get_base_abr_rate().call()
+    assert from64x61(base_abr_rate_query.result.res) == pytest.approx(
+        0.0000125, abs=1e-3)
+
+
+@ pytest.mark.asyncio
 async def test_set_base_abr_rate_authorized(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
@@ -1096,7 +1154,7 @@ async def test_set_base_abr_rate_authorized(abr_factory):
         0.000025, abs=1e-3)
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_set_abr_round_2(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
@@ -1137,7 +1195,7 @@ async def test_set_abr_round_2(abr_factory):
     assert remaining_markets_query.result.remaining_markets_list == []
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_view_functions_state_2_round_2(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
@@ -1160,7 +1218,7 @@ async def test_view_functions_state_2_round_2(abr_factory):
     assert remaining_markets_query.result.remaining_markets_list == []
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_make_abr_payments_round_2(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
@@ -1191,7 +1249,7 @@ async def test_make_abr_payments_round_2(abr_factory):
     assert state_query.result.res == 0
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_abr_result_different_length(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
