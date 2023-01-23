@@ -12,6 +12,7 @@ from helpers import StarknetService, ContractType
 from dummy_addresses import L1_dummy_address
 from dummy_signers import signer1, signer2, signer3
 
+
 @pytest.fixture(scope='module')
 def event_loop():
     return asyncio.new_event_loop()
@@ -30,27 +31,30 @@ async def adminAuth_factory(starknet_service: StarknetService):
     user1 = await starknet_service.deploy(ContractType.Account, [
         signer3.public_key
     ])
-    
+
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
-    
+
     # ZKX Deployer
     zkxDeployer = await starknet_service.deploy(ContractType.ZKXDeployer, [registry.contract_address, 1])
 
     # a contract definition has to be declared before we can use class hash
     # can declare directly using state for tests
-    contract_class_trading = starknet_service.contracts_holder.get_contract_class(ContractType.Trading)
-    contract_class_liquidate = starknet_service.contracts_holder.get_contract_class(ContractType.Liquidate)
-    contract_class_abr = starknet_service.contracts_holder.get_contract_class(ContractType.ABR)
+    contract_class_trading = starknet_service.contracts_holder.get_contract_class(
+        ContractType.Trading)
+    contract_class_liquidate = starknet_service.contracts_holder.get_contract_class(
+        ContractType.Liquidate)
+    contract_class_abr = starknet_service.contracts_holder.get_contract_class(
+        ContractType.ABRCore)
 
     class_hash_trading_, _ = await starknet_service.starknet.state.declare(contract_class_trading)
     class_hash_liquidate_, _ = await starknet_service.starknet.state.declare(contract_class_liquidate)
     class_hash_abr_, _ = await starknet_service.starknet.state.declare(contract_class_abr)
 
-    class_hash_trading = int.from_bytes(class_hash_trading_,'big')
-    class_hash_liquidate =  int.from_bytes(class_hash_liquidate_,'big')
-    class_hash_abr =  int.from_bytes(class_hash_abr_,'big')
+    class_hash_trading = int.from_bytes(class_hash_trading_, 'big')
+    class_hash_liquidate = int.from_bytes(class_hash_liquidate_, 'big')
+    class_hash_abr = int.from_bytes(class_hash_abr_, 'big')
 
     print(class_hash_trading, class_hash_liquidate, class_hash_abr)
 
@@ -62,7 +66,8 @@ async def test_deploy_non_admin(adminAuth_factory):
     admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_abr = adminAuth_factory
 
     await assert_revert(
-        signer3.send_transaction(user1, zkxDeployer.contract_address, 'deploy_contracts', [2, class_hash_trading, class_hash_liquidate])
+        signer3.send_transaction(user1, zkxDeployer.contract_address, 'deploy_contracts', [
+                                 2, class_hash_trading, class_hash_liquidate])
     )
 
 
@@ -89,6 +94,3 @@ async def test_salt(adminAuth_factory):
 
     assert res_deployed_before.result.array[0] != res_deployed_after.result.array[0]
     assert res_deployed_before.result.array[1] != res_deployed_after.result.array[1]
-
-
-
