@@ -150,6 +150,7 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Recurse through all positions to see if it needs to liquidated
     let (
         liq_result,
+        least_collateral_ratio,
         least_collateral_ratio_position,
         least_collateral_ratio_position_collateral_price,
         least_collateral_ratio_position_asset_price,
@@ -169,21 +170,33 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     );
 
     if (liq_result == TRUE) {
-        let (amount_to_be_sold) = check_deleveraging(
-            account_address,
-            market_address,
-            least_collateral_ratio_position,
-            least_collateral_ratio_position_collateral_price,
-            least_collateral_ratio_position_asset_price,
-        );
-        IAccountManager.liquidate_position(
-            contract_address=account_address,
-            position_=least_collateral_ratio_position,
-            amount_to_be_sold_=amount_to_be_sold,
-        );
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+        // if margin ratio is <=0, we directly perform liquidation else we check for deleveraging
+        if (is_le(least_collateral_ratio, 0) == FALSE) {
+            let (amount_to_be_sold) = check_deleveraging(
+                account_address,
+                market_address,
+                least_collateral_ratio_position,
+                least_collateral_ratio_position_collateral_price,
+                least_collateral_ratio_position_asset_price,
+            );
+            IAccountManager.liquidate_position(
+                contract_address=account_address,
+                position_=least_collateral_ratio_position,
+                amount_to_be_sold_=amount_to_be_sold,
+            );
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            IAccountManager.liquidate_position(
+                contract_address=account_address,
+                position_=least_collateral_ratio_position,
+                amount_to_be_sold_=0,
+            );
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
     } else {
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -248,12 +261,12 @@ func find_collateral_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         collateralID=[prices].collateralID,
         assetPrice=[prices].assetPrice,
         collateralPrice=[prices].collateralPrice,
-    );
+        );
 
     // Create a temporary struct to read data from the array element of collaterals
     tempvar collateral_details: CollateralBalance = CollateralBalance(
         assetID=[collaterals].assetID, balance=[collaterals].balance
-    );
+        );
     // Check if the passed prices list is in proper order and the price is not negative
     with_attr error_message("Liquidate: AssetID and collateralID mismatch") {
         assert price_details.collateralID = collateral_details.assetID;
@@ -292,6 +305,7 @@ func find_collateral_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // @param least_collateral_ratio_position_collateral_price - Collateral price of the collateral in the postion which is having the least collateral ratio
 // @param least_collateral_ratio_position_asset_price - Asset price of an asset in the postion which is having the least collateral ratio
 // @return is_liquidation - 1 if positions are marked to be liquidated
+// @return least_collateral_ratio - least collateral ratio
 // @return least_collateral_ratio_position - The least collateralized position
 // @return least_collateral_ratio_position_collateral_price - Collateral price of the collateral in least_collateral_ratio_position
 // @return least_collateral_ratio_position_asset_price - Asset price of an asset in least_collateral_ratio_position
@@ -310,6 +324,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     least_collateral_ratio_position_asset_price: felt,
 ) -> (
     is_liquidation: felt,
+    least_collateral_ratio: felt,
     least_collateral_ratio_position: PositionDetailsForRiskManagement,
     least_collateral_ratio_position_collateral_price: felt,
     least_collateral_ratio_position_asset_price: felt,
@@ -347,6 +362,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         // Return if the account should be liquidated or not and the orderId of the least colalteralized position
         return (
             is_liquidation,
+            least_collateral_ratio,
             least_collateral_ratio_position,
             least_collateral_ratio_position_collateral_price,
             least_collateral_ratio_position_asset_price,
@@ -362,7 +378,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         margin_amount=[positions].margin_amount,
         borrowed_amount=[positions].borrowed_amount,
         leverage=[positions].leverage,
-    );
+        );
 
     // Get the asset ID and collateral ID of the position
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
@@ -375,7 +391,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         collateralID=[prices].collateralID,
         assetPrice=[prices].assetPrice,
         collateralPrice=[prices].collateralPrice,
-    );
+        );
 
     // Check if there is a mismatch in prices array and positions array
     with_attr error_message("Liquidate: AssetID and collateralID mismatch") {
@@ -596,6 +612,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     // Recurse through all positions to see if it needs to liquidated
     let (
         liq_result,
+        least_collateral_ratio,
         least_collateral_ratio_position,
         least_collateral_ratio_position_collateral_price,
         least_collateral_ratio_position_asset_price,
