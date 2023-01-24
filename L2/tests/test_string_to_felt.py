@@ -7,10 +7,10 @@ from starkware.starknet.compiler.compile import get_selector_from_name
 @pytest.mark.asyncio
 async def test_str_to_felt():
     asset_felt = str_to_felt("USDC")
-    amount = to64x61(10000000)
-    price = from64x61(1844674407370955161600)
-    margin = from64x61(11531451713787407040000)
-    borrowed = from64x61(8718657198078)
+    amount = to64x61(0.5555555555555553)
+    price = from64x61(2536427310135063347200)
+    margin = from64x61(16232806235124623343711705154)
+    borrowed = from64x61(1281023894007607296)
     leverage = from64x61(2305843009213693952)
     print("\namount:", amount)
     print("\nasset_felt:", asset_felt)

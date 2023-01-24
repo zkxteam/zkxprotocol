@@ -526,7 +526,7 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         price_diff = diff;
     }
 
-    // Calcculate amount to be sold for deleveraging
+    // Calculate amount to be sold for deleveraging
     let (margin_amount_in_usd) = Math64x61_mul(margin_amount, collateral_price_);
     let (maintenance_requirement_in_usd) = Math64x61_mul(req_margin, asset_price_);
     let (price_diff_in_usd) = Math64x61_sub(maintenance_requirement_in_usd, price_diff);

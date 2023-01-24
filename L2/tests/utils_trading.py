@@ -973,12 +973,18 @@ class Liquidator:
         liq_result = total_account_value_collateral < total_maintenance_requirement
 
         if liq_result:
-            amount_to_be_sold = self.__check_for_deleveraging(
-                position=least_collateral_ratio_position, collateral_price=least_collateral_ratio_position_collateral_price, asset_price=least_collateral_ratio_position_asset_price)
-            user.liquidate_position(
-                position=least_collateral_ratio_position,
-                amount_to_be_sold=amount_to_be_sold
-            )
+            if least_collateral_ratio > 0:
+                amount_to_be_sold = self.__check_for_deleveraging(
+                    position=least_collateral_ratio_position, collateral_price=least_collateral_ratio_position_collateral_price, asset_price=least_collateral_ratio_position_asset_price)
+                user.liquidate_position(
+                    position=least_collateral_ratio_position,
+                    amount_to_be_sold=amount_to_be_sold
+                )
+            else:
+                user.liquidate_position(
+                    position=least_collateral_ratio_position,
+                    amount_to_be_sold=0
+                )
         return (liq_result, least_collateral_ratio_position)
 
 

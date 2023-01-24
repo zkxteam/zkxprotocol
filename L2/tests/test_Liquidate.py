@@ -609,7 +609,7 @@ async def test_deleveraging_flow(adminAuth_factory):
     users_test = [eduard_test, daniel_test]
 
     # Sufficient balance for users
-    eduard_balance = 1500
+    eduard_balance = 1100
     daniel_balance = 5500
     balance_array = [eduard_balance, daniel_balance]
 
@@ -648,7 +648,7 @@ async def test_deleveraging_flow(adminAuth_factory):
 
     market_prices_1 = [{
         "market_id": BTC_USD_ID,
-        "asset_price": 1250,
+        "asset_price": 1150,
         "collateral_price": 1.05
     }]
 
@@ -676,18 +676,18 @@ async def test_deleveraging_invalid_size(adminAuth_factory):
     quantity_locked_1 = 1.96
     market_id_1 = BTC_USD_ID
     asset_id_1 = AssetID.USDC
-    oracle_price_1 = 1250
+    oracle_price_1 = 1150
 
     # Create orders
     orders_1 = [{
         "quantity": 1.96,
-        "price": 1250,
+        "price": 1150,
         "order_type": order_types["limit"],
         "life_cycle": order_life_cycles["close"],
         "direction": order_direction["short"]
     }, {
         "quantity": 1.96,
-        "price": 1250,
+        "price": 1150,
         "leverage": 5,
         "order_type": order_types["deleverage"],
         "liquidator_address": liquidator.contract_address,
@@ -697,7 +697,8 @@ async def test_deleveraging_invalid_size(adminAuth_factory):
     error_at_index = 1
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code="0005:", error_at_index=error_at_index, param_2=to64x61(1.96))
-
+    is_liquidatable = await eduard.get_deleveragable_or_liquidatable_position().call()
+    print(is_liquidatable.result)
 
 @pytest.mark.asyncio
 async def test_deleveraging_invalid_order_type(adminAuth_factory):
@@ -709,29 +710,29 @@ async def test_deleveraging_invalid_order_type(adminAuth_factory):
     users_test = [daniel_test, eduard_test]
 
     # Batch params
-    quantity_locked_1 = 1.9454545454
+    quantity_locked_1 = 0.5555555555555553
     market_id_1 = BTC_USD_ID
     asset_id_1 = AssetID.USDC
-    oracle_price_1 = 1250
+    oracle_price_1 = 1150
 
     # Create orders
     orders_1 = [{
-        "quantity": 1.9454545454,
-        "price": 1250,
+        "quantity": 0.5555555555555553,
+        "price": 1150,
         "order_type": order_types["limit"],
         "life_cycle": order_life_cycles["close"],
         "direction": order_direction["short"]
     }, {
-        "quantity": 1.9454545454,
-        "price": 1250,
+        "quantity": 0.5555555555555553,
+        "price": 1150,
         "order_type": order_types["liquidation"],
         "liquidator_address": liquidator.contract_address,
         "life_cycle": order_life_cycles["close"],
     }]
 
     error_at_index = 1
-    # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code="0006:", error_at_index=error_at_index, param_2=to64x61(1.9454545454))
+    # execute order (here 64x61(0.5555555555555553) = 1281023894007607040)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code="0006:", error_at_index=error_at_index, param_2=to64x61(0.5555555555555553))
 
 
 @pytest.mark.asyncio
@@ -744,21 +745,21 @@ async def test_deleveraging(adminAuth_factory):
     users_test = [daniel_test, eduard_test]
 
     # Batch params
-    quantity_locked_1 = 1.94545454
+    quantity_locked_1 = 0.5555555555555553
     market_id_1 = BTC_USD_ID
     asset_id_1 = AssetID.USDC
-    oracle_price_1 = 1250
+    oracle_price_1 = 1150
 
     # Create orders
     orders_1 = [{
-        "quantity": 1.9454545454,
-        "price": 1250,
+        "quantity": 0.5555555555555553,
+        "price": 1150,
         "order_type": order_types["limit"],
         "life_cycle": order_life_cycles["close"],
         "direction": order_direction["short"]
     }, {
-        "quantity": 1.9454545454,
-        "price": 1250,
+        "quantity": 0.5555555555555553,
+        "price": 1150,
         "leverage": 5,
         "order_type": order_types["deleverage"],
         "liquidator_address": liquidator.contract_address,
@@ -792,33 +793,42 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
         "collateral_id": AssetID.USDC,
         "collateral_price": 1.05
     }]
+
+    ####### Liquidation Order #######
+    ###################
+     # List of users
+    users = [daniel, eduard]
+    users_test = [daniel_test, eduard_test]
+
+    # Sufficient balance for users
+    daniel_balance = 6000
+    eduard_balance = 1100
+    balance_array = [daniel_balance, eduard_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 4.44444444444
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1800
+
+     # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
     await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard,
                             user_test=eduard_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test)
 
-    ####### Liquidation Order #######
-    ###################
-    # List of users
-    users = [daniel, eduard]
-    users_test = [daniel_test, eduard_test]
-
-    # Batch params for OPEN orders
-    quantity_locked_1 = 3.054545454
-    market_id_1 = BTC_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 1800
-
     ####### Liquidation Order 1#######
     # Create orders
     orders_1 = [{
-        "quantity": 3.054545454,
+        "quantity": 4.44444444444,
         "price": 1800,
         "leverage": 2,
         "direction": order_direction["short"],
         "order_type": order_types["limit"],
     }, {
-        "quantity": 3.054545454,
+        "quantity": 4.44444444444,
         "price": 1800,
         "order_type": order_types["liquidation"],
         "liquidator_address": liquidator.contract_address,
