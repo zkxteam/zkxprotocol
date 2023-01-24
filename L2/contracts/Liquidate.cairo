@@ -73,9 +73,9 @@ func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 // Events //
 // //////////
 
-// Event emitted whenever check_liquidation() is called
+// Event emitted whenever find_under_collateralized_position() is called
 @event
-func check_liquidation_called(
+func find_under_collateralized_position_called(
     account_address: felt,
     liq_result: felt,
     least_collateral_ratio_position: PositionDetailsForRiskManagement,
@@ -119,7 +119,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param prices - Array with all the price details
 // @return res - 1 if positions are marked to be liquidated
 @external
-func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func find_under_collateralized_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address: felt, prices_len: felt, prices: PriceData*
 ) -> (liq_result: felt, least_collateral_ratio_position: PositionDetailsForRiskManagement) {
     alloc_locals;
@@ -203,8 +203,8 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    // check_liquidation_called event is emitted
-    check_liquidation_called.emit(
+    // find_under_collateralized_position_called event is emitted
+    find_under_collateralized_position_called.emit(
         account_address=account_address,
         liq_result=liq_result,
         least_collateral_ratio_position=least_collateral_ratio_position,

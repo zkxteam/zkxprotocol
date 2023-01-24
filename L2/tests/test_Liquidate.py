@@ -11,7 +11,7 @@ from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, 
 from utils_trading import (
     User, Liquidator, OrderExecutor,
     order_direction, order_types, order_life_cycles, fund_mapping,
-    set_balance, execute_and_compare, check_liquidation,
+    set_balance, execute_and_compare, find_under_collateralized_position,
     compare_fund_balances, compare_user_balances, compare_user_positions, compare_debugging_values, compare_liquidatable_position
 )
 from utils_links import DEFAULT_LINK_1, prepare_starknet_string
@@ -230,7 +230,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, AssetID.ETH, AssetID.USDC, to64x61(10), 1, 0, 10, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
 
     # Fund the Holding contract
-    # Fund the Holding contract
     python_executor.set_fund_balance(
         fund=fund_mapping["holding_fund"], asset_id=AssetID.USDC, new_balance=1000000)
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
@@ -322,7 +321,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         "collateral_price": 0.05
     }]
 
-    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
                             user_test=alice_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
@@ -332,7 +331,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     ######## Bob's liquidation result 1 ##########
     ##############################################
 
-    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob,
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob,
                             user_test=bob_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=bob, user_test=bob_test)
@@ -388,7 +387,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
         "collateral_price": 0.05
     }]
 
-    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
                             user_test=alice_test, market_prices=market_prices_2, collateral_prices=collateral_prices_2, liquidate=liquidate)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test)
@@ -397,7 +396,7 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     ##############################################
     ######## Bob's liquidation result 2 ##########
     ##############################################
-    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob,
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob,
                             user_test=bob_test, market_prices=market_prices_2, collateral_prices=collateral_prices_2, liquidate=liquidate)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
@@ -430,7 +429,7 @@ async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
         "collateral_price": 0.05
     }]
 
-    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
                             user_test=alice_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test)
@@ -547,7 +546,7 @@ async def test_liquidation_flow_underwater(adminAuth_factory):
         "collateral_price": 1.05
     }]
 
-    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=charlie,
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=charlie,
                             user_test=charlie_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=charlie, user_test=charlie_test)
@@ -657,7 +656,7 @@ async def test_deleveraging_flow(adminAuth_factory):
         "collateral_price": 1.05
     }]
 
-    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard,
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard,
                             user_test=eduard_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test)
@@ -796,7 +795,7 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
 
     ####### Liquidation Order #######
     ###################
-     # List of users
+    # List of users
     users = [daniel, eduard]
     users_test = [daniel_test, eduard_test]
 
@@ -814,7 +813,7 @@ async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
      # Set balance in Starknet & Python
     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
 
-    await check_liquidation(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard,
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard,
                             user_test=eduard_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test)

@@ -4,7 +4,7 @@ from contracts.DataTypes import PriceData, MultipleOrder, PositionDetailsForRisk
 
 @contract_interface
 namespace ILiquidate {
-    func check_liquidation(account_address: felt, prices_len: felt, prices: PriceData*) -> (
+    func find_under_collateralized_position(account_address: felt, prices_len: felt, prices: PriceData*) -> (
         liq_result: felt, least_collateral_ratio_position: PositionDetailsForRiskManagement
     ) {
     }

@@ -33,7 +33,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @notice - All the following are mirror functions for Liquidate.cairo - just record call details and forward call
 
 @external
-func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func find_under_collateralized_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address: felt, prices_len: felt, prices: PriceData*
 ) -> (liq_result: felt, least_collateral_ratio_position: PositionDetailsForRiskManagement) {
     alloc_locals;
@@ -45,6 +45,6 @@ func check_liquidation{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (inner_address) = get_inner_contract();
     let (
         liq_result, least_collateral_ratio_position: PositionDetailsForRiskManagement
-    ) = ILiquidate.check_liquidation(inner_address, account_address, prices_len, prices);
+    ) = ILiquidate.find_under_collateralized_position(inner_address, account_address, prices_len, prices);
     return (liq_result, least_collateral_ratio_position);
 }
