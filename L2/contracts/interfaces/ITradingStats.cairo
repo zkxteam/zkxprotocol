@@ -44,6 +44,7 @@ namespace ITradingStats {
         trader_stats_list: TraderStats*,
         executed_sizes_list_len: felt,
         executed_sizes_list: felt*,
+        open_interest_: felt,
     ) -> () {
     }
 }
