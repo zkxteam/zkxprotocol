@@ -82,6 +82,7 @@ const LEVERAGE_ONE = 2305843009213693952;
 const NEGATIVE_ONE = 3618502788666131213697322783095070105623107215331596699970786213126658326529;
 const FIFTEEN_PERCENTAGE = 34587645138205409280;
 const HUNDRED = 230584300921369395200;
+const TWO = 4611686018427387904;
 
 // //////////
 // Events //
@@ -1002,7 +1003,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Check if the list is empty, if yes return 1
     if (request_list_len_ == 0) {
-        return (taker_execution_price, open_interest_);
+        let (actual_open_interest) = Math64x61_div(open_interest_, TWO);
+        return (taker_execution_price, actual_open_interest);
     }
 
     // Create a struct object for the order

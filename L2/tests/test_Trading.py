@@ -514,7 +514,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_3, oracle_price=oracle_price_3, trading=trading, is_reverted=1, error_code="1101:", error_at_index=0, param_2=market_id_3)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert open_interest_response.result.res == to64x61(4)
+    assert open_interest_response.result.res == to64x61(2)
 
 @pytest.mark.asyncio
 async def test_revert_balance_low_user_1(trading_test_initializer):
@@ -1453,7 +1453,7 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert open_interest_response.result.res == to64x61(10)
+    assert open_interest_response.result.res == to64x61(5)
 
     ###################
     ### Close orders ##
@@ -1483,7 +1483,7 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert open_interest_response.result.res == to64x61(4)
+    assert open_interest_response.result.res == to64x61(2)
 
 
 @pytest.mark.asyncio
@@ -1559,7 +1559,7 @@ async def test_opening_and_closing_full_orders_with_leverage(trading_test_initia
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert open_interest_response.result.res == to64x61(4)
+    assert open_interest_response.result.res == to64x61(2)
 
 
 @pytest.mark.asyncio
@@ -1636,7 +1636,7 @@ async def test_opening_and_closing_three_orders_full_with_leverage(trading_test_
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert open_interest_response.result.res == to64x61(4)
+    assert open_interest_response.result.res == to64x61(2)
 
 
 @pytest.mark.asyncio
@@ -1684,7 +1684,7 @@ async def test_IoC_orders(trading_test_initializer):
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert from64x61(open_interest_response.result.res) == 5.62 
+    assert from64x61(open_interest_response.result.res) == 2.81
 
     ##########################
     ### Open orders Partial ##
@@ -1777,7 +1777,7 @@ async def test_opening_partial_orders(trading_test_initializer):
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 9.62
+    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
 
 
 @pytest.mark.asyncio
@@ -1830,7 +1830,7 @@ async def test_closing_partial_orders(trading_test_initializer):
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 9.62
+    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
 
     ###############################
     ### Close orders partially ###
@@ -1856,7 +1856,7 @@ async def test_closing_partial_orders(trading_test_initializer):
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 9.62
+    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
 
 
 @pytest.mark.asyncio
@@ -1906,7 +1906,7 @@ async def test_opening_and_closing_full_orders_different_market(trading_test_ini
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
-    assert from64x61(open_interest_response.result.res) == 9
+    assert from64x61(open_interest_response.result.res) == 4.5
 
     ###################
     ### Close orders ##
@@ -1939,7 +1939,7 @@ async def test_opening_and_closing_full_orders_different_market(trading_test_ini
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
-    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 5.954
+    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 2.977
 
 
 @pytest.mark.asyncio
