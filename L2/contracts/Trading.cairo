@@ -82,6 +82,7 @@ const LEVERAGE_ONE = 2305843009213693952;
 const NEGATIVE_ONE = 3618502788666131213697322783095070105623107215331596699970786213126658326529;
 const FIFTEEN_PERCENTAGE = 34587645138205409280;
 const HUNDRED = 230584300921369395200;
+const TWO = 4611686018427387904;
 
 // //////////
 // Events //
@@ -211,7 +212,7 @@ func execute_batch{
     let (executed_sizes_list: felt*) = alloc();
 
     // Recursively loop through the orders in the batch
-    let (taker_execution_price: felt) = check_and_execute(
+    let (taker_execution_price: felt, open_interest: felt) = check_and_execute(
         quantity_locked_=quantity_locked_,
         market_id_=market_id_,
         collateral_id_=collateral_id,
@@ -237,6 +238,7 @@ func execute_batch{
         executed_sizes_list_=executed_sizes_list,
         total_order_volume_=0,
         taker_execution_price=0,
+        open_interest_=0,
     );
 
     // /// Set Market Price /////
@@ -284,6 +286,7 @@ func execute_batch{
         trader_stats_list=trader_stats_list,
         executed_sizes_list_len=request_list_len,
         executed_sizes_list=executed_sizes_list,
+        open_interest_=open_interest,
     );
 
     // Change the status of the batch to 1
@@ -619,7 +622,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_order_value
     );
 
-    return (average_execution_price_open, margin_amount_open, borrowed_amount_open, trading_fee,);
+    return (average_execution_price_open, margin_amount_open, borrowed_amount_open, trading_fee);
 }
 
 // @notice Intenal function that processes close orders including Liquidation & Deleveraging
@@ -913,7 +916,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     return (
-        average_execution_price_close, margin_amount_close, borrowed_amount_close, realized_pnl,
+        average_execution_price_close, margin_amount_close, borrowed_amount_close, realized_pnl
     );
 }
 
@@ -942,8 +945,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param trader_stats_list_ - This list contains trader addresses along with fee charged
 // @param total_order_volume_ - This stores the sum of size*execution_price for each maker order
 // @param taker_execution_price - The price to be stored for the market price in execute_batch
+// @param open_interest_ - Open interest corresponding to the current order
 // @return res - returns the net sum of the orders do far
-// @return trader_stats_list_len - returns the length of the trader fee list so far
+// @return trader_stats_list_len - length of the trader fee list so far
+// @return open_interest - open interest corresponding to the trade batch
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     quantity_locked_: felt,
     market_id_: felt,
@@ -970,7 +975,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     executed_sizes_list_: felt*,
     total_order_volume_: felt,
     taker_execution_price: felt,
-) -> (taker_execution_price: felt) {
+    open_interest_: felt,
+) -> (taker_execution_price: felt, open_interest: felt) {
     alloc_locals;
 
     local execution_price;
@@ -982,6 +988,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local quantity_to_execute;
     local current_quantity_executed;
     local current_order_side;
+    local current_open_interest;
 
     // Local variables to be passed as arguments in error_messages
     local order_id;
@@ -996,7 +1003,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Check if the list is empty, if yes return 1
     if (request_list_len_ == 0) {
-        return (taker_execution_price,);
+        let (actual_open_interest) = Math64x61_div(open_interest_, TWO);
+        return (taker_execution_price, actual_open_interest);
     }
 
     // Create a struct object for the order
@@ -1015,8 +1023,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         order_type=[request_list_].order_type,
         time_in_force=[request_list_].time_in_force,
         post_only=[request_list_].post_only,
-        life_cycle=[request_list_].life_cycle
-        );
+        life_cycle=[request_list_].life_cycle,
+    );
     assert order_id = temp_order.order_id;
     assert leverage = temp_order.leverage;
     assert market_id_order = temp_order.market_id;
@@ -1201,6 +1209,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
         assert pnl = trading_fee;
+        assert current_open_interest = quantity_to_execute;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1227,6 +1236,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
         assert pnl = realized_pnl;
+        assert current_open_interest = 0 - quantity_to_execute;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1333,6 +1343,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             executed_sizes_list_=executed_sizes_list_ + 1,
             total_order_volume_=new_total_order_volume,
             taker_execution_price=0,
+            open_interest_=current_open_interest,
         );
     }
 
@@ -1364,6 +1375,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_le(min_quantity_, temp_order.quantity);
     }
 
+    let (new_open_interest) = Math64x61_add(open_interest_, current_open_interest);
+
     // Recursive Call
     return check_and_execute(
         quantity_locked_=quantity_locked_,
@@ -1391,5 +1404,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         executed_sizes_list_=executed_sizes_list_ + 1,
         total_order_volume_=new_total_order_volume,
         taker_execution_price=execution_price,
+        open_interest_=new_open_interest,
     );
 }

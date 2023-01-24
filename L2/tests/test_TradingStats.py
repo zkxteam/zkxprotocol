@@ -442,6 +442,7 @@ async def test_unauthorized_call(adminAuth_factory):
             2,
             to64x61(1),
             to64x61(1),
+            to64x61(1),
         ]), "TradingStats: Trade can be recorded only by Trading contract"
     )
 

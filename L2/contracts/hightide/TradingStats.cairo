@@ -102,6 +102,11 @@ func traders_in_season(season_id: felt, index: felt) -> (trader_address: felt) {
 func trader_for_season(season_id: felt, trader_address: felt) -> (is_trader: felt) {
 }
 
+// stores current open interest corresponding to a market
+@storage_var
+func open_interest(market_id: felt) -> (res: felt) {
+}
+
 // //////////////
 // Constructor //
 // //////////////
@@ -120,6 +125,15 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ///////
 // View //
 // ///////
+
+// @dev - This function returns open interest corresponding to a specific market
+@view
+func get_open_interest{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_
+) -> (res: felt) {
+    let (current_open_interest) = open_interest.read(market_id_);
+    return (current_open_interest,);
+}
 
 // @dev - This function returns current running total for VolumeMetaData
 // It supports pagination through the use of num_order_required_ and index_from_ params
@@ -331,6 +345,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     trader_stats_list: TraderStats*,
     executed_sizes_list_len: felt,
     executed_sizes_list: felt*,
+    open_interest_: felt,
 ) {
     alloc_locals;
 
@@ -346,6 +361,10 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     with_attr error_message("TradingStats: Trade can be recorded only by Trading contract") {
         assert caller = trading_address;
     }
+
+    let (current_open_interest) = open_interest.read(market_id_);
+    let (new_open_interest) = Math64x61_add(current_open_interest, open_interest_);
+    open_interest.write(market_id_, new_open_interest);
 
     // Get Hightide address from Authorized Registry
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(
