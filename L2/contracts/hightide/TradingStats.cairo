@@ -363,7 +363,8 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     }
 
     let (current_open_interest) = open_interest.read(market_id_);
-    open_interest.write(market_id_, current_open_interest + open_interest_);
+    let (new_open_interest) = Math64x61_add(current_open_interest, open_interest_);
+    open_interest.write(market_id_, new_open_interest);
 
     // Get Hightide address from Authorized Registry
     let (hightide_address) = IAuthorizedRegistry.get_contract_address(

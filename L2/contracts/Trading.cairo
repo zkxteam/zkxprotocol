@@ -1343,7 +1343,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             executed_sizes_list_=executed_sizes_list_ + 1,
             total_order_volume_=new_total_order_volume,
             taker_execution_price=0,
-            open_interest_=open_interest_ + current_open_interest,
+            open_interest_=current_open_interest,
         );
     }
 
@@ -1375,6 +1375,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_le(min_quantity_, temp_order.quantity);
     }
 
+    let (new_open_interest) = Math64x61_add(open_interest_, current_open_interest);
+
     // Recursive Call
     return check_and_execute(
         quantity_locked_=quantity_locked_,
@@ -1402,6 +1404,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         executed_sizes_list_=executed_sizes_list_ + 1,
         total_order_volume_=new_total_order_volume,
         taker_execution_price=execution_price,
-        open_interest_=open_interest_ + current_open_interest,
+        open_interest_=new_open_interest,
     );
 }
