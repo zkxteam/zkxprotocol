@@ -217,7 +217,7 @@ func execute_batch{
 
     tempvar ttl = market.ttl;
 
-    with_attr error_message("0509: {order_id} {market_id_}") {
+    with_attr error_message("0509: {market_id_}") {
         assert_not_zero(market.is_tradable);
     }
 
