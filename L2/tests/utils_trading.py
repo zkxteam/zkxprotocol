@@ -973,12 +973,18 @@ class Liquidator:
         liq_result = total_account_value_collateral < total_maintenance_requirement
 
         if liq_result:
-            amount_to_be_sold = self.__check_for_deleveraging(
-                position=least_collateral_ratio_position, collateral_price=least_collateral_ratio_position_collateral_price, asset_price=least_collateral_ratio_position_asset_price)
-            user.liquidate_position(
-                position=least_collateral_ratio_position,
-                amount_to_be_sold=amount_to_be_sold
-            )
+            if least_collateral_ratio > 0:
+                amount_to_be_sold = self.__check_for_deleveraging(
+                    position=least_collateral_ratio_position, collateral_price=least_collateral_ratio_position_collateral_price, asset_price=least_collateral_ratio_position_asset_price)
+                user.liquidate_position(
+                    position=least_collateral_ratio_position,
+                    amount_to_be_sold=amount_to_be_sold
+                )
+            else:
+                user.liquidate_position(
+                    position=least_collateral_ratio_position,
+                    amount_to_be_sold=0
+                )
         return (liq_result, least_collateral_ratio_position)
 
 
@@ -1089,8 +1095,8 @@ def convert_list_from_64x61(fixed_point_list: List[int]) -> List[float]:
 
 
 # Liquidation check on starknet
-async def check_liquidation_starknet(zkx_node_signer: Signer, zkx_node: StarknetContract, liquidate: StarknetContract, liquidate_params: List[int]) -> Tuple[int, List[float]]:
-    liquidation_result_object = await zkx_node_signer.send_transaction(zkx_node, liquidate.contract_address, "check_liquidation", liquidate_params)
+async def find_under_collateralized_position_starknet(zkx_node_signer: Signer, zkx_node: StarknetContract, liquidate: StarknetContract, liquidate_params: List[int]) -> Tuple[int, List[float]]:
+    liquidation_result_object = await zkx_node_signer.send_transaction(zkx_node, liquidate.contract_address, "find_under_collateralized_position", liquidate_params)
     liquidation_return_data = liquidation_result_object.call_info.retdata
     # Convert the quantity to decimals
     least_collateral_ratio_position = [
@@ -1180,7 +1186,7 @@ def set_balance_python(user_test: User, asset_id: int, new_balance: float):
 
 
 # Liquidation check on the python implementation
-def check_liquidation_python(user_test: User, liquidator: Liquidator, liquidate_params: List[Dict]) -> Tuple[int, List]:
+def find_under_collateralized_position_python(user_test: User, liquidator: Liquidator, liquidate_params: List[Dict]) -> Tuple[int, List]:
     result = liquidator.check_for_liquidation(
         user=user_test, prices_array=liquidate_params)
     return (result[0], list(result[1].values())[:-2])
@@ -1192,7 +1198,7 @@ def check_liquidation_python(user_test: User, liquidator: Liquidator, liquidate_
 
 
 # Function to check for liquidation on starknet + python and to compare the results
-async def check_liquidation(zkx_node_signer: Signer, zkx_node: StarknetContract, liquidator: Liquidator, user: StarknetContract, user_test: User, market_prices: List[Dict], collateral_prices: List[Dict], liquidate: StarknetContract):
+async def find_under_collateralized_position(zkx_node_signer: Signer, zkx_node: StarknetContract, liquidator: Liquidator, user: StarknetContract, user_test: User, market_prices: List[Dict], collateral_prices: List[Dict], liquidate: StarknetContract):
     # Length of the final price data list
     total_length = len(market_prices) + len(collateral_prices)
     # intialize params list for starknet and python
@@ -1235,10 +1241,10 @@ async def check_liquidation(zkx_node_signer: Signer, zkx_node: StarknetContract,
         liquidation_params_starknet.extend(liquidation_format_starknet)
 
     # Get the liquidation result from starknet
-    starknet_result = await check_liquidation_starknet(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, liquidate=liquidate, liquidate_params=liquidation_params_starknet)
+    starknet_result = await find_under_collateralized_position_starknet(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, liquidate=liquidate, liquidate_params=liquidation_params_starknet)
 
     # Get the liquidation result from the python implmentation
-    python_result = check_liquidation_python(
+    python_result = find_under_collateralized_position_python(
         user_test=user_test, liquidator=liquidator, liquidate_params=liquidation_params_python)
 
     # Compare the results of python and starkent
