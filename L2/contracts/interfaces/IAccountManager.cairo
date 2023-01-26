@@ -21,6 +21,7 @@ namespace IAccountManager {
         margin_amount: felt,
         borrowed_amount: felt,
         market_id: felt,
+        collateral_id_: felt,
         pnl: felt,
     ) -> (res: felt) {
     }
@@ -43,7 +44,7 @@ namespace IAccountManager {
     func get_positions() -> (positions_array_len: felt, positions_array: PositionDetailsWithMarket*) {
     }
 
-    func get_positions_for_risk_management() -> (positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*) {
+    func get_positions_for_risk_management(collateral_id_:felt) -> (positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*) {
     }
 
     func get_simplified_positions(timestamp_filter_: felt) -> (

@@ -147,9 +147,24 @@ func portion_executed(order_id: felt) -> (res: felt) {
 func L1_address() -> (res: felt) {
 }
 
+// Stores the mapping from collateral to market_id array
+@storage_var
+func collateral_to_market_array(collateral_id: felt, index: felt) -> (market_id: felt) {
+}
+
+// Stores the length of the collateral to market_id array
+@storage_var
+func collateral_to_market_array_len(collateral_id: felt) -> (len: felt) {
+}
+
 // Stores all markets the user has position in
 @storage_var
 func index_to_market_array(index: felt) -> (market_id: felt) {
+}
+
+// Stores the length of the index_to_market_array
+@storage_var
+func index_to_market_array_len() -> (len: felt) {
 }
 
 // Stores the mapping from the market_id to index
@@ -165,11 +180,6 @@ func market_is_exist(market_id) -> (res: felt) {
 // Stores all collaterals held by the user
 @storage_var
 func collateral_array(index: felt) -> (collateral_id: felt) {
-}
-
-// Stores the length of the index_to_market_array
-@storage_var
-func index_to_market_array_len() -> (len: felt) {
 }
 
 // Stores length of the collateral array
@@ -606,15 +616,21 @@ func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of positions
 @view
-func get_positions_for_risk_management{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+func get_positions_for_risk_management{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(collateral_id_: felt) -> (
     positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*
 ) {
     alloc_locals;
 
     let (positions_array: PositionDetailsForRiskManagement*) = alloc();
-    let (array_len: felt) = index_to_market_array_len.read();
+    let (array_len: felt) = collateral_to_market_array_len.read(collateral_id=collateral_id_);
     return populate_positions_risk_management(
-        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
+        collateral_id_=collateral_id_,
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        iterator_=0,
+        final_len_=array_len,
     );
 }
 
@@ -633,7 +649,6 @@ func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     );
 }
-
 
 // @notice External function called by the Trading Contract to transfer funds from account contract
 // @param assetID_ - asset ID of the collateral that needs to be transferred
@@ -682,6 +697,7 @@ func execute_order{
     margin_amount: felt,
     borrowed_amount: felt,
     market_id: felt,
+    collateral_id_: felt,
     pnl: felt,
 ) -> (res: felt) {
     alloc_locals;
@@ -742,7 +758,7 @@ func execute_order{
         local created_timestamp;
 
         if (position_details.position_size == 0) {
-            add_to_market_array(market_id);
+            add_to_market_array(market_id_=market_id, collateral_id_=collateral_id_);
             created_timestamp = current_timestamp;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -879,7 +895,7 @@ func execute_order{
 
         if (new_position_size == 0) {
             if (position_details.position_size == 0) {
-                remove_from_market_array(market_id);
+                remove_from_market_array(market_id_=market_id, collateral_id_=collateral_id_);
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -1185,7 +1201,10 @@ func populate_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 // @param final_len_ - Length of the final array
 // @returns positions_array_len - Length of the positions array
 // @returns positions_array - Array with the positions
-func populate_positions_risk_management{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func populate_positions_risk_management{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    collateral_id_: felt,
     positions_array_len_: felt,
     positions_array_: PositionDetailsForRiskManagement*,
     iterator_: felt,
@@ -1199,7 +1218,9 @@ func populate_positions_risk_management{syscall_ptr: felt*, pedersen_ptr: HashBu
     }
 
     // Get the market id at that position
-    let (curr_market_id: felt) = index_to_market_array.read(index=iterator_);
+    let (curr_market_id: felt) = collateral_to_market_array.read(
+        collateral_id=collateral_id_, index=iterator_
+    );
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
@@ -1249,6 +1270,7 @@ func populate_positions_risk_management{syscall_ptr: felt*, pedersen_ptr: HashBu
     }
 
     return populate_positions_risk_management(
+        collateral_id_=collateral_id_,
         positions_array_len_=positions_array_len_ + is_long + is_short,
         positions_array_=positions_array_,
         iterator_=iterator_ + 1,
@@ -1468,20 +1490,20 @@ func hash_withdrawal_request{pedersen_ptr: HashBuiltin*}(
 // @param market_id - Id of the market to tbe added
 // @return 1 - If successfully added
 func add_to_market_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt
+    market_id_: felt, collateral_id_: felt
 ) {
-    let (is_exists) = market_is_exist.read(market_id=market_id);
+    let (is_exists) = market_is_exist.read(market_id=market_id_);
 
     if (is_exists == TRUE) {
         return ();
     }
 
-    let (arr_len) = index_to_market_array_len.read();
-    index_to_market_array.write(index=arr_len, value=market_id);
+    let (arr_len) = collateral_to_market_array_len.read(collateral_id=collateral_id_);
+    collateral_to_market_array.write(collateral_id=collateral_id_, index=arr_len, value=market_id_);
 
-    market_to_index_mapping.write(market_id=market_id, value=arr_len);
-    index_to_market_array_len.write(value=arr_len + 1);
-    market_is_exist.write(market_id=market_id, value=TRUE);
+    market_to_index_mapping.write(market_id=market_id_, value=arr_len);
+    collateral_to_market_array_len.write(collateral_id=collateral_id_, value=arr_len + 1);
+    market_is_exist.write(market_id=market_id_, value=TRUE);
     return ();
 }
 
@@ -1489,25 +1511,27 @@ func add_to_market_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @param market_id - Id of the market
 // @return 1 - If successfully removed
 func remove_from_market_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id: felt
+    market_id_: felt, collateral_id_: felt
 ) {
     alloc_locals;
 
-    let (index) = market_to_index_mapping.read(market_id=market_id);
-    let (arr_len) = index_to_market_array_len.read();
+    let (index) = market_to_index_mapping.read(market_id=market_id_);
+    let (arr_len) = collateral_to_market_array_len.read(collateral_id=collateral_id_);
 
     if (arr_len == 1) {
-        index_to_market_array.write(index=index, value=0);
+        collateral_to_market_array.write(collateral_id=collateral_id_, index=index, value=0);
     } else {
-        let (last_id) = index_to_market_array.read(index=arr_len - 1);
-        index_to_market_array.write(index=index, value=last_id);
-        index_to_market_array.write(index=arr_len - 1, value=0);
+        let (last_id) = collateral_to_market_array.read(
+            collateral_id=collateral_id_, index=arr_len - 1
+        );
+        collateral_to_market_array.write(collateral_id=collateral_id_, index=index, value=last_id);
+        collateral_to_market_array.write(collateral_id=collateral_id_, index=arr_len - 1, value=0);
         market_to_index_mapping.write(market_id=last_id, value=index);
     }
 
-    market_to_index_mapping.write(market_id=market_id, value=0);
-    market_is_exist.write(market_id=market_id, value=FALSE);
-    index_to_market_array_len.write(arr_len - 1);
+    market_to_index_mapping.write(market_id=market_id_, value=0);
+    market_is_exist.write(market_id=market_id_, value=FALSE);
+    collateral_to_market_array_len.write(collateral_id=collateral_id_, value=arr_len - 1);
     return ();
 }
 
