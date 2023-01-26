@@ -1013,6 +1013,55 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_not_zero(is_registered);
     }
 
+    // Size Check
+    with_attr error_message("0505: {order_id} {quantity_order}") {
+        assert_le(min_quantity_, [request_list_].quantity);
+    }
+
+    // Market Check
+    with_attr error_message("0504: {order_id} {market_id_order}") {
+        assert [request_list_].market_id = market_id_;
+    }
+
+    // Leverage check minimum
+    with_attr error_message("0503: {order_id} {leverage}") {
+        assert_le(LEVERAGE_ONE, [request_list_].leverage);
+    }
+
+    // Leverage check maximum
+    with_attr error_message("0502: {order_id} {leverage}") {
+        assert_le([request_list_].leverage, max_leverage_);
+    }
+
+    // Direction Check
+    if (request_list_len_ == 1) {
+        tempvar direction_check = maker_direction_ - [request_list_].direction;
+        with_attr error_message("0511: {order_id} {direction_order}") {
+            assert_not_zero(direction_check);
+        }
+
+        maker_direction = maker_direction_;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        if (maker_direction_ == 0) {
+            maker_direction = direction_order;
+        } else {
+            maker_direction = maker_direction_;
+            with_attr error_message("0512: {order_id} {direction_order}") {
+                assert maker_direction_ = [request_list_].direction;
+            }
+        }
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    tempvar syscall_ptr = syscall_ptr;
+    tempvar pedersen_ptr = pedersen_ptr;
+    tempvar range_check_ptr = range_check_ptr;
+
     // Quantity remaining to be executed
     let (quantity_remaining: felt) = Math64x61_sub(quantity_locked_, quantity_executed_);
 
@@ -1260,51 +1309,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Set the order size in executed_sizes_list array
     assert [executed_sizes_list_] = quantity_to_execute;
 
-    // Market Check
-    with_attr error_message("0504: {order_id} {market_id_order}") {
-        assert [request_list_].market_id = market_id_;
-    }
-
-    // Leverage check minimum
-    with_attr error_message("0503: {order_id} {leverage}") {
-        assert_le(LEVERAGE_ONE, [request_list_].leverage);
-    }
-
-    // Leverage check maximum
-    with_attr error_message("0502: {order_id} {leverage}") {
-        assert_le([request_list_].leverage, max_leverage_);
-    }
-
-    // Direction Check
-    if (request_list_len_ == 1) {
-        tempvar direction_check = maker_direction_ - [request_list_].direction;
-        with_attr error_message("0511: {order_id} {direction_order}") {
-            assert_not_zero(direction_check);
-        }
-
-        maker_direction = maker_direction_;
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        if (maker_direction_ == 0) {
-            maker_direction = direction_order;
-        } else {
-            maker_direction = maker_direction_;
-            with_attr error_message("0512: {order_id} {direction_order}") {
-                assert maker_direction_ = [request_list_].direction;
-            }
-        }
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    }
-
-    // Size Check
-    with_attr error_message("0505: {order_id} {quantity_order}") {
-        assert_le(min_quantity_, [request_list_].quantity);
-    }
-
     let (new_open_interest) = Math64x61_add(open_interest_, current_open_interest);
 
     return check_and_execute(
@@ -1325,7 +1329,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         liquidity_fund_address_=liquidity_fund_address_,
         insurance_fund_address_=insurance_fund_address_,
         max_leverage_=max_leverage_,
-        min_quantity_=0,
+        min_quantity_=min_quantity_,
         maker_direction_=maker_direction,
         trader_stats_list_=trader_stats_list_ + TraderStats.SIZE,
         executed_sizes_list_=executed_sizes_list_ + 1,
