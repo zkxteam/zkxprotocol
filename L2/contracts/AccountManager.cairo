@@ -84,16 +84,6 @@ from contracts.Math_64x61 import (
 // Events //
 // //////////
 
-// Event emitted whenever collateral is transferred from account by trading
-@event
-func transferred_from(asset_id: felt, amount: felt) {
-}
-
-// Event emitted whenever collateral is transferred to account by trading
-@event
-func transferred(asset_id: felt, amount: felt) {
-}
-
 // Event emitted whenever collateral is transferred to account by abr payment
 @event
 func transferred_abr(market_id: felt, direction: felt, amount: felt, timestamp: felt) {
@@ -104,19 +94,9 @@ func transferred_abr(market_id: felt, direction: felt, amount: felt, timestamp: 
 func transferred_from_abr(market_id: felt, direction: felt, amount: felt, timestamp: felt) {
 }
 
-// Event emitted whenver a new withdrawal request is made
-@event
-func withdrawal_request(collateral_id: felt, amount: felt, node_operator_l2: felt) {
-}
-
 // Event emitted whenever a position is marked to be liquidated/deleveraged
 @event
 func liquidate_deleverage(market_id: felt, direction: felt, amount_to_be_sold: felt) {
-}
-
-// Event emitted whenever asset deposited in into account
-@event
-func deposited(asset_id: felt, amount: felt) {
 }
 
 // ///////////
@@ -434,7 +414,16 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     // Compute and update the new balance.
     tempvar new_balance = balance_collateral + amount_in_decimal_representation;
     balance.write(assetID=assetID_, value=new_balance);
-    deposited.emit(asset_id=assetID_, amount=amount_in_decimal_representation);
+
+    let (keys: felt*) = alloc();
+    assert keys[0] = 'deposit';
+    let (data: felt*) = alloc();
+    assert data[0] = amount;
+    assert data[1] = balance_collateral;
+    assert data[2] = assetID_;
+
+    emit_event(1, keys, 3, data);
+
     return ();
 }
 
@@ -474,8 +463,9 @@ func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     let (data: felt*) = alloc();
     assert data[0] = -amount_;
     assert data[1] = balance_;
+    assert data[2] = assetID_;
 
-    emit_event(1, keys, 2, data);
+    emit_event(1, keys, 3, data);
 
     return ();
 }
@@ -510,8 +500,9 @@ func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let (data: felt*) = alloc();
     assert data[0] = amount_;
     assert data[1] = balance_;
+    assert data[2] = assetID_;
 
-    emit_event(1, keys, 2, data);
+    emit_event(1, keys, 3, data);
 
     return ();
 }
@@ -576,8 +567,9 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (data: felt*) = alloc();
     assert data[0] = -amount_;
     assert data[1] = balance_;
+    assert data[2] = collateral_id_;
 
-    emit_event(1, keys, 2, data);
+    emit_event(1, keys, 3, data);
 
     return ();
 }
@@ -641,8 +633,9 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     let (data: felt*) = alloc();
     assert data[0] = amount_;
     assert data[1] = balance_;
+    assert data[2] = collateral_id_;
 
-    emit_event(1, keys, 2, data);
+    emit_event(1, keys, 3, data);
 
     return ();
 }
@@ -1124,9 +1117,27 @@ func withdraw{
     let (array_len) = withdrawal_history_array_len.read();
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_);
     withdrawal_history_array_len.write(array_len + 1);
-    withdrawal_request.emit(
-        collateral_id=collateral_id_, amount=amount_, node_operator_l2=node_operator_L2_address_
-    );
+
+    // Event for withdrawal
+    let (keys: felt*) = alloc();
+    assert keys[0] = 'withdrawal';
+    let (data: felt*) = alloc();
+    assert data[0] = -amount_;
+    assert data[1] = current_balance;
+    assert data[2] = collateral_id_;
+
+    emit_event(1, keys, 3, data);
+
+    // Event for withdrawal fee
+    let (keys: felt*) = alloc();
+    assert keys[0] = 'withdrawal_fee';
+    let (data: felt*) = alloc();
+    assert data[0] = -standard_fee;
+    assert data[1] = fee_collateral_balance;
+    assert data[2] = fee_collateral_id;
+
+    emit_event(1, keys, 3, data);
+
     return ();
 }
 
