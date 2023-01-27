@@ -27,7 +27,6 @@ from contracts.DataTypes import (
     PositionDetailsForRiskManagement,
 )
 from contracts.interfaces.IAccountManager import IAccountManager
-from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IMarketPrices import IMarketPrices
@@ -453,7 +452,8 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     } else {
         assert least_collateral_ratio = least_collateral_ratio_;
         assert least_collateral_ratio_position = least_collateral_ratio_position_;
-        assert least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price_;
+        assert least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price_
+            ;
     }
 
     // Recurse over to the next position
@@ -526,4 +526,86 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         position_to_be_deleveraged.emit(position=position_, amount_to_be_sold=amount_to_be_sold);
         return (amount_to_be_sold,);
     }
+}
+
+// @notice Internal function to check if position can be opened
+// @param order - MultipleOrder structure
+// @param size - matched order size of current order
+// @param execution_price - Execution price of current order
+// @param prices_len - Length of the prices array
+// @param prices - Array with all the price details
+@external
+func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    order: MultipleOrder, size: felt, execution_price: felt
+) {
+    alloc_locals;
+
+    can_order_be_opened.emit(order=order);
+
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get required contract addresses from the AuthorizedRegistry
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    let (market_price_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=MarketPrices_INDEX, version=version
+    );
+
+    // Get the asset ID and collateral ID of the position
+    let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
+        contract_address=market_address, market_id_=order.market_id
+    );
+
+    // Get a list with all positions with the same collateral from AccountManager contract
+    let (
+        positions_len: felt, positions: PositionDetailsForRiskManagement*
+    ) = IAccountManager.get_positions_for_risk_management(
+        contract_address=order.user_address, collateral_id_=collateral_id
+    );
+
+    // Fetch the maintanence margin requirement from Markets contract
+    let (req_margin) = IMarkets.get_maintenance_margin(
+        contract_address=market_address, market_id_=order.market_id
+    );
+
+    // Calculate needed values
+    let (leveraged_position_value) = Math64x61_mul(execution_price, size);
+
+    let (total_position_value) = Math64x61_div(leveraged_position_value, order.leverage);
+    let (amount_to_be_borrowed) = Math64x61_sub(leveraged_position_value, total_position_value);
+
+    let (account_value) = Math64x61_sub(leveraged_position_value, amount_to_be_borrowed);
+    let (maintenance_requirement) = Math64x61_mul(req_margin, leveraged_position_value);
+
+    // Recurse through all positions to see if it needs to liquidated
+    let (
+        liq_result,
+        least_collateral_ratio,
+        least_collateral_ratio_position,
+        least_collateral_ratio_position_asset_price,
+    ) = check_liquidation_recurse(
+        account_address_=order.user_address,
+        market_address_=market_address,
+        market_price_address_=market_price_address,
+        positions_len_=positions_len,
+        positions_=positions,
+        collateral_id_=collateral_id,
+        total_account_value_=account_value,
+        total_maintenance_requirement_=maintenance_requirement,
+        least_collateral_ratio_=Math64x61_ONE,
+        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position_asset_price_=0,
+    );
+
+    local order_id;
+    local market_id;
+    assert order_id = order.order_id;
+    assert market_id = order.market_id;
+    with_attr error_message("1101: {order_id} {market_id}") {
+        assert liq_result = FALSE;
+    }
+    return ();
 }

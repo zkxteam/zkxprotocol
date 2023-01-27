@@ -1290,7 +1290,7 @@ async def execute_batch_reverted(zkx_node_signer: Signer, zkx_node: StarknetCont
     return
 
 
-async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContract, executor: OrderExecutor, orders: List[Dict], users_test: List[User], quantity_locked: float, market_id: int, oracle_price: float, trading: StarknetContract, timestamp: int = 0, is_reverted: int = 0, error_code: str = "", error_at_index: int = 0, param_2: str = "", error_message: str = "") -> Tuple[int, List]:
+async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContract, executor: OrderExecutor, orders: List[Dict], users_test: List[User], quantity_locked: float, market_id: int, oracle_price: float, trading: StarknetContract, timestamp: int = 0, is_reverted: int = 0, error_code: str = "", error_at_index: int = -1, param_2: str = "", error_message: str = "") -> Tuple[int, List]:
     # Generate a random batch id
     batch_id = random_string(10)
 
@@ -1338,8 +1338,11 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
         actual_error_message = ""
         # If the error code is passed
         if error_code:
-            error_at_order_id = complete_orders_python[error_at_index]["order_id"]
-            actual_error_message = f"{error_code} {error_at_order_id} {param_2}"
+            if error_at_index == -1:
+                actual_error_message = f"{error_code} {param_2}"
+            else:
+                error_at_order_id = complete_orders_python[error_at_index]["order_id"]
+                actual_error_message = f"{error_code} {error_at_order_id} {param_2}"
         # If an error message is passed
         elif error_message:
             actual_error_message = error_message
