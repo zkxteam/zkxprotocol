@@ -889,28 +889,20 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 // Check if the user's balance can cover the deficit
                 let is_payable = is_le(deficit, user_balance);
 
-                if (is_payable == TRUE) {
-                    // Transfer the full amount from the user
-                    IAccountManager.transfer_from(
-                        contract_address=order_.user_address,
-                        assetID_=collateral_id_,
-                        amount_=deficit,
-                        invoked_for_='liquidation',
-                    );
+                // Transfer the deficit from user balance. User balance can go negative
+                IAccountManager.transfer_from(
+                    contract_address=order_.user_address,
+                    assetID_=collateral_id_,
+                    amount_=deficit,
+                    invoked_for_='liquidation',
+                );
 
+                if (is_payable == TRUE) {
                     realized_pnl = margin_plus_pnl;
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                     tempvar range_check_ptr = range_check_ptr;
                 } else {
-                    // Transfer the partial amount from the user
-                    IAccountManager.transfer_from(
-                        contract_address=order_.user_address,
-                        assetID_=collateral_id_,
-                        amount_=user_balance,
-                        invoked_for_='liquidation',
-                    );
-
                     // Transfer the remaining amount from Insurance Fund
                     let (insurance_amount_claim) = Math64x61_sub(deficit, user_balance);
                     IInsuranceFund.withdraw(
