@@ -23,6 +23,7 @@ from starkware.cairo.common.signature import verify_ecdsa_signature
 from starkware.starknet.common.messages import send_message_to_l1
 from starkware.starknet.common.syscalls import (
     call_contract,
+    emit_event,
     get_block_timestamp,
     get_caller_address,
     get_contract_address,
@@ -446,13 +447,12 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 // @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    assetID_: felt, amount: felt
+    assetID_: felt, amount_: felt, invoked_for_: felt
 ) -> () {
     // Check if the caller is trading contract
     let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
-    let (balance_) = balance.read(assetID=assetID_);
 
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
@@ -462,9 +462,57 @@ func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         assert caller = trading_address;
     }
 
-    balance.write(assetID=assetID_, value=balance_ - amount);
+    with_attr error_message("AccountManager: Amount cannot be negative") {
+        assert_nn(amount_);
+    }
 
-    transferred_from.emit(asset_id=assetID_, amount=amount);
+    let (balance_) = balance.read(assetID=assetID_);
+    balance.write(assetID=assetID_, value=balance_ - amount_);
+
+    let (keys: felt*) = alloc();
+    assert keys[0] = invoked_for_;
+    let (data: felt*) = alloc();
+    assert data[0] = -amount_;
+    assert data[1] = balance_;
+
+    emit_event(1, keys, 2, data);
+
+    return ();
+}
+
+// @notice External function called by the Trading Contract to transfer funds from account contract
+// @param assetID_ - asset ID of the collateral that needs to be transferred
+// @param amount - Amount of funds to transfer to this contract
+@external
+func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    assetID_: felt, amount_: felt, invoked_for_: felt
+) -> () {
+    let (caller) = get_caller_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    let (trading_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Trading_INDEX, version=version
+    );
+    with_attr error_message("AccountManager: Unauthorized caller for transfer") {
+        assert caller = trading_address;
+    }
+
+    with_attr error_message("AccountManager: Amount cannot be negative") {
+        assert_nn(amount_);
+    }
+
+    let (balance_) = balance.read(assetID=assetID_);
+    balance.write(assetID=assetID_, value=balance_ + amount_);
+
+    let (keys: felt*) = alloc();
+    assert keys[0] = invoked_for_;
+    let (data: felt*) = alloc();
+    assert data[0] = amount_;
+    assert data[1] = balance_;
+
+    emit_event(1, keys, 2, data);
+
     return ();
 }
 
@@ -523,10 +571,14 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Write it to the position mapping
     position_mapping.write(market_id=market_id_, direction=direction_, value=updated_position);
 
-    // Emit transfer from event
-    transferred_from_abr.emit(
-        market_id=market_id_, direction=direction_, amount=amount_, timestamp=block_timestamp
-    );
+    let (keys: felt*) = alloc();
+    assert keys[0] = 'abr_transfer';
+    let (data: felt*) = alloc();
+    assert data[0] = -amount_;
+    assert data[1] = balance_;
+
+    emit_event(1, keys, 2, data);
+
     return ();
 }
 
@@ -584,10 +636,14 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     // Write it to the position mapping
     position_mapping.write(market_id=market_id_, direction=direction_, value=updated_position);
 
-    // Emit transfer event
-    transferred_abr.emit(
-        market_id=market_id_, direction=direction_, amount=amount_, timestamp=block_timestamp
-    );
+    let (keys: felt*) = alloc();
+    assert keys[0] = 'abr_transfer';
+    let (data: felt*) = alloc();
+    assert data[0] = amount_;
+    assert data[1] = balance_;
+
+    emit_event(1, keys, 2, data);
+
     return ();
 }
 
@@ -648,35 +704,6 @@ func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return populate_positions(
         positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     );
-}
-
-// @notice External function called by the Trading Contract to transfer funds from account contract
-// @param assetID_ - asset ID of the collateral that needs to be transferred
-// @param amount - Amount of funds to transfer to this contract
-@external
-func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    assetID_: felt, amount: felt
-) -> () {
-    let (caller) = get_caller_address();
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
-
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
-    );
-    with_attr error_message("AccountManager: Unauthorized caller for transfer") {
-        assert caller = trading_address;
-    }
-
-    with_attr error_message("AccountManager: Amount cannot be negative") {
-        assert_nn(amount);
-    }
-
-    let (balance_) = balance.read(assetID=assetID_);
-    balance.write(assetID=assetID_, value=balance_ + amount);
-
-    transferred.emit(asset_id=assetID_, amount=amount);
-    return ();
 }
 
 // @notice Function called by Trading Contract
