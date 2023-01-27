@@ -377,6 +377,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
 
     print("Trading contract:", hex(trading.contract_address))
     print("liquidate contract:", hex(liquidate.contract_address))
+    print("Market:", hex(market.contract_address))
+    print("Market Prices:", hex(marketPrices.contract_address))
+    print("Auth Registry", hex(registry.contract_address))
     return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats
 
 
