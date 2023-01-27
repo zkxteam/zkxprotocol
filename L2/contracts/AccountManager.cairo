@@ -84,16 +84,6 @@ from contracts.Math_64x61 import (
 // Events //
 // //////////
 
-// Event emitted whenever collateral is transferred to account by abr payment
-@event
-func transferred_abr(market_id: felt, direction: felt, amount: felt, timestamp: felt) {
-}
-
-// Event emitted whenever collateral is transferred from account by abr payment
-@event
-func transferred_from_abr(market_id: felt, direction: felt, amount: felt, timestamp: felt) {
-}
-
 // Event emitted whenever a position is marked to be liquidated/deleveraged
 @event
 func liquidate_deleverage(market_id: felt, direction: felt, amount_to_be_sold: felt) {

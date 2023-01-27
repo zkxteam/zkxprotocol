@@ -886,9 +886,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     contract_address=order_.user_address, assetID_=collateral_id_
                 );
 
-                // Check if the user's balance can cover the deficit
-                let is_payable = is_le(deficit, user_balance);
-
                 // Transfer the deficit from user balance. User balance can go negative
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
@@ -897,7 +894,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     invoked_for_='liquidation',
                 );
 
-                if (is_payable == TRUE) {
+                if (is_le(deficit, user_balance) == TRUE) {
                     realized_pnl = margin_plus_pnl;
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -905,12 +902,22 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 } else {
                     // Transfer the remaining amount from Insurance Fund
                     let (insurance_amount_claim) = Math64x61_sub(deficit, user_balance);
-                    IInsuranceFund.withdraw(
-                        contract_address=insurance_fund_address_,
-                        asset_id_=collateral_id_,
-                        amount=insurance_amount_claim,
-                        position_id_=order_.order_id,
-                    );
+                    if (is_le(user_balance, 0) == FALSE) {
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address_,
+                            asset_id_=collateral_id_,
+                            amount=deficit,
+                            position_id_=order_.order_id,
+                        );
+                    } else {
+                        let (difference) = Math64x61_sub(deficit, user_balance);
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address_,
+                            asset_id_=collateral_id_,
+                            amount=difference,
+                            position_id_=order_.order_id,
+                        );
+                    }
 
                     let (realized_pnl_) = Math64x61_add(user_balance, margin_amount);
                     let (signed_realized_pnl_) = Math64x61_mul(realized_pnl_, NEGATIVE_ONE);
