@@ -351,10 +351,6 @@ func get_withdrawal_history{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     return populate_withdrawals_array(0, withdrawal_list);
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> db34e66 (ZKX-1317 adds get safe amount to withdraw function)
 // @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
 // @param timestmap_filter_ - Timestmap by which to filter the array
 // @returns positions_array_len - Length of the array
@@ -746,35 +742,6 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
     emit_event(1, keys, 6, data);
 
-    return ();
-}
-
-// @notice External function called by the Trading Contract to transfer funds from account contract
-// @param assetID_ - asset ID of the collateral that needs to be transferred
-// @param amount - Amount of funds to transfer to this contract
-@external
-func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    assetID_: felt, amount: felt
-) -> () {
-    let (caller) = get_caller_address();
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
-
-    let (trading_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Trading_INDEX, version=version
-    );
-    with_attr error_message("AccountManager: Unauthorized caller for transfer") {
-        assert caller = trading_address;
-    }
-
-    with_attr error_message("AccountManager: Amount cannot be negative") {
-        assert_nn(amount);
-    }
-
-    let (balance_) = balance.read(assetID=assetID_);
-    balance.write(assetID=assetID_, value=balance_ + amount);
-
-    transferred.emit(asset_id=assetID_, amount=amount);
     return ();
 }
 
