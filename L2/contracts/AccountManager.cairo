@@ -68,6 +68,7 @@ from contracts.DataTypes import (
 from contracts.interfaces.IAccountLiquidator import IAccountLiquidator
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.ILiquidate import ILiquidate
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
 from contracts.libraries.CommonLibrary import CommonLib
@@ -348,6 +349,66 @@ func get_withdrawal_history{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 ) {
     let (withdrawal_list: WithdrawalHistory*) = alloc();
     return populate_withdrawals_array(0, withdrawal_list);
+}
+
+
+// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
+// @param timestmap_filter_ - Timestmap by which to filter the array
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of net positions
+@view
+func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    timestamp_filter_: felt
+) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
+    alloc_locals;
+
+    let (positions_array: SimplifiedPosition*) = alloc();
+    let (array_len: felt) = index_to_market_array_len.read();
+    return populate_simplified_positions(
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        iterator_=0,
+        final_len_=array_len,
+        timestamp_filter_=timestamp_filter_,
+    );
+}
+
+// @notice External function called by the Liquidate Contract to get the array of net positions of the user
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of positions
+@view
+func get_positions_for_risk_management{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(collateral_id_: felt) -> (
+    positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*
+) {
+    alloc_locals;
+
+    let (positions_array: PositionDetailsForRiskManagement*) = alloc();
+    let (array_len: felt) = collateral_to_market_array_len.read(collateral_id=collateral_id_);
+    return populate_positions_risk_management(
+        collateral_id_=collateral_id_,
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        iterator_=0,
+        final_len_=array_len,
+    );
+}
+
+// @notice External function called by the Liquidate Contract to get the array of net positions of the user
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of positions
+@view
+func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    positions_array_len: felt, positions_array: PositionDetailsWithMarket*
+) {
+    alloc_locals;
+
+    let (positions_array: PositionDetailsWithMarket*) = alloc();
+    let (array_len: felt) = index_to_market_array_len.read();
+    return populate_positions(
+        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
+    );
 }
 
 // //////////////
@@ -647,63 +708,33 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     return ();
 }
 
-// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
-// @param timestmap_filter_ - Timestmap by which to filter the array
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of net positions
-@view
-func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    timestamp_filter_: felt
-) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
-    alloc_locals;
+// @notice External function called by the Trading Contract to transfer funds from account contract
+// @param assetID_ - asset ID of the collateral that needs to be transferred
+// @param amount - Amount of funds to transfer to this contract
+@external
+func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    assetID_: felt, amount: felt
+) -> () {
+    let (caller) = get_caller_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
-    let (positions_array: SimplifiedPosition*) = alloc();
-    let (array_len: felt) = index_to_market_array_len.read();
-    return populate_simplified_positions(
-        positions_array_len_=0,
-        positions_array_=positions_array,
-        iterator_=0,
-        final_len_=array_len,
-        timestamp_filter_=timestamp_filter_,
+    let (trading_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Trading_INDEX, version=version
     );
-}
+    with_attr error_message("AccountManager: Unauthorized caller for transfer") {
+        assert caller = trading_address;
+    }
 
-// @notice External function called by the Liquidate Contract to get the array of net positions of the user
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of positions
-@view
-func get_positions_for_risk_management{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(collateral_id_: felt) -> (
-    positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*
-) {
-    alloc_locals;
+    with_attr error_message("AccountManager: Amount cannot be negative") {
+        assert_nn(amount);
+    }
 
-    let (positions_array: PositionDetailsForRiskManagement*) = alloc();
-    let (array_len: felt) = collateral_to_market_array_len.read(collateral_id=collateral_id_);
-    return populate_positions_risk_management(
-        collateral_id_=collateral_id_,
-        positions_array_len_=0,
-        positions_array_=positions_array,
-        iterator_=0,
-        final_len_=array_len,
-    );
-}
+    let (balance_) = balance.read(assetID=assetID_);
+    balance.write(assetID=assetID_, value=balance_ + amount);
 
-// @notice External function called by the Liquidate Contract to get the array of net positions of the user
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of positions
-@view
-func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    positions_array_len: felt, positions_array: PositionDetailsWithMarket*
-) {
-    alloc_locals;
-
-    let (positions_array: PositionDetailsWithMarket*) = alloc();
-    let (array_len: felt) = index_to_market_array_len.read();
-    return populate_positions(
-        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
-    );
+    transferred.emit(asset_id=assetID_, amount=amount);
+    return ();
 }
 
 // @notice Function called by Trading Contract
@@ -933,14 +964,14 @@ func execute_order{
                 market_id=market_id,
                 direction=parent_direction,
                 value=PositionDetails(
-                    avg_execution_price=0,
-                    position_size=0,
-                    margin_amount=0,
-                    borrowed_amount=0,
-                    leverage=0,
-                    created_timestamp=0,
-                    modified_timestamp=0,
-                    realized_pnl=0,
+                avg_execution_price=0,
+                position_size=0,
+                margin_amount=0,
+                borrowed_amount=0,
+                leverage=0,
+                created_timestamp=0,
+                modified_timestamp=0,
+                realized_pnl=0,
                 ),
             );
 
@@ -1044,7 +1075,7 @@ func withdraw{
     // Create withdrawal request for hashing
     local hash_withdrawal_request_: WithdrawalRequestForHashing = WithdrawalRequestForHashing(
         request_id=request_id_, collateral_id=collateral_id_, amount=amount_
-    );
+        );
     // hash the parameters
     let (hash) = hash_withdrawal_request(&hash_withdrawal_request_);
     // check if Tx is signed by the user
@@ -1067,6 +1098,7 @@ func withdraw{
     let (standard_fee, fee_collateral_id) = IWithdrawalFeeBalance.get_standard_withdraw_fee(
         contract_address=withdrawal_fee_balance_address
     );
+
     // Compute current balance
     let (fee_collateral_balance) = balance.read(assetID=fee_collateral_id);
     with_attr error_message("AccountManager: Insufficient balance to pay fees") {
@@ -1080,6 +1112,7 @@ func withdraw{
         collateral_id_=fee_collateral_id,
         fee_to_add_=standard_fee,
     );
+
     // Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_);
     with_attr error_message("AccountManager: Insufficient balance to withdraw") {
@@ -1088,6 +1121,25 @@ func withdraw{
     tempvar new_balance = current_balance - amount_;
     // Update the new balance
     balance.write(assetID=collateral_id_, value=new_balance);
+
+    // Check whether the withdrawal leads to the position to be liquidatable or deleveraged
+    // Get Liquidate contract address
+    let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Liquidate_INDEX, version=version
+    );
+    let (
+        liq_result: felt, least_collateral_ratio_position: PositionDetailsForRiskManagement
+    ) = ILiquidate.find_under_collateralized_position(
+        contract_address=liquidate_address,
+        account_address_=user_l2_address,
+        collateral_id_=collateral_id_,
+    );
+
+    with_attr error_message(
+            "AccountManager: This withdrawal will lead to the deleveraging or liquidation") {
+        assert liq_result = 0;
+    }
+
     // Calculate the timestamp
     let (timestamp_) = get_block_timestamp();
     // Get asset
@@ -1119,7 +1171,7 @@ func withdraw{
         node_operator_L2_address=node_operator_L2_address_,
         fee=standard_fee,
         status=WITHDRAWAL_INITIATED,
-    );
+        );
     // Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read();
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_);
