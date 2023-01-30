@@ -411,8 +411,9 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     assert data[0] = amount;
     assert data[1] = balance_collateral;
     assert data[2] = assetID_;
+    assert data[3] = user;
 
-    emit_event(1, keys, 3, data);
+    emit_event(1, keys, 4, data);
 
     return ();
 }
@@ -503,7 +504,12 @@ func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 // @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
+    collateral_id_: felt,
+    market_id_: felt,
+    direction_: felt,
+    amount_: felt,
+    abr_value_: felt,
+    position_size_: felt,
 ) {
     // Check if the caller is ABR Payment
     let (caller) = get_caller_address();
@@ -558,8 +564,11 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     assert data[0] = -amount_;
     assert data[1] = balance_;
     assert data[2] = collateral_id_;
+    assert data[3] = market_id_;
+    assert data[4] = abr_value_;
+    assert data[5] = position_size_;
 
-    emit_event(1, keys, 3, data);
+    emit_event(1, keys, 6, data);
 
     return ();
 }
@@ -570,7 +579,12 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param amount_ - Amount of funds to transfer from this contract
 @external
 func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
+    collateral_id_: felt,
+    market_id_: felt,
+    direction_: felt,
+    amount_: felt,
+    abr_value_: felt,
+    position_size_: felt,
 ) {
     // Check if the caller is trading contract
     let (caller) = get_caller_address();
@@ -624,8 +638,11 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     assert data[0] = amount_;
     assert data[1] = balance_;
     assert data[2] = collateral_id_;
+    assert data[3] = market_id_;
+    assert data[4] = abr_value_;
+    assert data[5] = position_size_;
 
-    emit_event(1, keys, 3, data);
+    emit_event(1, keys, 6, data);
 
     return ();
 }
@@ -1115,8 +1132,9 @@ func withdraw{
     assert data[0] = -amount_;
     assert data[1] = current_balance;
     assert data[2] = collateral_id_;
+    assert data[3] = user_l1_address;
 
-    emit_event(1, keys, 3, data);
+    emit_event(1, keys, 4, data);
 
     // Event for withdrawal fee
     let (keys: felt*) = alloc();

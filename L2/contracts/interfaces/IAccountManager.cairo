@@ -60,11 +60,23 @@ namespace IAccountManager {
     }
 
     func transfer_from_abr(
-        collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt
+        collateral_id_: felt,
+        market_id_: felt,
+        direction_: felt,
+        amount_: felt,
+        abr_value_: felt,
+        position_size_: felt,
     ) {
     }
 
-    func transfer_abr(collateral_id_: felt, market_id_: felt, direction_: felt, amount_: felt) {
+    func transfer_abr(
+        collateral_id_: felt,
+        market_id_: felt,
+        direction_: felt,
+        amount_: felt,
+        abr_value_: felt,
+        position_size_: felt,
+    ) {
     }
 
     func timestamp_check(market_id_: felt) -> (is_eight_hours: felt) {
