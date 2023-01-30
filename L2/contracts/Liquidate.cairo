@@ -140,8 +140,8 @@ func find_under_collateralized_position{
     );
 
     // Check if the list is empty
-    with_attr error_message("Liquidate: User's positions array is empty") {
-        assert_not_zero(positions_len);
+    if (positions_len == 0) {
+        return (0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
     }
 
     // Get Market contract address

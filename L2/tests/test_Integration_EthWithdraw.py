@@ -56,6 +56,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
+    liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
     withdrawal_fee_balance = await starknet_service.deploy(ContractType.WithdrawalFeeBalance, [registry.contract_address, 1])
     withdrawal_request = await starknet_service.deploy(ContractType.WithdrawalRequest, [registry.contract_address, 1])
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
@@ -70,6 +71,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await signer1.send_transaction(admin1,
                                    registry.contract_address, 'update_contract_registry', [1, 1, asset.contract_address])
+    
+    await signer1.send_transaction(admin1,
+                                   registry.contract_address, 'update_contract_registry', [11, 1, liquidate.contract_address])
     
     await signer1.send_transaction(admin1,
                                    registry.contract_address, 'update_contract_registry', [15, 1, withdrawal_fee_balance.contract_address])
