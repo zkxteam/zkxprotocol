@@ -381,7 +381,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     }
 
     let (market_price: MarketPrice) = IMarketPrices.get_market_price(
-        contract_address=market_address_, id=[positions_].market_id
+        contract_address=market_price_address_, id=[positions_].market_id
     );
 
     // Get the market ttl from the market contract

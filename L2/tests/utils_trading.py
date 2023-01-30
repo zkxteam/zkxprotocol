@@ -100,6 +100,7 @@ class User:
         self.balance = {}
         self.portion_executed = {}
         self.positions = {}
+        self.collateral_to_market_array = {}
         self.market_array = []
         self.collateral_array = []
         self.deleveragable_or_liquidatable_position = {}
