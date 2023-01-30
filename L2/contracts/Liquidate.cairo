@@ -117,6 +117,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param prices_len - Length of the prices array
 // @param prices - Array with all the price details
 // @return res - 1 if positions are marked to be liquidated
+// @return least_collateral_ratio_position - Position with least margin ratio
+// @return total_account_value - Total account value of the positions for the corresponding collateral
+// @return total_maintenance_requirement - Total maintenece requirement of the positions for the corresponding collateral
 @external
 func find_under_collateralized_position{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
@@ -321,9 +324,11 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 // @param least_collateral_ratio_position_collateral_price_ - Collateral price of the collateral in the postion which is having the least collateral ratio
 // @param least_collateral_ratio_position_asset_price_ - Asset price of an asset in the postion which is having the least collateral ratio
 // @return is_liquidation - 1 if positions are marked to be liquidated
-// @return least_collateral_ratio_ - least collateral ratio
-// @return least_collateral_ratio_position_ - The least collateralized position
-// @return least_collateral_ratio_position_asset_price_ - Asset price of an asset in least_collateral_ratio_position
+// @return least_collateral_ratio - least collateral ratio
+// @return least_collateral_ratio_position - The least collateralized position
+// @return least_collateral_ratio_position_asset_price - Asset price of an asset in least_collateral_ratio_position
+// @return total_account_value - Total account value of the positions for the corresponding collateral
+// @return total_maintenance_requirement - Total maintenece requirement of the positions for the corresponding collateral
 func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     account_address_: felt,
     market_address_: felt,

@@ -421,9 +421,10 @@ func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     collateral_id_: felt
 ) -> (safe_withdrawal_amount_64x61: felt) {
-    let (user_l2_address) = get_contract_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
+    let (user_l2_address) = get_contract_address();
+
     // Get Liquidate contract address
     let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Liquidate_INDEX, version=version
@@ -439,8 +440,9 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         collateral_id_=collateral_id_,
     );
 
-    with_attr error_message("AccountManager: Withdrawal puts the position under water") {
-        assert liq_result = 0;
+    // Returns 0, if the position is to be deleveraged or liquiditable
+    if (liq_result == 1) {
+        return (0,);
     }
 
     // Compute current balance
@@ -1178,7 +1180,7 @@ func withdraw{
     );
 
     with_attr error_message(
-            "AccountManager: This withdrawal will lead to the deleveraging or liquidation") {
+            "AccountManager: This withdrawal will lead to either deleveraging or liquidation") {
         assert liq_result = 0;
     }
 
