@@ -76,9 +76,9 @@ from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_div,
     Math64x61_fromDecimalFelt,
-    Math64x61_toDecimalFelt,
-    Math64x61_mul,
+    Math64x61_min,
     Math64x61_sub,
+    Math64x61_toDecimalFelt,
 )
 
 // //////////
@@ -351,7 +351,10 @@ func get_withdrawal_history{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     return populate_withdrawals_array(0, withdrawal_list);
 }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> db34e66 (ZKX-1317 adds get safe amount to withdraw function)
 // @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
 // @param timestmap_filter_ - Timestmap by which to filter the array
 // @returns positions_array_len - Length of the array
@@ -409,6 +412,43 @@ func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return populate_positions(
         positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
     );
+}
+
+// @notice view function to get amount to withdraw
+// @param collateral_id_ - ID of the collateral
+// @return safe_withdrawal_amount_64x61 - returns the safe amount to withdraw before position gets deleveraged or liquidated
+@view
+func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    collateral_id_: felt
+) -> (safe_withdrawal_amount_64x61: felt) {
+    let (user_l2_address) = get_contract_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+    // Get Liquidate contract address
+    let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Liquidate_INDEX, version=version
+    );
+    let (
+        liq_result: felt,
+        least_collateral_ratio_position: PositionDetailsForRiskManagement,
+        total_account_value: felt,
+        total_maintenance_requirement: felt,
+    ) = ILiquidate.find_under_collateralized_position(
+        contract_address=liquidate_address,
+        account_address_=user_l2_address,
+        collateral_id_=collateral_id_,
+    );
+
+    with_attr error_message("AccountManager: Withdrawal puts the position under water") {
+        assert liq_result = 0;
+    }
+
+    // Compute current balance
+    let (current_balance) = balance.read(assetID=collateral_id_);
+
+    let (safe_amount) = Math64x61_sub(total_account_value, total_maintenance_requirement);
+    let (safe_withdrawal_amount_64x61) = Math64x61_min(current_balance, safe_amount);
+    return (safe_withdrawal_amount_64x61,);
 }
 
 // //////////////
@@ -475,7 +515,6 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     assert data[3] = user;
 
     emit_event(1, keys, 4, data);
-
     return ();
 }
 
@@ -1128,7 +1167,10 @@ func withdraw{
         contract_address=registry, index=Liquidate_INDEX, version=version
     );
     let (
-        liq_result: felt, least_collateral_ratio_position: PositionDetailsForRiskManagement
+        liq_result: felt,
+        least_collateral_ratio_position: PositionDetailsForRiskManagement,
+        total_account_value: felt,
+        total_maintenance_requirement: felt,
     ) = ILiquidate.find_under_collateralized_position(
         contract_address=liquidate_address,
         account_address_=user_l2_address,

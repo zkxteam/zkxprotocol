@@ -121,7 +121,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func find_under_collateralized_position{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(account_address_: felt, collateral_id_: felt) -> (
-    liq_result: felt, least_collateral_ratio_position: PositionDetailsForRiskManagement
+    liq_result: felt,
+    least_collateral_ratio_position: PositionDetailsForRiskManagement,
+    total_account_value: felt,
+    total_maintenance_requirement: felt,
 ) {
     alloc_locals;
     // Check if the caller is a node
@@ -155,6 +158,8 @@ func find_under_collateralized_position{
         least_collateral_ratio,
         least_collateral_ratio_position,
         least_collateral_ratio_position_asset_price,
+        total_account_value,
+        total_maintenance_requirement,
     ) = check_liquidation_recurse(
         account_address_=account_address_,
         market_address_=market_address,
@@ -209,7 +214,12 @@ func find_under_collateralized_position{
         least_collateral_ratio_position=least_collateral_ratio_position,
     );
 
-    return (liq_result, least_collateral_ratio_position);
+    return (
+        liq_result,
+        least_collateral_ratio_position,
+        total_account_value,
+        total_maintenance_requirement,
+    );
 }
 
 // @notice Function to check if position can be opened
@@ -268,6 +278,8 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         least_collateral_ratio,
         least_collateral_ratio_position,
         least_collateral_ratio_position_asset_price,
+        total_account_value,
+        total_maintenance_requirement,
     ) = check_liquidation_recurse(
         account_address_=order.user_address,
         market_address_=market_address,
@@ -329,6 +341,8 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     least_collateral_ratio: felt,
     least_collateral_ratio_position: PositionDetailsForRiskManagement,
     least_collateral_ratio_position_asset_price: felt,
+    total_account_value: felt,
+    total_maintenance_requirement: felt,
 ) {
     alloc_locals;
 
@@ -357,6 +371,8 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
             least_collateral_ratio_,
             least_collateral_ratio_position_,
             least_collateral_ratio_position_asset_price_,
+            total_account_value_collateral,
+            total_maintenance_requirement_,
         );
     }
 
@@ -378,7 +394,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // ttl has passed, return 0
     let status = is_le(time_difference, ttl);
     if (status == FALSE) {
-        return (0, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0);
+        return (0, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0, 0);
     }
 
     let (req_margin) = IMarkets.get_maintenance_margin(
