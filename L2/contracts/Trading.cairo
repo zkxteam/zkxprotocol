@@ -542,7 +542,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     tempvar order_value_with_fee = order_value_with_fee_felt;
 
     // Check if the position can be opened
-    ILiquidate.check_order_can_be_opened(
+    ILiquidate.check_for_risk(
         contract_address=liquidate_address_,
         order=order_,
         size=order_size_,
