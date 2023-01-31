@@ -1,5 +1,6 @@
 %lang starknet
 
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.math_cmp import is_le, is_not_zero
 from starkware.cairo.common.pow import pow
@@ -89,15 +90,18 @@ func Math64x61_toFelt{range_check_ptr}(x: felt) -> (res: felt) {
 //##################
 
 // Approximates a 64.61 value to a specific number of decimal places
-func Math64x61_approx{range_check_ptr}(x: felt, decimals: felt) -> (res: felt) {
+func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
     alloc_locals;
     local value;
+
     Math64x61_assert64x61(x);
-    let (ten_power_decimals) = pow(10, decimals + 1);
-    let prod = x * ten_power_decimals;
+    assert_in_range(precision, 0, 19);
+
+    let (ten_power_precision) = pow(10, precision + 1);
+    let prod = x * ten_power_precision;
     let (int_val, mod_val) = unsigned_div_rem(prod, Math64x61_TEN);
     let is_less = is_le(mod_val, Math64x61_FIVE);
-    if (is_less == 1) {
+    if (is_less == TRUE) {
         value = int_val;
     } else {
         value = int_val + 1;
@@ -105,13 +109,13 @@ func Math64x61_approx{range_check_ptr}(x: felt, decimals: felt) -> (res: felt) {
 
     // Division with 10^decimals is done before converting to 64x61 to avoid overflow
     // Finding 64x61 form of integer part
-    let (ten_power) = pow(10, decimals);
+    let (ten_power) = pow(10, precision);
     let (quo, mod) = unsigned_div_rem(value, ten_power);
     let (quo_64x61) = Math64x61_fromIntFelt(quo);
     // Finding 64x61 form of decimal part
     let (mod_64x61) = Math64x61_fromIntFelt(mod);
-    let (ten_power_decimals_64x61) = Math64x61_fromIntFelt(ten_power);
-    let (decimal_part_64x61) = Math64x61_div(mod_64x61, ten_power_decimals_64x61);
+    let (ten_power_precision_64x61) = Math64x61_fromIntFelt(ten_power);
+    let (decimal_part_64x61) = Math64x61_div(mod_64x61, ten_power_precision_64x61);
     // Adding both integer and decimal part
     let (res) = Math64x61_add(quo_64x61, decimal_part_64x61);
     return (res,);

@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from helpers import StarknetService, ContractType
-from utils import from64x61, to64x61
+from utils import assert_revert, from64x61, to64x61
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -26,6 +26,9 @@ async def test_approx_1(math64x61_factory):
    assert from64x61(approx.result.res) == 1.22
 
    approx = await math.calc(to64x61(1.222), 3).call()
+   assert from64x61(approx.result.res) == 1.222
+
+   approx = await math.calc(to64x61(1.222), 18).call()
    assert from64x61(approx.result.res) == 1.222
 
 @pytest.mark.asyncio
@@ -110,3 +113,9 @@ async def test_approx_6(math64x61_factory):
 
    approx = await math.calc(to64x61(10000000000000.123456789123456789), 1).call()
    assert from64x61(approx.result.res) == 10000000000000.1
+
+@pytest.mark.asyncio
+async def test_approx_revert(math64x61_factory):
+   math = math64x61_factory
+
+   await assert_revert(math.calc(to64x61(1467.0000001), 19).call())
