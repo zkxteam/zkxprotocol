@@ -15,7 +15,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
 @pytest.mark.asyncio
 async def test_math64x61_is_le(adminAuth_factory):
    test = adminAuth_factory
-   
+
+   # When difference between x and y is 0
+   x = to64x61(0.5555555555555554)
+   y = to64x61(0.5555555555555554)
+   res = await test.math64x61_is_le(x,y,16).call()
+   assert res.result.res == 1
+
    # When difference between x and y is less than given precision(6)
    x = to64x61(0.5555555555555554)
    y = to64x61(0.5555555555555553)
@@ -35,6 +41,11 @@ async def test_math64x61_is_le(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_math64x61_assert_le(adminAuth_factory):
    test = adminAuth_factory
+
+   # When difference between x and y is 0
+   x = to64x61(0.5555555555555554)
+   y = to64x61(0.5555555555555554)
+   await test.math64x61_assert_le(x,y,6).call()
 
    # When difference between x and y is less than given precision(6)
    x = to64x61(0.5555555555555554)
