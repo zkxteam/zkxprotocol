@@ -1,5 +1,6 @@
 %lang starknet
 
+from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.math_cmp import is_le, is_not_zero
 from starkware.cairo.common.pow import pow
@@ -30,6 +31,8 @@ const Math64x61_BOUND = 2 ** 125;
 
 // 0x002000000000000000 or 2305843009213693952
 const Math64x61_ONE = 1 * Math64x61_FRACT_PART;
+const Math64x61_FIVE = 11529215046068469760;
+const Math64x61_TEN = 10 * Math64x61_FRACT_PART;
 
 // E (~2.7182) * ONE (2305843009213693952)
 const Math64x61_E = 6267931151224907085;
@@ -85,6 +88,38 @@ func Math64x61_toFelt{range_check_ptr}(x: felt) -> (res: felt) {
 //##################
 // Math operations #
 //##################
+
+// Approximates a 64.61 value to a specific number of decimal places
+func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
+    alloc_locals;
+    local value;
+
+    Math64x61_assert64x61(x);
+    assert_in_range(precision, 0, 19);
+
+    let (ten_power_precision) = pow(10, precision + 1);
+    let prod = x * ten_power_precision;
+    let (int_val, mod_val) = unsigned_div_rem(prod, Math64x61_TEN);
+    let is_less = is_le(mod_val, Math64x61_FIVE);
+    if (is_less == TRUE) {
+        value = int_val;
+    } else {
+        value = int_val + 1;
+    }
+
+    // Division with 10^decimals is done before converting to 64x61 to avoid overflow
+    // Finding 64x61 form of integer part
+    let (ten_power) = pow(10, precision);
+    let (quo, mod) = unsigned_div_rem(value, ten_power);
+    let (quo_64x61) = Math64x61_fromIntFelt(quo);
+    // Finding 64x61 form of decimal part
+    let (mod_64x61) = Math64x61_fromIntFelt(mod);
+    let (ten_power_precision_64x61) = Math64x61_fromIntFelt(ten_power);
+    let (decimal_part_64x61) = Math64x61_div(mod_64x61, ten_power_precision_64x61);
+    // Adding both integer and decimal part
+    let (res) = Math64x61_add(quo_64x61, decimal_part_64x61);
+    return (res,);
+}
 
 // Calculates the floor of a 64.61 value
 func Math64x61_floor{range_check_ptr}(x: felt) -> (res: felt) {
