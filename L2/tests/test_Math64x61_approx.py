@@ -58,7 +58,7 @@ async def test_approx_3(math64x61_factory):
    assert from64x61(approx.result.res) == 100
 
 @pytest.mark.asyncio
-async def test_approx_3(math64x61_factory):
+async def test_approx_4(math64x61_factory):
    math = math64x61_factory
 
    approx = await math.calc(to64x61(0.001), 3).call()
@@ -77,7 +77,7 @@ async def test_approx_3(math64x61_factory):
    assert from64x61(approx.result.res) == 0
 
 @pytest.mark.asyncio
-async def test_approx_4(math64x61_factory):
+async def test_approx_5(math64x61_factory):
    math = math64x61_factory
 
    approx = await math.calc(to64x61(10000000000000.98123456789), 6).call()
@@ -93,7 +93,7 @@ async def test_approx_4(math64x61_factory):
    assert from64x61(approx.result.res) == 10000000000001
 
 @pytest.mark.asyncio
-async def test_approx_5(math64x61_factory):
+async def test_approx_6(math64x61_factory):
    math = math64x61_factory
 
    approx = await math.calc(to64x61(1467.0000001), 3).call()
@@ -101,3 +101,12 @@ async def test_approx_5(math64x61_factory):
 
    approx = await math.calc(to64x61(756.99999999), 4).call()
    assert from64x61(approx.result.res) == 757
+
+   approx = await math.calc(to64x61(10000000000000.123456789123456789), 18).call()
+   assert from64x61(approx.result.res) == 10000000000000.123456789123456789
+
+   approx = await math.calc(to64x61(10000000000000.123456789123456789), 16).call()
+   assert from64x61(approx.result.res) == 10000000000000.1234567891234568
+
+   approx = await math.calc(to64x61(10000000000000.123456789123456789), 1).call()
+   assert from64x61(approx.result.res) == 10000000000000.1
