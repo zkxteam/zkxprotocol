@@ -428,3 +428,30 @@ func Math64x61_log10{range_check_ptr}(x: felt) -> (res: felt) {
     let (product) = Math64x61_mul(log10_x, log10_2);
     return (product,);
 }
+
+// Returns 1 if x <= y (or more precisely 0 <= y - x < RANGE_CHECK_BOUND).
+// Returns 1, if (y - x) <= precision
+// Returns 0, otherwise
+func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, decimals: felt) -> (res: felt) {
+    Math64x61_assert64x61(x);
+    Math64x61_assert64x61(y);
+    assert_in_range(decimals, 1, 19);
+    let x_le = is_le(x, y);
+
+    if (x_le == 1) {
+        return (1,);
+    } else {
+        let (ten_power_decimals) = pow(10, decimals);
+        let (ten_power_decimals_64x61: felt) = Math64x61_fromIntFelt(ten_power_decimals);
+        let (one_64x61: felt) = Math64x61_fromIntFelt(1);
+        let (res) = Math64x61_div(one_64x61, ten_power_decimals_64x61);
+        let (sub) = Math64x61_sub(y, x);
+        let sub_le = is_le(sub, res);
+
+        if (sub_le == 1) {
+            return (1,);
+        } else {
+            return (0,);
+        }
+    }
+}
