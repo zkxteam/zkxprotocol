@@ -445,7 +445,7 @@ func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, decimals: felt) -> (res:
         let (ten_power_decimals_64x61: felt) = Math64x61_fromIntFelt(ten_power_decimals);
         let (one_64x61: felt) = Math64x61_fromIntFelt(1);
         let (res) = Math64x61_div(one_64x61, ten_power_decimals_64x61);
-        let (sub) = Math64x61_sub(x,y);
+        let (sub) = Math64x61_sub(x, y);
         let sub_le = is_le(sub, res);
 
         if (sub_le == 1) {
@@ -454,4 +454,13 @@ func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, decimals: felt) -> (res:
             return (0,);
         }
     }
+}
+
+// Verifies that x <= y (or more precisely 0 <= y - x < RANGE_CHECK_BOUND).
+func Math64x61_assert_le{range_check_ptr}(x: felt, y: felt, decimals: felt) {
+    let (res) = Math64x61_is_le(x, y, decimals);
+    with_attr error_message("Math64x61_assert_le failed") {
+        assert res = 1;
+    }
+    return ();
 }
