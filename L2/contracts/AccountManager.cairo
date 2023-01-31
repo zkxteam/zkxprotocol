@@ -3,31 +3,19 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.hash_state import (
-    hash_finalize,
-    hash_init,
-    hash_update,
-    hash_update_single,
-)
-from starkware.cairo.common.math import (
-    abs_value,
-    assert_le,
-    assert_nn,
-    assert_not_equal,
-    assert_not_zero,
-)
+from starkware.cairo.common.hash_state import hash_finalize, hash_init, hash_update
+from starkware.cairo.common.math import assert_le, assert_nn, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_not_zero
-from starkware.cairo.common.pow import pow
+
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
-from starkware.starknet.common.messages import send_message_to_l1
+
 from starkware.starknet.common.syscalls import (
     call_contract,
     emit_event,
     get_block_timestamp,
     get_caller_address,
     get_contract_address,
-    get_tx_signature,
 )
 
 from contracts.Constants import (
@@ -40,9 +28,6 @@ from contracts.Constants import (
     LIQUIDATION_ORDER,
     LONG,
     OPEN,
-    POSITION_OPENED,
-    POSITION_TO_BE_DELEVERAGED,
-    POSITION_TO_BE_LIQUIDATED,
     SHORT,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
@@ -54,7 +39,6 @@ from contracts.DataTypes import (
     Asset,
     CollateralBalance,
     LiquidatablePosition,
-    Message,
     OrderRequest,
     PositionDetails,
     PositionDetailsForRiskManagement,
@@ -149,14 +133,11 @@ func collateral_array(index: felt) -> (collateral_id: felt) {
 func collateral_array_len() -> (len: felt) {
 }
 
-// Stores amount_to_be_sold in a position for delveraging
-@storage_var
-func amount_to_be_sold(order_id: felt) -> (amount: felt) {
-}
-
 // Stores the position which is to be deleveraged or liquidated
 @storage_var
-func deleveragable_or_liquidatable_position() -> (position: LiquidatablePosition) {
+func deleveragable_or_liquidatable_position(collateral_id: felt) -> (
+    position: LiquidatablePosition
+) {
 }
 
 // Stores all withdrawals made by the user
@@ -314,8 +295,8 @@ func get_L1_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 @view
 func get_deleveragable_or_liquidatable_position{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}() -> (position: LiquidatablePosition) {
-    let position = deleveragable_or_liquidatable_position.read();
+}(collateral_id_: felt) -> (position: LiquidatablePosition) {
+    let position = deleveragable_or_liquidatable_position.read(collateral_id=collateral_id_);
     return position;
 }
 
@@ -888,7 +869,9 @@ func execute_order{
 
         if (is_liq == 1) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
-            let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read();
+            let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
+                collateral_id=collateral_id_
+            );
 
             with_attr error_message("0004: {order_id} {market_id}") {
                 assert liq_position.market_id = market_id;
@@ -921,7 +904,9 @@ func execute_order{
             );
 
             // Update the Liquidatable position
-            deleveragable_or_liquidatable_position.write(value=updated_liquidatable_position);
+            deleveragable_or_liquidatable_position.write(
+                collateral_id=collateral_id_, value=updated_liquidatable_position
+            );
 
             // If it's a deleveraging order, calculate the new leverage
             if (request.order_type == DELEVERAGING_ORDER) {
@@ -1124,7 +1109,9 @@ func withdraw{
     balance.write(assetID=collateral_id_, value=new_balance);
 
     // Check whether any position is already marked to be deleveraged or liquidatable
-    let (position: LiquidatablePosition) = deleveragable_or_liquidatable_position.read();
+    let (position: LiquidatablePosition) = deleveragable_or_liquidatable_position.read(
+        collateral_id_
+    );
     with_attr error_message(
             "AccountManager: This withdrawal will lead to either deleveraging or liquidation") {
         assert position.liquidatable = 0;
@@ -1218,7 +1205,7 @@ func withdraw{
 // @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
 @external
 func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt
+    collateral_id_: felt, position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt
 ) {
     alloc_locals;
 
@@ -1252,7 +1239,9 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     );
 
     // Update deleveraged or liquidatable position
-    deleveragable_or_liquidatable_position.write(value=liquidatable_position);
+    deleveragable_or_liquidatable_position.write(
+        collateral_id=collateral_id_, value=liquidatable_position
+    );
 
     liquidate_deleverage.emit(
         market_id=position_.market_id, direction=position_.direction, amount_to_be_sold=amount
