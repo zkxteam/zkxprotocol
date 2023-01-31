@@ -445,7 +445,7 @@ func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, decimals: felt) -> (res:
         let (ten_power_decimals_64x61: felt) = Math64x61_fromIntFelt(ten_power_decimals);
         let (one_64x61: felt) = Math64x61_fromIntFelt(1);
         let (res) = Math64x61_div(one_64x61, ten_power_decimals_64x61);
-        let (sub) = Math64x61_sub(y, x);
+        let (sub) = Math64x61_sub(x,y);
         let sub_le = is_le(sub, res);
 
         if (sub_le == 1) {

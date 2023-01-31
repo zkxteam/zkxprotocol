@@ -73,6 +73,8 @@ class ContractType(Enum):
     Starkway = "tests/testable/StarkwayProxy.cairo"
     ERC20 = "tests/testable/TestERC20Mintable.cairo"
     TestUserBatch = "tests/testable/TestUserBatch.cairo"
+    TestMath64x61 = "tests/testable/TestMath64x61.cairo"
+
 
 
 class OptimizedStarknetState(StarknetState):
