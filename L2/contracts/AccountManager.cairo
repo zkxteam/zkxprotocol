@@ -1130,6 +1130,14 @@ func withdraw{
     // Update the new balance
     balance.write(assetID=collateral_id_, value=new_balance);
 
+    // Check whether any position is already marked to be deleveraged or liquidatable
+    let (position: LiquidatablePosition) = deleveragable_or_liquidatable_position.read();
+    with_attr error_message(
+            "AccountManager: This withdrawal will lead to either deleveraging or liquidation") {
+        assert position.liquidatable = 0;
+        assert position.amount_to_be_sold = 0;
+    }
+
     // Check whether the withdrawal leads to the position to be liquidatable or deleveraged
     // Get Liquidate contract address
     let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
