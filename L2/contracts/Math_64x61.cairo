@@ -438,8 +438,8 @@ func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: fe
     assert_in_range(scale, 1, 19);
     let x_le = is_le(x, y);
 
-    if (x_le == 1) {
-        return (1,);
+    if (x_le == TRUE) {
+        return (TRUE,);
     } else {
         let (ten_power_scale) = pow(10, scale);
         let (ten_power_scale_64x61: felt) = Math64x61_fromIntFelt(ten_power_scale);
@@ -448,24 +448,24 @@ func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: fe
         let (res) = Math64x61_sub(x, y);
         let res_le = is_le(res, epsilon);
 
-        if (res_le == 1) {
-            return (1,);
+        if (res_le == TRUE) {
+            return (TRUE,);
         } else {
-            return (0,);
+            return (FALSE,);
         }
     }
 }
 
-// Verifies that x <= y 
+// Verifies that x <= y
 func Math64x61_assert_le{range_check_ptr}(x: felt, y: felt, scale: felt) {
     let (res) = Math64x61_is_le(x, y, scale);
     with_attr error_message("Math64x61_assert_le failed") {
-        assert res = 1;
+        assert res = TRUE;
     }
     return ();
 }
 
-// Returns 1, if x == y 
+// Returns 1, if x == y
 // Returns 1, if |x - y| <= 10^-scale
 // Returns 0, otherwise
 func Math64x61_is_equal{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: felt) {
@@ -476,7 +476,7 @@ func Math64x61_is_equal{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res:
     let (local res) = Math64x61_sub(x, y);
 
     if (res == 0) {
-        return (1,);
+        return (TRUE,);
     } else {
         let (ten_power_scale) = pow(10, scale);
         let (ten_power_scale_64x61: felt) = Math64x61_fromIntFelt(ten_power_scale);
@@ -485,19 +485,19 @@ func Math64x61_is_equal{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res:
         let abs_res = abs_value(res);
         let res_le = is_le(abs_res, epsilon);
 
-        if (res_le == 1) {
-            return (1,);
+        if (res_le == TRUE) {
+            return (TRUE,);
         } else {
-            return (0,);
+            return (FALSE,);
         }
     }
 }
 
-// Verifies that x == y 
+// Verifies that x == y
 func Math64x61_assert_equal{range_check_ptr}(x: felt, y: felt, scale: felt) {
     let (res) = Math64x61_is_equal(x, y, scale);
     with_attr error_message("Math64x61_assert_equal failed") {
-        assert res = 1;
+        assert res = TRUE;
     }
     return ();
 }
