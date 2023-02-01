@@ -102,31 +102,45 @@ async def test_math64x61_is_le(adminAuth_factory):
 async def test_math64x61_assert_le(adminAuth_factory):
    test = adminAuth_factory
 
-   # When difference between x and y is 0
+   # Case 1: When both are equal
+   # x == y, (x-y) <= 10^-16
    x = to64x61(0.5555555555555554)
    y = to64x61(0.5555555555555554)
-   await test.math64x61_assert_le(x,y,6).call()
+   await test.math64x61_assert_le(x,y,16).call()
 
-   # When difference between x and y is less than given precision(6)
+   # Case 2: When both are positive
+   # x > y, (x-y) <= 10^-6
    x = to64x61(0.5555555555555554)
    y = to64x61(0.5555555555555553)
-   await test.math64x61_assert_le(x,y,6).call()
+   await test.math64x61_is_le(x,y,6).call()
 
-   # When difference between x and y is more than given precision(6)
-   x = to64x61(0.5578945678393322)
-   y = to64x61(-0.5555555555555531)
+   # Case 3: When one is negative
+   # x > y, (x-y) > 10^-6
+   x = to64x61(0.5555555555555554)
+   y = to64x61(-0.5555555555555553)
    await assert_revert(
         test.math64x61_assert_le(x,y,6).call(),
         "Math64x61_assert_le failed"
    )
 
-   # When difference between x and y is more than given precision(18)
-   x = to64x61(-0.5555555555555531)
-   y = to64x61(-0.5578945678393322)
+   # x < y, (x-y) <= 10^-18
+   x = to64x61(-0.5555555555555553)
+   y = to64x61(0.5555555555555554)
+   await test.math64x61_is_le(x,y,18).call()
+
+   # Case 4: When both are negative 
+   # x > y, (x-y) > 10^-4
+   x = to64x61(-1)
+   y = to64x61(-1.001)
    await assert_revert(
-        test.math64x61_assert_le(x,y,18).call(),
+        test.math64x61_assert_le(x,y,4).call(),
         "Math64x61_assert_le failed"
-    )
+   )
+
+   # x < y, (x-y) <= 10^-2
+   x = to64x61(-1.001)
+   y = to64x61(-1)
+   await test.math64x61_is_le(x,y,2).call()
 
 @pytest.mark.asyncio
 async def test_math64x61_is_equal(adminAuth_factory):
@@ -213,3 +227,50 @@ async def test_math64x61_is_equal(adminAuth_factory):
    y = to64x61(-1)
    res = await test.math64x61_is_equal(x,y,2).call()
    assert res.result.res == 1
+
+@pytest.mark.asyncio
+async def test_math64x61_assert_equal(adminAuth_factory):
+   test = adminAuth_factory
+
+   # Case 1: When both are equal
+   # x == y, |x-y| <= 10^-16
+   x = to64x61(0.5555555555555554)
+   y = to64x61(0.5555555555555554)
+   await test.math64x61_assert_equal(x,y,16).call()
+
+   # Case 2: When both are positive
+   # x > y, |x-y| <= 10^-6
+   x = to64x61(0.5555555555555554)
+   y = to64x61(0.5555555555555553)
+   await test.math64x61_is_le(x,y,6).call()
+
+   # Case 3: When one is negative
+   # x > y, |x-y| > 10^-6
+   x = to64x61(0.5555555555555554)
+   y = to64x61(-0.5555555555555553)
+   await assert_revert(
+        test.math64x61_assert_equal(x,y,6).call(),
+        "Math64x61_assert_equal failed"
+   )
+
+   # x < y, |x-y| > 10^-18
+   x = to64x61(-0.5555555555555553)
+   y = to64x61(0.5555555555555554)
+   await assert_revert(
+        test.math64x61_assert_equal(x,y,18).call(),
+        "Math64x61_assert_equal failed"
+   )
+
+   # Case 4: When both are negative 
+   # x > y, |x-y| > 10^-4
+   x = to64x61(-1)
+   y = to64x61(-1.001)
+   await assert_revert(
+        test.math64x61_assert_equal(x,y,4).call(),
+        "Math64x61_assert_equal failed"
+   )
+   
+   # x < y, |x-y| <= 10^-2
+   x = to64x61(-1.001)
+   y = to64x61(-1)
+   await test.math64x61_is_le(x,y,2).call()
