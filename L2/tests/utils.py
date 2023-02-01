@@ -324,13 +324,3 @@ def print_parsed_collaterals(coll_array):
         print("collateral_id: ", felt_to_str(coll_array[i].assetID))
         print("balance: ", from64x61(coll_array[i].balance))
         print("\n")
-
-
-MATH_64x61_10 = to64x61(10)
-x = to64x61(10.135)
-print(x)
-y = x * 10**2
-int_value = y//MATH_64x61_10
-mod_value = y % MATH_64x61_10
-print(int_value, mod_value)
-print(from64x61(mod_value))

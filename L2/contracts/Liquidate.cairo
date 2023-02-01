@@ -6,8 +6,17 @@ from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp
 
-from contracts.Constants import LONG, Market_INDEX, MarketPrices_INDEX
-from contracts.DataTypes import MarketPrice, MultipleOrder, PositionDetailsForRiskManagement
+from contracts.Constants import (
+    LONG,
+    Market_INDEX,
+    MarketPrices_INDEX,
+)
+from contracts.DataTypes import (
+    LiquidatablePosition,
+    MarketPrice,
+    MultipleOrder,
+    PositionDetailsForRiskManagement,
+)
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
@@ -112,6 +121,14 @@ func find_under_collateralized_position{
 ) {
     alloc_locals;
     // Check if the caller is a node
+
+    let (
+        liquidatable_position: LiquidatablePosition
+    ) = IAccountManager.get_deleveragable_or_liquidatable_position(contract_address=account_address_, collateral_id_=collateral_id_);
+
+    if(liquidatable_position.amount_to_be_sold != 0){
+        return (1, PositionDetailsForRiskManagement(0,0,0,0,0,0), 0, 0);
+    }
 
     // Fetch all the positions from the Account contract
     let (

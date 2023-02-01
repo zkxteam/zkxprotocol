@@ -1,8 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import abs_value, assert_not_zero, assert_not_equal
+from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from contracts.Math_64x61 import (
     Math64x61_add,

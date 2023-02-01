@@ -2,12 +2,10 @@ from copyreg import constructor
 import pytest
 import asyncio
 import time
-from starkware.starknet.testing.starknet import Starknet
-from starkware.starkware_utils.error_handling import StarkException
-from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, PRIME
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61, from64x61, PRIME
+from starkware.starknet.testing.contract import StarknetContract
 from utils_trading import (
     User, Liquidator, OrderExecutor,
     order_direction, order_types, order_life_cycles, fund_mapping,
@@ -29,15 +27,25 @@ liquidator_private_key = 123456789987654326
 liquidator_signer = Signer(liquidator_private_key)
 daniel_signer = Signer(123456789987654327)
 eduard_signer = Signer(123456789987654328)
+gary_signer = Signer(123456789987654329)
+felix_signer = Signer(123456789987654330)
 
 maker_trading_fees = to64x61(0.0002 * 0.97)
 taker_trading_fees = to64x61(0.0005 * 0.97)
 
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
+BTC_DAI_ID = str_to_felt("nxczijewihrewi")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
+ETH_DAI_ID = str_to_felt("dsfjlkj3249jfkdl")
 TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 DOGE_ID = str_to_felt("jdi2i8621hzmnc7324o")
 TSLA_ID = str_to_felt("i39sk1nxlqlzcee")
+
+timestamp = int(time.time())
+timestamp_1 = timestamp + 10
+timestamp_2 = timestamp + 61
+timestamp_3 = timestamp_2 + 59
+timestamp_4 = timestamp_2 + 61
 
 
 @pytest.fixture(scope='module')
@@ -87,7 +95,13 @@ async def adminAuth_factory(starknet_service: StarknetService):
     eduard_test = User(123456789987654328,
                        eduard.contract_address, liquidator_private_key)
 
-    timestamp = int(time.time())
+    gary = await account_factory.deploy_ZKX_account(gary_signer.public_key)
+    gary_test = User(123456789987654329,
+                     gary.contract_address, liquidator_private_key)
+
+    felix = await account_factory.deploy_ZKX_account(felix_signer.public_key)
+    felix_test = User(123456789987654330,
+                      felix.contract_address, liquidator_private_key)
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1,
@@ -108,7 +122,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     insuranceFund = await starknet_service.deploy(ContractType.InsuranceFund, [registry.contract_address, 1])
     feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     marketPrices = await starknet_service.deploy(ContractType.MarketPrices, [registry.contract_address, 1])
-    collateral_prices = await starknet_service.deploy(ContractType.CollateralPrices, [registry.contract_address, 1])
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
     trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
     user_stats = await starknet_service.deploy(ContractType.UserStats, [registry.contract_address, 1])
@@ -146,6 +159,12 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(
         admin1, account_registry.contract_address, 'add_to_account_registry', [eduard.contract_address])
 
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry', [gary.contract_address])
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry', [felix.contract_address])
+
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Asset, 1, asset.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Market, 1, market.contract_address])
@@ -156,7 +175,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Holding, 1, holding.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.LiquidityFund, 1, liquidityFund.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.InsuranceFund, 1, insuranceFund.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.CollateralPrices, 1, collateral_prices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.AccountRegistry, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Liquidate, 1, liquidate.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.MarketPrices, 1, marketPrices.contract_address])
@@ -212,46 +230,99 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
 
-    UST_properties = build_asset_properties(
-        id=AssetID.UST,
-        short_name=str_to_felt("UST"),
+    DAI_properties = build_asset_properties(
+        id=AssetID.DAI,
+        short_name=str_to_felt("DAI"),
         asset_version=0,
         is_tradable=0,
         is_collateral=1,
         token_decimal=6
     )
-    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', UST_properties)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', DAI_properties)
 
-    # Update collateral prices
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.USDC, to64x61(1)])
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.UST, to64x61(1)])
-
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, AssetID.BTC, AssetID.USDC, to64x61(10), 1, 0, 10, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, AssetID.ETH, AssetID.USDC, to64x61(10), 1, 0, 10, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, AssetID.BTC, AssetID.USDC, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, AssetID.ETH, AssetID.USDC, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_DAI_ID, AssetID.BTC, AssetID.DAI, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_DAI_ID, AssetID.ETH, AssetID.DAI, to64x61(10), 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
 
     # Fund the Holding contract
     python_executor.set_fund_balance(
         fund=fund_mapping["holding_fund"], asset_id=AssetID.USDC, new_balance=1000000)
+    python_executor.set_fund_balance(
+        fund=fund_mapping["holding_fund"], asset_id=AssetID.DAI, new_balance=1000000)
     await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.DAI, to64x61(1000000)])
 
     # Fund the Liquidity fund contract
     python_executor.set_fund_balance(
         fund=fund_mapping["liquidity_fund"], asset_id=AssetID.USDC, new_balance=1000000)
     python_executor.set_fund_balance(
+        fund=fund_mapping["liquidity_fund"], asset_id=AssetID.DAI, new_balance=1000000)
+    python_executor.set_fund_balance(
         fund=fund_mapping["insurance_fund"], asset_id=AssetID.USDC, new_balance=1000000)
+    python_executor.set_fund_balance(
+        fund=fund_mapping["insurance_fund"], asset_id=AssetID.DAI, new_balance=1000000)
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, insuranceFund.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [AssetID.DAI, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, insuranceFund.contract_address, 'fund', [AssetID.DAI, to64x61(1000000)])
 
     # Set the threshold for oracle price in Trading contract
     await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
-    return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, alice_test, bob_test, charlie_test, python_executor, python_liquidator, feeBalance, liquidityFund, eduard_test, daniel_test
+    return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, alice_test, bob_test, charlie_test, python_executor, python_liquidator, feeBalance, liquidityFund, eduard_test, daniel_test, gary, felix, gary_test, felix_test, marketPrices, starknet_service
+
+
+async def set_asset_price_by_trading(starknet_service, admin: StarknetContract, trading: StarknetContract, python_executor: OrderExecutor, new_timestamp: int,  gary: StarknetContract, felix: StarknetContract, gary_test: User, felix_test: User, market_id: int, collateral_id: int, price: float):
+
+    starknet_service.starknet.state.state.block_info = BlockInfo(
+        block_number=1,
+        block_timestamp=new_timestamp,
+        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
+        starknet_version=STARKNET_VERSION
+    )
+
+    # List of users
+    users = [gary, felix]
+    users_test = [gary_test, felix_test]
+
+    # Collaterals
+    collateral_id_1 = collateral_id
+
+    # Sufficient balance for users
+    gary_balance = 1000000
+    felix_balance = 1000000
+
+    balance_array = [gary_balance, felix_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = market_id
+    oracle_price_1 = price
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin, users=users, users_test=users_test, balance_array=balance_array, asset_id=collateral_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "price": price,
+        "market_id": market_id_1,
+        "order_type": order_types["limit"],
+    }, {
+        "quantity": 1,
+        "price": price,
+        "market_id": market_id_1,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=new_timestamp)
 
 
 @pytest.mark.asyncio
-async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
+async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
 
     ###################
     ### Open orders ##
@@ -262,16 +333,12 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     # Collaterals
     collateral_id_1 = AssetID.USDC
-    collateral_id_2 = AssetID.UST
 
     # Sufficient balance for users
-    alice_balance_usdc = 5500
-    alice_balance_ust = 1000
-    bob_balance_usdc = 6000
-    bob_balance_ust = 5500
+    alice_balance_usdc = 5110
+    bob_balance_usdc = 5110
 
     balance_array_usdc = [bob_balance_usdc, alice_balance_usdc]
-    balance_array_ust = [bob_balance_ust, alice_balance_ust]
 
     # Batch params for OPEN orders
     quantity_locked_1 = 2
@@ -281,7 +348,6 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
 
     # Set balance in Starknet & Python
     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array_usdc, asset_id=collateral_id_1)
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array_ust, asset_id=collateral_id_2)
 
     # Create orders
     orders_1 = [{
@@ -297,548 +363,296 @@ async def test_should_calculate_correct_liq_ratio_1(adminAuth_factory):
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp)
 
     # compare
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
-    ##############################################
-    ######## Alice's liquidation result 1 ########
-    ##############################################
-    market_prices_1 = [{
-        "market_id": BTC_USD_ID,
-        "asset_price": 5000,
-        "collateral_price": 1.05
-    }]
-
-    collateral_prices_1 = [{
-        "collateral_id": AssetID.USDC,
-        "collateral_price": 1.05
-    }, {
-        "collateral_id": AssetID.UST,
-        "collateral_price": 0.05
-    }]
-
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
-                                             user_test=alice_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
+    #################################################
+    ######## Alice's liquidation result USDC ########
+    #################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-    await compare_liquidatable_position(user=alice, user_test=alice_test)
-
-    # ##############################################
-    # ######## Bob's liquidation result 1 ##########
-    # ##############################################
-
-    # await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob,
-    #                         user_test=bob_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
-    # await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-    # await compare_liquidatable_position(user=bob, user_test=bob_test)
-
-    # # ###### Opening of Orders 2 #######
-    # # Batch params for OPEN orders 2
-    # quantity_locked_2 = 3
-    # market_id_2 = ETH_USD_ID
-    # asset_id_2 = AssetID.USDC
-    # oracle_price_2 = 100
-
-    # orders_2 = [{
-    #     "quantity": 3,
-    #     "market_id": ETH_USD_ID,
-    #     "price": 100,
-    #     "order_type": order_types["limit"],
-    #     "leverage": 3,
-    # }, {
-    #     "quantity": 3,
-    #     "market_id": ETH_USD_ID,
-    #     "price": 100,
-    #     "direction": order_direction["short"],
-    #     "leverage": 3,
-    # }]
-
-    # # execute order
-    # await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0)
-
-    # # compare
-    # await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
-    # await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
-    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-
-    # ##############################################
-    # ######## Alice's liquidation result 2 ########
-    # ##############################################
-
-    # market_prices_2 = [{
-    #     "market_id": BTC_USD_ID,
-    #     "asset_price": 5000,
-    #     "collateral_price": 1.05
-    # }, {
-    #     "market_id": ETH_USD_ID,
-    #     "asset_price": 100,
-    #     "collateral_price": 1.05
-    # }]
-
-    # collateral_prices_2 = [{
-    #     "collateral_id": AssetID.USDC,
-    #     "collateral_price": 1.05
-    # }, {
-    #     "collateral_id": AssetID.UST,
-    #     "collateral_price": 0.05
-    # }]
-
-    # await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
-    #                         user_test=alice_test, market_prices=market_prices_2, collateral_prices=collateral_prices_2, liquidate=liquidate)
-    # await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-    # await compare_liquidatable_position(user=alice, user_test=alice_test)
-    # await compare_liquidatable_position(user=alice, user_test=alice_test)
-
-    # ##############################################
-    # ######## Bob's liquidation result 2 ##########
-    # ##############################################
-    # await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob,
-    #                         user_test=bob_test, market_prices=market_prices_2, collateral_prices=collateral_prices_2, liquidate=liquidate)
-
-    # await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-    # await compare_liquidatable_position(user=bob, user_test=bob_test)
-
-
-# @pytest.mark.asyncio
-# async def test_should_calculate_correct_liq_ratio_2(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ##############################################
-#     ######## Alice's liquidation result 3 ########
-#     ##############################################
-
-#     market_prices_1 = [{
-#         "market_id": BTC_USD_ID,
-#         "asset_price": 8000.5,
-#         "collateral_price": 1.05
-#     }, {
-#         "market_id": ETH_USD_ID,
-#         "asset_price": 100,
-#         "collateral_price": 1.05
-#     }]
-
-#     collateral_prices_1 = [{
-#         "collateral_id": AssetID.USDC,
-#         "collateral_price": 1.05
-#     }, {
-#         "collateral_id": AssetID.UST,
-#         "collateral_price": 0.05
-#     }]
-
-#     await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice,
-#                             user_test=alice_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
-#     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-#     await compare_liquidatable_position(user=alice, user_test=alice_test)
-
-
-# @pytest.mark.asyncio
-# async def test_liquidation_invalid_order_type(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ###################
-#     # List of users
-#     users = [charlie, alice]
-#     users_test = [charlie_test, alice_test]
-
-#     # Sufficient balance for users
-#     charlie_balance = 8000
-#     balance_array = [charlie_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 7357.5
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=[charlie], users_test=[charlie_test], balance_array=balance_array, asset_id=asset_id_1)
-
-#     ####### Liquidation Order 1#######
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "price": 7357.5,
-#         "leverage": 2,
-#         "direction": order_direction["short"],
-#         "order_type": order_types["limit"],
-#     }, {
-#         "quantity": 1,
-#         "price": 7357.5,
-#         "direction": order_direction["long"],
-#         "order_type": order_types["deleverage"],
-#         "liquidator_address": liquidator.contract_address,
-#         "life_cycle": order_life_cycles["close"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code="0007:", error_at_index=error_at_index, param_2=to64x61(1))
-
-
-# @pytest.mark.asyncio
-# async def test_liquidation_flow(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ###################
-#     # List of users
-#     users = [charlie, alice]
-#     users_test = [charlie_test, alice_test]
-
-#     # Sufficient balance for users
-#     charlie_balance = 8000
-#     balance_array = [charlie_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 2
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 7357.5
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=[charlie], users_test=[charlie_test], balance_array=balance_array, asset_id=asset_id_1)
-
-#     ####### Liquidation Order 1#######
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 2,
-#         "price": 7357.5,
-#         "leverage": 2,
-#         "direction": order_direction["short"],
-#         "order_type": order_types["limit"],
-#     }, {
-#         "quantity": 2,
-#         "price": 7357.5,
-#         "direction": order_direction["long"],
-#         "order_type": order_types["liquidation"],
-#         "liquidator_address": liquidator.contract_address,
-#         "life_cycle": order_life_cycles["close"],
-#     }]
-
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0)
-
-#     # compare
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_liquidatable_position(user=alice, user_test=alice_test)
-
-
-# @pytest.mark.asyncio
-# async def test_liquidation_flow_underwater(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ##############################################
-#     ######## Charlie's liquidation result 1 ######
-#     ##############################################
-#     market_prices_1 = [{
-#         "market_id": BTC_USD_ID,
-#         "asset_price": 11500,
-#         "collateral_price": 1.05
-#     }]
-
-#     collateral_prices_1 = [{
-#         "collateral_id": AssetID.USDC,
-#         "collateral_price": 1.05
-#     }]
-
-#     await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=charlie,
-#                             user_test=charlie_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
-#     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-#     await compare_liquidatable_position(user=charlie, user_test=charlie_test)
-
-#     # ####### Liquidation Order 2#######
-#     ###################
-#     # List of users
-#     users = [alice, charlie]
-#     users_test = [alice_test, charlie_test]
-
-#     # Sufficient balances for the users
-#     alice_balance = 13000
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 2
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 11500
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=[alice], users_test=[alice_test], balance_array=[alice_balance], asset_id=asset_id_1)
-
-#     ####### Liquidation Order 1#######
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 2,
-#         "price": 11500,
-#         "leverage": 2,
-#         "direction": order_direction["short"],
-#         "order_type": order_types["limit"],
-#     }, {
-#         "quantity": 2,
-#         "price": 11500,
-#         "direction": order_direction["long"],
-#         "order_type": order_types["liquidation"],
-#         "liquidator_address": liquidator.contract_address,
-#         "life_cycle": order_life_cycles["close"],
-#     }]
-
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0)
-
-#     # compare
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_liquidatable_position(user=alice, user_test=alice_test)
-
-
-# @pytest.mark.asyncio
-# async def test_deleveraging_flow(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [eduard, daniel]
-#     users_test = [eduard_test, daniel_test]
-
-#     # Sufficient balance for users
-#     eduard_balance = 1100
-#     daniel_balance = 5500
-#     balance_array = [eduard_balance, daniel_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 5
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1000
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 5,
-#         "price": 1000,
-#         "direction": order_direction["short"],
-#         "leverage": 5,
-#         "order_type": order_types["limit"],
-#     }, {
-#         "quantity": 5,
-#         "price": 1000,
-#     }]
-
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
-
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-#     ########################################
-#     ######## Check for deleveraging ########
-#     ########################################
-
-#     market_prices_1 = [{
-#         "market_id": BTC_USD_ID,
-#         "asset_price": 1150,
-#         "collateral_price": 1.05
-#     }]
-
-#     collateral_prices_1 = [{
-#         "collateral_id": AssetID.USDC,
-#         "collateral_price": 1.05
-#     }]
-
-#     await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard,
-#                             user_test=eduard_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
-#     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-#     await compare_liquidatable_position(user=eduard, user_test=eduard_test)
-
-
-# @pytest.mark.asyncio
-# async def test_deleveraging_invalid_size(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ####### Opening of Deleveraged Order #######
-#     # List of users
-#     users = [daniel, eduard]
-#     users_test = [daniel_test, eduard_test]
-
-#     # Batch params
-#     quantity_locked_1 = 1.96
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1150
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1.96,
-#         "price": 1150,
-#         "order_type": order_types["limit"],
-#         "life_cycle": order_life_cycles["close"],
-#         "direction": order_direction["short"]
-#     }, {
-#         "quantity": 1.96,
-#         "price": 1150,
-#         "leverage": 5,
-#         "order_type": order_types["deleverage"],
-#         "liquidator_address": liquidator.contract_address,
-#         "life_cycle": order_life_cycles["close"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code="0005:", error_at_index=error_at_index, param_2=to64x61(1.96))
-#     is_liquidatable = await eduard.get_deleveragable_or_liquidatable_position().call()
-#     print(is_liquidatable.result)
-
-# @pytest.mark.asyncio
-# async def test_deleveraging_invalid_order_type(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ####### Opening of Deleveraged Order #######
-#     # List of users
-#     users = [daniel, eduard]
-#     users_test = [daniel_test, eduard_test]
-
-#     # Batch params
-#     quantity_locked_1 = 0.5555555555555553
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1150
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 0.5555555555555553,
-#         "price": 1150,
-#         "order_type": order_types["limit"],
-#         "life_cycle": order_life_cycles["close"],
-#         "direction": order_direction["short"]
-#     }, {
-#         "quantity": 0.5555555555555553,
-#         "price": 1150,
-#         "order_type": order_types["liquidation"],
-#         "liquidator_address": liquidator.contract_address,
-#         "life_cycle": order_life_cycles["close"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order (here 64x61(0.5555555555555553) = 1281023894007607040)
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code="0006:", error_at_index=error_at_index, param_2=to64x61(0.5555555555555553))
-
-
-# @pytest.mark.asyncio
-# async def test_deleveraging(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ####### Opening of Deleveraged Order #######
-#     # List of users
-#     users = [daniel, eduard]
-#     users_test = [daniel_test, eduard_test]
-
-#     # Batch params
-#     quantity_locked_1 = 0.5555555555555553
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1150
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 0.5555555555555553,
-#         "price": 1150,
-#         "order_type": order_types["limit"],
-#         "life_cycle": order_life_cycles["close"],
-#         "direction": order_direction["short"]
-#     }, {
-#         "quantity": 0.5555555555555553,
-#         "price": 1150,
-#         "leverage": 5,
-#         "order_type": order_types["deleverage"],
-#         "liquidator_address": liquidator.contract_address,
-#         "life_cycle": order_life_cycles["close"],
-#     }]
-
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0)
-
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-#     await compare_liquidatable_position(user=eduard, user_test=eduard_test)
-
-
-# @pytest.mark.asyncio
-# async def test_liquidation_after_deleveraging_flow(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test = adminAuth_factory
-
-#     ##############################################
-#     ######## Check for liquidation ##########
-#     ##############################################
-#     market_prices_1 = [{
-#         "market_id": BTC_USD_ID,
-#         "asset_price": 1800,
-#         "collateral_price": 1.05
-#     }]
-
-#     collateral_prices_1 = [{
-#         "collateral_id": AssetID.USDC,
-#         "collateral_price": 1.05
-#     }]
-
-#     ####### Liquidation Order #######
-#     ###################
-#     # List of users
-#     users = [daniel, eduard]
-#     users_test = [daniel_test, eduard_test]
-
-#     # Sufficient balance for users
-#     daniel_balance = 6000
-#     eduard_balance = 1100
-#     balance_array = [daniel_balance, eduard_balance]
-
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 4.44444444444
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 1800
-
-#      # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-#     await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard,
-#                             user_test=eduard_test, market_prices=market_prices_1, collateral_prices=collateral_prices_1, liquidate=liquidate)
-#     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-#     await compare_liquidatable_position(user=eduard, user_test=eduard_test)
-
-#     ####### Liquidation Order 1#######
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 4.44444444444,
-#         "price": 1800,
-#         "leverage": 2,
-#         "direction": order_direction["short"],
-#         "order_type": order_types["limit"],
-#     }, {
-#         "quantity": 4.44444444444,
-#         "price": 1800,
-#         "order_type": order_types["liquidation"],
-#         "liquidator_address": liquidator.contract_address,
-#         "life_cycle": order_life_cycles["close"],
-#     }]
-
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0)
-
-#     # compare
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_liquidatable_position(user=eduard, user_test=eduard_test)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    ################################################
+    ####### Bob's liquidation result USDC ##########
+    ################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
+
+    # ###### Opening of Orders 2 #######
+    # Batch params for OPEN orders 2
+    quantity_locked_2 = 3
+    market_id_2 = ETH_USD_ID
+    asset_id_2 = AssetID.USDC
+    oracle_price_2 = 100
+
+    orders_2 = [{
+        "quantity": 3,
+        "market_id": ETH_USD_ID,
+        "price": 100,
+        "order_type": order_types["limit"],
+        "leverage": 3,
+    }, {
+        "quantity": 3,
+        "market_id": ETH_USD_ID,
+        "price": 100,
+        "direction": order_direction["short"],
+        "leverage": 3,
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp)
+
+    # compare
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+
+    ###################################################
+    ######## Alice's liquidation result USDC 2 ########
+    ###################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    ##################################################
+    ####### Bob's liquidation result USDC 2 ##########
+    ##################################################
+
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
+
+    alice_balance = alice_test.get_balance(AssetID.USDC)
+    print("alice balance", alice_balance)
+
+    bob_balance = bob_test.get_balance(AssetID.USDC)
+    print("bob balance", bob_balance)
+
+
+@pytest.mark.asyncio
+async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+
+    collateral_id_1 = AssetID.USDC
+    market_id_1 = BTC_USD_ID
+    market_id_2 = ETH_USD_ID
+
+    ########################################################
+    ######## Set new price for the market under ttl ########
+    ########################################################
+    await set_asset_price_by_trading(starknet_service=starknet_service, admin=admin1, trading=trading, python_executor=python_executor, new_timestamp=timestamp_1,  gary=gary, felix=felix, gary_test=gary_test, felix_test=felix_test, market_id=market_id_1, collateral_id=collateral_id_1, price=7510)
+
+    BTC_market_price_query_starknet = await marketPrices.get_market_price(
+        market_id_1).call()
+    BTC_market_price = from64x61(
+        BTC_market_price_query_starknet.result.market_price.price)
+
+    BTC_market_price_python = python_executor.get_market_price(
+        market_id=market_id_1, timestamp=timestamp_1)
+
+    # Order executed within the ttl, hence the price remains 5000
+    assert BTC_market_price_python == BTC_market_price == 5000.0
+
+    ###################################################
+    ######## Alice's liquidation result USDC 3 ########
+    ###################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_1)
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    ###################################################
+    ######## Set new price for the market #############
+    ###################################################
+    await set_asset_price_by_trading(starknet_service=starknet_service, admin=admin1, trading=trading, python_executor=python_executor, new_timestamp=timestamp_2,  gary=gary,
+                                     felix=felix, gary_test=gary_test, felix_test=felix_test, market_id=market_id_1, collateral_id=collateral_id_1, price=7510)
+
+    BTC_market_price_query_starknet = await marketPrices.get_market_price(
+        market_id_1).call()
+    BTC_market_price = from64x61(
+        BTC_market_price_query_starknet.result.market_price.price)
+
+    BTC_market_price_python = python_executor.get_market_price(
+        market_id=market_id_1, timestamp=timestamp_2)
+    print(BTC_market_price, BTC_market_price_python)
+
+    # Order executed within the ttl, hence the price remains 5000
+    assert BTC_market_price_python == BTC_market_price == 7510.0
+
+    ###################################################
+    ######## Alice's liquidation result USDC 4 ########
+    ###################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    ###################################################
+    ######## Set new price for the market #############
+    ###################################################
+    await set_asset_price_by_trading(starknet_service=starknet_service, admin=admin1, trading=trading, python_executor=python_executor, new_timestamp=timestamp_2,  gary=gary,
+                                     felix=felix, gary_test=gary_test, felix_test=felix_test, market_id=market_id_2, collateral_id=collateral_id_1, price=100)
+
+    ###################################################
+    ######## Alice's liquidation result USDC 5 ########
+    ###################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    ###################################################
+    ######## Alice's liquidation result USDC 5 ########
+    ###################################################
+    # will return (1, (0,0,0,0,0,0)) as a position has already been set as liquidatable
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+
+@pytest.mark.asyncio
+async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [bob, alice]
+    users_test = [bob_test, alice_test]
+
+    # Collaterals
+    collateral_id_1 = AssetID.DAI
+
+    # Sufficient balance for users
+    alice_balance_dai = 5005
+    bob_balance_dai = 5005
+
+    balance_array_dai = [bob_balance_dai, alice_balance_dai]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 2
+    market_id_1 = BTC_DAI_ID
+    asset_id_1 = AssetID.DAI
+    oracle_price_1 = 5000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array_dai, asset_id=collateral_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 2,
+        "price": 5000,
+        "market_id": BTC_DAI_ID,
+        "order_type": order_types["limit"],
+        "leverage": 2,
+    }, {
+        "quantity": 2,
+        "price": 5000,
+        "market_id": BTC_DAI_ID,
+        "direction": order_direction["short"],
+        "leverage": 2,
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_2)
+
+    # compare
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+
+    ##################################################
+    ######## Alice's liquidation result DAI 1 ########
+    ##################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    #################################################
+    ####### Bob's liquidation result DAI 1 ##########
+    #################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
+
+    ########################################################
+    ######## Set new price for the market under ttl ########
+    ########################################################
+    await set_asset_price_by_trading(starknet_service=starknet_service, admin=admin1, trading=trading, python_executor=python_executor, new_timestamp=timestamp_3,  gary=gary, felix=felix, gary_test=gary_test, felix_test=felix_test, market_id=market_id_1, collateral_id=collateral_id_1, price=7510)
+
+    BTC_market_price_query_starknet = await marketPrices.get_market_price(
+        market_id_1).call()
+    BTC_market_price = from64x61(
+        BTC_market_price_query_starknet.result.market_price.price)
+
+    BTC_market_price_python = python_executor.get_market_price(
+        market_id=market_id_1, timestamp=timestamp_3)
+
+    print("Market Prices", BTC_market_price, BTC_market_price_python)
+
+    ##################################################
+    ######## Alice's liquidation result DAI 2 ########
+    ##################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_3)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    #################################################
+    ####### Bob's liquidation result DAI 2 ##########
+    #################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_3)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
+
+    ###################################################
+    ######## Set new price for the market #############
+    ###################################################
+    await set_asset_price_by_trading(starknet_service=starknet_service, admin=admin1, trading=trading, python_executor=python_executor, new_timestamp=timestamp_4,  gary=gary,
+                                     felix=felix, gary_test=gary_test, felix_test=felix_test, market_id=market_id_1, collateral_id=collateral_id_1, price=7510)
+
+    BTC_market_price_query_starknet = await marketPrices.get_market_price(
+        market_id_1).call()
+    BTC_market_price = from64x61(
+        BTC_market_price_query_starknet.result.market_price.price)
+
+    BTC_market_price_python = python_executor.get_market_price(
+        market_id=market_id_1, timestamp=timestamp_4)
+    print(BTC_market_price, BTC_market_price_python)
+
+    # Order executed within the ttl, hence the price remains 5000
+    assert BTC_market_price_python == BTC_market_price == 7510.0
+
+    ###################################################
+    ######## Alice's liquidation result DAI 3 #########
+    ###################################################
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    ##################################################
+    ####### Bob's liquidation result DAI 3 ###########
+    ##################################################
+
+    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
+
+    alice_balance = alice_test.get_balance(AssetID.DAI)
+    print("alice balance", alice_balance)
+
+    bob_balance = bob_test.get_balance(AssetID.DAI)
+    print("bob balance", bob_balance)
