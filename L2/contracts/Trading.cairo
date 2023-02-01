@@ -74,6 +74,7 @@ from contracts.Math_64x61 import (
     Math64x61_mul,
     Math64x61_sub,
     Math64x61_ONE,
+    Math64x61_is_le,
 )
 
 // ////////////
@@ -210,8 +211,11 @@ func execute_batch{
         contract_address=market_address, market_id_=market_id_
     );
 
-    // Get number of token decimals of an asset
+    // Get Asset to fetch number of token decimals of an asset
     let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=asset_id);
+
+    // Get collateral to fetch number of token decimals of a collateral
+    let (collateral: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id);
 
     // Initialize trader_stats_list and executed_size arrays
     let (trader_stats_list: TraderStats*) = alloc();
@@ -234,6 +238,7 @@ func execute_batch{
         market_id_=market_id_,
         collateral_id_=collateral_id,
         asset_token_decimal_=asset.token_decimal,
+        collateral_token_decimal_=collateral.token_decimal,
         lower_limit_=lower_limit,
         upper_limit_=upper_limit,
         orders_len_=request_list_len,
@@ -331,19 +336,23 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 }
 
 func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_id_: felt, price_: felt, execution_price_: felt, direction_: felt
+    order_id_: felt,
+    price_: felt,
+    execution_price_: felt,
+    direction_: felt,
+    collateral_token_decimal_: felt,
 ) {
     // if it's a limit order
     if (direction_ == LONG) {
         // if it's a long order
         with_attr error_message("0508: {order_id_} {execution_price_}") {
-            assert_le(execution_price_, price_);
+            Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
         }
         tempvar range_check_ptr = range_check_ptr;
     } else {
         // if it's a short order
         with_attr error_message("0507: {order_id_} {execution_price_}") {
-            assert_le(price_, execution_price_);
+            Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
         }
         tempvar range_check_ptr = range_check_ptr;
     }
@@ -488,6 +497,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     order_size_: felt,
     market_id_: felt,
     collateral_id_: felt,
+    collateral_token_decimal_: felt,
     trading_fees_address_: felt,
     liquidity_fund_address_: felt,
     liquidate_address_: felt,
@@ -578,7 +588,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // User must be able to pay the amount
     with_attr error_message("0501: {order_id_} {user_balance_}") {
-        assert_le(order_value_with_fee, user_balance);
+        Math64x61_assert_le(order_value_with_fee, user_balance, collateral_token_decimal_);
     }
 
     // Deduct the margin amount from account contract
@@ -665,6 +675,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     order_size_: felt,
     market_id_: felt,
     collateral_id_: felt,
+    collateral_token_decimal_: felt,
     liquidity_fund_address_: felt,
     insurance_fund_address_: felt,
     holding_address_: felt,
@@ -806,7 +817,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
 
         // Check if the position is underwater
-        let is_negative = is_le(margin_plus_pnl, 0);
+        let (is_negative) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
 
         if (is_negative == TRUE) {
             // If yes, deduct the difference from user's balance, can go negative
@@ -826,8 +837,14 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             );
 
             // Check if the user's balance can cover the deficit
-            if (is_le(amount_to_transfer_from, user_balance) == FALSE) {
-                if (is_le(user_balance, 0) == TRUE) {
+            let (balance_check) = Math64x61_is_le(
+                amount_to_transfer_from, user_balance, collateral_token_decimal_
+            );
+            if (balance_check == FALSE) {
+                let (balance_less_than_zero_res) = Math64x61_is_le(
+                    user_balance, 0, collateral_token_decimal_
+                );
+                if (balance_less_than_zero_res == TRUE) {
                     IInsuranceFund.withdraw(
                         contract_address=insurance_fund_address_,
                         asset_id_=collateral_id_,
@@ -891,7 +908,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             );
 
             // Check if the account value for the position is negative
-            let is_negative = is_le(margin_plus_pnl, 0);
+            let (is_negative) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
 
             if (is_negative == TRUE) {
                 // Absolute value of the acc value
@@ -910,7 +927,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     invoked_for_='liquidation',
                 );
 
-                if (is_le(deficit, user_balance) == TRUE) {
+                let (balance_check) = Math64x61_is_le(
+                    deficit, user_balance, collateral_token_decimal_
+                );
+                if (balance_check == TRUE) {
                     realized_pnl = margin_plus_pnl;
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -918,7 +938,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 } else {
                     // Transfer the remaining amount from Insurance Fund
                     let (insurance_amount_claim) = Math64x61_sub(deficit, user_balance);
-                    if (is_le(user_balance, 0) == FALSE) {
+                    let (balance_less_than_zero_res) = Math64x61_is_le(
+                        user_balance, 0, collateral_token_decimal_
+                    );
+                    if (balance_less_than_zero_res == FALSE) {
                         IInsuranceFund.withdraw(
                             contract_address=insurance_fund_address_,
                             asset_id_=collateral_id_,
@@ -1016,6 +1039,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     market_id_: felt,
     collateral_id_: felt,
     asset_token_decimal_: felt,
+    collateral_token_decimal_: felt,
     lower_limit_: felt,
     upper_limit_: felt,
     orders_len_: felt,
@@ -1194,6 +1218,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 price_=[request_list_].price,
                 execution_price_=new_execution_price,
                 direction_=[request_list_].direction,
+                collateral_token_decimal_=collateral_token_decimal_,
             );
         }
 
@@ -1223,7 +1248,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // Get min of remaining quantity and the order quantity
         let (executable_quantity: felt) = Math64x61_sub(quantity_order, order_portion_executed);
-        let cmp_res = is_le(quantity_remaining, executable_quantity);
+        let (cmp_res) = Math64x61_is_le(
+            quantity_remaining, executable_quantity, asset_token_decimal_
+        );
 
         // If yes, make the quantity_to_execute to be quantity_remaining
         // i.e Partial order
@@ -1290,6 +1317,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             order_size_=quantity_to_execute,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
+            collateral_token_decimal_=collateral_token_decimal_,
             trading_fees_address_=trading_fees_address_,
             liquidity_fund_address_=liquidity_fund_address_,
             liquidate_address_=liquidate_address_,
@@ -1320,6 +1348,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             order_size_=quantity_to_execute,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
+            collateral_token_decimal_=collateral_token_decimal_,
             liquidity_fund_address_=liquidity_fund_address_,
             insurance_fund_address_=insurance_fund_address_,
             holding_address_=holding_address_,
@@ -1389,6 +1418,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         market_id_=market_id_,
         collateral_id_=collateral_id_,
         asset_token_decimal_=asset_token_decimal_,
+        collateral_token_decimal_=collateral_token_decimal_,
         lower_limit_=lower_limit_,
         upper_limit_=upper_limit_,
         orders_len_=orders_len_,
