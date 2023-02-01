@@ -69,33 +69,35 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import (
     Math64x61_add,
+    Math64x61_assert_le,
     Math64x61_div,
     Math64x61_mul,
     Math64x61_sub,
     Math64x61_ONE,
 )
 
-//############
-// Constants #
-//############
+// ////////////
+// Constants //
+// ////////////
+
 const LEVERAGE_ONE = 2305843009213693952;
 const NEGATIVE_ONE = 3618502788666131213697322783095070105623107215331596699970786213126658326529;
 const FIFTEEN_PERCENTAGE = 34587645138205409280;
 const HUNDRED = 230584300921369395200;
 const TWO = 4611686018427387904;
 
-// //////////
+// /////////
 // Events //
-// //////////
+// /////////
 
 // Event emitted whenever a new market is added
 @event
 func trade_execution(address: felt, request: OrderRequest, market_id: felt, execution_price: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores public key associated with an account
 @storage_var
@@ -107,22 +109,9 @@ func threshold_percentage() -> (res: felt) {
 func batch_id_status(batch_id: felt) -> (res: felt) {
 }
 
-//##############
-// Constructor #
-//##############
-
-// ////////
-// View //
-// ////////
-@view
-func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    batch_id_: felt
-) -> (status: felt) {
-    alloc_locals;
-
-    let (status: felt) = batch_id_status.read(batch_id=batch_id_);
-    return (status,);
-}
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -135,15 +124,29 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// ////////////
+// ///////
+// View //
+// ///////
+
+@view
+func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    batch_id_: felt
+) -> (status: felt) {
+    alloc_locals;
+
+    let (status: felt) = batch_id_status.read(batch_id=batch_id_);
+    return (status,);
+}
+
+// ///////////
 // External //
-// ////////////
+// ///////////
 
 // @notice Function to set the threshold percentage can only be called by masterAdmin; all execution_prices must be +/-threshold percentage of oracle price
-// @param new_percentage - New value of threshold percentage to be set in the contract
+// @param new_percentage_ - New value of threshold percentage to be set in the contract
 @external
 func set_threshold_percentage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_percentage
+    new_percentage_: felt
 ) {
     with_attr error_message("Trading: Unauthorized") {
         let (registry) = CommonLib.get_registry_address();
@@ -152,10 +155,10 @@ func set_threshold_percentage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     }
 
     with_attr error_message("Trading: Invalid percentage passed") {
-        assert_lt(0, new_percentage);
-        assert_lt(new_percentage, FIFTEEN_PERCENTAGE);
+        assert_lt(0, new_percentage_);
+        assert_lt(new_percentage_, FIFTEEN_PERCENTAGE);
     }
-    threshold_percentage.write(value=new_percentage);
+    threshold_percentage.write(value=new_percentage_);
     return ();
 }
 
@@ -187,6 +190,7 @@ func execute_batch{
     // Get all the addresses from the auth registry
     let (
         account_registry_address: felt,
+        asset_address: felt,
         holding_address: felt,
         trading_fees_address: felt,
         fees_balance_address: felt,
@@ -205,6 +209,9 @@ func execute_batch{
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
         contract_address=market_address, market_id_=market_id_
     );
+
+    // Get number of token decimals of an asset
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=asset_id);
 
     // Initialize trader_stats_list and executed_size arrays
     let (trader_stats_list: TraderStats*) = alloc();
@@ -226,6 +233,7 @@ func execute_batch{
         quantity_locked_=quantity_locked_,
         market_id_=market_id_,
         collateral_id_=collateral_id,
+        asset_token_decimal_=asset.token_decimal,
         lower_limit_=lower_limit,
         upper_limit_=upper_limit,
         orders_len_=request_list_len,
@@ -290,15 +298,15 @@ func execute_batch{
         open_interest_=open_interest,
     );
 
-    // Change the status of the batch to 1
-    batch_id_status.write(batch_id=batch_id_, value=1);
+    // Change the status of the batch to TRUE
+    batch_id_status.write(batch_id=batch_id_, value=TRUE);
 
     return ();
 }
 
-// ////////////
+// ///////////
 // Internal //
-// ////////////
+// ///////////
 
 func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_id_: felt, slippage_: felt, price_: felt, execution_price_: felt
@@ -345,6 +353,7 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
 // @notice Internal function to retrieve contract addresses from the Auth Registry
 // @returns account_registry_address - Address of the Account Registry contract
+// @returns asset_address - Address of the Asset contract
 // @returns holding_address - Address of the Holding contract
 // @returns trading_fees_address - Address of the Trading contract
 // @returns fees_balance_address - Address of the Fee Balance contract
@@ -356,6 +365,7 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @returns market_prices_address - Address of the Market Prices contract
 func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     account_registry_address: felt,
+    asset_address: felt,
     holding_address: felt,
     trading_fees_address: felt,
     fees_balance_address: felt,
@@ -370,9 +380,14 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
-    // Get ccount Registry address
+    // Get account Registry address
     let (account_registry_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AccountRegistry_INDEX, version=version
+    );
+
+    // Get Asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
     );
 
     // Get holding address
@@ -422,6 +437,7 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     return (
         account_registry_address,
+        asset_address,
         holding_address,
         trading_fees_address,
         fees_balance_address,
@@ -999,6 +1015,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     quantity_locked_: felt,
     market_id_: felt,
     collateral_id_: felt,
+    asset_token_decimal_: felt,
     lower_limit_: felt,
     upper_limit_: felt,
     orders_len_: felt,
@@ -1071,7 +1088,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Size Check
     with_attr error_message("0505: {order_id} {quantity_order}") {
-        assert_le(min_quantity_, [request_list_].quantity);
+        Math64x61_assert_le(min_quantity_, [request_list_].quantity, asset_token_decimal_);
     }
 
     // Market Check
@@ -1371,6 +1388,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         quantity_locked_=quantity_locked_,
         market_id_=market_id_,
         collateral_id_=collateral_id_,
+        asset_token_decimal_=asset_token_decimal_,
         lower_limit_=lower_limit_,
         upper_limit_=upper_limit_,
         orders_len_=orders_len_,
