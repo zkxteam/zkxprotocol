@@ -12,7 +12,9 @@ from contracts.Constants import (
     MarketPrices_INDEX,
 )
 from contracts.DataTypes import (
+    Asset,
     LiquidatablePosition,
+    Market,
     MarketPrice,
     MultipleOrder,
     PositionDetailsForRiskManagement,
@@ -24,15 +26,17 @@ from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import (
     Math64x61_div,
+    Math64x61_is_le,
     Math64x61_mul,
     Math64x61_add,
     Math64x61_sub,
     Math64x61_ONE,
+    Math64x61_round,
 )
 
-// ////////////////
+// ///////////////
 // Test Helpers //
-// ////////////////
+// ///////////////
 
 @storage_var
 func maintenance() -> (maintenance: felt) {
@@ -58,9 +62,9 @@ func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (res=_acc_value);
 }
 
-// //////////
+// /////////
 // Events //
-// //////////
+// /////////
 
 // Event emitted whenever find_under_collateralized_position() is called
 @event
@@ -83,9 +87,9 @@ func position_to_be_deleveraged(
 ) {
 }
 
-// ///////////////
+// //////////////
 // Constructor //
-// ///////////////
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -98,17 +102,15 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// ////////////
+// ///////////
 // External //
-// ////////////
+// ///////////
 
 // @notice Function to check and mark the positions to be liquidated
 // @param account_address_ - Account address of the user
 // @param collateral_id_ - Collateral Id of the isolated cross-margin order_value_with_fee
 // @return liq_result_ - 1 if to be liq/del, 
 // @return least_collateral_ratio_position - Position which has the least collateral ratio
-// @return res - 1 if positions are marked to be liquidated
-// @return least_collateral_ratio_position - Position with least margin ratio
 // @return total_account_value - Total account value of the positions for the corresponding collateral
 // @return total_maintenance_requirement - Total maintenece requirement of the positions for the corresponding collateral
 @external
@@ -154,6 +156,14 @@ func find_under_collateralized_position{
         contract_address=registry, index=MarketPrices_INDEX, version=version
     );
 
+    // Get Asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+
+    // Get collateral to fetch number of token decimals of a collateral
+    let (collateral: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
+
     // Recurse through all positions to see if it needs to liquidated
     let (
         liq_result,
@@ -169,6 +179,7 @@ func find_under_collateralized_position{
         positions_len_=positions_len,
         positions_=positions,
         collateral_id_=collateral_id_,
+        collateral_token_decimal_=collateral.token_decimal,
         total_account_value_=0,
         total_maintenance_requirement_=0,
         least_collateral_ratio_=Math64x61_ONE,
@@ -225,6 +236,97 @@ func find_under_collateralized_position{
     );
 }
 
+// @notice Function to check if position can be opened
+// @param order - MultipleOrder structure
+// @param size - matched order size of current order
+// @param execution_price - Execution price of current order
+@external
+func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    order: MultipleOrder, size: felt, execution_price: felt
+) {
+    alloc_locals;
+
+    can_order_be_opened.emit(order=order);
+
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get required contract addresses from the AuthorizedRegistry
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    let (market_price_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=MarketPrices_INDEX, version=version
+    );
+
+    // Get the asset ID and collateral ID of the position
+    let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
+        contract_address=market_address, market_id_=order.market_id
+    );
+
+    // Get a list with all positions with the same collateral from AccountManager contract
+    let (
+        positions_len: felt, positions: PositionDetailsForRiskManagement*
+    ) = IAccountManager.get_positions_for_risk_management(
+        contract_address=order.user_address, collateral_id_=collateral_id
+    );
+
+    // Fetch the maintanence margin requirement from Markets contract
+    let (req_margin) = IMarkets.get_maintenance_margin(
+        contract_address=market_address, market_id_=order.market_id
+    );
+
+    // Calculate needed values
+    let (leveraged_position_value) = Math64x61_mul(execution_price, size);
+
+    let (total_position_value) = Math64x61_div(leveraged_position_value, order.leverage);
+    let (amount_to_be_borrowed) = Math64x61_sub(leveraged_position_value, total_position_value);
+
+    let (account_value) = Math64x61_sub(leveraged_position_value, amount_to_be_borrowed);
+    let (maintenance_requirement) = Math64x61_mul(req_margin, leveraged_position_value);
+
+    // Get Asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+
+    // Get collateral to fetch number of token decimals of a collateral
+    let (collateral: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id);
+
+    // Recurse through all positions to see if it needs to liquidated
+    let (
+        liq_result,
+        least_collateral_ratio,
+        least_collateral_ratio_position,
+        least_collateral_ratio_position_asset_price,
+        total_account_value,
+        total_maintenance_requirement,
+    ) = check_liquidation_recurse(
+        account_address_=order.user_address,
+        market_address_=market_address,
+        market_price_address_=market_price_address,
+        positions_len_=positions_len,
+        positions_=positions,
+        collateral_id_=collateral_id,
+        collateral_token_decimal_=collateral.token_decimal,
+        total_account_value_=account_value,
+        total_maintenance_requirement_=maintenance_requirement,
+        least_collateral_ratio_=Math64x61_ONE,
+        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position_asset_price_=0,
+    );
+
+    local order_id;
+    local market_id;
+    assert order_id = order.order_id;
+    assert market_id = order.market_id;
+    with_attr error_message("1101: {order_id} {market_id}") {
+        assert liq_result = FALSE;
+    }
+    return ();
+}
+
 // ////////////
 // Internal //
 // ////////////
@@ -235,7 +337,7 @@ func find_under_collateralized_position{
 // @param market_price_address_ - Markets contarct address
 // @param positions_len_ - Length of the positions_ array
 // @param postions_ - Array with all the position details
-// @param collateral_id_ - collateral id
+// @param collateral_id_ - Id of the collateral
 // @param total_account_value_ - Collateral value - borrowed value + positionSize * price
 // @param total_maintenance_requirement_ - maintenance ratio of the asset * value of the position when executed
 // @param least_collateral_ratio_ - The least collateral ratio among the positions
@@ -254,6 +356,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     positions_len_: felt,
     positions_: PositionDetailsForRiskManagement*,
     collateral_id_: felt,
+    collateral_token_decimal_: felt,
     total_account_value_: felt,
     total_maintenance_requirement_: felt,
     least_collateral_ratio_: felt,
@@ -286,7 +389,11 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         // /////////////////
 
         // Check if the maintenance margin is not satisfied
-        let is_liquidation = is_le(total_account_value_collateral, total_maintenance_requirement_);
+        let (is_liquidation) = Math64x61_is_le(
+            total_account_value_collateral,
+            total_maintenance_requirement_,
+            collateral_token_decimal_,
+        );
 
         // Return if the account should be liquidated or not and the orderId of the least colalteralized position
         return (
@@ -384,6 +491,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         positions_len_=positions_len_ - 1,
         positions_=positions_ + PositionDetailsForRiskManagement.SIZE,
         collateral_id_=collateral_id_,
+        collateral_token_decimal_=collateral_token_decimal_,
         total_account_value_=total_account_value,
         total_maintenance_requirement_=total_maintenance_requirement,
         least_collateral_ratio_=least_collateral_ratio,
@@ -401,6 +509,19 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     market_address_: felt, position_: PositionDetailsForRiskManagement, asset_price_: felt
 ) -> (amount_to_be_sold: felt) {
     alloc_locals;
+    // Read the registry and version
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+
+    // Get Market contract address
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
 
     // Fetch the maintatanence margin requirement from Markets contract
     let (req_margin) = IMarkets.get_maintenance_margin(
@@ -420,11 +541,20 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         price_diff = diff;
     }
 
+    // get collateral id
+    let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
+        contract_address=market_address, market_id_=position_.market_id
+    );
+
+    // Get Asset to fetch number of token decimals of an asset
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=asset_id);
+
     // Calculate amount to be sold for deleveraging
     let (maintenance_requirement) = Math64x61_mul(req_margin, asset_price_);
     let (price_diff_maintenance) = Math64x61_sub(maintenance_requirement, price_diff);
     let (amount_to_be_present) = Math64x61_div(margin_amount, price_diff_maintenance);
-    let (amount_to_be_sold) = Math64x61_sub(position_size, amount_to_be_present);
+    let (amount_to_be_sold_not_rounded) = Math64x61_sub(position_size, amount_to_be_present);
+    let (amount_to_be_sold) = Math64x61_round(amount_to_be_sold_not_rounded, asset.token_decimal);
 
     // Calculate the leverage after deleveraging
     let (position_value) = Math64x61_add(margin_amount, borrowed_amount);
@@ -433,7 +563,7 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let (leverage_after_deleveraging) = Math64x61_div(remaining_position_value, margin_amount);
 
     // to64x61(2) == 4611686018427387904
-    let can_be_liquidated = is_le(leverage_after_deleveraging, 4611686018427387904);
+    let (can_be_liquidated) = Math64x61_is_le(leverage_after_deleveraging, 4611686018427387904, 5);
     if (can_be_liquidated == TRUE) {
         return (0,);
     } else {
