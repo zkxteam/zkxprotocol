@@ -323,10 +323,6 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_USD_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_UST_ID, to64x61(1000000)])
 
-    # Update collateral prices
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.USDC, to64x61(1)])
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.UST, to64x61(1)])
-
     # Add accounts to Account Registry
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [alice.contract_address])
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [bob.contract_address])
@@ -479,7 +475,7 @@ async def test_trades_different_markets(abr_factory):
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=from64x61(timestamp), is_reverted=0, error_code=0)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp, is_reverted=0, error_code=0)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -515,7 +511,7 @@ async def test_trades_different_markets(abr_factory):
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=from64x61(timestamp), is_reverted=0, error_code=0)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp, is_reverted=0, error_code=0)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -614,7 +610,7 @@ async def test_view_functions_state_1(abr_factory):
 async def test_set_abr_1(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
     # Set BTC_USD ABR
-    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=BTC_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=from64x61(timestamp_1), spot=ABR_data.btc_usd_perp_spot_1, perp=ABR_data.btc_usd_perp_1, spot_64x61=convertTo64x61(ABR_data.btc_usd_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.btc_usd_perp_1), epoch=1, base_rate=0.0000125, boll_width=2.0)
+    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=BTC_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=timestamp_1, spot=ABR_data.btc_usd_perp_spot_1, perp=ABR_data.btc_usd_perp_1, spot_64x61=convertTo64x61(ABR_data.btc_usd_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.btc_usd_perp_1), epoch=1, base_rate=0.0000125, boll_width=2.0)
 
     assert_events_emitted_from_all_calls(
         set_abr_value_tx,
@@ -699,7 +695,7 @@ async def test_set_abr_untradable_market(abr_factory):
 async def test_set_abr_2(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
     # Set ETH_USD ABR
-    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=ETH_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=from64x61(timestamp_1), spot=ABR_data.eth_usd_perp_spot_1, perp=ABR_data.eth_usd_perp_1, spot_64x61=convertTo64x61(ABR_data.eth_usd_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.eth_usd_perp_1), epoch=1, base_rate=0.0000125, boll_width=2.0)
+    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=ETH_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=timestamp_1, spot=ABR_data.eth_usd_perp_spot_1, perp=ABR_data.eth_usd_perp_1, spot_64x61=convertTo64x61(ABR_data.eth_usd_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.eth_usd_perp_1), epoch=1, base_rate=0.0000125, boll_width=2.0)
 
     assert_events_emitted_from_all_calls(
         set_abr_value_tx,
@@ -740,7 +736,7 @@ async def test_set_timestamp_state_1(abr_factory):
 async def test_set_abr_3(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
     # Set BTC_UST ABR
-    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=BTC_UST_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=from64x61(timestamp_1), spot=ABR_data.btc_ust_perp_spot_1, perp=ABR_data.btc_ust_perp_1, spot_64x61=convertTo64x61(ABR_data.btc_ust_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.btc_ust_perp_1), epoch=1, base_rate=0.0000125, boll_width=2.0)
+    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=BTC_UST_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=timestamp_1, spot=ABR_data.btc_ust_perp_spot_1, perp=ABR_data.btc_ust_perp_1, spot_64x61=convertTo64x61(ABR_data.btc_ust_perp_spot_1), perp_64x61=convertTo64x61(ABR_data.btc_ust_perp_1), epoch=1, base_rate=0.0000125, boll_width=2.0)
 
     assert_events_emitted_from_all_calls(
         set_abr_value_tx,
@@ -829,7 +825,7 @@ async def test_trade_new_market(abr_factory):
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=from64x61(timestamp_2), is_reverted=0, error_code=0)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp_2, is_reverted=0, error_code=0)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -841,7 +837,7 @@ async def test_pay_abr_call_1(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
     abr_tx = await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=relay_abr,
-                                     abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=from64x61(timestamp_2))
+                                     abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=timestamp_2)
 
     await compare_user_balances(users=[alice, bob], user_tests=[alice_test, bob_test], asset_id=AssetID.USDC)
     await compare_user_positions(users=[alice, bob], users_test=[alice_test, bob_test], market_id=BTC_USD_ID)
@@ -859,7 +855,7 @@ async def test_pay_abr_call_2(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
     await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=relay_abr,
-                            abr_executor=abr_executor, users_test=[charlie_test, dave_test], timestamp=from64x61(timestamp_2))
+                            abr_executor=abr_executor, users_test=[charlie_test, dave_test], timestamp=timestamp_2)
 
     await compare_user_balances(users=[charlie, dave], user_tests=[charlie_test, dave_test], asset_id=AssetID.UST)
     await compare_user_positions(users=[charlie, dave], users_test=[charlie_test, dave_test], market_id=BTC_UST_ID)
@@ -926,7 +922,7 @@ async def test_set_timestamp_epoch_2(abr_factory):
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1,
-        block_timestamp=timestamp_3,
+        block_timestamp=timestamp_4,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
         starknet_version=STARKNET_VERSION
@@ -994,7 +990,7 @@ async def test_set_abr_round_2(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
     # Set BTC_UST ABR
-    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=BTC_UST_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=from64x61(timestamp_4), spot=ABR_data.btc_ust_perp_spot_2, perp=ABR_data.btc_ust_perp_2, spot_64x61=convertTo64x61(ABR_data.btc_ust_perp_spot_2), perp_64x61=convertTo64x61(ABR_data.btc_ust_perp_2), epoch=2, base_rate=0.000025, boll_width=1.5)
+    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=BTC_UST_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=timestamp_4, spot=ABR_data.btc_ust_perp_spot_2, perp=ABR_data.btc_ust_perp_2, spot_64x61=convertTo64x61(ABR_data.btc_ust_perp_spot_2), perp_64x61=convertTo64x61(ABR_data.btc_ust_perp_2), epoch=2, base_rate=0.000025, boll_width=1.5)
 
     assert_events_emitted_from_all_calls(
         set_abr_value_tx,
@@ -1004,7 +1000,7 @@ async def test_set_abr_round_2(abr_factory):
         ]
     )
     # Set BTC_USD ABR
-    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=BTC_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=from64x61(timestamp_4), spot=ABR_data.btc_usd_perp_spot_2, perp=ABR_data.btc_usd_perp_2, spot_64x61=convertTo64x61(ABR_data.btc_usd_perp_spot_2), perp_64x61=convertTo64x61(ABR_data.btc_usd_perp_2), epoch=2, base_rate=0.000025, boll_width=1.5)
+    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=BTC_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=timestamp_4, spot=ABR_data.btc_usd_perp_spot_2, perp=ABR_data.btc_usd_perp_2, spot_64x61=convertTo64x61(ABR_data.btc_usd_perp_spot_2), perp_64x61=convertTo64x61(ABR_data.btc_usd_perp_2), epoch=2, base_rate=0.000025, boll_width=1.5)
 
     assert_events_emitted_from_all_calls(
         set_abr_value_tx,
@@ -1014,7 +1010,7 @@ async def test_set_abr_round_2(abr_factory):
         ]
     )
     # Set ETH_USD ABR
-    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=ETH_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=from64x61(timestamp_4), spot=ABR_data.eth_usd_perp_spot_2, perp=ABR_data.eth_usd_perp_2, spot_64x61=convertTo64x61(ABR_data.eth_usd_perp_spot_2), perp_64x61=convertTo64x61(ABR_data.eth_usd_perp_2), epoch=2, base_rate=0.000025, boll_width=1.5)
+    (set_abr_value_tx, abr_value, abr_last_price) = await set_abr_value(market_id=ETH_USD_ID, node_signer=admin1_signer, node=admin1, abr_core=relay_abr, abr_executor=abr_executor, timestamp=timestamp_4, spot=ABR_data.eth_usd_perp_spot_2, perp=ABR_data.eth_usd_perp_2, spot_64x61=convertTo64x61(ABR_data.eth_usd_perp_spot_2), perp_64x61=convertTo64x61(ABR_data.eth_usd_perp_2), epoch=2, base_rate=0.000025, boll_width=1.5)
 
     assert_events_emitted_from_all_calls(
         set_abr_value_tx,
@@ -1058,7 +1054,7 @@ async def test_make_abr_payments_round_2(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
     abr_tx = await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=relay_abr,
-                                     abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=from64x61(timestamp_4))
+                                     abr_executor=abr_executor, users_test=[alice_test, bob_test], timestamp=timestamp_4)
 
     await compare_user_balances(users=[alice, bob], user_tests=[alice_test, bob_test], asset_id=AssetID.USDC)
     await compare_user_positions(users=[alice, bob], users_test=[alice_test, bob_test], market_id=BTC_USD_ID)
@@ -1071,7 +1067,7 @@ async def test_make_abr_payments_round_2(abr_factory):
     assert state_query.result.res == 2
 
     abr_tx = await make_abr_payments(admin_signer=admin1_signer, admin=admin1, abr_core=relay_abr,
-                                     abr_executor=abr_executor, users_test=[charlie_test, dave_test], timestamp=from64x61(timestamp_4))
+                                     abr_executor=abr_executor, users_test=[charlie_test, dave_test], timestamp=timestamp_4)
 
     await compare_user_balances(users=[charlie, dave], user_tests=[charlie_test, dave_test], asset_id=AssetID.USDC)
     await compare_user_positions(users=[charlie, dave], users_test=[charlie_test, dave_test], market_id=BTC_UST_ID)

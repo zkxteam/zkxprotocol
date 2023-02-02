@@ -111,11 +111,10 @@ struct PositionDetailsForRiskManagement {
     position_size: felt,
     margin_amount: felt,
     borrowed_amount: felt,
-    leverage: felt,
 }
 
-struct PositionDetailsWithMarket{
-    market_id:felt,
+struct PositionDetailsWithMarket {
+    market_id: felt,
     direction: felt,
     avg_execution_price: felt,
     position_size: felt,

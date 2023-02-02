@@ -3,31 +3,19 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.hash_state import (
-    hash_finalize,
-    hash_init,
-    hash_update,
-    hash_update_single,
-)
-from starkware.cairo.common.math import (
-    abs_value,
-    assert_le,
-    assert_nn,
-    assert_not_equal,
-    assert_not_zero,
-)
+from starkware.cairo.common.hash_state import hash_finalize, hash_init, hash_update
+from starkware.cairo.common.math import assert_le, assert_nn, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_not_zero
-from starkware.cairo.common.pow import pow
+
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
-from starkware.starknet.common.messages import send_message_to_l1
+
 from starkware.starknet.common.syscalls import (
     call_contract,
     emit_event,
     get_block_timestamp,
     get_caller_address,
     get_contract_address,
-    get_tx_signature,
 )
 
 from contracts.Constants import (
@@ -40,9 +28,6 @@ from contracts.Constants import (
     LIQUIDATION_ORDER,
     LONG,
     OPEN,
-    POSITION_OPENED,
-    POSITION_TO_BE_DELEVERAGED,
-    POSITION_TO_BE_LIQUIDATED,
     SHORT,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
@@ -54,7 +39,6 @@ from contracts.DataTypes import (
     Asset,
     CollateralBalance,
     LiquidatablePosition,
-    Message,
     OrderRequest,
     PositionDetails,
     PositionDetailsForRiskManagement,
@@ -129,16 +113,6 @@ func collateral_to_market_array(collateral_id: felt, index: felt) -> (market_id:
 func collateral_to_market_array_len(collateral_id: felt) -> (len: felt) {
 }
 
-// Stores all markets the user has position in
-@storage_var
-func index_to_market_array(index: felt) -> (market_id: felt) {
-}
-
-// Stores the length of the index_to_market_array
-@storage_var
-func index_to_market_array_len() -> (len: felt) {
-}
-
 // Stores the mapping from the market_id to index
 @storage_var
 func market_to_index_mapping(market_id: felt) -> (market_id: felt) {
@@ -159,14 +133,11 @@ func collateral_array(index: felt) -> (collateral_id: felt) {
 func collateral_array_len() -> (len: felt) {
 }
 
-// Stores amount_to_be_sold in a position for delveraging
-@storage_var
-func amount_to_be_sold(order_id: felt) -> (amount: felt) {
-}
-
 // Stores the position which is to be deleveraged or liquidated
 @storage_var
-func deleveragable_or_liquidatable_position() -> (position: LiquidatablePosition) {
+func deleveragable_or_liquidatable_position(collateral_id: felt) -> (
+    position: LiquidatablePosition
+) {
 }
 
 // Stores all withdrawals made by the user
@@ -320,12 +291,13 @@ func get_L1_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 }
 
 // @notice view function to get deleveraged or liquidatable position
-//  @return position - Returns a LiquidatablePosition struct
+// @param collateral_id_ - collateral id 
+// @return position - Returns a LiquidatablePosition struct
 @view
 func get_deleveragable_or_liquidatable_position{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}() -> (position: LiquidatablePosition) {
-    let position = deleveragable_or_liquidatable_position.read();
+}(collateral_id_: felt) -> (position: LiquidatablePosition) {
+    let position = deleveragable_or_liquidatable_position.read(collateral_id=collateral_id_);
     return position;
 }
 
@@ -349,65 +321,6 @@ func get_withdrawal_history{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 ) {
     let (withdrawal_list: WithdrawalHistory*) = alloc();
     return populate_withdrawals_array(0, withdrawal_list);
-}
-
-// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
-// @param timestmap_filter_ - Timestmap by which to filter the array
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of net positions
-@view
-func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    timestamp_filter_: felt
-) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
-    alloc_locals;
-
-    let (positions_array: SimplifiedPosition*) = alloc();
-    let (array_len: felt) = index_to_market_array_len.read();
-    return populate_simplified_positions(
-        positions_array_len_=0,
-        positions_array_=positions_array,
-        iterator_=0,
-        final_len_=array_len,
-        timestamp_filter_=timestamp_filter_,
-    );
-}
-
-// @notice External function called by the Liquidate Contract to get the array of net positions of the user
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of positions
-@view
-func get_positions_for_risk_management{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(collateral_id_: felt) -> (
-    positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*
-) {
-    alloc_locals;
-
-    let (positions_array: PositionDetailsForRiskManagement*) = alloc();
-    let (array_len: felt) = collateral_to_market_array_len.read(collateral_id=collateral_id_);
-    return populate_positions_risk_management(
-        collateral_id_=collateral_id_,
-        positions_array_len_=0,
-        positions_array_=positions_array,
-        iterator_=0,
-        final_len_=array_len,
-    );
-}
-
-// @notice External function called by the Liquidate Contract to get the array of net positions of the user
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of positions
-@view
-func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    positions_array_len: felt, positions_array: PositionDetailsWithMarket*
-) {
-    alloc_locals;
-
-    let (positions_array: PositionDetailsWithMarket*) = alloc();
-    let (array_len: felt) = index_to_market_array_len.read();
-    return populate_positions(
-        positions_array_len_=0, positions_array_=positions_array, iterator_=0, final_len_=array_len
-    );
 }
 
 // @notice view function to get amount to withdraw
@@ -649,7 +562,7 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         borrowed_amount=position_details.borrowed_amount,
         leverage=position_details.leverage,
         created_timestamp=position_details.created_timestamp,
-        modified_timestamp=position_details.modified_timestamp,
+        modified_timestamp=block_timestamp,
         realized_pnl=new_realized_pnl,
     );
 
@@ -723,7 +636,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         borrowed_amount=position_details.borrowed_amount,
         leverage=position_details.leverage,
         created_timestamp=position_details.created_timestamp,
-        modified_timestamp=position_details.modified_timestamp,
+        modified_timestamp=block_timestamp,
         realized_pnl=new_realized_pnl,
     );
 
@@ -740,9 +653,72 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     assert data[4] = abr_value_;
     assert data[5] = position_size_;
 
-    emit_event(1, keys, 6, data);
-
     return ();
+}
+
+// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
+// @param timestmap_filter_ - Timestamp by which to filter the array
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of net positions
+@view
+func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    timestamp_filter_: felt
+) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
+    alloc_locals;
+
+    let (positions_array: SimplifiedPosition*) = alloc();
+    let (collateral_array_len_) = collateral_array_len.read();
+    return populate_simplified_positions_collaterals_recurse(
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        collateral_array_iterator_=0,
+        collateral_array_len_=collateral_array_len_,
+        timestamp_filter_=timestamp_filter_,
+    );
+}
+
+// @notice External function called by the Liquidate Contract to get the array of net positions of the user
+// @param collateral_id_ - collateral id 
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of positions
+@view
+func get_positions_for_risk_management{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(collateral_id_: felt) -> (
+    positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*
+) {
+    alloc_locals;
+
+    let (positions_array: PositionDetailsForRiskManagement*) = alloc();
+    let (markets_array_len: felt) = collateral_to_market_array_len.read(
+        collateral_id=collateral_id_
+    );
+    return populate_positions_risk_management(
+        collateral_id_=collateral_id_,
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        iterator_=0,
+        markets_array_len_=markets_array_len,
+    );
+}
+
+// @notice External function called by the Liquidate Contract to get the array of net positions of the user
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of positions
+@view
+func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    positions_array_len: felt, positions_array: PositionDetailsWithMarket*
+) {
+    alloc_locals;
+
+    let (positions_array: PositionDetailsWithMarket*) = alloc();
+    let (collateral_array_len_) = collateral_array_len.read();
+    return populate_positions_collaterals_recurse(
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        collateral_array_iterator_=0,
+        collateral_array_len_=collateral_array_len_,
+    );
 }
 
 // @notice Function called by Trading Contract
@@ -750,7 +726,11 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @param signature - Details of the signature
 // @param size - Size of the Order to be executed
 // @param execution_price - Price at which the order should be executed
-// @param amount - TODO: Amount of funds that user must send/receive
+// @param margin_amount - New margin amount of the position
+// @param borrowed_amount - New borrowed amount of the position 
+// @param market_id - Market id of the position
+// @param collateral_id_ - Collateral id of the position
+// @param pnl_ - New pnl of the position
 // @return 1, if executed correctly
 @external
 func execute_order{
@@ -895,7 +875,9 @@ func execute_order{
 
         if (is_liq == 1) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
-            let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read();
+            let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
+                collateral_id=collateral_id_
+            );
 
             with_attr error_message("0004: {order_id} {market_id}") {
                 assert liq_position.market_id = market_id;
@@ -908,27 +890,30 @@ func execute_order{
 
             let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
 
-            // to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
-            let result = is_le(updated_amount, 230584300);
-
-            local amount_to_be_updated;
+            // to64x61(10**-6) = 2305843009213. We are comparing result with this number to fix overflow issues
+            let result = is_le(updated_amount, 2305843009213);
+            local updated_liquidatable_position: LiquidatablePosition;
 
             if (result == TRUE) {
-                assert amount_to_be_updated = 0;
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=0,
+                    direction=0,
+                    amount_to_be_sold=0,
+                    liquidatable=0,
+                );
             } else {
-                assert amount_to_be_updated = updated_amount;
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=liq_position.market_id,
+                    direction=liq_position.direction,
+                    amount_to_be_sold=updated_amount,
+                    liquidatable=liq_position.liquidatable,
+                );
             }
 
-            // Create a struct with the updated details
-            let updated_liquidatable_position: LiquidatablePosition = LiquidatablePosition(
-                market_id=liq_position.market_id,
-                direction=liq_position.direction,
-                amount_to_be_sold=amount_to_be_updated,
-                liquidatable=liq_position.liquidatable,
-            );
-
             // Update the Liquidatable position
-            deleveragable_or_liquidatable_position.write(value=updated_liquidatable_position);
+            deleveragable_or_liquidatable_position.write(
+                collateral_id=collateral_id_, value=updated_liquidatable_position
+            );
 
             // If it's a deleveraging order, calculate the new leverage
             if (request.order_type == DELEVERAGING_ORDER) {
@@ -972,14 +957,14 @@ func execute_order{
                 market_id=market_id,
                 direction=parent_direction,
                 value=PositionDetails(
-                avg_execution_price=0,
-                position_size=0,
-                margin_amount=0,
-                borrowed_amount=0,
-                leverage=0,
-                created_timestamp=0,
-                modified_timestamp=0,
-                realized_pnl=0,
+                    avg_execution_price=0,
+                    position_size=0,
+                    margin_amount=0,
+                    borrowed_amount=0,
+                    leverage=0,
+                    created_timestamp=0,
+                    modified_timestamp=0,
+                    realized_pnl=0,
                 ),
             );
 
@@ -1083,7 +1068,7 @@ func withdraw{
     // Create withdrawal request for hashing
     local hash_withdrawal_request_: WithdrawalRequestForHashing = WithdrawalRequestForHashing(
         request_id=request_id_, collateral_id=collateral_id_, amount=amount_
-        );
+    );
     // hash the parameters
     let (hash) = hash_withdrawal_request(&hash_withdrawal_request_);
     // check if Tx is signed by the user
@@ -1131,7 +1116,9 @@ func withdraw{
     balance.write(assetID=collateral_id_, value=new_balance);
 
     // Check whether any position is already marked to be deleveraged or liquidatable
-    let (position: LiquidatablePosition) = deleveragable_or_liquidatable_position.read();
+    let (position: LiquidatablePosition) = deleveragable_or_liquidatable_position.read(
+        collateral_id_
+    );
     with_attr error_message(
             "AccountManager: This withdrawal will lead to either deleveraging or liquidation") {
         assert position.liquidatable = 0;
@@ -1190,7 +1177,7 @@ func withdraw{
         node_operator_L2_address=node_operator_L2_address_,
         fee=standard_fee,
         status=WITHDRAWAL_INITIATED,
-        );
+    );
     // Update Withdrawal history
     let (array_len) = withdrawal_history_array_len.read();
     withdrawal_history_array.write(index=array_len, value=withdrawal_history_);
@@ -1225,7 +1212,7 @@ func withdraw{
 // @param amount_to_be_sold_ - Amount to be put on sale for deleveraging a position
 @external
 func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt
+    collateral_id_: felt, position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt
 ) {
     alloc_locals;
 
@@ -1259,7 +1246,9 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     );
 
     // Update deleveraged or liquidatable position
-    deleveragable_or_liquidatable_position.write(value=liquidatable_position);
+    deleveragable_or_liquidatable_position.write(
+        collateral_id=collateral_id_, value=liquidatable_position
+    );
 
     liquidate_deleverage.emit(
         market_id=position_.market_id, direction=position_.direction, amount_to_be_sold=amount
@@ -1312,10 +1301,11 @@ func populate_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 }
 
 // @notice Internal Function called by get_positions_for_risk_management to recursively add active positions to the array and return it
+// @param collateral_id_ - collateral id
 // @param positions_array_len_ - Length of the array
 // @param positions_array_ - Required array of positions
 // @param iterator_ - Current length of traversed array
-// @param final_len_ - Length of the final array
+// @param markets_array_len_ - Length of the markets array
 // @returns positions_array_len - Length of the positions array
 // @returns positions_array - Array with the positions
 func populate_positions_risk_management{
@@ -1325,12 +1315,12 @@ func populate_positions_risk_management{
     positions_array_len_: felt,
     positions_array_: PositionDetailsForRiskManagement*,
     iterator_: felt,
-    final_len_: felt,
+    markets_array_len_: felt,
 ) -> (positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*) {
     alloc_locals;
 
     // If we reached the end of the array, then return
-    if (final_len_ == iterator_) {
+    if (markets_array_len_ == iterator_) {
         return (positions_array_len_, positions_array_);
     }
 
@@ -1363,7 +1353,6 @@ func populate_positions_risk_management{
             position_size=long_position.position_size,
             margin_amount=long_position.margin_amount,
             borrowed_amount=long_position.borrowed_amount,
-            leverage=long_position.leverage,
         );
         assert positions_array_[positions_array_len_] = curr_position;
         assert is_long = 1;
@@ -1380,7 +1369,6 @@ func populate_positions_risk_management{
             position_size=short_position.position_size,
             margin_amount=short_position.margin_amount,
             borrowed_amount=short_position.borrowed_amount,
-            leverage=short_position.leverage,
         );
         assert positions_array_[positions_array_len_ + is_long] = curr_position;
         assert is_short = 1;
@@ -1391,32 +1379,36 @@ func populate_positions_risk_management{
         positions_array_len_=positions_array_len_ + is_long + is_short,
         positions_array_=positions_array_,
         iterator_=iterator_ + 1,
-        final_len_=final_len_,
+        markets_array_len_=markets_array_len_,
     );
 }
 
 // @notice Internal Function called by get_positions to recursively add active positions to the array and return it
 // @param positions_array_len_ - Length of the array
 // @param positions_array_ - Required array of positions
-// @param iterator_ - Current length of traversed array
-// @param final_len_ - Length of the final array
+// @param markets_iterator_ - Current length of traversed markets array
+// @param markets_array_len_ - Length of the markets array 
+// @param current_collateral_id_ - Current collateral_id
 // @returns positions_array_len - Length of the positions array
 // @returns positions_array - Array with the positions
 func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     positions_array_len_: felt,
     positions_array_: PositionDetailsWithMarket*,
-    iterator_: felt,
-    final_len_: felt,
+    markets_iterator_: felt,
+    markets_array_len_: felt,
+    current_collateral_id_: felt,
 ) -> (positions_array_len: felt, positions_array: PositionDetailsWithMarket*) {
     alloc_locals;
 
-    // If we reached the end of the array, then return
-    if (final_len_ == iterator_) {
+    // If reached the end of the array, then return
+    if (markets_array_len_ == markets_iterator_) {
         return (positions_array_len_, positions_array_);
     }
 
     // Get the market id at that position
-    let (curr_market_id: felt) = index_to_market_array.read(index=iterator_);
+    let (curr_market_id: felt) = collateral_to_market_array.read(
+        collateral_id=current_collateral_id_, index=markets_iterator_
+    );
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
@@ -1474,33 +1466,39 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return populate_positions(
         positions_array_len_=positions_array_len_ + is_long + is_short,
         positions_array_=positions_array_,
-        iterator_=iterator_ + 1,
-        final_len_=final_len_,
+        markets_iterator_=markets_iterator_ + 1,
+        markets_array_len_=markets_array_len_,
+        current_collateral_id_=current_collateral_id_,
     );
 }
 
-// @notice External function called by the ABR Contract to get the array of net positions of the user
+// @notice Internal Function to populate positions for ABR Payments
 // @param positions_array_len_ - Length of the array
-// @param positions_array_ - Required array of net positions
-// @param final_len_ - Length of the final array
-// @param timestamp_filter_ - Timestamp by which to filter the array
-// @returns positions_array_len - Length of the net positions array
-// @returns positions_array - Array with the net positions
+// @param positions_array_ - Required array of positions
+// @param iterator_ - Current length of traversed array
+// @param markets_array_len_ - Length of the markets array
+// @param current_collateral_id_ - current collateral id of the positions being populated
+// @param timestamp_filter_ - Timestamp by which to filter out the positions
+// @returns positions_array_len - Length of the positions array
+// @returns positions_array - Array with the positions
 func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     positions_array_len_: felt,
     positions_array_: SimplifiedPosition*,
-    iterator_: felt,
-    final_len_: felt,
+    markets_iterator_: felt,
+    markets_array_len_: felt,
+    current_collateral_id_: felt,
     timestamp_filter_: felt,
 ) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
     alloc_locals;
     // If reached the end of the array, then return
-    if (final_len_ == iterator_) {
+    if (markets_iterator_ == markets_array_len_) {
         return (positions_array_len_, positions_array_);
     }
 
     // Get the market id at that position
-    let (curr_market_id: felt) = index_to_market_array.read(index=iterator_);
+    let (curr_market_id: felt) = collateral_to_market_array.read(
+        collateral_id=current_collateral_id_, index=markets_iterator_
+    );
 
     // Get Long position
     let (long_position: PositionDetails) = position_mapping.read(
@@ -1547,9 +1545,111 @@ func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     return populate_simplified_positions(
         positions_array_len_=positions_array_len_ + is_long + is_short,
         positions_array_=positions_array_,
-        iterator_=iterator_ + 1,
-        final_len_=final_len_,
+        markets_iterator_=markets_iterator_ + 1,
+        markets_array_len_=markets_array_len_,
+        current_collateral_id_=current_collateral_id_,
         timestamp_filter_=timestamp_filter_,
+    );
+}
+
+// @notice Internal function to fetch all collaterals and recurse over them to populate the positions for ABR
+// @param positions_array_len_ - Length of the array
+// @param positions_array_ - Required array of net positions
+// @param collateral_array_iterator_ - Iterator to the collateral array
+// @param collateral_array_len_ - Length of the collateral array
+// @param timestamp_filter_ - Timestamp by which to filter the array
+// @returns positions_array_len - Length of the net positions array
+// @returns positions_array - Array with the net positions
+func populate_simplified_positions_collaterals_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    positions_array_len_: felt,
+    positions_array_: SimplifiedPosition*,
+    collateral_array_iterator_: felt,
+    collateral_array_len_: felt,
+    timestamp_filter_: felt,
+) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
+    alloc_locals;
+    // If reached the end of the array, then return
+    if (collateral_array_iterator_ == collateral_array_len_) {
+        return (positions_array_len_, positions_array_);
+    }
+
+    // Get the market id at that position
+    let (current_collateral_id: felt) = collateral_array.read(index=collateral_array_iterator_);
+
+    // Get current collateral array length
+    let (current_markets_array_len: felt) = collateral_to_market_array_len.read(
+        collateral_id=current_collateral_id
+    );
+
+    // Recursively call the next market_id
+    let (
+        positions_array_len: felt, positions_array: SimplifiedPosition*
+    ) = populate_simplified_positions(
+        positions_array_len_=positions_array_len_,
+        positions_array_=positions_array_,
+        markets_iterator_=0,
+        markets_array_len_=current_markets_array_len,
+        current_collateral_id_=current_collateral_id,
+        timestamp_filter_=timestamp_filter_,
+    );
+
+    return populate_simplified_positions_collaterals_recurse(
+        positions_array_len_=positions_array_len,
+        positions_array_=positions_array_,
+        collateral_array_iterator_=collateral_array_iterator_ + 1,
+        collateral_array_len_=collateral_array_len_,
+        timestamp_filter_=timestamp_filter_,
+    );
+}
+
+
+// @notice Internal function to fetch all collaterals and recurse over them to populate the positions
+// @param positions_array_len_ - Length of the array
+// @param positions_array_ - Required array of net positions
+// @param collateral_array_iterator_ - Iterator to the collateral array
+// @param collateral_array_len_ - Length of the collateral array
+// @returns positions_array_len - Length of the net positions array
+// @returns positions_array - Array with the net positions
+func populate_positions_collaterals_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    positions_array_len_: felt,
+    positions_array_: PositionDetailsWithMarket*,
+    collateral_array_iterator_: felt,
+    collateral_array_len_: felt,
+) -> (positions_array_len: felt, positions_array: PositionDetailsWithMarket*) {
+    alloc_locals;
+    // If reached the end of the array, then return
+    if (collateral_array_iterator_ == collateral_array_len_) {
+        return (positions_array_len_, positions_array_);
+    }
+
+    // Get the market id at that position
+    let (current_collateral_id: felt) = collateral_array.read(index=collateral_array_iterator_);
+
+    // Get current collateral array length
+    let (current_markets_array_len: felt) = collateral_to_market_array_len.read(
+        collateral_id=current_collateral_id
+    );
+
+    // Recursively call the next market_id
+    let (
+        positions_array_len: felt, positions_array: PositionDetailsWithMarket*
+    ) = populate_positions(
+        positions_array_len_=positions_array_len_,
+        positions_array_=positions_array_,
+        markets_iterator_=0,
+        markets_array_len_=current_markets_array_len,
+        current_collateral_id_=current_collateral_id,
+    );
+
+    return populate_positions_collaterals_recurse(
+        positions_array_len_=positions_array_len,
+        positions_array_=positions_array_,
+        collateral_array_iterator_=collateral_array_iterator_ + 1,
+        collateral_array_len_=collateral_array_len_,
     );
 }
 
@@ -1626,6 +1726,7 @@ func add_to_market_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
 // @notice Internal function called to remove a market_id when both positions are fully closed
 // @param market_id - Id of the market
+// @param collateral_id_ - collateral id
 // @return 1 - If successfully removed
 func remove_from_market_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, collateral_id_: felt

@@ -3,6 +3,7 @@ import copy
 import random
 import string
 import calculate_abr
+from math import isclose
 from utils_asset import AssetID
 from utils import Signer, str_to_felt, assert_revert, hash_order, from64x61, to64x61
 from typing import List, Dict, Tuple
@@ -11,8 +12,10 @@ from starkware.starknet.testing.contract import StarknetContract
 
 # Market IDs
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
+BTC_DAI_ID = str_to_felt("nxczijewihrewi")
 BTC_UST_ID = str_to_felt("gecn2j0c12rtzxcmsz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
+ETH_DAI_ID = str_to_felt("dsfjlkj3249jfkdl")
 TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 
@@ -74,14 +77,18 @@ fund_mode = {
 market_to_collateral_mapping = {
     BTC_USD_ID: AssetID.USDC,
     BTC_UST_ID: AssetID.UST,
+    BTC_DAI_ID: AssetID.DAI,
     ETH_USD_ID: AssetID.USDC,
+    ETH_DAI_ID: AssetID.DAI,
     TSLA_USD_ID: AssetID.USDC
 }
 
 market_to_asset_mapping = {
     BTC_USD_ID: AssetID.BTC,
+    BTC_DAI_ID: AssetID.BTC,
     BTC_UST_ID: AssetID.BTC,
     ETH_USD_ID: AssetID.ETH,
+    ETH_DAI_ID: AssetID.ETH,
     TSLA_USD_ID: AssetID.TSLA
 }
 
@@ -100,6 +107,7 @@ class User:
         self.balance = {}
         self.portion_executed = {}
         self.positions = {}
+        self.collateral_to_market_array = {}
         self.market_array = []
         self.collateral_array = []
         self.deleveragable_or_liquidatable_position = {}
@@ -133,21 +141,30 @@ class User:
     def __set_portion_executed(self, order_id: int, new_amount: float):
         self.portion_executed[order_id] = new_amount
 
-    def __add_to_market_array(self, new_market_id: int):
-        for i in range(len(self.market_array)):
-            if self.market_array[i] == new_market_id:
-                return
-        self.market_array.append(new_market_id)
+    def __add_to_market_array(self, collateral_id: int, new_market_id: int):
+        try:
+            for i in range(len(self.collateral_to_market_array[collateral_id])):
+                if self.collateral_to_market_array[collateral_id] == new_market_id:
+                    return
+            self.collateral_to_market_array[collateral_id].append(
+                new_market_id)
+        except:
+            self.collateral_to_market_array.update({
+                collateral_id: [new_market_id]
+            })
 
-    def __remove_from_market_array(self, market_id: int):
-        if len(self.market_array) == 1:
-            self.market_array.pop()
-        for i in range(len(self.market_array)):
-            if self.market_array[i] == market_id:
-                self.market_array[i] = self.market_array[len(
-                    self.market_array) - 1]
-                self.market_array.pop()
-                return
+    def __remove_from_market_array(self, collateral_id: int, market_id: int):
+        try:
+            if len(self.collateral_to_market_array[collateral_id]) == 1:
+                self.collateral_to_market_array[collateral_id].pop()
+            else:
+                for i in range(len(self.collateral_to_market_array[collateral_id])):
+                    if self.collateral_to_market_array[collateral_id][i] == market_id:
+                        self.collateral_to_market_array[collateral_id][i] = self.collateral_to_market_array[collateral_id][len(
+                            self.collateral_to_market_array[collateral_id]) - 1]
+                        self.collateral_to_market_array[collateral_id].pop()
+        except:
+            return
 
     def __get_signed_order(self, order: Dict, liquidator_address: int) -> Dict:
         hashed_order = hash_order(list(order.values())[:-1])
@@ -187,23 +204,56 @@ class User:
             }
 
     def get_positions(self) -> List[Dict]:
-        markets = self.market_array
+        collaterals = self.collateral_array
         positions = []
-        for i in range(len(markets)):
-            long_position = self.get_position(
-                market_id=markets[i], direction=order_direction["long"])
-            short_position = self.get_position(
-                market_id=markets[i], direction=order_direction["short"])
 
-            if long_position["position_size"] != 0:
-                long_position["market_id"] = markets[i]
-                long_position["direction"] = order_direction["long"]
-                positions.append(long_position)
+        for collateral in collaterals:
+            try:
+                for market in self.collateral_to_market_array[collateral]:
+                    long_position = self.get_position(
+                        market_id=market, direction=order_direction["long"])
+                    short_position = self.get_position(
+                        market_id=market, direction=order_direction["short"])
 
-            if short_position["position_size"] != 0:
-                short_position["market_id"] = markets[i]
-                short_position["direction"] = order_direction["short"]
-                positions.append(short_position)
+                    if long_position["position_size"] != 0:
+                        long_position["market_id"] = market
+                        long_position["direction"] = order_direction["long"]
+                        positions.append(long_position)
+
+                    if short_position["position_size"] != 0:
+                        short_position["market_id"] = market
+                        short_position["direction"] = order_direction["short"]
+                        positions.append(short_position)
+            except KeyError:
+                continue
+        return positions
+
+    def get_positions_risk_management(self, collateral_id: int) -> List[Dict]:
+        collaterals = self.collateral_array
+        positions = []
+
+        for collateral in collaterals:
+            if collateral == collateral_id:
+                try:
+                    for market in self.collateral_to_market_array[collateral]:
+                        long_position = self.get_position(
+                            market_id=market, direction=order_direction["long"])
+                        short_position = self.get_position(
+                            market_id=market, direction=order_direction["short"])
+
+                        if long_position["position_size"] != 0:
+                            long_position["market_id"] = market
+                            long_position["direction"] = order_direction["long"]
+                            positions.append(long_position)
+
+                        if short_position["position_size"] != 0:
+                            short_position["market_id"] = market
+                            short_position["direction"] = order_direction["short"]
+                            positions.append(short_position)
+                except KeyError:
+                    continue
+            else:
+                continue
         return positions
 
     def get_collaterals(self) -> List[Dict]:
@@ -304,23 +354,29 @@ class User:
         try:
             return self.balance[asset_id]
         except KeyError:
+            print("key error here")
             return 0
 
-    def get_deleveragable_or_liquidatable_position(self) -> Dict:
-        if self.deleveragable_or_liquidatable_position != {}:
-            return self.deleveragable_or_liquidatable_position
-        else:
-            return {
-                "market_id": 0,
-                "direction": 0,
-                "amount_to_be_sold": 0,
-                "liquidatable": 0
-            }
+    def get_deleveragable_or_liquidatable_position(self, collateral_id: int) -> Dict:
+        try:
+            if self.deleveragable_or_liquidatable_position[collateral_id] != {}:
+                return self.deleveragable_or_liquidatable_position[collateral_id]
+        except:
+            pass
 
-    def set_deleveragable_or_liquidatable_position(self, updated_position: Dict):
-        self.deleveragable_or_liquidatable_position = updated_position
+        return {
+            "market_id": 0,
+            "direction": 0,
+            "amount_to_be_sold": 0,
+            "liquidatable": 0
+        }
 
-    def liquidate_position(self, position: Dict, amount_to_be_sold: float):
+    def set_deleveragable_or_liquidatable_position(self, collateral_id: int, updated_position: Dict):
+        self.deleveragable_or_liquidatable_position.update({
+            collateral_id: updated_position
+        })
+
+    def liquidate_position(self, position: Dict, collateral_id: int, amount_to_be_sold: float):
         amount = 0
         liquidatable = 0
         if amount_to_be_sold == 0:
@@ -335,7 +391,9 @@ class User:
             "amount_to_be_sold": amount,
             "liquidatable": liquidatable
         }
-        self.deleveragable_or_liquidatable_position = liquidatable_position
+        self.deleveragable_or_liquidatable_position.update({
+            collateral_id: liquidatable_position
+        })
 
     def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int, timestamp: int, pnl: int):
         position = self.get_position(
@@ -358,7 +416,8 @@ class User:
             created_timestamp = 0
 
             if position["position_size"] == 0:
-                self.__add_to_market_array(new_market_id=order["market_id"])
+                self.__add_to_market_array(
+                    new_market_id=order["market_id"], collateral_id=market_to_collateral_mapping[market_id])
                 created_timestamp = timestamp
                 current_pnl = pnl
             else:
@@ -405,7 +464,8 @@ class User:
                 return
 
             if order["order_type"] > 3:
-                liq_position = self.get_deleveragable_or_liquidatable_position()
+                liq_position = self.get_deleveragable_or_liquidatable_position(
+                    collateral_id=market_to_collateral_mapping[market_id])
 
                 if liq_position["market_id"] != market_id:
                     print("Position not marked as liquidatable/deleveragable")
@@ -417,9 +477,20 @@ class User:
 
                 updated_amount = liq_position["amount_to_be_sold"] - size
 
-                liq_position["amount_to_be_sold"] = updated_amount
-                self.set_deleveragable_or_liquidatable_position(
-                    updated_position=liq_position)
+                if isclose(updated_amount, 0, abs_tol=1e-6):
+                    new_liq_position = {key: 0 for key in liq_position}
+                    print("new liq position", new_liq_position)
+
+                    self.set_deleveragable_or_liquidatable_position(
+                        collateral_id=market_to_collateral_mapping[market_id],
+                        updated_position=new_liq_position)
+                else:
+                    liq_position["amount_to_be_sold"] = updated_amount
+                    print("old liq position", liq_position)
+
+                    self.set_deleveragable_or_liquidatable_position(
+                        collateral_id=market_to_collateral_mapping[market_id],
+                        updated_position=liq_position)
 
                 if order["order_type"] == order_types["deleverage"]:
                     if liq_position["liquidatable"] == 1:
@@ -439,7 +510,8 @@ class User:
             updated_position = {}
             if new_position_size == 0:
                 if position["position_size"] == 0:
-                    self.__remove_from_market_array(market_id=market_id)
+                    self.__remove_from_market_array(
+                        market_id=market_id, collateral_id=market_to_collateral_mapping[market_id])
 
                 updated_position = {
                     "avg_execution_price": 0,
@@ -556,6 +628,26 @@ class OrderExecutor:
         self.taker_trading_fees = 0.0005 * 0.97
         self.fund_balances = {}
         self.batch_id_status = {}
+        self.market_prices = {}
+        self.ttl = 60
+
+    def _set_market_price(self, market_id: int, price: float, current_timestamp: int):
+        last_timestamp = 0
+        try:
+            last_timestamp = self.market_prices[market_id]["timestamp"]
+        except:
+            last_timestamp = 0
+
+        if last_timestamp + self.ttl < current_timestamp:
+            print("timestamp set", last_timestamp, current_timestamp)
+            self.market_prices.update({
+                market_id: {
+                    "price": price,
+                    "timestamp": current_timestamp
+                }
+            })
+        else:
+            return
 
     def __modify_fund_balance(self, fund: int, mode: int, asset_id: int, amount: float):
         current_balance = self.get_fund_balance(fund, asset_id,)
@@ -634,7 +726,7 @@ class OrderExecutor:
         if order["leverage"] > 1:
             self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["defund"],
                                        asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_be_borrowed)
-
+        print(margin_amount)
         return (average_execution_price, margin_amount, borrowed_amount, trading_fees)
 
     def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, market_id) -> Tuple[float, float, float, float]:
@@ -701,7 +793,7 @@ class OrderExecutor:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
             if net_account_value <= 0:
-                deficit = leveraged_amount_out - borrowed_amount_to_be_returned
+                deficit = borrowed_amount_to_be_returned - leveraged_amount_out
                 user.modify_balance(
                     mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
             else:
@@ -721,13 +813,12 @@ class OrderExecutor:
                         asset_id=market_to_collateral_mapping[order["market_id"]],
                     )
 
-                    if deficit <= user_balance:
-                        user.modify_balance(
+                    user.modify_balance(
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
+
+                    if deficit <= user_balance:
                         realized_pnl = net_account_value
                     else:
-                        user.modify_balance(
-                            mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance)
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_balance)
                         realized_pnl = (user_balance+margin_amount)*-1
@@ -748,9 +839,26 @@ class OrderExecutor:
         return self.maker_trading_fees if side == 1 else self.taker_trading_fees
 
     def set_fund_balance(self, fund: int, asset_id: int, new_balance: float):
-        self.fund_balances[fund] = {
-            asset_id: new_balance
-        }
+        try:
+            self.fund_balances[fund].update({
+                asset_id: new_balance
+            })
+        except KeyError:
+            self.fund_balances.update({
+                fund: {
+                    asset_id: new_balance
+                }
+            })
+
+    def get_market_price(self, market_id: int, timestamp: int) -> float:
+        try:
+            if self.market_prices[market_id]["timestamp"] + self.ttl < timestamp:
+                return 0
+            else:
+                return self.market_prices[market_id]["price"]
+        except:
+            print("Error while getting market price")
+            return 0
 
     def get_fund_balance(self, fund: int, asset_id: int) -> int:
         try:
@@ -803,6 +911,9 @@ class OrderExecutor:
                 quantity_to_execute = quantity_locked
                 execution_price = running_weighted_sum/quantity_locked
 
+                self._set_market_price(
+                    market_id=market_id, price=execution_price, current_timestamp=timestamp)
+
                 if request_list[i]["order_type"] == order_types["market"]:
                     threshold = (
                         request_list[i]["slippage"]/100.0)*request_list[i]["price"]
@@ -848,6 +959,9 @@ class OrderExecutor:
                 (avg_execution_price, margin_amount, borrowed_amount, trading_fees) = self.__process_open_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=side)
                 pnl = trading_fees
+                if avg_execution_price == 0:
+                    print("Cannot execute batch; returning")
+                    return
             else:
                 (avg_execution_price, margin_amount, borrowed_amount, realized_pnl) = self.__process_close_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id)
@@ -872,32 +986,26 @@ class Liquidator:
         self.maintenance_requirement = maintenance_requirement
         self.total_account_value_collateral = total_account_value_collateral
 
-    def __find_collateral_balance(self, prices_array: List[Dict], collateral_array: List) -> int:
-
-        total_collateral_value = 0
-        for i in range(len(collateral_array)):
-            total_collateral_value += collateral_array[i]["balance"] * \
-                prices_array[i]["collateral_price"]
-        return total_collateral_value
-
-    def __check_for_deleveraging(self, position: Dict, collateral_price: float, asset_price: float) -> int:
+    def __check_for_deleveraging(self, position: Dict, asset_price: float) -> int:
         price_diff = (asset_price - position["avg_execution_price"]) if position["direction"] == order_direction["long"] else (
             position["avg_execution_price"] - asset_price)
 
         # calculate the amoutn to be sold for deleveraging
         # amount = (0.075 * P - D)(S - X)
-        amount_to_be_sold = position["position_size"] - position["margin_amount"] * \
-            collateral_price / (self.maintenance_margin *
-                                asset_price - price_diff)
+        amount_to_be_sold = position["position_size"] - position["margin_amount"] / (self.maintenance_margin *
+                                                                                     asset_price - price_diff)
 
         # Calculate the new leverage
-        position_value_usd = (
-            position["margin_amount"] + position["borrowed_amount"]) * collateral_price
-        amount_to_be_sold_usd = amount_to_be_sold * asset_price
-        remaining_position_value_usd = position_value_usd - amount_to_be_sold_usd
+        position_value = (
+            position["margin_amount"] + position["borrowed_amount"])
+        amount_to_be_sold_ = amount_to_be_sold * asset_price
+        print("\nAmount to be sold:", amount_to_be_sold, "\n")
+        remaining_position_value = position_value - amount_to_be_sold_
 
-        leverage_after_deleveraging = remaining_position_value_usd / \
-            (position["margin_amount"] * collateral_price)
+        leverage_after_deleveraging = remaining_position_value / \
+            (position["margin_amount"])
+
+        print("leverage_after_deleveraging", leverage_after_deleveraging)
         if leverage_after_deleveraging <= 2:
             return 0
         else:
@@ -906,86 +1014,109 @@ class Liquidator:
     def get_debugging_values(self) -> Tuple[float, float]:
         return (self.maintenance_requirement, self.total_account_value_collateral)
 
-    def check_for_liquidation(self, user: User, prices_array: List[Dict]) -> Tuple[int, Dict]:
-        positions = user.get_positions()
+    def find_under_collateralized_position(self, user: User, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, Dict, int, int]:
+        liquidatable_position = user.get_deleveragable_or_liquidatable_position(
+            collateral_id=collateral_id)
+
+        if liquidatable_position["amount_to_be_sold"] != 0:
+            return (1, {
+                    "market_id": 0,
+                    "direction": 0,
+                    "amount_to_be_sold": 0,
+                    "liquidatable": 0,
+                    }, 0, 0)
+
+        positions = user.get_positions_risk_management(
+            collateral_id=collateral_id)
 
         if len(positions) == 0:
             print("Liquidator: Empty positions array")
-            return
-
-        if len(prices_array) != len(prices_array):
-            print("Liquidator: Invalid prices array")
-            return
+            return (0, {
+                    "market_id": 0,
+                    "direction": 0,
+                    "amount_to_be_sold": 0,
+                    "liquidatable": 0,
+                    }, 0, 0)
 
         least_collateral_ratio = 1
         least_collateral_ratio_position = 0
-        least_collateral_ratio_position_collateral_price = 0
         least_collateral_ratio_position_asset_price = 0
         total_account_value = 0
         total_maintenance_requirement = 0
 
         for i in range(len(positions)):
+            market_price = order_executor.get_market_price(
+                market_id=positions[i]["market_id"], timestamp=timestamp)
+
+            if market_price == 0:
+                print("Outdated market price")
+                return (0, {
+                    "market_id": 0,
+                    "direction": 0,
+                    "amount_to_be_sold": 0,
+                    "liquidatable": 0,
+                }, 0, 0)
+
             maintenance_position = positions[i]["avg_execution_price"] * \
                 positions[i]["position_size"]
             maintenance_requirement = self.maintenance_margin * maintenance_position
-            maintenance_requirement_usd = maintenance_requirement * \
-                prices_array[i]["collateral_price"]
+            print("maintenance_requirement", maintenance_requirement)
 
             # Calculate pnl to check if it is the least collateralized position
             price_diff = 0
             if positions[i]["direction"] == 1:
-                price_diff = prices_array[i]["asset_price"] - \
+                price_diff = market_price - \
                     positions[i]["avg_execution_price"]
             else:
                 price_diff = positions[i]["avg_execution_price"] - \
-                    prices_array[i]["asset_price"]
+                    market_price
 
             pnl = price_diff*positions[i]["position_size"]
             # Calculate the value of the current account margin in usd
             position_value = maintenance_position - \
                 positions[i]["borrowed_amount"] + pnl
-            net_position_value_usd = position_value * \
-                prices_array[i]["collateral_price"]
+            print("position_value", position_value)
 
             # Margin ratio calculation
             collateral_ratio = (positions[i]["margin_amount"] + pnl)/(
-                positions[i]["position_size"] * prices_array[i]["asset_price"])
+                positions[i]["position_size"] * market_price)
+
+            print("collateral ratio position:", collateral_ratio)
 
             if collateral_ratio < least_collateral_ratio:
                 least_collateral_ratio = collateral_ratio
                 least_collateral_ratio_position = positions[i]
-                least_collateral_ratio_position_collateral_price = prices_array[
-                    i]["collateral_price"]
-                least_collateral_ratio_position_asset_price = prices_array[i]["asset_price"]
+                least_collateral_ratio_position_asset_price = market_price
 
-            total_maintenance_requirement += maintenance_requirement_usd
-            total_account_value += net_position_value_usd
+            total_maintenance_requirement += maintenance_requirement
+            total_account_value += position_value
 
-        collaterals_array = user.get_collaterals()
-        user_balance = self.__find_collateral_balance(
-            prices_array=prices_array[len(positions):],
-            collateral_array=collaterals_array
-        )
-
+        user_balance = user.get_balance(asset_id=collateral_id)
+        print("user_balance", user_balance)
         total_account_value_collateral = total_account_value + user_balance
+        print("total_account_value", total_account_value)
+        print("total_account_value_collateral", total_account_value_collateral)
         self.__set_debugging_values(maintenance_requirement=total_maintenance_requirement,
                                     total_account_value_collateral=total_account_value_collateral)
         liq_result = total_account_value_collateral < total_maintenance_requirement
-
+        print("total_maintenance_requirement", total_maintenance_requirement)
+        print("liquidation result", liq_result)
         if liq_result:
             if least_collateral_ratio > 0:
                 amount_to_be_sold = self.__check_for_deleveraging(
-                    position=least_collateral_ratio_position, collateral_price=least_collateral_ratio_position_collateral_price, asset_price=least_collateral_ratio_position_asset_price)
+                    position=least_collateral_ratio_position, asset_price=least_collateral_ratio_position_asset_price)
                 user.liquidate_position(
                     position=least_collateral_ratio_position,
-                    amount_to_be_sold=amount_to_be_sold
+                    amount_to_be_sold=amount_to_be_sold,
+                    collateral_id=collateral_id
                 )
             else:
                 user.liquidate_position(
                     position=least_collateral_ratio_position,
-                    amount_to_be_sold=0
+                    amount_to_be_sold=0,
+                    collateral_id=collateral_id
                 )
-        return (liq_result, least_collateral_ratio_position)
+        return (liq_result, least_collateral_ratio_position, total_account_value_collateral, total_maintenance_requirement)
 
 
 class ABR:
@@ -1107,8 +1238,8 @@ async def find_under_collateralized_position_starknet(zkx_node_signer: Signer, z
 
 
 # Function to get the liquidatable position from starknet
-async def get_liquidatable_position_starknet(user: User) -> List[float]:
-    liquidatable_position_query = await user.get_deleveragable_or_liquidatable_position().call()
+async def get_liquidatable_position_starknet(user: User, collateral_id: int) -> List[float]:
+    liquidatable_position_query = await user.get_deleveragable_or_liquidatable_position(collateral_id).call()
     liquidatable_position = list(liquidatable_position_query.result.position)
     # Convert amount to decimals rep
     liquidatable_position[2] = from64x61(liquidatable_position[2])
@@ -1120,7 +1251,8 @@ async def get_user_position(user: StarknetContract, market_id: int, direction: i
     user_starknet_query = await user.get_position_data(market_id_=market_id, direction_=direction).call()
     user_starknet_query_parsed = list(user_starknet_query.result.res)
     user_starknet_position = [from64x61(x)
-                              for x in user_starknet_query_parsed]
+                              for x in user_starknet_query_parsed[:5]] + user_starknet_query_parsed[5:7] + [from64x61(x)
+                                                                                                            for x in user_starknet_query_parsed[7:]]
     return user_starknet_position
 
 
@@ -1157,8 +1289,8 @@ async def execute_batch(zkx_node_signer: Signer, zkx_node: StarknetContract, tra
 
 
 # Function to get the liquidatable position from the python implementation
-def get_liquidatable_position_python(user_test: User) -> List[float]:
-    return list(user_test.get_deleveragable_or_liquidatable_position().values())
+def get_liquidatable_position_python(user_test: User, collateral_id: int) -> List[float]:
+    return list(user_test.get_deleveragable_or_liquidatable_position(collateral_id=collateral_id).values())
 
 
 # Function to get the balance of a user from the python implementation
@@ -1186,10 +1318,10 @@ def set_balance_python(user_test: User, asset_id: int, new_balance: float):
 
 
 # Liquidation check on the python implementation
-def find_under_collateralized_position_python(user_test: User, liquidator: Liquidator, liquidate_params: List[Dict]) -> Tuple[int, List]:
-    result = liquidator.check_for_liquidation(
-        user=user_test, prices_array=liquidate_params)
-    return (result[0], list(result[1].values())[:-2])
+def find_under_collateralized_position_python(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
+    result = liquidator.find_under_collateralized_position(
+        user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
+    return (result[0], list(result[1].values())[:4], result[2], result[3])
 
 
 ####################################
@@ -1198,54 +1330,14 @@ def find_under_collateralized_position_python(user_test: User, liquidator: Liqui
 
 
 # Function to check for liquidation on starknet + python and to compare the results
-async def find_under_collateralized_position(zkx_node_signer: Signer, zkx_node: StarknetContract, liquidator: Liquidator, user: StarknetContract, user_test: User, market_prices: List[Dict], collateral_prices: List[Dict], liquidate: StarknetContract):
-    # Length of the final price data list
-    total_length = len(market_prices) + len(collateral_prices)
-    # intialize params list for starknet and python
-    liquidation_params_starknet = [user.contract_address, total_length]
-    liquidation_params_python = []
-
-    # Process each market_prices dict
-    for i in range(len(market_prices)):
-        price_data_dict = {
-            "asset_id": market_to_asset_mapping[market_prices[i]["market_id"]],
-            "collateral_id": market_to_collateral_mapping[market_prices[i]["market_id"]],
-            "asset_price": market_prices[i]["asset_price"],
-            "collateral_price": market_prices[i]["collateral_price"]
-        }
-
-        # For python, we just append the formatted price_data_dict
-        liquidation_params_python.append(price_data_dict)
-
-        # For starknet, we need to convert asset_price and collateral price to 64x61
-        liquidation_format_starknet = convert_to_64x61_liquidation_format(
-            price_data_dict)
-
-        liquidation_params_starknet.extend(liquidation_format_starknet)
-
-    for i in range(len(collateral_prices)):
-        price_data_dict = {
-            "asset_id": 0,
-            "collateral_id": collateral_prices[i]["collateral_id"],
-            "asset_price": 0,
-            "collateral_price": collateral_prices[i]["collateral_price"]
-        }
-
-        # For python, we just append the formatted price_data_dict
-        liquidation_params_python.append(price_data_dict)
-
-        # For starknet, we need to convert asset_price and collateral price to 64x61
-        liquidation_format_starknet = convert_to_64x61_liquidation_format(
-            price_data_dict)
-
-        liquidation_params_starknet.extend(liquidation_format_starknet)
-
+async def find_under_collateralized_position(zkx_node_signer: Signer, zkx_node: StarknetContract, liquidator: Liquidator, user: StarknetContract, user_test: User, liquidate: StarknetContract, collateral_id: int, order_executor: OrderExecutor, timestamp):
+    liquidate_params = [user.contract_address, collateral_id]
     # Get the liquidation result from starknet
-    starknet_result = await find_under_collateralized_position_starknet(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, liquidate=liquidate, liquidate_params=liquidation_params_starknet)
+    starknet_result = await find_under_collateralized_position_starknet(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, liquidate=liquidate, liquidate_params=liquidate_params)
 
     # Get the liquidation result from the python implmentation
     python_result = find_under_collateralized_position_python(
-        user_test=user_test, liquidator=liquidator, liquidate_params=liquidation_params_python)
+        user_test=user_test, liquidator=liquidator, collateral_id=collateral_id, order_executor=order_executor, timestamp=timestamp)
 
     # Compare the results of python and starkent
     compare_result_liquidation(
@@ -1290,7 +1382,7 @@ async def execute_batch_reverted(zkx_node_signer: Signer, zkx_node: StarknetCont
     return
 
 
-async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContract, executor: OrderExecutor, orders: List[Dict], users_test: List[User], quantity_locked: float, market_id: int, oracle_price: float, trading: StarknetContract, timestamp: int = 0, is_reverted: int = 0, error_code: str = "", error_at_index: int = 0, param_2: str = "", error_message: str = "") -> Tuple[int, List]:
+async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContract, executor: OrderExecutor, orders: List[Dict], users_test: List[User], quantity_locked: float, market_id: int, oracle_price: float, trading: StarknetContract, timestamp: int = 0, is_reverted: int = 0, error_code: str = "", error_at_index: int = -1, param_2: str = "", error_message: str = "") -> Tuple[int, List]:
     # Generate a random batch id
     batch_id = random_string(10)
 
@@ -1338,8 +1430,11 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
         actual_error_message = ""
         # If the error code is passed
         if error_code:
-            error_at_order_id = complete_orders_python[error_at_index]["order_id"]
-            actual_error_message = f"{error_code} {error_at_order_id} {param_2}"
+            if error_at_index == -1:
+                actual_error_message = f"{error_code} {param_2}"
+            else:
+                error_at_order_id = complete_orders_python[error_at_index]["order_id"]
+                actual_error_message = f"{error_code} {error_at_order_id} {param_2}"
         # If an error message is passed
         elif error_message:
             actual_error_message = error_message
@@ -1370,6 +1465,11 @@ async def compare_debugging_values(liquidate: StarknetContract, liquidator: Liqu
     (maintenance_requirement_python,
      account_value_python) = liquidator.get_debugging_values()
 
+    print("maintenance_requirement", maintenance_requirement)
+    print("account_value", account_value)
+    print("maintenance_requirement_python", maintenance_requirement_python)
+    print("account_value_python", account_value_python)
+
     # Assert that both of them are appoximately equal
     assert maintenance_requirement_python == pytest.approx(
         maintenance_requirement, abs=1e-3)
@@ -1377,7 +1477,9 @@ async def compare_debugging_values(liquidate: StarknetContract, liquidator: Liqu
 
 
 # Function to check the result of a liquidation call
-def compare_result_liquidation(python_result: Tuple[int, List], starknet_result: Tuple[int, List]):
+def compare_result_liquidation(python_result: Tuple[int, List, int, int], starknet_result: Tuple[int, List, int, int]):
+    print("python_result", python_result)
+    print("starknet_result", starknet_result)
     assert python_result[0] == starknet_result[0]
 
     for element_1, element_2 in zip(python_result[1], starknet_result[1]):
@@ -1396,7 +1498,8 @@ async def compare_user_balances(users: List[StarknetContract], user_tests: List[
         user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
         user_balance_python = get_user_balance_python(
             user=user_tests[i], asset_id=asset_id)
-
+        print("user_balance", user_balance)
+        print("user_balance_python", user_balance_python)
         assert user_balance_python == pytest.approx(
             user_balance, abs=1e-6)
 
@@ -1414,6 +1517,8 @@ async def compare_user_positions(users: List[StarknetContract], users_test: List
         user_position_starknet_short = await get_user_position(
             user=users[i], market_id=market_id, direction=order_direction["short"])
 
+        print("user_position_python_long", user_position_python_long)
+        print("user_position_starknet_long", user_position_starknet_long)
         for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
             assert element_1 == pytest.approx(element_2, abs=1e-6)
 
@@ -1426,34 +1531,39 @@ async def compare_fund_balances(executor: OrderExecutor, holding: StarknetContra
     holding_fund_balance = await get_fund_balance(fund=holding, asset_id=asset_id, is_fee_balance=0)
     holding_fund_balance_python = get_fund_balance_python(
         executor=executor, fund=fund_mapping["holding_fund"], asset_id=asset_id)
+
     assert holding_fund_balance_python == pytest.approx(
         holding_fund_balance, abs=1e-6)
 
     liquidity_fund_balance = await get_fund_balance(fund=liquidity, asset_id=asset_id, is_fee_balance=0)
     liquidity_fund_balance_python = get_fund_balance_python(
         executor=executor, fund=fund_mapping["liquidity_fund"], asset_id=asset_id)
+
     assert liquidity_fund_balance_python == pytest.approx(
         liquidity_fund_balance, abs=1e-6)
 
     fee_balance_balance = await get_fund_balance(fund=fee_balance, asset_id=asset_id, is_fee_balance=1)
     fee_balance_python = get_fund_balance_python(
         executor=executor, fund=fund_mapping["fee_balance"], asset_id=asset_id)
+
     assert fee_balance_python == pytest.approx(
         fee_balance_balance, abs=1e-6)
 
     insurance_balance = await get_fund_balance(fund=insurance, asset_id=asset_id, is_fee_balance=0)
     insurance_balance_python = get_fund_balance_python(
         executor=executor, fund=fund_mapping["insurance_fund"], asset_id=asset_id)
+
     assert insurance_balance_python == pytest.approx(
         insurance_balance, abs=1e-6)
 
 
 # Assert that the liquidatable position on starknet and python class are the same
-async def compare_liquidatable_position(user: StarknetContract, user_test: User):
-    liquidatable_position_starknet = await get_liquidatable_position_starknet(user)
-    liquidatable_position_python = get_liquidatable_position_python(user_test)
+async def compare_liquidatable_position(user: StarknetContract, user_test: User, collateral_id: int):
+    liquidatable_position_starknet = await get_liquidatable_position_starknet(user=user, collateral_id=collateral_id)
+    liquidatable_position_python = get_liquidatable_position_python(
+        user_test=user_test, collateral_id=collateral_id)
 
-    for i in range(len(liquidatable_position_python)):
+    for i in range(len(liquidatable_position_starknet)):
         assert liquidatable_position_python[i] == pytest.approx(
             liquidatable_position_starknet[i], abs=1e-3)
 

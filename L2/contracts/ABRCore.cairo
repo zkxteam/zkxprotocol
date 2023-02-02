@@ -488,7 +488,6 @@ func set_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     // Get current state, epoch and timestamp
     let (current_state) = state.read();
     let (current_epoch) = epoch.read();
-    let (current_timestamp) = epoch_to_timestamp.read(epoch=current_epoch);
 
     // Get registry and version
     let (registry) = CommonLib.get_registry_address();

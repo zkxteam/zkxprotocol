@@ -1,17 +1,14 @@
 %lang starknet
 
-from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.bool import FALSE, TRUE
-from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import abs_value, assert_not_zero
+from starkware.cairo.common.bool import TRUE
+from starkware.cairo.common.cairo_builtins import HashBuiltin
+from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Math_64x61 import Math64x61_mul
 from contracts.Constants import (
     ABR_Core_Index,
     ABR_FUNDS_INDEX,
-    ABR_Calculations_INDEX,
-    AccountRegistry_INDEX,
     Market_INDEX,
     SHORT,
 )
@@ -20,7 +17,6 @@ from contracts.DataTypes import SimplifiedPosition
 from contracts.interfaces.IABRCore import IABRCore
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAccountManager import IAccountManager
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib

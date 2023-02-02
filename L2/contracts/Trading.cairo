@@ -1058,6 +1058,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     assert quantity_order = [request_list_].quantity;
     assert user_address = [request_list_].user_address;
     assert direction_order = [request_list_].direction;
+    assert market_id_order = [request_list_].market_id;
 
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
     let (is_registered) = IAccountRegistry.is_registered_user(
@@ -1105,7 +1106,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         } else {
             maker_direction = maker_direction_;
             with_attr error_message("0512: {order_id} {direction_order}") {
-                assert maker_direction_ = [request_list_].direction;
+                assert maker_direction_ = direction_order;
             }
         }
         tempvar syscall_ptr = syscall_ptr;
