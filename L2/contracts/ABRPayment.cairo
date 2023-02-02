@@ -5,18 +5,23 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
-from contracts.Math_64x61 import Math64x61_mul
+from contracts.Math_64x61 import Math64x61_mul, Math64x61_round
 from contracts.Constants import (
     ABR_Core_Index,
     ABR_FUNDS_INDEX,
+    ABR_Calculations_INDEX,
+    AccountRegistry_INDEX,
+    Asset_INDEX,
     Market_INDEX,
     SHORT,
 )
 
-from contracts.DataTypes import SimplifiedPosition
+from contracts.DataTypes import Asset, SimplifiedPosition
 from contracts.interfaces.IABRCore import IABRCore
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAccountManager import IAccountManager
+from contracts.interfaces.IAccountRegistry import IAccountRegistry
+from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
@@ -197,6 +202,14 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         contract_address=market_contract_, market_id_=[positions_].market_id
     );
 
+    // Get number of decimals of collateral
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+    let (collateral: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id);
+
     // Get the abr value
     let (abr_value: felt, abr_last_price: felt) = IABRCore.get_abr_details(
         contract_address=abr_core_contract_, epoch_=epoch_, market_id_=[positions_].market_id
@@ -205,7 +218,10 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     // Find if the abr_rate is +ve or -ve
     let (position_value) = Math64x61_mul(abr_last_price, [positions_].position_size);
     let (payment_amount) = Math64x61_mul(abr_value, position_value);
-    let abs_payment_amount = abs_value(payment_amount);
+    let abs_payment_amount_non_rounded = abs_value(payment_amount);
+    let (abs_payment_amount) = Math64x61_round(
+        abs_payment_amount_non_rounded, collateral.token_decimal
+    );
     let is_negative = is_le(abr_value, 0);
 
     // If the abr is negative

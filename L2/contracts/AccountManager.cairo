@@ -27,6 +27,7 @@ from contracts.Constants import (
     Liquidate_INDEX,
     LIQUIDATION_ORDER,
     LONG,
+    Market_INDEX,
     OPEN,
     SHORT,
     Trading_INDEX,
@@ -39,6 +40,8 @@ from contracts.DataTypes import (
     Asset,
     CollateralBalance,
     LiquidatablePosition,
+    Market,
+    Message,
     OrderRequest,
     PositionDetails,
     PositionDetailsForRiskManagement,
@@ -53,30 +56,35 @@ from contracts.interfaces.IAccountLiquidator import IAccountLiquidator
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.ILiquidate import ILiquidate
+from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import (
     Math64x61_add,
+    Math64x61_assert_le,
     Math64x61_div,
     Math64x61_fromDecimalFelt,
+    Math64x61_is_equal,
+    Math64x61_is_le,
     Math64x61_min,
+    Math64x61_round,
     Math64x61_sub,
     Math64x61_toDecimalFelt,
 )
 
-// //////////
+// /////////
 // Events //
-// //////////
+// /////////
 
 // Event emitted whenever a position is marked to be liquidated/deleveraged
 @event
 func liquidate_deleverage(market_id: felt, direction: felt, amount_to_be_sold: felt) {
 }
 
-// ///////////
+// //////////
 // Storage //
-// ///////////
+// //////////
 
 // Stores public key associated with an account
 @storage_var
@@ -155,9 +163,9 @@ func withdrawal_history_array_len() -> (len: felt) {
 func order_id_mapping(order_id: felt) -> (hash: felt) {
 }
 
-// ///////////////
+// //////////////
 // Constructor //
-// ///////////////
+// //////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -175,9 +183,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// //////////////////
-// View Functions //
-// //////////////////
+// ///////
+// View //
+// ///////
 
 // @notice view function to get public key
 // @return res - public key of an account
@@ -362,9 +370,9 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     return (safe_withdrawal_amount_64x61,);
 }
 
-// //////////////
+// /////////////
 // L1 Handler //
-// //////////////
+// /////////////
 
 // @notice Function to handle deposit from L1ZKX contract
 // @param from_address - The address from where deposit function is called from
@@ -403,7 +411,8 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     let (array_len) = collateral_array_len.read();
     // Read the current balance.
     let (balance_collateral) = balance.read(assetID=assetID_);
-    if (balance_collateral == 0) {
+    let (is_equal) = Math64x61_is_equal(balance_collateral, 0, asset.token_decimal);
+    if (is_equal == TRUE) {
         add_collateral(new_asset_id=assetID_, iterator=0, length=array_len);
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -429,9 +438,9 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return ();
 }
 
-// //////////////////////
-// External Functions //
-// //////////////////////
+// ///////////
+// External //
+// ///////////
 
 // @notice External function called by the Trading Contract
 // @param assetID_ - asset ID of the collateral that needs to be transferred
@@ -458,7 +467,8 @@ func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     }
 
     let (balance_) = balance.read(assetID=assetID_);
-    balance.write(assetID=assetID_, value=balance_ - amount_);
+    let (new_balance) = Math64x61_sub(balance_, amount_);
+    balance.write(assetID=assetID_, value=new_balance);
 
     let (keys: felt*) = alloc();
     assert keys[0] = invoked_for_;
@@ -495,7 +505,8 @@ func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     }
 
     let (balance_) = balance.read(assetID=assetID_);
-    balance.write(assetID=assetID_, value=balance_ + amount_);
+    let (new_balance) = Math64x61_add(balance_, amount_);
+    balance.write(assetID=assetID_, value=new_balance);
 
     let (keys: felt*) = alloc();
     assert keys[0] = invoked_for_;
@@ -541,7 +552,8 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Reduce the amount from balance
     let (balance_) = balance.read(assetID=collateral_id_);
-    balance.write(assetID=collateral_id_, value=balance_ - amount_);
+    let (new_balance) = Math64x61_sub(balance_, amount_);
+    balance.write(assetID=collateral_id_, value=new_balance);
 
     // Get curent block_timestamp
     let (block_timestamp) = get_block_timestamp();
@@ -615,7 +627,8 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
     // Add amount to balance
     let (balance_) = balance.read(assetID=collateral_id_);
-    balance.write(assetID=collateral_id_, value=balance_ + amount_);
+    let (new_balance) = Math64x61_add(balance_, amount_);
+    balance.write(assetID=collateral_id_, value=new_balance);
 
     // Update the timestamp of last called
     let (block_timestamp) = get_block_timestamp();
@@ -765,6 +778,23 @@ func execute_order{
         assert caller = trading_address;
     }
 
+    // Get asset and collateral number of decimals
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_address, market_id_=market_id
+    );
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+    let (asset_details) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
+    let (collateral_details) = IAsset.get_asset(
+        contract_address=asset_address, id=market.asset_collateral
+    );
+    let asset_decimals = asset_details.token_decimal;
+    let collateral_decimals = collateral_details.token_decimal;
+
     // hash the parameters
     let (hash) = hash_order(&request);
 
@@ -785,16 +815,19 @@ func execute_order{
 
     // Return if the position size after the executing the current order is more than the order's positionSize
     with_attr error_message("0001: {order_id} {size}") {
-        assert_le(new_position_executed, request.quantity);
+        Math64x61_assert_le(new_position_executed, request.quantity, asset_decimals);
     }
 
     if (request.time_in_force == IoC) {
         // Update the portion executed to request.quantity if it's an IoC order
         portion_executed.write(order_id=request.order_id, value=request.quantity);
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     } else {
         // Update the portion executed
         portion_executed.write(order_id=request.order_id, value=new_position_executed);
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     }
+    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
 
     let (local current_timestamp) = get_block_timestamp();
 
@@ -802,8 +835,8 @@ func execute_order{
     // closeOrder == 2 -> Close a position
     if (request.life_cycle == OPEN) {
         local created_timestamp;
-
-        if (position_details.position_size == 0) {
+        let (is_equal) = Math64x61_is_equal(position_details.position_size, 0, asset_decimals);
+        if (is_equal == TRUE) {
             add_to_market_array(market_id_=market_id, collateral_id_=collateral_id_);
             created_timestamp = current_timestamp;
             tempvar syscall_ptr = syscall_ptr;
@@ -824,8 +857,9 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr;
 
         // New leverage
-        let total_value = margin_amount + borrowed_amount;
+        let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
         let (new_leverage) = Math64x61_div(total_value, margin_amount);
+        let (new_leverage_rounded) = Math64x61_round(new_leverage, 5);
         let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
 
         // Create a new struct with the updated details
@@ -834,7 +868,7 @@ func execute_order{
             position_size=new_position_size,
             margin_amount=margin_amount,
             borrowed_amount=borrowed_amount,
-            leverage=new_leverage,
+            leverage=new_leverage_rounded,
             created_timestamp=created_timestamp,
             modified_timestamp=current_timestamp,
             realized_pnl=current_pnl,
@@ -867,7 +901,7 @@ func execute_order{
 
         // Assert that the size amount can be closed from the parent position
         with_attr error_message("0003: {order_id} {size}") {
-            assert_nn(new_position_size);
+            Math64x61_assert_le(0, new_position_size, asset_decimals);
         }
 
         // Check if it's liq/delveraging order
@@ -885,30 +919,18 @@ func execute_order{
             }
 
             with_attr error_message("0005: {order_id} {size}") {
-                assert_le(size, liq_position.amount_to_be_sold);
+                Math64x61_assert_le(size, liq_position.amount_to_be_sold, asset_decimals);
             }
 
             let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
 
-            // to64x61(10**-6) = 2305843009213. We are comparing result with this number to fix overflow issues
-            let result = is_le(updated_amount, 2305843009213);
-            local updated_liquidatable_position: LiquidatablePosition;
-
-            if (result == TRUE) {
-                assert updated_liquidatable_position = LiquidatablePosition(
-                    market_id=0,
-                    direction=0,
-                    amount_to_be_sold=0,
-                    liquidatable=0,
-                );
-            } else {
-                assert updated_liquidatable_position = LiquidatablePosition(
-                    market_id=liq_position.market_id,
-                    direction=liq_position.direction,
-                    amount_to_be_sold=updated_amount,
-                    liquidatable=liq_position.liquidatable,
-                );
-            }
+            // Create a struct with the updated details
+            let updated_liquidatable_position: LiquidatablePosition = LiquidatablePosition(
+                market_id=liq_position.market_id,
+                direction=liq_position.direction,
+                amount_to_be_sold=updated_amount,
+                liquidatable=liq_position.liquidatable,
+            );
 
             // Update the Liquidatable position
             deleveragable_or_liquidatable_position.write(
@@ -942,11 +964,18 @@ func execute_order{
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
 
-        if (new_position_size == 0) {
+        let (is_equal) = Math64x61_is_equal(new_position_size, 0, asset_decimals);
+        if (is_equal == TRUE) {
             if (position_details.position_size == 0) {
                 remove_from_market_array(market_id_=market_id, collateral_id_=collateral_id_);
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -1097,7 +1126,7 @@ func withdraw{
     with_attr error_message("AccountManager: Insufficient balance to pay fees") {
         assert_le(standard_fee, fee_collateral_balance);
     }
-    tempvar new_fee_collateral_balance = fee_collateral_balance - standard_fee;
+    let (new_fee_collateral_balance) = Math64x61_sub(fee_collateral_balance, standard_fee);
     // Update the new fee collateral balance
     balance.write(assetID=fee_collateral_id, value=new_fee_collateral_balance);
     IWithdrawalFeeBalance.update_withdrawal_fee_mapping(
@@ -1106,12 +1135,17 @@ func withdraw{
         fee_to_add_=standard_fee,
     );
 
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
+
     // Compute current balance
     let (current_balance) = balance.read(assetID=collateral_id_);
     with_attr error_message("AccountManager: Insufficient balance to withdraw") {
-        assert_le(amount_, current_balance);
+        Math64x61_assert_le(amount_, current_balance, asset.token_decimal);
     }
-    tempvar new_balance = current_balance - amount_;
+    let (new_balance) = Math64x61_sub(current_balance, amount_);
     // Update the new balance
     balance.write(assetID=collateral_id_, value=new_balance);
 
@@ -1148,11 +1182,7 @@ func withdraw{
 
     // Calculate the timestamp
     let (timestamp_) = get_block_timestamp();
-    // Get asset
-    let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Asset_INDEX, version=version
-    );
-    let (local asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
+
     // Convert amount from Math64x61 format to felt
     let (amount_in_felt) = Math64x61_toDecimalFelt(amount_, decimals=asset.token_decimal);
     // Get the L1 wallet address of the user
@@ -1256,9 +1286,9 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return ();
 }
 
-// //////////////////////
-// Internal Functions //
-// //////////////////////
+// ///////////
+// Internal //
+// ///////////
 
 // @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
 // @param withdrawal_list_len_ - Stores the current length of the populated withdrawals array
@@ -1339,10 +1369,25 @@ func populate_positions_risk_management{
         market_id=curr_market_id, direction=SHORT
     );
 
+    // Get asset token decimal
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_address, market_id_=curr_market_id
+    );
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
+
     local is_long;
     local is_short;
 
-    if (long_position.position_size == 0) {
+    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
+    if (is_long_zero == TRUE) {
         assert is_long = 0;
     } else {
         // Store it in the array
@@ -1358,7 +1403,8 @@ func populate_positions_risk_management{
         assert is_long = 1;
     }
 
-    if (short_position.position_size == 0) {
+    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
+    if (is_short_zero == 0) {
         assert is_short = 0;
     } else {
         // Store it in the array
@@ -1420,10 +1466,25 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         market_id=curr_market_id, direction=SHORT
     );
 
+    // Get asset token decimal
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_address, market_id_=curr_market_id
+    );
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
+
     local is_long;
     local is_short;
 
-    if (long_position.position_size == 0) {
+    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
+    if (is_long_zero == TRUE) {
         assert is_long = 0;
     } else {
         // Store it in the array
@@ -1443,7 +1504,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         assert is_long = 1;
     }
 
-    if (short_position.position_size == 0) {
+    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
+    if (is_short_zero == TRUE) {
         assert is_short = 0;
     } else {
         // Store it in the array
@@ -1510,33 +1572,57 @@ func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
         market_id=curr_market_id, direction=SHORT
     );
 
+    // Get asset token decimal
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_address, market_id_=curr_market_id
+    );
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
+
     local is_long;
     local is_short;
 
     let within_timestamp_long = is_le(long_position.created_timestamp, timestamp_filter_);
-    let is_not_zero_long = is_not_zero(long_position.position_size);
+    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
 
     let within_timestamp_short = is_le(short_position.created_timestamp, timestamp_filter_);
-    let is_not_zero_short = is_not_zero(short_position.position_size);
+    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
 
-    if (within_timestamp_long - is_not_zero_long == 0) {
-        // Create the struct with the details
-        let position_struct_long: SimplifiedPosition = SimplifiedPosition(
-            market_id=curr_market_id, direction=LONG, position_size=long_position.position_size
-        );
-        assert positions_array_[positions_array_len_] = position_struct_long;
-        assert is_long = 1;
+    if (within_timestamp_long == TRUE) {
+        if (is_long_zero == FALSE) {
+            // Create the struct with the details
+            let position_struct_long: SimplifiedPosition = SimplifiedPosition(
+                market_id=curr_market_id, direction=LONG, position_size=long_position.position_size
+            );
+            assert positions_array_[positions_array_len_] = position_struct_long;
+            assert is_long = 1;
+        } else {
+            assert is_long = 0;
+        }
     } else {
         assert is_long = 0;
     }
 
-    if (within_timestamp_short - is_not_zero_short == 0) {
-        // Create the struct with the details
-        let position_struct_short: SimplifiedPosition = SimplifiedPosition(
-            market_id=curr_market_id, direction=SHORT, position_size=short_position.position_size
-        );
-        assert positions_array_[positions_array_len_ + is_long] = position_struct_short;
-        assert is_short = 1;
+    if (within_timestamp_short == TRUE) {
+        if (is_short_zero == FALSE) {
+            // Create the struct with the details
+            let position_struct_short: SimplifiedPosition = SimplifiedPosition(
+                market_id=curr_market_id,
+                direction=SHORT,
+                position_size=short_position.position_size,
+            );
+            assert positions_array_[positions_array_len_ + is_long] = position_struct_short;
+            assert is_short = 1;
+        } else {
+            assert is_short = 0;
+        }
     } else {
         assert is_short = 0;
     }
