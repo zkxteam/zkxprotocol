@@ -323,10 +323,6 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_USD_ID, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, abr_fund.contract_address, 'fund', [BTC_UST_ID, to64x61(1000000)])
 
-    # Update collateral prices
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.USDC, to64x61(1)])
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.UST, to64x61(1)])
-
     # Add accounts to Account Registry
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [alice.contract_address])
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [bob.contract_address])
@@ -926,7 +922,7 @@ async def test_set_timestamp_epoch_2(abr_factory):
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1,
-        block_timestamp=timestamp_3,
+        block_timestamp=timestamp_4,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
         starknet_version=STARKNET_VERSION

@@ -3,6 +3,7 @@ import copy
 import random
 import string
 import calculate_abr
+from math import isclose
 from utils_asset import AssetID
 from utils import Signer, str_to_felt, assert_revert, hash_order, from64x61, to64x61
 from typing import List, Dict, Tuple
@@ -476,10 +477,20 @@ class User:
 
                 updated_amount = liq_position["amount_to_be_sold"] - size
 
-                liq_position["amount_to_be_sold"] = updated_amount
-                self.set_deleveragable_or_liquidatable_position(
-                    collateral_id=market_to_collateral_mapping[market_id],
-                    updated_position=liq_position)
+                if isclose(updated_amount, 0, abs_tol=1e-6):
+                    new_liq_position = {key: 0 for key in liq_position}
+                    print("new liq position", new_liq_position)
+
+                    self.set_deleveragable_or_liquidatable_position(
+                        collateral_id=market_to_collateral_mapping[market_id],
+                        updated_position=new_liq_position)
+                else:
+                    liq_position["amount_to_be_sold"] = updated_amount
+                    print("old liq position", liq_position)
+
+                    self.set_deleveragable_or_liquidatable_position(
+                        collateral_id=market_to_collateral_mapping[market_id],
+                        updated_position=liq_position)
 
                 if order["order_type"] == order_types["deleverage"]:
                     if liq_position["liquidatable"] == 1:
@@ -842,8 +853,6 @@ class OrderExecutor:
 
     def get_market_price(self, market_id: int, timestamp: int) -> float:
         try:
-            print("getting market price",
-                  self.market_prices[market_id]["timestamp"], timestamp)
             if self.market_prices[market_id]["timestamp"] + self.ttl < timestamp:
                 return 0
             else:
@@ -991,11 +1000,13 @@ class Liquidator:
         position_value = (
             position["margin_amount"] + position["borrowed_amount"])
         amount_to_be_sold_ = amount_to_be_sold * asset_price
+        print("\nAmount to be sold:", amount_to_be_sold, "\n")
         remaining_position_value = position_value - amount_to_be_sold_
 
         leverage_after_deleveraging = remaining_position_value / \
             (position["margin_amount"])
-        print(leverage_after_deleveraging)
+
+        print("leverage_after_deleveraging", leverage_after_deleveraging)
         if leverage_after_deleveraging <= 2:
             return 0
         else:
@@ -1231,10 +1242,8 @@ async def find_under_collateralized_position_starknet(zkx_node_signer: Signer, z
 async def get_liquidatable_position_starknet(user: User, collateral_id: int) -> List[float]:
     liquidatable_position_query = await user.get_deleveragable_or_liquidatable_position(collateral_id).call()
     liquidatable_position = list(liquidatable_position_query.result.position)
-    print("liquidatable_position starknet 1", liquidatable_position)
     # Convert amount to decimals rep
     liquidatable_position[2] = from64x61(liquidatable_position[2])
-    print("liquidatable_position starknet 2", liquidatable_position)
     return liquidatable_position
 
 
@@ -1457,6 +1466,11 @@ async def compare_debugging_values(liquidate: StarknetContract, liquidator: Liqu
     (maintenance_requirement_python,
      account_value_python) = liquidator.get_debugging_values()
 
+    print("maintenance_requirement", maintenance_requirement)
+    print("account_value", account_value)
+    print("maintenance_requirement_python", maintenance_requirement_python)
+    print("account_value_python", account_value_python)
+
     # Assert that both of them are appoximately equal
     assert maintenance_requirement_python == pytest.approx(
         maintenance_requirement, abs=1e-3)
@@ -1485,7 +1499,8 @@ async def compare_user_balances(users: List[StarknetContract], user_tests: List[
         user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
         user_balance_python = get_user_balance_python(
             user=user_tests[i], asset_id=asset_id)
-
+        print("user_balance", user_balance)
+        print("user_balance_python", user_balance_python)
         assert user_balance_python == pytest.approx(
             user_balance, abs=1e-6)
 
@@ -1566,62 +1581,3 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
     assert price == from64x61(abr_query.result.abr_last_price)
 
     return (abr_query.result.abr_value, abr_query.result.abr_last_price)
-
-
-# order_executor = OrderExecutor()
-# liquidator = Liquidator()
-# alice = User(private_key=1123, user_address=123431)
-# bob = User(private_key=231, user_address=432411)
-# alice_balance = 200
-# bob_balance = 200
-
-# alice.set_balance(new_balance=alice_balance, asset_id=AssetID.USDC)
-# bob.set_balance(new_balance=alice_balance, asset_id=AssetID.USDC)
-
-# alice.set_balance(new_balance=alice_balance, asset_id=AssetID.UST)
-# bob.set_balance(new_balance=alice_balance, asset_id=AssetID.UST)
-
-# (alice_order, _) = alice.create_order(leverage=10)
-# (bob_order, _) = bob.create_order(
-#     direction=order_direction["short"], leverage=10)
-
-# print(alice_order)
-# print(bob_order)
-
-# order_executor.execute_batch(batch_id=1, request_list=[
-#                              alice_order, bob_order], user_list=[alice, bob], quantity_locked=1, market_id=BTC_USD_ID, oracle_price=1000, timestamp=12321312312)
-
-# btc_price = order_executor.get_market_price(market_id=BTC_USD_ID)
-# print("market price btc", btc_price)
-
-# result = liquidator.find_under_collateralized_position(
-#     user=alice, order_executor=order_executor, collateral_id=AssetID.USDC)
-
-# print(result)
-# print(liquidator.get_debugging_values())
-# (alice_order, _) = alice.create_order(price=1500.0)
-# (bob_order, _) = bob.create_order(
-#     direction=order_direction["short"], price=1500.0)
-
-# print(alice_order)
-# print(bob_order)
-
-# order_executor.execute_batch(batch_id=1, request_list=[
-#                              alice_order, bob_order], user_list=[alice, bob], quantity_locked=1, market_id=BTC_USD_ID, oracle_price=1500, timestamp=12321312312 + 60)
-
-# btc_price = order_executor.get_market_price(market_id=BTC_USD_ID)
-# print("market price btc", btc_price)
-
-
-# # (alice_order, _) = alice.create_order(
-# #     direction=order_direction["short"], market_id=BTC_UST_ID)
-# # (bob_order, _) = bob.create_order(
-# #     market_id=BTC_UST_ID)
-
-# # order_executor.execute_batch(batch_id=1, request_list=[
-# #                              alice_order, bob_order], user_list=[alice, bob], quantity_locked=1, market_id=BTC_UST_ID, oracle_price=1000, timestamp=123213324324213)
-
-# # btc_price = order_executor.get_market_price(market_id=BTC_UST_ID)
-# # print("market price btc", btc_price)
-
-print("DAI", AssetID.DAI)

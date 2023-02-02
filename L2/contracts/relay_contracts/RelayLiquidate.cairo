@@ -18,7 +18,7 @@ from contracts.libraries.RelayLibrary import (
     verify_caller_authority,
 )
 
-from contracts.DataTypes import PriceData, PositionDetailsForRiskManagement
+from contracts.DataTypes import PositionDetailsForRiskManagement, MultipleOrder
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
@@ -46,7 +46,7 @@ func find_under_collateralized_position{
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
     local range_check_ptr = range_check_ptr;
 
-    record_call_details('check_liquidation');
+    record_call_details('find_under_collateralized');
     let (inner_address) = get_inner_contract();
 
     let (
@@ -65,4 +65,37 @@ func find_under_collateralized_position{
         total_account_value,
         total_maintenance_requirement,
     );
+}
+
+@external
+func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    order: MultipleOrder, size: felt, execution_price: felt
+) -> () {
+    alloc_locals;
+
+    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    local range_check_ptr = range_check_ptr;
+
+    record_call_details('check_for_risk');
+    let (inner_address) = get_inner_contract();
+    ILiquidate.check_for_risk(inner_address, order, size, execution_price);
+    return ();
+}
+
+@view
+func return_maintenance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (inner_address) = get_inner_contract();
+    let (res) = ILiquidate.return_maintenance(inner_address);
+    return (res,);
+}
+
+@view
+func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (inner_address) = get_inner_contract();
+    let (res) = ILiquidate.return_acc_value(inner_address);
+    return (res,);
 }

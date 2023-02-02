@@ -1013,7 +1013,7 @@ async def test_set_timestamp_epoch_2(abr_factory):
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1,
-        block_timestamp=timestamp_3,
+        block_timestamp=timestamp_4,
         gas_price=starknet_service.starknet.state.state.block_info.gas_price,
         sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
         starknet_version=STARKNET_VERSION

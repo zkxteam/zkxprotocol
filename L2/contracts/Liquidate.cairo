@@ -103,9 +103,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ////////////
 
 // @notice Function to check and mark the positions to be liquidated
-// @param account_address - Account address of the user
-// @param prices_len - Length of the prices array
-// @param prices - Array with all the price details
+// @param account_address_ - Account address of the user
+// @param collateral_id_ - Collateral Id of the isolated cross-margin order_value_with_fee
+// @return liq_result_ - 1 if to be liq/del, 
+// @return least_collateral_ratio_position - Position which has the least collateral ratio
 // @return res - 1 if positions are marked to be liquidated
 // @return least_collateral_ratio_position - Position with least margin ratio
 // @return total_account_value - Total account value of the positions for the corresponding collateral
@@ -231,14 +232,14 @@ func find_under_collateralized_position{
 // @notice Function that is called recursively by check_recurse
 // @param account_address_ - Account address of the user
 // @param market_address_ - Markets contarct address
+// @param market_price_address_ - Markets contarct address
 // @param positions_len_ - Length of the positions_ array
 // @param postions_ - Array with all the position details
-// @param prices_array_ - Array with all the price details
+// @param collateral_id_ - collateral id
 // @param total_account_value_ - Collateral value - borrowed value + positionSize * price
 // @param total_maintenance_requirement_ - maintenance ratio of the asset * value of the position when executed
 // @param least_collateral_ratio_ - The least collateral ratio among the positions
 // @param least_collateral_ratio_position_ - The position which is having the least collateral ratio
-// @param least_collateral_ratio_position_collateral_price_ - Collateral price of the collateral in the postion which is having the least collateral ratio
 // @param least_collateral_ratio_position_asset_price_ - Asset price of an asset in the postion which is having the least collateral ratio
 // @return is_liquidation - 1 if positions are marked to be liquidated
 // @return least_collateral_ratio - least collateral ratio
@@ -392,9 +393,8 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 }
 
 // @notice Function to calculate amount to be put on sale for deleveraging
-// @param position - position to be deleveraged
-// @param market_address - Address of the Market contract
-// @param position - direction of the position to be deleveraged
+// @param market_address_ - Address of the Market contract
+// @param position_ - position to be deleveraged
 // @param asset_price_ - asset price of the asset in the position
 // @return amount_to_sold - amount to be put on sale for deleveraging
 func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -447,8 +447,6 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param order - MultipleOrder structure
 // @param size - matched order size of current order
 // @param execution_price - Execution price of current order
-// @param prices_len - Length of the prices array
-// @param prices - Array with all the price details
 @external
 func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order: MultipleOrder, size: felt, execution_price: felt

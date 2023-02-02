@@ -291,7 +291,8 @@ func get_L1_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 }
 
 // @notice view function to get deleveraged or liquidatable position
-//  @return position - Returns a LiquidatablePosition struct
+// @param collateral_id_ - collateral id 
+// @return position - Returns a LiquidatablePosition struct
 @view
 func get_deleveragable_or_liquidatable_position{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
@@ -561,7 +562,7 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         borrowed_amount=position_details.borrowed_amount,
         leverage=position_details.leverage,
         created_timestamp=position_details.created_timestamp,
-        modified_timestamp=position_details.modified_timestamp,
+        modified_timestamp=block_timestamp,
         realized_pnl=new_realized_pnl,
     );
 
@@ -635,7 +636,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         borrowed_amount=position_details.borrowed_amount,
         leverage=position_details.leverage,
         created_timestamp=position_details.created_timestamp,
-        modified_timestamp=position_details.modified_timestamp,
+        modified_timestamp=block_timestamp,
         realized_pnl=new_realized_pnl,
     );
 
@@ -677,6 +678,7 @@ func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 }
 
 // @notice External function called by the Liquidate Contract to get the array of net positions of the user
+// @param collateral_id_ - collateral id 
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of positions
 @view
@@ -724,7 +726,11 @@ func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param signature - Details of the signature
 // @param size - Size of the Order to be executed
 // @param execution_price - Price at which the order should be executed
-// @param amount - TODO: Amount of funds that user must send/receive
+// @param margin_amount - New margin amount of the position
+// @param borrowed_amount - New borrowed amount of the position 
+// @param market_id - Market id of the position
+// @param collateral_id_ - Collateral id of the position
+// @param pnl_ - New pnl of the position
 // @return 1, if executed correctly
 @external
 func execute_order{
@@ -884,24 +890,25 @@ func execute_order{
 
             let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
 
-            // to64x61(0.0000000001) = 230584300. We are comparing result with this number to fix overflow issues
-            let result = is_le(updated_amount, 230584300);
-
-            local amount_to_be_updated;
+            // to64x61(10**-6) = 2305843009213. We are comparing result with this number to fix overflow issues
+            let result = is_le(updated_amount, 2305843009213);
+            local updated_liquidatable_position: LiquidatablePosition;
 
             if (result == TRUE) {
-                assert amount_to_be_updated = 0;
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=0,
+                    direction=0,
+                    amount_to_be_sold=0,
+                    liquidatable=0,
+                );
             } else {
-                assert amount_to_be_updated = updated_amount;
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=liq_position.market_id,
+                    direction=liq_position.direction,
+                    amount_to_be_sold=updated_amount,
+                    liquidatable=liq_position.liquidatable,
+                );
             }
-
-            // Create a struct with the updated details
-            let updated_liquidatable_position: LiquidatablePosition = LiquidatablePosition(
-                market_id=liq_position.market_id,
-                direction=liq_position.direction,
-                amount_to_be_sold=amount_to_be_updated,
-                liquidatable=liq_position.liquidatable,
-            );
 
             // Update the Liquidatable position
             deleveragable_or_liquidatable_position.write(
@@ -1294,10 +1301,11 @@ func populate_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 }
 
 // @notice Internal Function called by get_positions_for_risk_management to recursively add active positions to the array and return it
+// @param collateral_id_ - collateral id
 // @param positions_array_len_ - Length of the array
 // @param positions_array_ - Required array of positions
 // @param iterator_ - Current length of traversed array
-// @param final_len_ - Length of the final array
+// @param markets_array_len_ - Length of the markets array
 // @returns positions_array_len - Length of the positions array
 // @returns positions_array - Array with the positions
 func populate_positions_risk_management{
@@ -1378,8 +1386,9 @@ func populate_positions_risk_management{
 // @notice Internal Function called by get_positions to recursively add active positions to the array and return it
 // @param positions_array_len_ - Length of the array
 // @param positions_array_ - Required array of positions
-// @param iterator_ - Current length of traversed array
-// @param final_len_ - Length of the final array
+// @param markets_iterator_ - Current length of traversed markets array
+// @param markets_array_len_ - Length of the markets array 
+// @param current_collateral_id_ - Current collateral_id
 // @returns positions_array_len - Length of the positions array
 // @returns positions_array - Array with the positions
 func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -1463,6 +1472,15 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     );
 }
 
+// @notice Internal Function to populate positions for ABR Payments
+// @param positions_array_len_ - Length of the array
+// @param positions_array_ - Required array of positions
+// @param iterator_ - Current length of traversed array
+// @param markets_array_len_ - Length of the markets array
+// @param current_collateral_id_ - current collateral id of the positions being populated
+// @param timestamp_filter_ - Timestamp by which to filter out the positions
+// @returns positions_array_len - Length of the positions array
+// @returns positions_array - Array with the positions
 func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     positions_array_len_: felt,
     positions_array_: SimplifiedPosition*,
@@ -1534,10 +1552,11 @@ func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     );
 }
 
-// @notice External function called by the ABR Contract to get the array of net positions of the user
+// @notice Internal function to fetch all collaterals and recurse over them to populate the positions for ABR
 // @param positions_array_len_ - Length of the array
 // @param positions_array_ - Required array of net positions
-// @param final_len_ - Length of the final array
+// @param collateral_array_iterator_ - Iterator to the collateral array
+// @param collateral_array_len_ - Length of the collateral array
 // @param timestamp_filter_ - Timestamp by which to filter the array
 // @returns positions_array_len - Length of the net positions array
 // @returns positions_array - Array with the net positions
@@ -1585,6 +1604,14 @@ func populate_simplified_positions_collaterals_recurse{
     );
 }
 
+
+// @notice Internal function to fetch all collaterals and recurse over them to populate the positions
+// @param positions_array_len_ - Length of the array
+// @param positions_array_ - Required array of net positions
+// @param collateral_array_iterator_ - Iterator to the collateral array
+// @param collateral_array_len_ - Length of the collateral array
+// @returns positions_array_len - Length of the net positions array
+// @returns positions_array - Array with the net positions
 func populate_positions_collaterals_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
@@ -1699,6 +1726,7 @@ func add_to_market_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
 // @notice Internal function called to remove a market_id when both positions are fully closed
 // @param market_id - Id of the market
+// @param collateral_id_ - collateral id
 // @return 1 - If successfully removed
 func remove_from_market_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, collateral_id_: felt

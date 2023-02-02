@@ -12,6 +12,15 @@ namespace ILiquidate {
     ) {
     }
 
-    func check_for_risk(order: MultipleOrder, size: felt, execution_price: felt) {
+
+    func check_for_risk(
+        order: MultipleOrder, size: felt, execution_price: felt
+    ) {
+    }
+
+    func return_acc_value() -> (res: felt) {
+    }
+
+    func return_maintenance() -> (res: felt) {
     }
 }
