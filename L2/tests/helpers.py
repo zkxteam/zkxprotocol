@@ -46,7 +46,6 @@ class ContractType(Enum):
     UserStats = "contracts/hightide/UserStats.cairo"
     Settings = "contracts/Settings.cairo"
     Leaderboard = "contracts/hightide/Leaderboard.cairo"
-    TestMath64x61 = "tests/testable/TestMath64x61.cairo"
 
     # Relay contracts
     RelayABR = "contracts/relay_contracts/RelayABR.cairo"
@@ -73,6 +72,8 @@ class ContractType(Enum):
     Starkway = "tests/testable/StarkwayProxy.cairo"
     ERC20 = "tests/testable/TestERC20Mintable.cairo"
     TestUserBatch = "tests/testable/TestUserBatch.cairo"
+    TestMath64x61 = "tests/testable/TestMath64x61.cairo"
+
 
 
 class OptimizedStarknetState(StarknetState):
