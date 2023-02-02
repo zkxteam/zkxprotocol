@@ -74,6 +74,7 @@ from contracts.Math_64x61 import (
     Math64x61_mul,
     Math64x61_sub,
     Math64x61_ONE,
+    Math64x61_is_equal,
     Math64x61_is_le,
 )
 
@@ -481,6 +482,7 @@ func get_price_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @param order_size_ - The size of the asset that got matched
 // @param market_id_ - The market ID of the batch
 // @param collateral_id_ - Collateral_id of all the orders in the batch
+// @param collateral_token_decimal_ - No.of token decimals of collateral
 // @param trading_fees_address_ - Address of the Trading Fees contract
 // @param liquidity_fund_address_ - Address of the Liquidity contract
 // @param liquidate_address_ - Address of the Liquidate contract
@@ -661,6 +663,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @param order_size_ - The size of the asset that got matched
 // @param market_id_ - The market ID of the batch
 // @param collateral_id_ - Collateral_id of all the orders in the batch
+// @param collateral_token_decimal_ - No.of token decimals of collateral
 // @param liquidity_fund_address_ - Address of the Liquidity contract
 // @param insurance_fund_address - Address of the Insurance Fund contract
 // @param holding_address_ - Address of the Holding contract
@@ -1011,6 +1014,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param quantity_locked_ - Size of the order to be executed
 // @param market_id_ - Market ID of the batch
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
+// @param asset_token_decimal_ - No.of token decimals of an asset
+// @param collateral_token_decimal_ - No.of token decimals of collateral
 // @param lower_limit_ - Lower threshold of the passed oracle price
 // @param upper_limit_ - Upper threshold of the passed oracle price
 // @param orders_len_ - Length fo the execute batch (to be used to calculate the index of each order)
@@ -1168,7 +1173,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     );
 
     // Taker order
-    if (quantity_remaining == 0) {
+    let (quantity_remaining_res) = Math64x61_is_equal(quantity_remaining, 0, asset_token_decimal_);
+    if (quantity_remaining_res == TRUE) {
         // There must only be a single Taker order; hence they must be the last order in the batch
         with_attr error_message("0513: {order_id} {current_index}") {
             assert request_list_len_ = 1;
