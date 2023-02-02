@@ -128,7 +128,7 @@ func find_under_collateralized_position{
     ) = IAccountManager.get_deleveragable_or_liquidatable_position(contract_address=account_address_, collateral_id_=collateral_id_);
 
     if(liquidatable_position.amount_to_be_sold != 0){
-        return (1, PositionDetailsForRiskManagement(0,0,0,0,0,0), 0, 0);
+        return (1, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0);
     }
 
     // Fetch all the positions from the Account contract

@@ -1083,6 +1083,8 @@ async def test_should_calculate_correct_liq_USDC_collateral_4(adminAuth_factory)
     ######## Alice's liquidation result USDC 9 ########
     ###################################################
     await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_6)
+    res = await alice.get_balance(AssetID.USDC).call()
+    print("ALICE BALANCE: ", res.result)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 

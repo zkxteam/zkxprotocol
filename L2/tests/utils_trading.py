@@ -793,7 +793,7 @@ class OrderExecutor:
                 self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
             if net_account_value <= 0:
-                deficit = leveraged_amount_out - borrowed_amount_to_be_returned
+                deficit = borrowed_amount_to_be_returned - leveraged_amount_out
                 user.modify_balance(
                     mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
             else:
@@ -813,13 +813,12 @@ class OrderExecutor:
                         asset_id=market_to_collateral_mapping[order["market_id"]],
                     )
 
-                    if deficit <= user_balance:
-                        user.modify_balance(
+                    user.modify_balance(
                             mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
+
+                    if deficit <= user_balance:
                         realized_pnl = net_account_value
                     else:
-                        user.modify_balance(
-                            mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance)
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_balance)
                         realized_pnl = (user_balance+margin_amount)*-1
@@ -1015,7 +1014,7 @@ class Liquidator:
     def get_debugging_values(self) -> Tuple[float, float]:
         return (self.maintenance_requirement, self.total_account_value_collateral)
 
-    def find_under_collateralized_position(self, user: User, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, Dict]:
+    def find_under_collateralized_position(self, user: User, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, Dict, int, int]:
         liquidatable_position = user.get_deleveragable_or_liquidatable_position(
             collateral_id=collateral_id)
 
@@ -1025,7 +1024,7 @@ class Liquidator:
                     "direction": 0,
                     "amount_to_be_sold": 0,
                     "liquidatable": 0,
-                    })
+                    }, 0, 0)
 
         positions = user.get_positions_risk_management(
             collateral_id=collateral_id)
@@ -1037,7 +1036,7 @@ class Liquidator:
                     "direction": 0,
                     "amount_to_be_sold": 0,
                     "liquidatable": 0,
-                    })
+                    }, 0, 0)
 
         least_collateral_ratio = 1
         least_collateral_ratio_position = 0
@@ -1056,7 +1055,7 @@ class Liquidator:
                     "direction": 0,
                     "amount_to_be_sold": 0,
                     "liquidatable": 0,
-                })
+                }, 0, 0)
 
             maintenance_position = positions[i]["avg_execution_price"] * \
                 positions[i]["position_size"]
@@ -1117,7 +1116,7 @@ class Liquidator:
                     amount_to_be_sold=0,
                     collateral_id=collateral_id
                 )
-        return (liq_result, least_collateral_ratio_position)
+        return (liq_result, least_collateral_ratio_position, total_account_value_collateral, total_maintenance_requirement)
 
 
 class ABR:
@@ -1319,10 +1318,10 @@ def set_balance_python(user_test: User, asset_id: int, new_balance: float):
 
 
 # Liquidation check on the python implementation
-def find_under_collateralized_position_python(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List]:
+def find_under_collateralized_position_python(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
     result = liquidator.find_under_collateralized_position(
         user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
-    return (result[0], list(result[1].values())[:-2])
+    return (result[0], list(result[1].values())[:4], result[2], result[3])
 
 
 ####################################
@@ -1478,7 +1477,7 @@ async def compare_debugging_values(liquidate: StarknetContract, liquidator: Liqu
 
 
 # Function to check the result of a liquidation call
-def compare_result_liquidation(python_result: Tuple[int, List], starknet_result: Tuple[int, List]):
+def compare_result_liquidation(python_result: Tuple[int, List, int, int], starknet_result: Tuple[int, List, int, int]):
     print("python_result", python_result)
     print("starknet_result", starknet_result)
     assert python_result[0] == starknet_result[0]
