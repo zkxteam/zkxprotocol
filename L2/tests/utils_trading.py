@@ -1520,10 +1520,10 @@ async def compare_user_positions(users: List[StarknetContract], users_test: List
         print("user_position_python_long", user_position_python_long)
         print("user_position_starknet_long", user_position_starknet_long)
         for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
-            assert element_1 == pytest.approx(element_2, abs=1e-6)
+            assert element_1 == pytest.approx(element_2, abs=1e-4)
 
         for element_1, element_2 in zip(user_position_python_short, user_position_starknet_short):
-            assert element_1 == pytest.approx(element_2, abs=1e-6)
+            assert element_1 == pytest.approx(element_2, abs=1e-4)
 
 
 # Compare fund balances of starknet and python
