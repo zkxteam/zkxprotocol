@@ -924,13 +924,23 @@ func execute_order{
 
             let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
 
-            // Create a struct with the updated details
-            let updated_liquidatable_position: LiquidatablePosition = LiquidatablePosition(
-                market_id=liq_position.market_id,
-                direction=liq_position.direction,
-                amount_to_be_sold=updated_amount,
-                liquidatable=liq_position.liquidatable,
-            );
+            local updated_liquidatable_position: LiquidatablePosition;
+            let (is_equal_zero) = Math64x61_is_equal(updated_amount, 0, 6); // Double check precision
+            if (is_equal_zero == TRUE)  {
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=0,
+                    direction=0,
+                    amount_to_be_sold=0,
+                    liquidatable=0,
+                );
+            } else {
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=liq_position.market_id,
+                    direction=liq_position.direction,
+                    amount_to_be_sold=updated_amount,
+                    liquidatable=liq_position.liquidatable,
+                );
+            }
 
             // Update the Liquidatable position
             deleveragable_or_liquidatable_position.write(
@@ -1404,7 +1414,7 @@ func populate_positions_risk_management{
     }
 
     let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
-    if (is_short_zero == 0) {
+    if (is_short_zero == TRUE) {
         assert is_short = 0;
     } else {
         // Store it in the array

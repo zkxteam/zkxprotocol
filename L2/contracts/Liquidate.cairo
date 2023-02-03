@@ -123,13 +123,13 @@ func find_under_collateralized_position{
     alloc_locals;
     // Check if the caller is a node
 
-    // let (
-    //     liquidatable_position: LiquidatablePosition
-    // ) = IAccountManager.get_deleveragable_or_liquidatable_position(contract_address=account_address_, collateral_id_=collateral_id_);
+    let (
+        liquidatable_position: LiquidatablePosition
+    ) = IAccountManager.get_deleveragable_or_liquidatable_position(contract_address=account_address_, collateral_id_=collateral_id_);
 
-    // if(liquidatable_position.amount_to_be_sold != 0){
-    //     return (1, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0);
-    // }
+    if(liquidatable_position.amount_to_be_sold != 0){
+        return (1, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0);
+    }
 
     // Fetch all the positions from the Account contract
     let (
