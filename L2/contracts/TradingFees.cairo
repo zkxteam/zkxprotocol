@@ -59,12 +59,12 @@ func max_discount_tier() -> (value: felt) {
 
 // Stores base fee percentage for each tier for maker and tker
 @storage_var
-func base_fee_tiers(tier: felt) -> (value: BaseFee) {
+func base_fee_tier(tier: felt) -> (value: BaseFee) {
 }
 
 // Stores discount percentage for each tier
 @storage_var
-func discount_tiers(tier: felt) -> (value: Discount) {
+func discount_tier(tier: felt) -> (value: Discount) {
 }
 
 // //////////////
@@ -93,7 +93,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func get_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     tier_: felt
 ) -> (base_fee: BaseFee) {
-    let (base_fee) = base_fee_tiers.read(tier=tier_);
+    let (base_fee) = base_fee_tier.read(tier=tier_);
     return (base_fee,);
 }
 
@@ -104,7 +104,7 @@ func get_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func get_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(tier_: felt) -> (
     discount: Discount
 ) {
-    let (discount) = discount_tiers.read(tier=tier_);
+    let (discount) = discount_tier.read(tier=tier_);
     return (discount,);
 }
 
@@ -181,7 +181,22 @@ func get_all_tier_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     alloc_locals;
     let (fee_tiers: BaseFee*) = alloc();
     let (fee_tiers_len) = max_base_fee_tier.read();
-    return populate_fees_by_tier(iterator_=0, fee_tiers_len=fee_tiers_len, fee_tiers=fee_tiers);
+    return populate_fee_by_tier(iterator_=0, fee_tiers_len=fee_tiers_len, fee_tiers=fee_tiers);
+}
+
+// @notice Function which returns an array of all tier discounts
+// @returns discount_tiers_len - Length of discount tiers
+// @returns discount_tiers - Array of discount tiers
+@view
+func get_all_tier_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    discount_tiers_len: felt, discount_tiers: Discount*
+) {
+    alloc_locals;
+    let (discount_tiers: Discount*) = alloc();
+    let (discount_tiers_len) = max_discount_tier.read();
+    return populate_discount_by_tier(
+        iterator_=0, discount_tiers_len=discount_tiers_len, discount_tiers=discount_tiers
+    );
 }
 
 // ///////////
@@ -225,7 +240,7 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     // Verify whether the base fee of the tier being updated/added is correct
     // with respect to the lower tier, if lower tier exists
-    let (lower_tier_fee) = base_fee_tiers.read(tier=tier_ - 1);
+    let (lower_tier_fee) = base_fee_tier.read(tier=tier_ - 1);
     if (tier_ - 1 != 0) {
         with_attr error_message("TradingFees: Invalid fees for the tier to exisiting lower tiers") {
             assert_lt(lower_tier_fee.numberOfTokens, fee_details.numberOfTokens);
@@ -243,7 +258,7 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     // Verify whether the base fee of the tier being updated/added is correct
     // with respect to the upper tier, if upper tier exists
-    let (upper_tier_fee) = base_fee_tiers.read(tier=tier_ + 1);
+    let (upper_tier_fee) = base_fee_tier.read(tier=tier_ + 1);
     let is_max_base_fee_tier = is_le(current_max_base_fee_tier, tier_);
     if (is_max_base_fee_tier != 1) {
         with_attr error_message("TradingFees: Invalid fees for the tier to exisiting upper tiers") {
@@ -251,10 +266,10 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
             assert_lt(upper_tier_fee.makerFee, fee_details.makerFee);
             assert_lt(upper_tier_fee.takerFee, fee_details.takerFee);
         }
-        base_fee_tiers.write(tier=tier_, value=fee_details);
+        base_fee_tier.write(tier=tier_, value=fee_details);
     } else {
         max_base_fee_tier.write(value=tier_);
-        base_fee_tiers.write(tier=tier_, value=fee_details);
+        base_fee_tier.write(tier=tier_, value=fee_details);
     }
 
     // update_base_fees_called event is emitted
@@ -297,7 +312,7 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     // Verify whether the discount of the tier being updated/added is correct
     // with respect to the lower tier, if lower tier exists
-    let (lower_tier_discount) = discount_tiers.read(tier=tier_ - 1);
+    let (lower_tier_discount) = discount_tier.read(tier=tier_ - 1);
     if (tier_ - 1 != 0) {
         with_attr error_message("TradingFees: Invalid fees for the tier to exisiting lower tiers") {
             assert_lt(lower_tier_discount.numberOfTokens, discount_details.numberOfTokens);
@@ -314,17 +329,17 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     // Verify whether the discount of the tier being updated/added is correct
     // with respect to the upper tier, if upper tier exists
-    let (upper_tier_discount) = discount_tiers.read(tier=tier_ + 1);
+    let (upper_tier_discount) = discount_tier.read(tier=tier_ + 1);
     let is_max_discount_tier = is_le(current_max_discount_tier, tier_);
     if (is_max_discount_tier != 1) {
         with_attr error_message("TradingFees: Invalid fees for the tier to exisiting upper tiers") {
             assert_lt(discount_details.numberOfTokens, upper_tier_discount.numberOfTokens);
             assert_lt(discount_details.discount, upper_tier_discount.discount);
         }
-        discount_tiers.write(tier=tier_, value=discount_details);
+        discount_tier.write(tier=tier_, value=discount_details);
     } else {
         max_discount_tier.write(value=tier_);
-        discount_tiers.write(tier=tier_, value=discount_details);
+        discount_tier.write(tier=tier_, value=discount_details);
     }
 
     // update_discount_called event is emitted
@@ -346,7 +361,7 @@ func find_user_base_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     number_of_tokens_: felt, tier_: felt
 ) -> (base_fee_maker: felt, base_fee_taker: felt) {
     alloc_locals;
-    let (fee_details) = base_fee_tiers.read(tier=tier_);
+    let (fee_details) = base_fee_tier.read(tier=tier_);
     let sub_result = number_of_tokens_ - fee_details.numberOfTokens;
     let result = is_nn(sub_result);
     if (result == 1) {
@@ -364,7 +379,7 @@ func find_user_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     number_of_tokens_: felt, tier_: felt
 ) -> (discount: felt) {
     alloc_locals;
-    let (discount_details) = discount_tiers.read(tier=tier_);
+    let (discount_details) = discount_tier.read(tier=tier_);
     let sub_result = number_of_tokens_ - discount_details.numberOfTokens;
     let result = is_nn(sub_result);
     if (result == 1) {
@@ -378,15 +393,32 @@ func find_user_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @param iterator_ - Current index being populated
 // @param fee_tiers_len - Length of max base fee tier
 // @param fee_tiers - Array of base fess up to the index
-func populate_fees_by_tier{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func populate_fee_by_tier{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     iterator_: felt, fee_tiers_len: felt, fee_tiers: BaseFee*
 ) -> (fee_tiers_len: felt, fee_tiers: BaseFee*) {
     if (iterator_ == fee_tiers_len) {
         return (fee_tiers_len, fee_tiers);
     }
 
-    let (base_fee: BaseFee) = base_fee_tiers.read(tier=iterator_ + 1);
+    let (base_fee: BaseFee) = base_fee_tier.read(tier=iterator_ + 1);
     assert fee_tiers[iterator_] = base_fee;
 
-    return populate_fees_by_tier(iterator_ + 1, fee_tiers_len, fee_tiers);
+    return populate_fee_by_tier(iterator_ + 1, fee_tiers_len, fee_tiers);
+}
+
+// @notice Internal Function called by get_all_tier_discount to recursively add discounts to the array and return it
+// @param iterator_ - Current index being populated
+// @param discount_tiers_len - Length of max discount tier
+// @param discount_tiers - Array of tier discounts up to the index
+func populate_discount_by_tier{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    iterator_: felt, discount_tiers_len: felt, discount_tiers: Discount*
+) -> (discount_tiers_len: felt, discount_tiers: Discount*) {
+    if (iterator_ == discount_tiers_len) {
+        return (discount_tiers_len, discount_tiers);
+    }
+
+    let (discount: Discount) = discount_tier.read(tier=iterator_ + 1);
+    assert discount_tiers[iterator_] = discount;
+
+    return populate_discount_by_tier(iterator_ + 1, discount_tiers_len, discount_tiers);
 }
