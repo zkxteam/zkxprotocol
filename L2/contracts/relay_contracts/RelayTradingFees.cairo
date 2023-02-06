@@ -114,10 +114,10 @@ func get_max_discount_tier{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 }
 
 @view
-func get_user_fee_and_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func get_discounted_fee_rate_for_user{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     address_: felt, side_: felt
-) -> (fee: felt) {
+) -> (discounted_base_fee_percent: felt, base_fee_tier: felt, discount_tier: felt) {
     let (inner_address) = get_inner_contract();
-    let (res) = ITradingFees.get_user_fee_and_discount(inner_address, address_, side_);
-    return (res,);
+    let (discounted_base_fee_percent: felt, base_fee_tier: felt, discount_tier: felt) = ITradingFees.get_discounted_fee_rate_for_user(inner_address, address_, side_);
+    return (discounted_base_fee_percent, base_fee_tier, discount_tier);
 }
