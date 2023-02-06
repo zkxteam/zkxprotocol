@@ -101,6 +101,23 @@ async def test_update_base_fees(adminAuth_factory):
     result = execution_info.result.value
     assert result == 3
 
+    # Get all tiers with base fess
+    execution_info = await fees.get_all_tier_fees().call()
+    parsed_list = list(execution_info.result.fee_tiers)[0]
+    assert parsed_list.numberOfTokens == 0
+    assert parsed_list.makerFee == base_fee_maker1
+    assert parsed_list.takerFee == base_fee_taker1
+
+    parsed_list = list(execution_info.result.fee_tiers)[1]
+    assert parsed_list.numberOfTokens == 1000
+    assert parsed_list.makerFee == base_fee_maker2
+    assert parsed_list.takerFee == base_fee_taker2
+
+    parsed_list = list(execution_info.result.fee_tiers)[2]
+    assert parsed_list.numberOfTokens == 5000
+    assert parsed_list.makerFee == base_fee_maker3
+    assert parsed_list.takerFee == base_fee_taker3
+
 
 @pytest.mark.asyncio
 async def test_update_discount(adminAuth_factory):
@@ -136,6 +153,20 @@ async def test_update_discount(adminAuth_factory):
     execution_info = await fees.get_max_discount_tier().call()
     result = execution_info.result.value
     assert result == 3
+
+    # Get all tiers with discounts
+    execution_info = await fees.get_all_tier_discounts().call()
+    parsed_list = list(execution_info.result.discount_tiers)[0]
+    assert parsed_list.numberOfTokens == 0
+    assert parsed_list.discount == discount1
+
+    parsed_list = list(execution_info.result.discount_tiers)[1]
+    assert parsed_list.numberOfTokens == 1000
+    assert parsed_list.discount == discount2
+
+    parsed_list = list(execution_info.result.discount_tiers)[2]
+    assert parsed_list.numberOfTokens == 5000
+    assert parsed_list.discount == discount3
 
 
 @pytest.mark.asyncio

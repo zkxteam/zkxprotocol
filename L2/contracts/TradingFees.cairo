@@ -188,7 +188,7 @@ func get_all_tier_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @returns discount_tiers_len - Length of discount tiers
 // @returns discount_tiers - Array of discount tiers
 @view
-func get_all_tier_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+func get_all_tier_discounts{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     discount_tiers_len: felt, discount_tiers: Discount*
 ) {
     alloc_locals;
@@ -251,6 +251,7 @@ func update_base_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
+        assert lower_tier_fee.numberOfTokens = 0;
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -322,6 +323,7 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
+        assert lower_tier_discount.numberOfTokens = 0;
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -406,7 +408,7 @@ func populate_fee_by_tier{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return populate_fee_by_tier(iterator_ + 1, fee_tiers_len, fee_tiers);
 }
 
-// @notice Internal Function called by get_all_tier_discount to recursively add discounts to the array and return it
+// @notice Internal Function called by get_all_tier_discounts to recursively add discounts to the array and return it
 // @param iterator_ - Current index being populated
 // @param discount_tiers_len - Length of max discount tier
 // @param discount_tiers - Array of tier discounts up to the index
