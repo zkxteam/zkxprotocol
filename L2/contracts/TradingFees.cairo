@@ -134,9 +134,11 @@ func get_max_discount_tier{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @returns base_fee - base fee for the user
 // @returns discount - discount for the user
 @view
-func get_user_fee_and_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    address_: felt, side_: felt
-) -> (fee: felt) {
+func get_discounted_fee_rate_for_user{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(address_: felt, side_: felt) -> (
+    discounted_base_fee_percent: felt, base_fee_tier: felt, discount_tier: felt
+) {
     alloc_locals;
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -148,12 +150,12 @@ func get_user_fee_and_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     );
 
     let (max_base_fee_level) = max_base_fee_tier.read();
-    let (base_fee_maker, base_fee_taker) = find_user_base_fee(
+    let (base_fee_maker, base_fee_taker, base_fee_tier) = find_user_base_fee(
         number_of_tokens_=number_of_tokens, tier_=max_base_fee_level
     );
 
     let (max_discount_level) = max_discount_tier.read();
-    let (discount) = find_user_discount(
+    let (discount, discount_tier) = find_user_discount(
         number_of_tokens_=number_of_tokens, tier_=max_discount_level
     );
 
@@ -168,7 +170,9 @@ func get_user_fee_and_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     let non_discount = Math64x61_ONE - discount;
     let fee: felt = Math64x61_mul(base_fee, non_discount);
 
-    return (fee=fee);
+    return (
+        discounted_base_fee_percent=fee, base_fee_tier=base_fee_tier, discount_tier=discount_tier
+    );
 }
 
 // @notice Function which returns an array of all tier fees
@@ -361,13 +365,15 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @returns base_fee_maker - base fee for the taker for the tier
 func find_user_base_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     number_of_tokens_: felt, tier_: felt
-) -> (base_fee_maker: felt, base_fee_taker: felt) {
+) -> (base_fee_maker: felt, base_fee_taker: felt, tier: felt) {
     alloc_locals;
     let (fee_details) = base_fee_tier.read(tier=tier_);
     let sub_result = number_of_tokens_ - fee_details.numberOfTokens;
     let result = is_nn(sub_result);
     if (result == 1) {
-        return (base_fee_maker=fee_details.makerFee, base_fee_taker=fee_details.takerFee);
+        return (
+            base_fee_maker=fee_details.makerFee, base_fee_taker=fee_details.takerFee, tier=tier_
+        );
     } else {
         return find_user_base_fee(number_of_tokens_, tier_ - 1);
     }
@@ -379,13 +385,13 @@ func find_user_base_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // @returns discount - discount for the tier
 func find_user_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     number_of_tokens_: felt, tier_: felt
-) -> (discount: felt) {
+) -> (discount: felt, tier: felt) {
     alloc_locals;
     let (discount_details) = discount_tier.read(tier=tier_);
     let sub_result = number_of_tokens_ - discount_details.numberOfTokens;
     let result = is_nn(sub_result);
     if (result == 1) {
-        return (discount=discount_details.discount);
+        return (discount=discount_details.discount, tier=tier_);
     } else {
         return find_user_discount(number_of_tokens_, tier_ - 1);
     }
