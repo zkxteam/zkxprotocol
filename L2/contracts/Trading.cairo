@@ -93,16 +93,16 @@ const TWO = 4611686018427387904;
 // Events //
 // /////////
 
-// Event emitted whenever a new market is added
+// Event emitted whenever a trade is executed for a user
 @event
-func trade_execution(address: felt, request: OrderRequest, market_id: felt, execution_price: felt) {
+func trade_execution(size: felt, execution_price: felt, maker_direction: felt) {
 }
 
 // //////////
 // Storage //
 // //////////
 
-// Stores public key associated with an account
+// Stores threshold percentage
 @storage_var
 func threshold_percentage() -> (res: felt) {
 }
@@ -1299,6 +1299,13 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // Set the current side as maker
         assert current_order_side = MAKER;
 
+        // Emit the event
+        trade_execution.emit(
+            size=quantity_to_execute,
+            execution_price=[request_list_].price,
+            maker_direction=[request_list_].direction
+        );
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -1406,13 +1413,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         market_id=market_id_,
         collateral_id_=collateral_id_,
         pnl=pnl,
-    );
-
-    trade_execution.emit(
-        address=[request_list_].user_address,
-        request=temp_order_request,
-        market_id=market_id_,
-        execution_price=average_execution_price,
+        side=current_order_side,
     );
 
     // Set the order size in executed_sizes_list array
