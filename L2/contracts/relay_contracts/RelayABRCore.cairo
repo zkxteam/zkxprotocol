@@ -16,7 +16,7 @@ from contracts.libraries.RelayLibrary import (
     reset_call_counter,
     set_self_index,
 )
-
+from contracts.DataTypes import ABRDetails
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
@@ -236,4 +236,20 @@ func get_abr_details{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         contract_address=inner_address, epoch_=epoch_, market_id_=market_id_
     );
     return (abr_value, abr_last_price);
+}
+
+@view
+func get_previous_abr_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    starting_epoch_: felt, market_id_: felt, n_: felt
+) -> (abr_values_list_len: felt, abr_values_list: ABRDetails*) {
+    let (inner_address) = get_inner_contract();
+    let (
+        abr_values_list_len: felt, abr_values_list: ABRDetails*
+    ) = IABRCore.get_previous_abr_values(
+        contract_address=inner_address,
+        starting_epoch_=starting_epoch_,
+        market_id_=market_id_,
+        n_=n_,
+    );
+    return (abr_values_list_len, abr_values_list);
 }
