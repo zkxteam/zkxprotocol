@@ -1,5 +1,6 @@
 %lang starknet
 
+from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le, is_nn
@@ -11,9 +12,9 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_mul, Math64x61_ONE
 
-//##########
-// Structs #
-//##########
+// //////////
+// Structs //
+// //////////
 
 // Struct to store base fee percentage for each tier for maker and taker
 struct BaseFee {
@@ -28,9 +29,9 @@ struct Discount {
     discount: felt,
 }
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever update_base_fees() is called
 @event
@@ -42,9 +43,9 @@ func update_base_fees_called(tier: felt, fee_details: BaseFee) {
 func update_discount_called(tier: felt, discount_details: Discount) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores the maximum base fee tier
 @storage_var
@@ -66,9 +67,9 @@ func base_fee_tiers(tier: felt) -> (value: BaseFee) {
 func discount_tiers(tier: felt) -> (value: Discount) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -81,9 +82,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice Getter function for base fees
 // @param tier_ - tier level
@@ -170,9 +171,22 @@ func get_user_fee_and_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return (fee=fee);
 }
 
-//#####################
-// External Functions #
-//#####################
+// @notice Function which returns an array of all tier fees
+// @returns fee_tiers_len - Length of base fee tiers
+// @returns fee_tiers - Array of base fee tiers
+@view
+func get_all_tier_fees{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    fee_tiers_len: felt, fee_tiers: BaseFee*
+) {
+    alloc_locals;
+    let (fee_tiers: BaseFee*) = alloc();
+    let (fee_tiers_len) = max_base_fee_tier.read();
+    return populate_fees_by_tier(iterator_=0, fee_tiers_len=fee_tiers_len, fee_tiers=fee_tiers);
+}
+
+// ///////////
+// External //
+// ///////////
 
 // @notice Function to update base fee details
 // @param tier_ - fee tier
@@ -319,9 +333,9 @@ func update_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// ///////////
+// Internal //
+// ///////////
 
 // @notice Recursive funtion to find the base fee tier of the user
 // @param  number_of_tokens_ - number of the tokens of the user
@@ -358,4 +372,21 @@ func find_user_discount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     } else {
         return find_user_discount(number_of_tokens_, tier_ - 1);
     }
+}
+
+// @notice Internal Function called by get_all_tier_fees to recursively add base fess to the array and return it
+// @param iterator_ - Current index being populated
+// @param fee_tiers_len - Length of max base fee tier
+// @param fee_tiers - Array of base fess up to the index
+func populate_fees_by_tier{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    iterator_: felt, fee_tiers_len: felt, fee_tiers: BaseFee*
+) -> (fee_tiers_len: felt, fee_tiers: BaseFee*) {
+    if (iterator_ == fee_tiers_len) {
+        return (fee_tiers_len, fee_tiers);
+    }
+
+    let (base_fee: BaseFee) = base_fee_tiers.read(tier=iterator_ + 1);
+    assert fee_tiers[iterator_] = base_fee;
+
+    return populate_fees_by_tier(iterator_ + 1, fee_tiers_len, fee_tiers);
 }
