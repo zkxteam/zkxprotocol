@@ -523,7 +523,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     local trading_fee;
 
     // Get the fees from Trading Fee contract
-    let (fees_rate) = ITradingFees.get_user_fee_and_discount(
+    let (fees_rate, base_fee_tier, discount_tier) = ITradingFees.get_discounted_fee_rate_for_user(
         contract_address=trading_fees_address_, address_=order_.user_address, side_=side_
     );
 

@@ -32,6 +32,8 @@ namespace ITradingFees {
     func get_max_discount_tier() -> (value: felt) {
     }
 
-    func get_user_fee_and_discount(address_: felt, side_: felt) -> (fee: felt) {
+    func get_discounted_fee_rate_for_user(address_: felt, side_: felt) -> (
+        discounted_base_fee_percent: felt, base_fee_tier: felt, discount_tier: felt
+    ) {
     }
 }
