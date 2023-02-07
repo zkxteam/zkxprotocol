@@ -1,46 +1,38 @@
 %lang starknet
 
-from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
-from contracts.Constants import (
-    AdminAuth_INDEX,
-    ManageMarkets_ACTION,
-    Market_INDEX,
-    MasterAdmin_ACTION,
-    Trading_INDEX,
-)
+from contracts.Constants import AdminAuth_INDEX, ManageMarkets_ACTION, Market_INDEX, Trading_INDEX
 from contracts.DataTypes import Market, MarketPrice
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
-from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
-////////////
+// //////////
 // Events //
-////////////
+// //////////
 
 // Event emitted whenever update_market_price() is called
 @event
 func update_market_price_called(market_id: felt, price: felt) {
 }
 
-/////////////
+// ///////////
 // Storage //
-/////////////
+// ///////////
 
 // Mapping between market ID and Market Prices
 @storage_var
 func market_prices(id: felt) -> (res: MarketPrice) {
 }
 
-/////////////////
+// ///////////////
 // Constructor //
-/////////////////
+// ///////////////
 
 // @notice Constructor for the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -53,9 +45,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//////////
+// ////////
 // View //
-//////////
+// ////////
 
 // @notice function to get market price
 // @param market_id_ - Id of the market pair
@@ -67,9 +59,9 @@ func get_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (market_price=res);
 }
 
-//////////////
+// ////////////
 // External //
-//////////////
+// ////////////
 
 // @notice function to update market price
 // @param market_id_ - Id of the market
@@ -144,7 +136,7 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         collateral_id=market.asset_collateral,
         timestamp=timestamp_,
         price=price_,
-        );
+    );
 
     market_prices.write(id=market_id_, value=new_market_price);
 

@@ -5,9 +5,9 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import Trading_INDEX
 from contracts.libraries.FundLibrary import balance, FundLib
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever fund() is called
 @event
@@ -29,9 +29,9 @@ func deposit_Holding_called(asset_id: felt, amount: felt) {
 func withdraw_Holding_called(asset_id: felt, amount: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -44,9 +44,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice Manually add amount to asset_id's balance
 // @param asset_id_ - target asset_id

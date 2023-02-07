@@ -1,15 +1,14 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le
 
 from contracts.Constants import Trading_INDEX
 from contracts.libraries.FundLibrary import balance, FundLib
 from contracts.Math_64x61 import Math64x61_assert64x61
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever fund() is called
 @event
@@ -31,18 +30,18 @@ func deposit_Liquidity_called(asset_id: felt, amount: felt, position_id: felt) {
 func withdraw_Liquidity_called(asset_id: felt, amount: felt, position_id: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores the mapping from asset and position ID to value
 @storage_var
 func asset_liq_position(asset_id: felt, position_id: felt) -> (value: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -55,9 +54,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice Gets the amount owed to liquidity fund by each position
 // @param asset_id_ - Target assetID
@@ -71,9 +70,9 @@ func liq_amount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     return (amount,);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice Manually add amount to asset's balance
 // @param asset_id_ - target asset id

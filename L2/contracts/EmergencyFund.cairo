@@ -1,8 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
-from starkware.starknet.common.syscalls import get_caller_address
+from starkware.cairo.common.math import assert_le, assert_lt
 
 from contracts.Constants import (
     Holding_INDEX,
@@ -18,9 +17,9 @@ from contracts.libraries.FundLibrary import balance, FundLib, FundLib_balance_by
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever fund() is called
 @event
@@ -62,9 +61,9 @@ func defund_Liquidity_from_Emergency_called(asset_id: felt, amount: felt) {
 func defund_Insurance_from_Emergency_called(asset_id: felt, amount: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -77,9 +76,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice Manually add amount to asset_id's balance by admins only
 // @param asset_id - target asset_id

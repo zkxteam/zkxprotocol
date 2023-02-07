@@ -1,20 +1,20 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.bool import FALSE, TRUE
+from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt, assert_nn, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import AccountDeployer_INDEX, MasterAdmin_ACTION, Trading_INDEX
+from contracts.Constants import AccountDeployer_INDEX, MasterAdmin_ACTION
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores all account contract addresses of users
 @storage_var
@@ -31,9 +31,9 @@ func account_registry_len() -> (len: felt) {
 func account_present(address: felt) -> (present: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor for the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -46,9 +46,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ////////
+// View /
+// ///////
 
 // @notice Function to check whether a user is present in account registry
 // @param address_ Address of the user that is to be checked
@@ -127,9 +127,9 @@ func get_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return populate_account_registry(0, starting_index_, ending_index, account_registry_list);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice add to account registry
 // @param address_ - L2 account contract address of the user
@@ -211,9 +211,9 @@ func remove_from_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// ///////////
+// Internal //
+// ///////////
 
 // @notice Internal Function called by get_account_registry to recursively add accounts to the registry and return it
 // @param iterator_ - The index of pointer of the array to be returned

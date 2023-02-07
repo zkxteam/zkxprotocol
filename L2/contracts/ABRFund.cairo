@@ -6,9 +6,9 @@ from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.Constants import ABR_PAYMENT_INDEX
 from contracts.libraries.FundLibrary import balance, FundLib
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever fund() is called
 @event
@@ -30,9 +30,9 @@ func deposit_ABR_called(account_address: felt, market_id: felt, amount: felt, ti
 func withdraw_ABR_called(account_address: felt, market_id: felt, amount: felt, timestamp: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param resgitry_address_ Address of the AuthorizedRegistry contract
@@ -45,9 +45,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice Manually add amount to market_id's balance
 // @param market_id_ - target market_id

@@ -5,13 +5,12 @@ from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.hash_state import hash_finalize, hash_init, hash_update
 from starkware.cairo.common.math import assert_le, assert_nn, assert_not_zero
-from starkware.cairo.common.math_cmp import is_le, is_not_zero
+from starkware.cairo.common.math_cmp import is_le
 
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
 
 from starkware.starknet.common.syscalls import (
-    call_contract,
     emit_event,
     get_block_timestamp,
     get_caller_address,
@@ -41,7 +40,6 @@ from contracts.DataTypes import (
     CollateralBalance,
     LiquidatablePosition,
     Market,
-    Message,
     OrderRequest,
     PositionDetails,
     PositionDetailsForRiskManagement,
@@ -66,7 +64,6 @@ from contracts.Math_64x61 import (
     Math64x61_div,
     Math64x61_fromDecimalFelt,
     Math64x61_is_equal,
-    Math64x61_is_le,
     Math64x61_min,
     Math64x61_round,
     Math64x61_sub,
@@ -384,7 +381,6 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     from_address: felt, user: felt, amount: felt, assetID_: felt
 ) {
     alloc_locals;
-    let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
     // Get L1 ZKX contract address
@@ -792,11 +788,7 @@ func execute_order{
         contract_address=registry, index=Asset_INDEX, version=version
     );
     let (asset_details) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
-    let (collateral_details) = IAsset.get_asset(
-        contract_address=asset_address, id=market.asset_collateral
-    );
     let asset_decimals = asset_details.token_decimal;
-    let collateral_decimals = collateral_details.token_decimal;
 
     // hash the parameters
     let (hash) = hash_order(&request);
@@ -1710,7 +1702,7 @@ func populate_simplified_positions_collaterals_recurse{
 
     return populate_simplified_positions_collaterals_recurse(
         positions_array_len_=positions_array_len,
-        positions_array_=positions_array_,
+        positions_array_=positions_array,
         collateral_array_iterator_=collateral_array_iterator_ + 1,
         collateral_array_len_=collateral_array_len_,
         timestamp_filter_=timestamp_filter_,
@@ -1759,7 +1751,7 @@ func populate_positions_collaterals_recurse{
 
     return populate_positions_collaterals_recurse(
         positions_array_len_=positions_array_len,
-        positions_array_=positions_array_,
+        positions_array_=positions_array,
         collateral_array_iterator_=collateral_array_iterator_ + 1,
         collateral_array_len_=collateral_array_len_,
     );

@@ -8,9 +8,9 @@ from contracts.Constants import MasterAdmin_ACTION
 from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
 from contracts.libraries.Utils import verify_caller_authority
 
-//##########
-// Storage #
-// ##########
+// //////////
+// Storage //
+// //////////
 
 // Stores the deployed addreses array
 @storage_var
@@ -27,8 +27,8 @@ func deployed_addresses_len() -> (res: felt) {
 func curr_nonce() -> (res: felt) {
 }
 
-// ////////////////
-// Constructor ///
+// //////////////
+// Constructor //
 // //////////////
 
 // @notice Constructor of the smart-contract
@@ -42,9 +42,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// //////////////////
-// View Functions //
-// ////////////////
+// ///////
+// View //
+// ///////
 
 // @notice View function to return all the deployed contract addresses
 // @returns array_len - Length of the last deployed array
@@ -57,9 +57,9 @@ func populate_deployed_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     return populate_deployed_addresses_recurse(0, array, array_len);
 }
 
-// //////////////////////
-// External Functions //
-// ////////////////////
+// ///////////
+// External //
+// ///////////
 
 // @notice External function to deploy_contracts
 // @dev The hashes must be declared beforehand, the sequence of hashes must be handled by the deploy script
@@ -87,9 +87,9 @@ func deploy_contracts{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return ();
 }
 
-// //////////////////////
-// Internal Functions //
-// ////////////////////
+// ///////////
+// Internal //
+// ///////////
 
 // @notice Internal function to recursively deploy contracts
 // @param hashes_len_ - Current length of the hashes array

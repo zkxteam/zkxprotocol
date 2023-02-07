@@ -6,29 +6,20 @@ from starkware.cairo.common.math import abs_value
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_round
-from contracts.Constants import (
-    ABR_Core_Index,
-    ABR_FUNDS_INDEX,
-    ABR_Calculations_INDEX,
-    AccountRegistry_INDEX,
-    Asset_INDEX,
-    Market_INDEX,
-    SHORT,
-)
+from contracts.Constants import ABR_Core_Index, ABR_FUNDS_INDEX, Asset_INDEX, Market_INDEX, SHORT
 
 from contracts.DataTypes import Asset, SimplifiedPosition
 from contracts.interfaces.IABRCore import IABRCore
 from contracts.interfaces.IABRFund import IABRFund
 from contracts.interfaces.IAccountManager import IAccountManager
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
 
-// //////////
+// /////////
 // Events //
-// //////////
+// /////////
 
 // Event emitted when abr payment called for a position
 @event
@@ -37,9 +28,9 @@ func abr_payment_called_user_position(
 ) {
 }
 
-// ///////////////
+// //////////////
 // Constructor //
-// ///////////////
+// //////////////
 
 // @notice
 // @param registry_address_ - Address of the auth registry
@@ -52,9 +43,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// //////////////////////
-// External Functions //
-// //////////////////////
+// ///////////
+// External //
+// ///////////
 
 // @notice Function to be called by the node
 // @param epoch - Epoch of the current abr
@@ -98,9 +89,9 @@ func pay_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     );
 }
 
-// //////////////////////
-// Internal Functions //
-// //////////////////////
+// ///////////
+// Internal //
+// ///////////
 
 // @notice Internal function called by pay_abr_users_positions to transfer funds between ABR Fund and users
 // @param account_address_ - Address of the user of whom the positions are passed

@@ -8,9 +8,9 @@ from starkware.cairo.common.math import assert_not_equal, assert_lt, assert_nn, 
 from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import MasterAdmin_ACTION
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // @notice Stores the access permissions
 // Action - role
@@ -47,9 +47,9 @@ func remover(address: felt) -> (remover_address: felt) {
 func current_total_admins() -> (res: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor for the contract
 // @param address1 - Address for first initial admin
@@ -66,9 +66,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice Function to find whether an address has permission to perform a specific role
 // @param address - Address for which permission has to be determined
@@ -99,9 +99,9 @@ func get_current_total_admins{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     return (res,);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice Function to update the permissions
 // @param address - Address for which permissions are to be granted/revoked
@@ -165,9 +165,9 @@ func set_min_num_admins{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// ///////////
+// Internal //
+// ///////////
 
 // @notice - This function processes the update admin mapping call when action = MasterAdmin_ACTION
 // It checks that caller is not the same as previous approver/remover and updates the mapping accordingly
