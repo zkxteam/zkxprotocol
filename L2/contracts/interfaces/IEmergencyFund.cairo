@@ -2,7 +2,12 @@
 
 @contract_interface
 namespace IEmergencyFund {
-    // external functions
+    // View functions
+
+    func balance(asset_id_: felt) -> (amount: felt) {
+    }
+
+    // External functions
 
     func fund(asset_id_: felt, amount: felt) {
     }
@@ -26,9 +31,5 @@ namespace IEmergencyFund {
     }
 
     func defund_liquidity(asset_id: felt, amount: felt) {
-    }
-
-    // view functions
-    func balance(asset_id_: felt) -> (amount: felt) {
     }
 }

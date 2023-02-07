@@ -4,6 +4,8 @@ from contracts.DataTypes import Constants, HighTideMetaData, Multipliers, Reward
 
 @contract_interface
 namespace IHighTide {
+    // View functions
+
     func get_current_season_id() -> (season_id: felt) {
     }
 

@@ -4,6 +4,16 @@ from contracts.DataTypes import PriceData, MultipleOrder, PositionDetailsForRisk
 
 @contract_interface
 namespace ILiquidate {
+    // View functions
+
+    func return_acc_value() -> (res: felt) {
+    }
+
+    func return_maintenance() -> (res: felt) {
+    }
+
+    // External functions
+
     func find_under_collateralized_position(account_address_: felt, collateral_id_: felt) -> (
         liq_result: felt,
         least_collateral_ratio_position: PositionDetailsForRiskManagement,
@@ -12,15 +22,6 @@ namespace ILiquidate {
     ) {
     }
 
-
-    func check_for_risk(
-        order: MultipleOrder, size: felt, execution_price: felt
-    ) {
-    }
-
-    func return_acc_value() -> (res: felt) {
-    }
-
-    func return_maintenance() -> (res: felt) {
+    func check_for_risk(order: MultipleOrder, size: felt, execution_price: felt) {
     }
 }

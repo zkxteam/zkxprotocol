@@ -4,6 +4,13 @@ from contracts.DataTypes import CoreFunction
 
 @contract_interface
 namespace ISigRequirementsManager {
+    // View functions
+
+    func get_sig_requirement(core_function: CoreFunction) -> (num_req: felt) {
+    }
+
+    // External functions
+
     func set_sig_requirement(core_function: CoreFunction, num_req: felt) {
     }
 
@@ -11,8 +18,5 @@ namespace ISigRequirementsManager {
     }
 
     func assert_func_handled(core_function: CoreFunction) {
-    }
-
-    func get_sig_requirement(core_function: CoreFunction) -> (num_req: felt) {
     }
 }
