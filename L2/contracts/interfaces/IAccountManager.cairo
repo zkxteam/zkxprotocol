@@ -23,6 +23,7 @@ namespace IAccountManager {
         market_id: felt,
         collateral_id_: felt,
         pnl: felt,
+        side: felt,
     ) -> (res: felt) {
     }
 

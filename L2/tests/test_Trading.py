@@ -7,7 +7,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, PRIME, PRIME_HALF
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, PRIME, PRIME_HALF, assert_event_emitted
 from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, get_fund_balance_python
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
@@ -416,8 +416,19 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
+    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
+    
+    assert_event_emitted(
+        info,
+        from_address=trading.contract_address,
+        name="trade_execution",
+        data=[
+            to64x61(quantity_locked_1),
+            to64x61(200),
+            1
+        ]
+    )
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1439,16 +1450,27 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
+
+    assert_event_emitted(
+        info,
+        from_address=trading.contract_address,
+        name="trade_execution",
+        data=[
+            to64x61(quantity_locked_1),
+            to64x61(1000),
+            1
+        ]
+    )
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert open_interest_response.result.res == to64x61(5)
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert open_interest_response.result.res == to64x61(5)
 
     ###################
     ### Close orders ##
@@ -1469,7 +1491,7 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp, is_reverted=0, error_code=0)
+    (batch_id_2, _, execution_info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1477,8 +1499,8 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert open_interest_response.result.res == to64x61(2)
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert open_interest_response.result.res == to64x61(2)
 
 
 @pytest.mark.asyncio
@@ -1518,7 +1540,7 @@ async def test_opening_and_closing_full_orders_with_leverage(trading_test_initia
     }]
 
     # execute order
-    (batch_id_1, _) = complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, _, _) = complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1545,7 +1567,7 @@ async def test_opening_and_closing_full_orders_with_leverage(trading_test_initia
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_2, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1553,8 +1575,8 @@ async def test_opening_and_closing_full_orders_with_leverage(trading_test_initia
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert open_interest_response.result.res == to64x61(2)
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert open_interest_response.result.res == to64x61(2)
 
 
 @pytest.mark.asyncio
@@ -1595,7 +1617,7 @@ async def test_opening_and_closing_three_orders_full_with_leverage(trading_test_
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1622,7 +1644,7 @@ async def test_opening_and_closing_three_orders_full_with_leverage(trading_test_
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_2, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1630,8 +1652,8 @@ async def test_opening_and_closing_three_orders_full_with_leverage(trading_test_
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert open_interest_response.result.res == to64x61(2)
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert open_interest_response.result.res == to64x61(2)
 
 
 @pytest.mark.asyncio
@@ -1670,7 +1692,7 @@ async def test_IoC_orders(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, complete_orders_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1678,8 +1700,8 @@ async def test_IoC_orders(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert from64x61(open_interest_response.result.res) == 2.81
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert from64x61(open_interest_response.result.res) == 2.81
 
     ##########################
     ### Open orders Partial ##
@@ -1739,7 +1761,7 @@ async def test_opening_partial_orders(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, complete_orders_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -1763,7 +1785,7 @@ async def test_opening_partial_orders(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_2, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -1771,8 +1793,8 @@ async def test_opening_partial_orders(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
 
 
 @ pytest.mark.asyncio
@@ -1815,7 +1837,7 @@ async def test_closing_partial_orders(trading_test_initializer):
         market_id=market_id_1, direction=order_direction["short"])
 
     # execute order
-    (_, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (_, complete_orders_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
 
     user_short = bob_test.get_position(
         market_id=market_id_1, direction=order_direction["short"])
@@ -1824,8 +1846,8 @@ async def test_closing_partial_orders(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
 
     ###############################
     ### Close orders partially ###
@@ -1843,15 +1865,26 @@ async def test_closing_partial_orders(trading_test_initializer):
     }]
 
     # execute order
-    (_, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (_, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+
+    assert_event_emitted(
+        info,
+        from_address=trading.contract_address,
+        name="trade_execution",
+        data=[
+            to64x61(quantity_locked_2),
+            to64x61(1000),
+            2
+        ]
+    )
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 4.81
 
 
 @ pytest.mark.asyncio
@@ -1900,8 +1933,8 @@ async def test_opening_and_closing_full_orders_different_market(trading_test_ini
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
-    # assert from64x61(open_interest_response.result.res) == 4.5
+    open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
+    assert from64x61(open_interest_response.result.res) == 4.5
 
     ###################
     ### Close orders ##
@@ -1933,8 +1966,8 @@ async def test_opening_and_closing_full_orders_different_market(trading_test_ini
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
-    # assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 2.977
+    open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
+    assert pytest.approx(from64x61(open_interest_response.result.res), abs=1e-6) == 2.977
 
 
 @ pytest.mark.asyncio
@@ -2003,7 +2036,9 @@ async def test_placing_order_directly(trading_test_initializer):
         # collateral_id
         AssetID.USDC,
         # pnl
-        0
+        0,
+        # side,
+        1
     ]
 
     await assert_revert(
@@ -2048,7 +2083,7 @@ async def test_closing_more_than_parent_size(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -2116,7 +2151,7 @@ async def test_invalid_liquidation(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -2187,7 +2222,7 @@ async def test_invalid_deleverage(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -2256,7 +2291,7 @@ async def test_opening_partial_orders_multiple(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, complete_orders_1) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, complete_orders_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -2301,7 +2336,7 @@ async def test_opening_partial_orders_multiple(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_2, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_2, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
 
     # check balances
@@ -2389,7 +2424,7 @@ async def test_opening_and_closing_full_orders_new_collateral(trading_test_initi
     }]
 
     # execute order
-    (batch_id_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances

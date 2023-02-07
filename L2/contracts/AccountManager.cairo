@@ -760,6 +760,7 @@ func execute_order{
     market_id: felt,
     collateral_id_: felt,
     pnl: felt,
+    side: felt,
 ) -> (res: felt) {
     alloc_locals;
 
@@ -880,6 +881,7 @@ func execute_order{
         position_mapping.write(
             market_id=market_id, direction=request.direction, value=updated_position
         );
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -1038,6 +1040,22 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr;
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     }
+
+    // Emit event for the order
+    let (keys: felt*) = alloc();
+    assert keys[0] = 'trade';
+    let (data: felt*) = alloc();
+    assert data[0] = order_id;
+    assert data[1] = market_id;
+    assert data[2] = request.direction;
+    assert data[3] = request.quantity;
+    assert data[4] = request.order_type;
+    assert data[5] = execution_price;
+    assert data[6] = pnl;
+    assert data[7] = side;
+
+    emit_event(1, keys, 8, data);
+
     return (1,);
 }
 

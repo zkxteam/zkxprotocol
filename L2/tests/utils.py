@@ -257,6 +257,32 @@ def assert_events_emitted(tx_exec_info, events):
 
         raise BaseException("Event not fired or not fired correctly")
 
+def assert_event_with_custom_keys_emitted(tx_exec_info, from_address, keys, data, order=0):
+    assert_events_with_custom_keys_emitted(tx_exec_info,[(order, from_address, keys, data)])
+
+def assert_events_with_custom_keys_emitted(tx_exec_info, events):
+    """Assert events are fired with correct data."""
+    for event in events:
+        order, from_address, keys, data = event
+        event_obj = OrderedEvent(
+            order=order,
+            keys=keys,
+            data=data,
+        )
+
+        base = tx_exec_info.call_info.internal_calls[0]
+        if event_obj in base.events and from_address == base.contract_address:
+            return
+
+        try:
+            base2 = base.internal_calls[0]
+            if event_obj in base2.events and from_address == base2.contract_address:
+                return
+        except IndexError:
+            pass
+
+        raise BaseException("Event not fired or not fired correctly")
+
 
 def from_call_to_call_array(calls):
     """Transform from Call to CallArray."""

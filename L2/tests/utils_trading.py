@@ -1281,8 +1281,8 @@ async def get_batch_status(batch_id: int, trading: StarknetContract) -> int:
 # Execute the orders in python and starkent
 async def execute_batch(zkx_node_signer: Signer, zkx_node: StarknetContract, trading: StarknetContract, execute_batch_params: List[int]):
     # Send execute_batch transaction
-    await zkx_node_signer.send_transaction(zkx_node, trading.contract_address, "execute_batch", execute_batch_params)
-    return
+    execution_info = await zkx_node_signer.send_transaction(zkx_node, trading.contract_address, "execute_batch", execute_batch_params)
+    return execution_info
 ################################
 #### Helper Function Python ####
 ################################
@@ -1379,7 +1379,7 @@ async def execute_batch_reverted(zkx_node_signer: Signer, zkx_node: StarknetCont
     # Send execute_batch transaction
     await assert_revert(
         zkx_node_signer.send_transaction(zkx_node, trading.contract_address, "execute_batch", execute_batch_params), reverted_with=error_message)
-    return
+    return 1
 
 
 async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContract, executor: OrderExecutor, orders: List[Dict], users_test: List[User], quantity_locked: float, market_id: int, oracle_price: float, trading: StarknetContract, timestamp: int = 0, is_reverted: int = 0, error_code: str = "", error_at_index: int = -1, param_2: str = "", error_message: str = "") -> Tuple[int, List]:
@@ -1424,7 +1424,8 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
         oracle_price,
         timestamp
     ]
-
+    
+    global execution_info
     # If the batch is to be reverted, generate the error_message
     if is_reverted:
         actual_error_message = ""
@@ -1438,11 +1439,11 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
         # If an error message is passed
         elif error_message:
             actual_error_message = error_message
-        await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
+        execution_info = await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
     else:
-        await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
+        execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
         executor.execute_batch(*execute_batch_params_python)
-    return (batch_id, complete_orders_python)
+    return (batch_id, complete_orders_python, execution_info)
 
 
 ###################################
