@@ -4,6 +4,7 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_lt, assert_le
+from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.UserBatches import calculate_no_of_batches, get_batch
@@ -18,7 +19,7 @@ from contracts.Constants import (
     MasterAdmin_ACTION,
 )
 
-from contracts.DataTypes import Market
+from contracts.DataTypes import ABRDetails, Market
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IABRCalculations import IABRCalculations
 from contracts.interfaces.IABRPayment import IABRPayment
@@ -278,6 +279,29 @@ func get_remaining_pay_abr_calls{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     }
 }
 
+// @notice View function that returns the timestamp of the last set_abr_call
+// @returns res- Timestamp of the last abr call
+@view
+func get_last_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (current_epoch) = epoch.read();
+    let (current_state) = state.read();
+
+    if (current_state == 0) {
+        if (current_epoch == 0) {
+            let (last_timestamp) = epoch_to_timestamp.read(epoch=current_epoch);
+            return (last_timestamp,);
+        } else {
+            let (last_timestamp) = epoch_to_timestamp.read(epoch=current_epoch - 1);
+            return (last_timestamp,);
+        }
+    } else {
+        let (last_timestamp) = epoch_to_timestamp.read(epoch=current_epoch);
+        return (last_timestamp,);
+    }
+}
+
 // @notice View function that returns the timestamp at which the next abr call is to be made
 // @return res- timestamp
 @view
@@ -285,10 +309,11 @@ func get_next_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     res: felt
 ) {
     let (current_epoch) = epoch.read();
+    let (current_state) = state.read();
     let (current_abr_interval) = abr_interval.read();
-    let (last_timestamp) = epoch_to_timestamp.read(epoch=current_epoch);
-    let next_timestamp = last_timestamp + current_abr_interval;
-    return (next_timestamp,);
+    let (last_timestamp) = get_last_abr_timestamp();
+
+    return (last_timestamp + current_abr_interval,);
 }
 
 // @notice View function that returns the abr_value and price
@@ -418,6 +443,7 @@ func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 func set_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_timestamp: felt
 ) {
+    alloc_locals;
     // Get registry and version
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -427,25 +453,37 @@ func set_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (current_epoch) = epoch.read();
     let (current_abr_interval) = abr_interval.read();
 
-    // Get last epoch's timestamp
-    let (last_timestamp) = epoch_to_timestamp.read(epoch=current_epoch);
-
     // Contract must be in state 0
     with_attr error_message("ABRCore: Invalid State") {
         assert current_state = ABR_STATE_0;
     }
+
+    let (last_timestamp) = get_last_abr_timestamp();
 
     // Enforces last_abr_timestamp + abr_interval < new_timestamp
     with_attr error_message("ABRCore: New Timstamp must be > last timestamp + abr_interval") {
         assert_le(last_timestamp + current_abr_interval, new_timestamp);
     }
 
-    // New epoch
-    let new_epoch = current_epoch + 1;
+    local new_epoch;
+    // First epoch
+    if (current_epoch == 0) {
+        new_epoch = current_epoch + 1;
+        epoch.write(value=new_epoch);
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        new_epoch = current_epoch;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
 
     // Write to state
     state.write(value=ABR_STATE_1);
-    epoch.write(value=new_epoch);
     epoch_to_timestamp.write(epoch=new_epoch, value=new_timestamp);
 
     // Get account Registry address
@@ -611,6 +649,50 @@ func make_abr_payments{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return ();
 }
 
+// @notice Function to get the last n abr values for a market; if n > abr values set in the contract
+//         it'll return the sliced version of
+// @param starting_epoch_ - Epoch at which to begin populating abr values
+// @param market_id_ - Market Id for which to fetch the abr values
+// @param n_ - Number of abr values
+// @returns abr_values_list_len - Length of the abr values array
+// @returns abr_values_list - ABR Values array
+@external
+func get_previous_abr_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    starting_epoch_: felt, market_id_: felt, n_: felt
+) -> (abr_values_list_len: felt, abr_values_list: ABRDetails*) {
+    alloc_locals;
+
+    // Get current epoch
+    let (current_epoch) = epoch.read();
+
+    // Initialize the required array
+    let (abr_values_list: ABRDetails*) = alloc();
+
+    // If number of abr values to retrieve is <= 0, return
+    if (is_le(n_, 0) == 1) {
+        return (0, abr_values_list);
+    }
+
+    // If current epoch is <= 1, return
+    if (is_le(current_epoch, 1) == 1) {
+        return (0, abr_values_list);
+    }
+
+    // If invalid starting epoch passed, return
+    if (is_le(starting_epoch_, 0) == 1) {
+        return (0, abr_values_list);
+    }
+
+    return get_previous_abr_values_recurse(
+        abr_values_list_=abr_values_list,
+        market_id_=market_id_,
+        array_iterator_=0,
+        epoch_iterator_=starting_epoch_,
+        current_epoch_=current_epoch,
+        n_=n_,
+    );
+}
+
 // ///////////
 // Internal //
 // ///////////
@@ -744,12 +826,63 @@ func get_current_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     abr_payment_made.emit(epoch=current_epoch_, batch_id=batches_fetched);
 
-    // If all batches are fetched, increment state
+    // If all batches are fetched, increment state and epoch
     if (new_batches_fetched == no_of_batches) {
         state_changed.emit(epoch=current_epoch_, new_state=ABR_STATE_0);
         state.write(value=ABR_STATE_0);
+        epoch.write(current_epoch_ + 1);
         return (users_list_len, users_list);
     } else {
         return (users_list_len, users_list);
     }
+}
+
+// @notice Internal recursive function to get the last n abr values for a market
+// @param abr_values_list_ - Array storing the populated abrdetails
+// @param market_id_ - Market Id for which to fetch the abr values
+// @param epoch_iterator_ - Iterator for the epoch
+// @param last_epoch_ - The last epoch in the system
+// @param n_ - Number of abr values
+// @returns abr_values_list_len - Length of the abr values array
+// @returns abr_values_list - ABR Values array
+func get_previous_abr_values_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    abr_values_list_: ABRDetails*,
+    market_id_: felt,
+    array_iterator_: felt,
+    epoch_iterator_: felt,
+    current_epoch_: felt,
+    n_: felt,
+) -> (abr_values_list_len: felt, abr_values_list: ABRDetails*) {
+    // If it reaches the last epoch, return
+    if (is_le(current_epoch_, epoch_iterator_) == 1) {
+        return (array_iterator_, abr_values_list_);
+    }
+
+    // If the required number of values are filled, return
+    if (n_ == 0) {
+        return (array_iterator_, abr_values_list_);
+    }
+
+    // Get abr value and timestamp
+    let (current_abr_value) = epoch_market_to_abr_value.read(
+        epoch=epoch_iterator_, market_id=market_id_
+    );
+    let (current_abr_timestamp) = epoch_to_timestamp.read(epoch=epoch_iterator_);
+
+    // Store it in the array
+    assert abr_values_list_[array_iterator_] = ABRDetails(
+        abr_value=current_abr_value, abr_timestamp=current_abr_timestamp
+    );
+
+    // Next iteration
+    return get_previous_abr_values_recurse(
+        abr_values_list_=abr_values_list_,
+        market_id_=market_id_,
+        array_iterator_=array_iterator_ + 1,
+        epoch_iterator_=epoch_iterator_ + 1,
+        current_epoch_=current_epoch_,
+        n_=n_ - 1,
+    );
 }

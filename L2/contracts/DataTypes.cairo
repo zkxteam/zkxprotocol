@@ -317,3 +317,8 @@ struct CoreFunction {
     version: felt,
     function_selector: felt,
 }
+
+struct ABRDetails {
+    abr_value: felt,
+    abr_timestamp: felt,
+}

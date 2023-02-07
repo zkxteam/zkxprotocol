@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.DataTypes import Market
+from contracts.DataTypes import ABRDetails, Market
 
 @contract_interface
 namespace IABRCore {
@@ -66,6 +66,11 @@ namespace IABRCore {
 
     func get_abr_details(epoch_: felt, market_id_: felt) -> (
         abr_value: felt, abr_last_price: felt
+    ) {
+    }
+
+    func get_previous_abr_values(starting_epoch_: felt, market_id_: felt, n_: felt) -> (
+        abr_values_list_len: felt, abr_values_list: ABRDetails*
     ) {
     }
 }

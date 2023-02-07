@@ -299,7 +299,7 @@ func get_L1_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 }
 
 // @notice view function to get deleveraged or liquidatable position
-// @param collateral_id_ - collateral id 
+// @param collateral_id_ - collateral id
 // @return position - Returns a LiquidatablePosition struct
 @view
 func get_deleveragable_or_liquidatable_position{
@@ -666,6 +666,8 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     assert data[4] = abr_value_;
     assert data[5] = position_size_;
 
+    emit_event(1, keys, 6, data);
+
     return ();
 }
 
@@ -691,7 +693,7 @@ func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 }
 
 // @notice External function called by the Liquidate Contract to get the array of net positions of the user
-// @param collateral_id_ - collateral id 
+// @param collateral_id_ - collateral id
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of positions
 @view
@@ -740,7 +742,7 @@ func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @param size - Size of the Order to be executed
 // @param execution_price - Price at which the order should be executed
 // @param margin_amount - New margin amount of the position
-// @param borrowed_amount - New borrowed amount of the position 
+// @param borrowed_amount - New borrowed amount of the position
 // @param market_id - Market id of the position
 // @param collateral_id_ - Collateral id of the position
 // @param pnl_ - New pnl of the position
@@ -925,13 +927,10 @@ func execute_order{
             let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
 
             local updated_liquidatable_position: LiquidatablePosition;
-            let (is_equal_zero) = Math64x61_is_equal(updated_amount, 0, 6); // Double check precision
-            if (is_equal_zero == TRUE)  {
+            let (is_equal_zero) = Math64x61_is_equal(updated_amount, 0, 6);  // Double check precision
+            if (is_equal_zero == TRUE) {
                 assert updated_liquidatable_position = LiquidatablePosition(
-                    market_id=0,
-                    direction=0,
-                    amount_to_be_sold=0,
-                    liquidatable=0,
+                    market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
                 );
             } else {
                 assert updated_liquidatable_position = LiquidatablePosition(
@@ -1443,7 +1442,7 @@ func populate_positions_risk_management{
 // @param positions_array_len_ - Length of the array
 // @param positions_array_ - Required array of positions
 // @param markets_iterator_ - Current length of traversed markets array
-// @param markets_array_len_ - Length of the markets array 
+// @param markets_array_len_ - Length of the markets array
 // @param current_collateral_id_ - Current collateral_id
 // @returns positions_array_len - Length of the positions array
 // @returns positions_array - Array with the positions
@@ -1699,7 +1698,6 @@ func populate_simplified_positions_collaterals_recurse{
         timestamp_filter_=timestamp_filter_,
     );
 }
-
 
 // @notice Internal function to fetch all collaterals and recurse over them to populate the positions
 // @param positions_array_len_ - Length of the array

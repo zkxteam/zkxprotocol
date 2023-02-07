@@ -434,6 +434,24 @@ async def test_view_functions_state_0(abr_factory):
     remaining_markets_query = await relay_abr.get_markets_remaining().call()
     assert remaining_markets_query.result.remaining_markets_list == []
 
+    previous_abr_query_1 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 0).call()
+    assert previous_abr_query_1.result.abr_values_list == []
+
+    previous_abr_query_2 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 1).call()
+    assert previous_abr_query_2.result.abr_values_list == []
+
+    previous_abr_query_3 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 2).call()
+    assert previous_abr_query_3.result.abr_values_list == []
+
+    previous_abr_query_4 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 0).call()
+    assert previous_abr_query_4.result.abr_values_list == []
+
+    previous_abr_query_5 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 1).call()
+    assert previous_abr_query_5.result.abr_values_list == []
+
+    previous_abr_query_6 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 2).call()
+    assert previous_abr_query_6.result.abr_values_list == []
+
 
 @pytest.mark.asyncio
 async def test_trades_different_markets(abr_factory):
@@ -605,6 +623,24 @@ async def test_view_functions_state_1(abr_factory):
     assert remaining_markets_query.result.remaining_markets_list == [
         BTC_USD_ID, BTC_UST_ID, ETH_USD_ID]
 
+    previous_abr_query_1 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 0).call()
+    assert previous_abr_query_1.result.abr_values_list == []
+
+    previous_abr_query_2 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 1).call()
+    assert previous_abr_query_2.result.abr_values_list == []
+
+    previous_abr_query_3 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 2).call()
+    assert previous_abr_query_3.result.abr_values_list == []
+
+    previous_abr_query_4 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 0).call()
+    assert previous_abr_query_4.result.abr_values_list == []
+
+    previous_abr_query_5 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 1).call()
+    assert previous_abr_query_5.result.abr_values_list == []
+
+    previous_abr_query_6 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 2).call()
+    assert previous_abr_query_6.result.abr_values_list == []
+
 
 @ pytest.mark.asyncio
 async def test_set_abr_1(abr_factory):
@@ -774,6 +810,24 @@ async def test_view_functions_state_2(abr_factory):
     remaining_markets_query = await relay_abr.get_markets_remaining().call()
     assert remaining_markets_query.result.remaining_markets_list == []
 
+    previous_abr_query_1 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 0).call()
+    assert previous_abr_query_1.result.abr_values_list == []
+
+    previous_abr_query_2 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 1).call()
+    assert previous_abr_query_2.result.abr_values_list == []
+
+    previous_abr_query_3 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 2).call()
+    assert previous_abr_query_3.result.abr_values_list == []
+
+    previous_abr_query_4 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 0).call()
+    assert previous_abr_query_4.result.abr_values_list == []
+
+    previous_abr_query_5 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 1).call()
+    assert previous_abr_query_5.result.abr_values_list == []
+
+    previous_abr_query_6 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 2).call()
+    assert previous_abr_query_6.result.abr_values_list == []
+
 
 @ pytest.mark.asyncio
 async def test_trade_new_market(abr_factory):
@@ -881,7 +935,7 @@ async def test_view_functions_state_0_round_2(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
     epoch_query = await relay_abr.get_epoch().call()
-    assert epoch_query.result.res == 1
+    assert epoch_query.result.res == 2
 
     state_query = await relay_abr.get_state().call()
     assert state_query.result.res == 0
@@ -897,6 +951,24 @@ async def test_view_functions_state_0_round_2(abr_factory):
 
     remaining_markets_query = await relay_abr.get_markets_remaining().call()
     assert remaining_markets_query.result.remaining_markets_list == []
+
+    previous_abr_query_1 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 0).call()
+    assert previous_abr_query_1.result.abr_values_list == []
+
+    previous_abr_query_2 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 1).call()
+    assert previous_abr_query_2.result.abr_values_list == []
+
+    previous_abr_query_3 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 2).call()
+    assert previous_abr_query_3.result.abr_values_list == []
+
+    previous_abr_query_4 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 0).call()
+    assert previous_abr_query_4.result.abr_values_list == []
+
+    previous_abr_query_5 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 1).call()
+    assert len(previous_abr_query_5.result.abr_values_list) == 1
+
+    previous_abr_query_6 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 2).call()
+    assert len(previous_abr_query_6.result.abr_values_list) == 1
 
 
 @pytest.mark.asyncio
@@ -962,6 +1034,33 @@ async def test_view_functions_state_1_round_2(abr_factory):
     remaining_markets_query = await relay_abr.get_markets_remaining().call()
     assert remaining_markets_query.result.remaining_markets_list == [
         BTC_USD_ID, BTC_UST_ID, ETH_USD_ID]
+
+    previous_abr_query_1 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 0).call()
+    assert previous_abr_query_1.result.abr_values_list == []
+
+    previous_abr_query_2 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 1).call()
+    assert previous_abr_query_2.result.abr_values_list == []
+
+    previous_abr_query_3 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 2).call()
+    assert previous_abr_query_3.result.abr_values_list == []
+
+    previous_abr_query_4 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 0).call()
+    assert previous_abr_query_4.result.abr_values_list == []
+
+    previous_abr_query_5 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 1).call()
+    assert len(previous_abr_query_5.result.abr_values_list) == 1
+
+    previous_abr_query_6 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 2).call()
+    assert len(previous_abr_query_6.result.abr_values_list) == 1
+
+    previous_abr_query_7 = await abr_core.get_previous_abr_values(2, BTC_USD_ID, 0).call()
+    assert previous_abr_query_7.result.abr_values_list == []
+
+    previous_abr_query_8 = await abr_core.get_previous_abr_values(2, BTC_USD_ID, 1).call()
+    assert previous_abr_query_8.result.abr_values_list == []
+
+    previous_abr_query_9 = await abr_core.get_previous_abr_values(2, BTC_USD_ID, 2).call()
+    assert previous_abr_query_9.result.abr_values_list == []
 
 
 @pytest.mark.asyncio
@@ -1078,3 +1177,53 @@ async def test_make_abr_payments_round_2(abr_factory):
 
     state_query = await relay_abr.get_state().call()
     assert state_query.result.res == 0
+
+
+@ pytest.mark.asyncio
+async def test_view_functions_state_0_round_3(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    epoch_query = await abr_core.get_epoch().call()
+    assert epoch_query.result.res == 3
+
+    state_query = await abr_core.get_state().call()
+    assert state_query.result.res == 0
+
+    next_timestamp_query = await abr_core.get_next_abr_timestamp().call()
+    assert next_timestamp_query.result.res == timestamp_4 + 3600
+
+    remaining_pay_abr_query = await abr_core.get_remaining_pay_abr_calls().call()
+    assert remaining_pay_abr_query.result.res == 0
+
+    no_of_batches_query = await abr_core.get_no_of_batches_for_current_epoch().call()
+    assert no_of_batches_query.result.res == 0
+
+    remaining_markets_query = await abr_core.get_markets_remaining().call()
+    assert remaining_markets_query.result.remaining_markets_list == []
+
+    previous_abr_query_1 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 0).call()
+    assert previous_abr_query_1.result.abr_values_list == []
+
+    previous_abr_query_2 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 1).call()
+    assert previous_abr_query_2.result.abr_values_list == []
+
+    previous_abr_query_3 = await abr_core.get_previous_abr_values(0, BTC_USD_ID, 2).call()
+    assert previous_abr_query_3.result.abr_values_list == []
+
+    previous_abr_query_4 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 0).call()
+    assert previous_abr_query_4.result.abr_values_list == []
+
+    previous_abr_query_5 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 1).call()
+    assert len(previous_abr_query_5.result.abr_values_list) == 1
+
+    previous_abr_query_6 = await abr_core.get_previous_abr_values(1, BTC_USD_ID, 2).call()
+    assert len(previous_abr_query_6.result.abr_values_list) == 2
+
+    previous_abr_query_7 = await abr_core.get_previous_abr_values(2, BTC_USD_ID, 0).call()
+    assert previous_abr_query_7.result.abr_values_list == []
+
+    previous_abr_query_8 = await abr_core.get_previous_abr_values(2, BTC_USD_ID, 1).call()
+    assert len(previous_abr_query_8.result.abr_values_list) == 1
+
+    previous_abr_query_9 = await abr_core.get_previous_abr_values(2, BTC_USD_ID, 2).call()
+    assert len(previous_abr_query_9.result.abr_values_list) == 1
