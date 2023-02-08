@@ -6,9 +6,9 @@ from contracts.Constants import MasterAdmin_ACTION
 from contracts.DataTypes import CoreFunction
 from contracts.libraries.Utils import verify_caller_authority
 
-//##########
-// Events  #
-//##########
+// /////////
+// Events //
+// /////////
 
 // this event is emitted whenever a signature requirement is set for any function
 @event
@@ -22,9 +22,9 @@ func signature_requirement_set(
 func function_deregistered(index: felt, version: felt, function_selector: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // this var stores the registry address
 @storage_var
@@ -46,9 +46,9 @@ func func_to_registration_mapping(core_function: CoreFunction) -> (res: felt) {
 func func_to_num_sig_mapping(core_function: CoreFunction) -> (num: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -64,9 +64,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice - this function will revert if core function is not registered or has been de-registered
 @view
@@ -108,9 +108,9 @@ func get_current_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     return (current_version,);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice - function to set number of signature requirement for a function (index, version, selector)
 // this also does the function registration (this is the only way to register a function)
