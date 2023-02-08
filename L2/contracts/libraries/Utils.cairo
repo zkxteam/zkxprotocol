@@ -11,7 +11,7 @@ from starkware.cairo.common.hash_state import (
 )
 
 from starkware.cairo.common.signature import verify_ecdsa_signature
-from starkware.starknet.common.syscalls import call_contract, get_caller_address, get_tx_info
+from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import AdminAuth_INDEX, MasterAdmin_ACTION
 from contracts.DataTypes import CoreFunctionCall, Signature
 from contracts.interfaces.IAdminAuth import IAdminAuth
@@ -71,9 +71,9 @@ func verify_caller_authority{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 }
 
 // @notice - Helper function to verify that caller is MasterAdmin or has necessary authority
-func verify_master_admin_or_authority{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry: felt, current_version: felt, action: felt
-) -> () {
+func verify_master_admin_or_authority{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(registry: felt, current_version: felt, action: felt) -> () {
     let (caller) = get_caller_address();
     let (auth_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=AdminAuth_INDEX, version=current_version

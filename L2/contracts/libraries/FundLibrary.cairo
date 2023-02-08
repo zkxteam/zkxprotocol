@@ -11,9 +11,9 @@ from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores the contract version
 @storage_var
@@ -48,9 +48,9 @@ namespace FundLib {
         return ();
     }
 
-    //#################
-    // View Functions #
-    //#################
+    // /////////////////
+    // View Functions //
+    // /////////////////
 
     // @notice Gets the amount of the balance for the asset_id(asset)
     // @param asset_id_ - Target asset_id
@@ -81,9 +81,9 @@ namespace FundLib {
         return (version,);
     }
 
-    //#####################
-    // Internal Functions #
-    //#####################
+    // /////////////////////
+    // Internal Functions //
+    // /////////////////////
 
     // @notice add amount to asset_id's balance
     // @param asset_id_ - target asset_id
@@ -287,9 +287,9 @@ namespace FundLib {
         return ();
     }
 }
-//#################
-// View Functions #
-//#################
+// /////////////////
+// View Functions //
+// /////////////////
 
 // @notice Gets the amount of the balance for the asset_id(asset)
 // @param asset_id_ - Target asset_id
