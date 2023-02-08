@@ -1,31 +1,18 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.bool import FALSE, TRUE
+from starkware.cairo.common.bool import TRUE
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import (
-    unsigned_div_rem,
-    assert_le,
-    assert_in_range,
-    assert_lt,
-    assert_nn,
-)
-from starkware.cairo.common.math_cmp import is_nn, is_le
+from starkware.cairo.common.math import unsigned_div_rem, assert_le, assert_lt
+from starkware.cairo.common.math_cmp import is_le
 
 from contracts.Constants import CLOSE, Hightide_INDEX, ONE_DAY, OPEN, Trading_INDEX, UserStats_INDEX
 from contracts.DataTypes import VolumeMetaData, TraderStats, TradingSeason, MultipleOrder
-from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IHighTide import IHighTide
 from contracts.interfaces.IUserStats import IUserStats
-from contracts.libraries.CommonLibrary import (
-    CommonLib,
-    get_contract_version,
-    get_registry_address,
-    set_contract_version,
-    set_registry_address,
-)
+from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
 from contracts.Math_64x61 import Math64x61_mul, Math64x61_add, Math64x61_div, Math64x61_fromIntFelt
 
 // /////////
@@ -174,7 +161,7 @@ func get_season_trade_frequency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     season_id_: felt, market_id_: felt
 ) -> (frequency_len: felt, frequency: felt*) {
     alloc_locals;
-    let number_of_days = get_current_days_in_season(season_id_, market_id_);
+    let number_of_days = get_current_days_in_season(season_id_);
     local ref_number_of_days = number_of_days;
     let frequency_list: felt* = alloc();
 
@@ -188,7 +175,7 @@ func get_season_trade_frequency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 func get_max_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, market_id_: felt
 ) -> (res: felt) {
-    let number_of_days = get_current_days_in_season(season_id_, market_id_);
+    let number_of_days = get_current_days_in_season(season_id_);
 
     let frequency_list: felt* = alloc();
     let max_trades = get_frequencies(season_id_, market_id_, number_of_days, 0, frequency_list, 0);
@@ -222,7 +209,7 @@ func get_num_trades_in_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 func get_total_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt, market_id_: felt
 ) -> (res: felt) {
-    let number_of_days = get_current_days_in_season(season_id_, market_id_);
+    let number_of_days = get_current_days_in_season(season_id_);
 
     // The 4th argument of the following function call keeeps a running total of days traded
     let count = count_num_days_traded(season_id_, market_id_, number_of_days, 0);
@@ -412,7 +399,7 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     );
 
     // Recursively set the trading stats for each order
-    record_trade_batch_stats_recurse(
+    return record_trade_batch_stats_recurse(
         season_id_=season_id_,
         market_id_=market_id_,
         execution_price_64x61_=execution_price_64x61_,
@@ -421,13 +408,11 @@ func record_trade_batch_stats{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
         executed_sizes_list_=executed_sizes_list,
         is_market_listed_=is_market_listed,
     );
-
-    return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// ///////////
+// Internal //
+// ///////////
 
 // @dev - Internal function to be called recursively
 func record_trade_batch_stats_recurse{
@@ -539,26 +524,6 @@ func record_trade_batch_stats_recurse{
     );
 }
 
-// @dev - returns the minimum of the 2 function arguments
-func min_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    x: felt, y: felt
-) -> felt {
-    if (is_le(x, y) == TRUE) {
-        return x;
-    }
-    return y;
-}
-
-// @dev - returns the maximum of the 2 function arguments
-func max_of{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    x: felt, y: felt
-) -> felt {
-    if (is_le(x, y) == TRUE) {
-        return y;
-    }
-    return x;
-}
-
 // @dev - Returns current day of the season based on current timestamp
 // if season has ended then it returns max number of trading days configured for the season
 func get_current_day{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -635,7 +600,7 @@ func count_num_days_traded{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
 // @dev - This function calculates number of days that have elapsed in the season so far
 func get_current_days_in_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    season_id_: felt, market_id_: felt
+    season_id_: felt
 ) -> felt {
     alloc_locals;
 

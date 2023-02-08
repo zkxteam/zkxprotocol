@@ -3,13 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import (
-    assert_in_range,
-    assert_le,
-    assert_lt,
-    assert_not_zero,
-    unsigned_div_rem,
-)
+from starkware.cairo.common.math import assert_in_range, assert_le, assert_lt, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_number, get_caller_address
 
@@ -241,7 +235,6 @@ func get_user_xp_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func get_traders_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     season_id_: felt
 ) -> (trader_list_len: felt, trader_list: felt*) {
-
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
@@ -260,7 +253,6 @@ func get_traders_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     let (batches_fetched: felt) = batches_fetched_by_season.read(season_id=season_id_);
     let (current_no_of_users_per_batch: felt) = no_of_users_per_batch.read();
-    let (no_of_batches: felt) = no_of_batches_by_season.read(season_id=season_id_);
 
     let (trader_list_len: felt, trader_list: felt*) = get_batch(
         season_id_=season_id_,
@@ -544,10 +536,6 @@ func set_user_xp_values_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     with_attr error_message("RewardsCalculation: User Address cannot be 0") {
         assert_not_zero([xp_values_].user_address);
     }
-
-    let (current_xp_value: felt) = xp_value.read(
-        season_id=season_id_, user_address=[xp_values_].user_address
-    );
 
     // Write the value
     xp_value.write(
