@@ -4,7 +4,8 @@ from contracts.DataTypes import MultipleOrder, TraderStats
 
 @contract_interface
 namespace ITradingStats {
-    // view functions
+    // View functions
+
     func get_num_active_traders(season_id_: felt, market_id_: felt) -> (res: felt) {
     }
 
@@ -34,7 +35,8 @@ namespace ITradingStats {
     ) -> (trader_list_len: felt, trader_list: felt*) {
     }
 
-    // external functions
+    // External functions
+
     func record_trade_batch_stats(
         market_id_: felt,
         execution_price_64x61_: felt,

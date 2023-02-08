@@ -1,24 +1,20 @@
 %lang starknet
 
 from starkware.cairo.common.bool import FALSE, TRUE
-from starkware.cairo.common.uint256 import Uint256
-from starkware.cairo.common.math_cmp import is_le, is_not_zero
+from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.pow import pow
 from starkware.cairo.common.math import (
+    abs_value,
     assert_in_range,
-    assert_le,
-    assert_lt,
     sqrt,
     sign,
-    abs_value,
     signed_div_rem,
     unsigned_div_rem,
-    assert_not_zero,
 )
 
-//############
-// Constants #
-//############
+// ////////////
+// Constants //
+// ////////////
 
 // 0x010000000000000000 or 18446744073709551616
 const Math64x61_INT_PART = 2 ** 64;
@@ -37,9 +33,9 @@ const Math64x61_TEN = 10 * Math64x61_FRACT_PART;
 // E (~2.7182) * ONE (2305843009213693952)
 const Math64x61_E = 6267931151224907085;
 
-//#############
-// Assertions #
-//#############
+// /////////////
+// Assertions //
+// /////////////
 
 // Validates that X is a valid Math64x61 value
 func Math64x61_assert64x61{range_check_ptr}(x: felt) {
@@ -53,9 +49,9 @@ func Math64x61_assertPositive64x61{range_check_ptr}(x: felt) {
     return ();
 }
 
-//#############
-// Conversion #
-//#############
+// /////////////
+// Conversion //
+// /////////////
 
 // Converts a felt with decimals to a fixed point value ensuring no overflow occurs
 func Math64x61_fromDecimalFelt{range_check_ptr}(x: felt, decimals: felt) -> (res: felt) {
@@ -85,9 +81,9 @@ func Math64x61_toFelt{range_check_ptr}(x: felt) -> (res: felt) {
     return (res,);
 }
 
-//##################
-// Math operations #
-//##################
+// //////////////////
+// Math operations //
+// //////////////////
 
 // Approximates a 64.61 value to a specific number of decimal places
 func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {

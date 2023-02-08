@@ -42,9 +42,9 @@ const BASE_ABR_MAX = 230584300921369;
 // Minimum ABR interval
 const ABR_INTERVAL_MIN = 3600;
 
-// //////////
+// /////////
 // Events //
-// //////////
+// /////////
 
 // Event emitted whenever collateral is transferred from account by trading
 @event
@@ -63,9 +63,9 @@ func abr_set(epoch: felt, market_id: felt, abr_value: felt, abr_last_price: felt
 func abr_payment_made(epoch: felt, batch_id: felt) {
 }
 
-// ///////////
+// //////////
 // Storage //
-// ///////////
+// //////////
 
 @storage_var
 func state() -> (res: felt) {
@@ -115,9 +115,9 @@ func base_abr_rate() -> (value: felt) {
 func bollinger_width() -> (value: felt) {
 }
 
-// ///////////////
+// //////////////
 // Constructor //
-// ///////////////
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -139,9 +139,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// ////////
+// ///////
 // View //
-// ////////
+// ///////
 
 // @notice View function to get the current state of the ABRCore contract
 // @returns res - Current state
@@ -308,8 +308,6 @@ func get_last_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 func get_next_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     res: felt
 ) {
-    let (current_epoch) = epoch.read();
-    let (current_state) = state.read();
     let (current_abr_interval) = abr_interval.read();
     let (last_timestamp) = get_last_abr_timestamp();
 

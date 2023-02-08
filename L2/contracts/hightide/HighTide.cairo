@@ -7,7 +7,6 @@ from starkware.cairo.common.math import (
     assert_in_range,
     assert_le,
     assert_lt,
-    assert_nn,
     assert_not_zero,
     split_felt,
 )
@@ -51,7 +50,7 @@ from contracts.DataTypes import (
     RewardToken,
     TradingSeason,
 )
-from contracts.hightide.libraries.UserBatches import calculate_no_of_batches, get_batch
+from contracts.hightide.libraries.UserBatches import get_batch
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IERC20 import IERC20
 from contracts.interfaces.IHighTideCalc import IHighTideCalc
@@ -528,11 +527,6 @@ func end_trade_season{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     with_attr error_message("HighTide: Trading season is still active") {
         assert is_expired = TRUE;
     }
-
-    // Get Trading Stats contract address from Authorized Registry
-    let (trading_stats_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=TradingStats_INDEX, version=version
-    );
 
     // Get HightideCalc contract address from Authorized Registry
     let (hightide_calc_address) = IAuthorizedRegistry.get_contract_address(

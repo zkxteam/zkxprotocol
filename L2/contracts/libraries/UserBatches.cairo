@@ -4,6 +4,10 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from starkware.cairo.common.math import unsigned_div_rem
 
+// ///////
+// View //
+// ///////
+
 // Function to calculate the number of batches given the no_of_users_per_batch
 // @param current_no_of_users_per_batch_ - Number of users in a batch
 // @param account_registry_address_ - Account Registry address

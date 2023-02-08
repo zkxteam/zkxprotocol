@@ -13,30 +13,9 @@ from contracts.DataTypes import (
 
 @contract_interface
 namespace IAccountManager {
-    func execute_order(
-        request: OrderRequest,
-        signature: Signature,
-        size: felt,
-        execution_price: felt,
-        margin_amount: felt,
-        borrowed_amount: felt,
-        market_id: felt,
-        collateral_id_: felt,
-        pnl: felt,
-        side: felt,
-    ) -> (res: felt) {
-    }
-
-    func update_withdrawal_history(request_id_: felt) {
-    }
-
-    func transfer_from(assetID_: felt, amount_: felt, invoked_for_: felt) -> () {
-    }
+    // View functions
 
     func get_position_data(market_id_: felt, direction_: felt) -> (res: PositionDetails) {
-    }
-
-    func transfer(assetID_: felt, amount_: felt, invoked_for_: felt) -> () {
     }
 
     func get_balance(assetID_: felt) -> (res: felt) {
@@ -60,6 +39,39 @@ namespace IAccountManager {
     func get_portion_executed(order_id_: felt) -> (res: felt) {
     }
 
+    func get_public_key() -> (res: felt) {
+    }
+
+    func return_array_collaterals() -> (array_list_len: felt, array_list: CollateralBalance*) {
+    }
+
+    func get_deleveragable_or_liquidatable_position(collateral_id_: felt) -> (
+        position: LiquidatablePosition
+    ) {
+    }
+
+    // External functions
+
+    func execute_order(
+        request: OrderRequest,
+        signature: Signature,
+        size: felt,
+        execution_price: felt,
+        margin_amount: felt,
+        borrowed_amount: felt,
+        market_id: felt,
+        collateral_id_: felt,
+        pnl: felt,
+        side: felt,
+    ) -> (res: felt) {
+    }
+
+    func update_withdrawal_history(request_id_: felt) {
+    }
+
+    func transfer_from(assetID_: felt, amount_: felt, invoked_for_: felt) -> () {
+    }
+
     func transfer_from_abr(
         collateral_id_: felt,
         market_id_: felt,
@@ -80,18 +92,11 @@ namespace IAccountManager {
     ) {
     }
 
-    func timestamp_check(market_id_: felt) -> (is_eight_hours: felt) {
+    func transfer(assetID_: felt, amount_: felt, invoked_for_: felt) -> () {
     }
 
-    func get_public_key() -> (res: felt) {
-    }
-
-    func return_array_collaterals() -> (array_list_len: felt, array_list: CollateralBalance*) {
-    }
-
-    func liquidate_position(collateral_id_: felt, position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt) {
-    }
-
-    func get_deleveragable_or_liquidatable_position(collateral_id_:felt) -> (position: LiquidatablePosition) {
+    func liquidate_position(
+        collateral_id_: felt, position_: PositionDetailsForRiskManagement, amount_to_be_sold_: felt
+    ) {
     }
 }

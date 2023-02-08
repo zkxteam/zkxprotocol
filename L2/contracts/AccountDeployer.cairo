@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.bool import FALSE, TRUE
+from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 from starkware.starknet.common.syscalls import deploy
@@ -18,9 +18,9 @@ from contracts.libraries.CommonLibrary import (
 )
 from contracts.libraries.Utils import verify_caller_authority
 
-//##########
-// Events  #
-//##########
+// /////////
+// Events //
+// /////////
 
 // this event is emitted whenever the account contract class hash is changed by the admin
 @event
@@ -32,14 +32,9 @@ func class_hash_changed(class_hash: felt) {
 func account_deployed(pubkey: felt, L1_address: felt, account_address: felt) {
 }
 
-// this event is emitted whenever the version for this contract is changed by the admin
-@event
-func version_changed(new_version: felt) {
-}
-
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // stores mapping from (pubkey, L1 address) -> (L2 address)
 @storage_var
@@ -51,9 +46,9 @@ func pubkey_L1_to_address(pubkey: felt, L1_address: felt) -> (address: felt) {
 func account_class_hash() -> (class_hash: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -66,9 +61,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice view function to get account class hash
 // @return class_hash - class hash of the account contract
@@ -92,9 +87,9 @@ func get_pubkey_L1_to_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     return (address,);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice external function to deploy an account
 // @param public_key - starkkey generated from users signature

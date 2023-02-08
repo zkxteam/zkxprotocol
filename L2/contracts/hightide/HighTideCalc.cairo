@@ -1,7 +1,6 @@
 %lang starknet
 
-from starkware.cairo.common.alloc import alloc
-from starkware.cairo.common.bool import FALSE, TRUE
+from starkware.cairo.common.bool import TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_in_range, assert_lt
 from starkware.cairo.common.math_cmp import is_le
@@ -20,7 +19,7 @@ from contracts.Constants import (
     TRADER_SCORE_CALCULATION_IN_PROGRESS,
     TradingStats_INDEX,
     UserStats_INDEX,
-    W_CALCULATION_IN_PROGRESS, 
+    W_CALCULATION_IN_PROGRESS,
 )
 from contracts.DataTypes import (
     Constants,
@@ -38,13 +37,7 @@ from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IRewardsCalculation import IRewardsCalculation
 from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.IUserStats import IUserStats
-from contracts.libraries.CommonLibrary import (
-    CommonLib,
-    get_contract_version,
-    get_registry_address,
-    set_contract_version,
-    set_registry_address,
-)
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import (
     Math64x61_add,

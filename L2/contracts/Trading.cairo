@@ -12,12 +12,10 @@ from starkware.cairo.common.math import (
     assert_not_zero,
 )
 from starkware.cairo.common.math_cmp import is_le
-from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.starknet.common.syscalls import get_block_timestamp
 
 from contracts.Constants import (
     AccountRegistry_INDEX,
-    AdminAuth_INDEX,
     Asset_INDEX,
     CLOSE,
     DELEVERAGING_ORDER,
@@ -32,12 +30,10 @@ from contracts.Constants import (
     LONG,
     MAKER,
     Market_INDEX,
-    MARKET_ORDER,
     MarketPrices_INDEX,
     MasterAdmin_ACTION,
     OPEN,
     SHORT,
-    STOP_ORDER,
     TAKER,
     TradingFees_INDEX,
     TradingStats_INDEX,
@@ -76,7 +72,6 @@ from contracts.Math_64x61 import (
     Math64x61_mul,
     Math64x61_ONE,
     Math64x61_sub,
-    Math64x61_round,
 )
 
 // ////////////
@@ -183,9 +178,6 @@ func execute_batch{
     request_list: MultipleOrder*,
 ) -> () {
     alloc_locals;
-
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
 
     // Calculate the timestamp
     let (current_timestamp) = get_block_timestamp();
@@ -490,7 +482,6 @@ func get_price_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @param fees_balance_address_ - Address of the Fee Balance contract
 // @param holding_address_ - Address of the Holding contract
 // @param trader_stats_list_ - traders fee list
-// @param current_index_ - Index of the order that is being processed
 // @returns average_execution_price_open - Average Execution Price for the order
 // @returns margin_amount_open - Margin amount for the order
 // @returns borrowed_amount_open - Borrowed amount for the order
@@ -507,7 +498,6 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     fees_balance_address_: felt,
     holding_address_: felt,
     trader_stats_list_: TraderStats*,
-    current_index_: felt,
     side_: felt,
 ) -> (
     average_execution_price_open: felt,
@@ -669,7 +659,6 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @param insurance_fund_address - Address of the Insurance Fund contract
 // @param holding_address_ - Address of the Holding contract
 // @param trader_stats_list_ - traders fee list
-// @param current_index_ - Index of the order that is being processed
 // @returns average_execution_price_open - Average Execution Price for the order
 // @returns margin_amount_open - Margin amount for the order
 // @returns borrowed_amount_open - Borrowed amount for the order
@@ -684,7 +673,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     insurance_fund_address_: felt,
     holding_address_: felt,
     trader_stats_list_: TraderStats*,
-    current_index_: felt,
 ) -> (
     margin_amount_close: felt,
     borrowed_amount_close: felt,
@@ -941,7 +929,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     tempvar range_check_ptr = range_check_ptr;
                 } else {
                     // Transfer the remaining amount from Insurance Fund
-                    let (insurance_amount_claim) = Math64x61_sub(deficit, user_balance);
                     let (balance_less_than_zero_res) = Math64x61_is_le(
                         user_balance, 0, collateral_token_decimal_
                     );
@@ -1303,7 +1290,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         trade_execution.emit(
             size=quantity_to_execute,
             execution_price=[request_list_].price,
-            maker_direction=[request_list_].direction
+            maker_direction=[request_list_].direction,
         );
 
         tempvar syscall_ptr = syscall_ptr;
@@ -1338,7 +1325,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             fees_balance_address_=fees_balance_address_,
             holding_address_=holding_address_,
             trader_stats_list_=trader_stats_list_,
-            current_index_=current_index,
             side_=current_order_side,
         );
         assert margin_amount = margin_amount_temp;
@@ -1367,7 +1353,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             insurance_fund_address_=insurance_fund_address_,
             holding_address_=holding_address_,
             trader_stats_list_=trader_stats_list_,
-            current_index_=current_index,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;

@@ -1,14 +1,12 @@
 %lang starknet
 
-from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import abs_value
-from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
+from starkware.starknet.common.syscalls import get_caller_address
 
-from contracts.Constants import CLOSE, Hightide_INDEX, OPEN, TradingStats_INDEX
-from contracts.DataTypes import TraderStats, TradingSeason, VolumeMetaData
+from contracts.Constants import CLOSE, OPEN, TradingStats_INDEX
+from contracts.DataTypes import TraderStats, VolumeMetaData
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.IHighTide import IHighTide
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import Math64x61_add
 

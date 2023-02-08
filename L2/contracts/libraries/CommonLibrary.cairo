@@ -7,9 +7,9 @@ from starkware.starknet.common.syscalls import get_caller_address
 from contracts.Constants import MasterAdmin_ACTION
 from contracts.libraries.Utils import verify_caller_authority
 
-////////////
+// //////////
 // Events //
-////////////
+// //////////
 
 // this event is emitted whenever contract version is changed by the admin
 @event
@@ -21,9 +21,9 @@ func contract_version_changed(caller: felt, old_version: felt, new_version: felt
 func registry_address_changed(caller: felt, old_address: felt, new_address: felt) {
 }
 
-/////////////
+// ///////////
 // Storage //
-/////////////
+// ///////////
 
 // Stores the contract version
 @storage_var
@@ -36,9 +36,9 @@ func CommonLib_registry_address() -> (contract_address: felt) {
 }
 
 namespace CommonLib {
-    /////////////////
+    // ///////////////
     // Constructor //
-    /////////////////
+    // ///////////////
 
     // @notice function to initialize registry address and contract version
     // @param resgitry_address_ Address of the AuthorizedRegistry contract
@@ -58,9 +58,9 @@ namespace CommonLib {
         return ();
     }
 
-    //////////
+    // ////////
     // View //
-    //////////
+    // ////////
 
     // @notice view function to get current contract version
     // @return contract_version - version of the contract
@@ -80,9 +80,9 @@ namespace CommonLib {
         return (current_registry_address,);
     }
 
-    //////////////
+    // ////////////
     // External //
-    //////////////
+    // ////////////
 
     // @notice external function to set contract version
     // @param new_version_ - new version of the contract
@@ -134,9 +134,9 @@ namespace CommonLib {
         return ();
     }
 }
-//////////////////
+// ////////////////
 // View helpers //
-//////////////////
+// ////////////////
 
 // @notice view function to get current contract version
 // @return contract_version - version of the contract
@@ -156,9 +156,9 @@ func get_registry_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return CommonLib.get_registry_address();
 }
 
-//////////////////////
+// ////////////////////
 // External helpers //
-//////////////////////
+// ////////////////////
 
 // @notice external function to set contract version
 // @param new_version_ - new version of the contract

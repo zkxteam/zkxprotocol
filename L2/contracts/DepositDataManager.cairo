@@ -4,7 +4,6 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_not_zero
 
-from contracts.Constants import MasterAdmin_ACTION
 from contracts.DataTypes import DepositData
 from contracts.libraries.CommonLibrary import (
     CommonLib,
@@ -12,11 +11,10 @@ from contracts.libraries.CommonLibrary import (
     get_registry_address,
     set_contract_version,
 )
-from contracts.libraries.Utils import verify_caller_authority
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // hold mapping from L2 address, index to DepositData
 @storage_var
@@ -27,9 +25,9 @@ func L2_address_to_DepositData(address: felt, index: felt) -> (res: DepositData)
 func num_deposits(address: felt) -> (res: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -39,9 +37,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice - returns DepositData array containing all deposits made by a user L2 address
 @view
@@ -57,9 +55,9 @@ func get_deposit_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (total_deposits, ret_data);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice - function to get store DepositData (the user L2 address is picked out from this struct to create mapping)
 @external
@@ -79,9 +77,9 @@ func store_deposit_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// ///////////
+// Internal //
+// ///////////
 
 // @notice - function to recursively create DepositData array
 func fill_deposit_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(

@@ -9,18 +9,18 @@ from contracts.interfaces.IAdminAuth import IAdminAuth
 
 from starkware.starknet.common.syscalls import get_caller_address
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever a new address is added to the registry
 @event
 func updated_registry(index: felt, version: felt, address: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // @notice Stores the address for a specific zkx contract corresponding to the version
 // Index - Contract information
@@ -41,9 +41,9 @@ func updated_registry(index: felt, version: felt, address: felt) {
 func contract_registry(index: felt, version: felt) -> (address: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor for the smart-contract
 // @param auth_address_ - Address of the AdminAuth Contract
@@ -58,9 +58,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice Function to find whether an address has permission to perform certain action
 // @param address - Address for which permission has to be determined
@@ -74,9 +74,9 @@ func get_contract_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return (address=address);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice Function to modify trusted contracts registry, only callable by the admins with action access=3
 // @param index_ - Index of the registry that needs to be updated

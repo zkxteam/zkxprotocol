@@ -21,6 +21,10 @@ from contracts.libraries.RelayLibrary import (
 from contracts.DataTypes import PositionDetailsForRiskManagement, MultipleOrder
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
+// //////////////
+// Constructor //
+// //////////////
+
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -30,8 +34,33 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// @notice - All the following are mirror functions for Liquidate.cairo - just record call details and forward call
+// ///////
+// View //
+// ///////
 
+@view
+func return_maintenance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (inner_address) = get_inner_contract();
+    let (res) = ILiquidate.return_maintenance(inner_address);
+    return (res,);
+}
+
+@view
+func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (inner_address) = get_inner_contract();
+    let (res) = ILiquidate.return_acc_value(inner_address);
+    return (res,);
+}
+
+// ///////////
+// External //
+// ///////////
+
+// @notice - All the following are mirror functions for Liquidate.cairo - just record call details and forward call
 @external
 func find_under_collateralized_position{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
@@ -80,22 +109,4 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (inner_address) = get_inner_contract();
     ILiquidate.check_for_risk(inner_address, order, size, execution_price);
     return ();
-}
-
-@view
-func return_maintenance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    res: felt
-) {
-    let (inner_address) = get_inner_contract();
-    let (res) = ILiquidate.return_maintenance(inner_address);
-    return (res,);
-}
-
-@view
-func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    res: felt
-) {
-    let (inner_address) = get_inner_contract();
-    let (res) = ILiquidate.return_acc_value(inner_address);
-    return (res,);
 }

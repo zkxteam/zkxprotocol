@@ -21,6 +21,10 @@ from contracts.libraries.RelayLibrary import (
 from contracts.DataTypes import MultipleOrder
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 
+// //////////////
+// Constructor //
+// //////////////
+
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -29,6 +33,23 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     initialize(registry_address_, version_, index_);
     return ();
 }
+
+// ///////
+// View //
+// ///////
+
+@view
+func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    batch_id_: felt
+) -> (status: felt) {
+    let (inner_address) = get_inner_contract();
+    let (res) = ITrading.get_batch_id_status(inner_address, batch_id_);
+    return (res,);
+}
+
+// ///////////
+// External //
+// ///////////
 
 // @notice - All the following are mirror functions for Trading.cairo - just record call details and forward call
 @external
@@ -60,13 +81,4 @@ func execute_batch{
         request_list,
     );
     return ();
-}
-
-@view
-func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    batch_id_: felt
-) -> (status: felt) {
-    let (inner_address) = get_inner_contract();
-    let (res) = ITrading.get_batch_id_status(inner_address, batch_id_);
-    return (res,);
 }

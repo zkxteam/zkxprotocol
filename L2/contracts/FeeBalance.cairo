@@ -5,15 +5,14 @@ from starkware.cairo.common.math import assert_le, assert_lt, assert_nn
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import Trading_INDEX, MasterAdmin_ACTION
-from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
-//##########
-// Events  #
-//##########
+// /////////
+// Events //
+// /////////
 
 @event
 func fee_mapping_updated(
@@ -31,9 +30,9 @@ func FeeBalance_withdraw_called(
 ) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores <address, assetID> to fee mapping
 @storage_var
@@ -45,9 +44,9 @@ func fee_mapping(address: felt, assetID: felt) -> (fee: felt) {
 func total_fee_per_asset(assetID: felt) -> (accumulated_fee: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -60,9 +59,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice Function to get the total fee accumulated in the system
 // @param assetID_ - asset ID of the collateral
@@ -87,9 +86,9 @@ func get_user_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     return (fee,);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice Function to update fee mapping which stores total fee for a user
 // @param address - address of the user for whom fee is to be updated

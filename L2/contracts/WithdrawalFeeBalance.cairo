@@ -14,9 +14,9 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever set_standard_withdraw_fee() is called
 @event
@@ -33,9 +33,9 @@ func update_withdrawal_fee_mapping_called(collateral_id: felt, fee_added: felt) 
 func WithdrawalFeeBalance_withdraw_called(collateral_id: felt, fee_withdrawn: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores the standard withdraw fee
 @storage_var
@@ -52,9 +52,9 @@ func standard_withdraw_fee_collateral_id() -> (collateral_id: felt) {
 func total_withdrawal_fee_per_asset(collateral_id: felt) -> (accumulated_fee: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -67,9 +67,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice Function to get the total withdrawal fee accumulated in the system
 // @param collateral_id_ - collateral to be withdrawn
@@ -92,9 +92,9 @@ func get_standard_withdraw_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     return (fee, collateral_id);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice set standard withdraw fee
 // @param fee_ - 0.02 USDC is the standard withdraw fee

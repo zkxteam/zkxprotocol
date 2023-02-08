@@ -8,16 +8,16 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.StringLib import StringLib
 from contracts.libraries.Utils import verify_master_admin_or_authority
 
-///////////////
+// ////////////
 // Constants //
-///////////////
+// ////////////
 
 const SETTINGS_LINK_TYPE = 'SETTINGS_LINK_TYPE';
 const LINK_ID = 0;
 
-////////////
+// /////////
 // Events //
-////////////
+// /////////
 
 // @notice Notifies of a settings contract creation
 @event
@@ -31,9 +31,9 @@ func settings_contract_created(
 func settings_link_updated() {
 }
 
-/////////////////
+// //////////////
 // Constructor //
-/////////////////
+// //////////////
 
 // @notice Constructor of Settings contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -52,23 +52,24 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-////////////////////
-// View Functions //
-////////////////////
+// ///////
+// View //
+// ///////
 
 // @notice Reads the stored settings link
 // @returns link_len - Length of the link
 // @returns link - List of link characters
 @view
-func get_settings_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-) -> (link_len: felt, link: felt*) {
+func get_settings_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    link_len: felt, link: felt*
+) {
     let (link_len, link) = StringLib.read_string(type=SETTINGS_LINK_TYPE, id=LINK_ID);
     return (link_len, link);
 }
 
-////////////////////////
-// External Functions //
-////////////////////////
+// ///////////
+// External //
+// ///////////
 
 // @notice Update settings link
 // @param link_len - Length of the link
@@ -88,12 +89,7 @@ func update_settings_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     StringLib.remove_existing_string(type=SETTINGS_LINK_TYPE, id=LINK_ID);
 
     // 3. Save new link
-    StringLib.save_string(
-        type=SETTINGS_LINK_TYPE, 
-        id=LINK_ID,
-        string_len=link_len,
-        string=link
-    );
+    StringLib.save_string(type=SETTINGS_LINK_TYPE, id=LINK_ID, string_len=link_len, string=link);
 
     // 4. Emit event
     settings_link_updated.emit();

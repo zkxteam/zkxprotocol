@@ -2,8 +2,8 @@
 
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.RelayLibrary import (
-    record_call_details, 
-    get_inner_contract, 
+    record_call_details,
+    get_inner_contract,
     initialize,
     get_current_version,
     get_caller_hash_status,
@@ -22,6 +22,10 @@ from contracts.DataTypes import Market
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import ManageMarkets_ACTION
 
+// //////////////
+// Constructor //
+// //////////////
+
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -31,17 +35,85 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// @notice - All the following are mirror functions for Markets.cairo - just record call details and forward call
+// ///////
+// View //
+// ///////
 
-//////////////
+@view
+func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (currMarket: Market) {
+    let (inner_address) = get_inner_contract();
+    let (currMarket) = IMarkets.get_market(inner_address, market_id_);
+    return (currMarket,);
+}
+
+@view
+func get_market_id_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id_: felt, collateral_id_: felt
+) -> (market_id: felt) {
+    let (inner_address) = get_inner_contract();
+    let (market_id) = IMarkets.get_market_id_from_assets(inner_address, asset_id_, collateral_id_);
+    return (market_id,);
+}
+
+@view
+func get_asset_collateral_from_market{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(market_id_: felt) -> (asset_id: felt, collateral_id: felt) {
+    let (inner_address) = get_inner_contract();
+    let (asset_id, collateral_id) = IMarkets.get_asset_collateral_from_market(
+        contract_address=inner_address, market_id_=market_id_
+    );
+    return (asset_id, collateral_id);
+}
+
+@view
+func get_ttl_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (ttl: felt) {
+    let (inner_address) = get_inner_contract();
+    let (ttl) = IMarkets.get_ttl_from_market(contract_address=inner_address, market_id_=market_id_);
+    return (ttl,);
+}
+
+@view
+func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    array_list_len: felt, array_list: Market*
+) {
+    let (inner_address) = get_inner_contract();
+    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets(inner_address);
+    return (array_list_len, array_list);
+}
+
+@view
+func get_all_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    is_tradable_: felt, is_archived_: felt
+) -> (array_list_len: felt, array_list: Market*) {
+    let (inner_address) = get_inner_contract();
+    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets_by_state(
+        inner_address, is_tradable_, is_archived_
+    );
+    return (array_list_len, array_list);
+}
+
+@view
+func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) -> (link_len: felt, link: felt*) {
+    let (inner_address) = get_inner_contract();
+    let (link_len, link) = IMarkets.get_metadata_link(inner_address, market_id_);
+    return (link_len, link);
+}
+
+// ///////////
 // External //
-//////////////
+// ///////////
 
+// @notice - All the following are mirror functions for Markets.cairo - just record call details and forward call
 @external
 func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_market_: Market, 
-    metadata_link_len: felt, 
-    metadata_link: felt*
+    new_market_: Market, metadata_link_len: felt, metadata_link: felt*
 ) {
     alloc_locals;
     verify_caller_authority(ManageMarkets_ACTION);
@@ -52,7 +124,9 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 }
 
 @external
-func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(market_id_: felt) {
+func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt
+) {
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('remove_market');
     let (inner_address) = get_inner_contract();
@@ -129,7 +203,7 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     incremental_initial_margin_fraction_: felt,
     incremental_position_size_: felt,
     baseline_position_size_: felt,
-    maximum_position_size_: felt
+    maximum_position_size_: felt,
 ) {
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('modify_trade_settings');
@@ -148,7 +222,7 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         incremental_initial_margin_fraction_,
         incremental_position_size_,
         baseline_position_size_,
-        maximum_position_size_
+        maximum_position_size_,
     );
     return ();
 }
@@ -161,90 +235,6 @@ func update_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     verify_caller_authority(ManageMarkets_ACTION);
     record_call_details('update_metadata_link');
     let (inner_address) = get_inner_contract();
-    IMarkets.update_metadata_link(
-        inner_address,
-        market_id_,
-        link_len,
-        link
-    );
+    IMarkets.update_metadata_link(inner_address, market_id_, link_len, link);
     return ();
-}
-
-//////////
-// View //
-//////////
-
-@view
-func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(market_id_: felt) -> (
-    currMarket: Market
-) {
-    let (inner_address) = get_inner_contract();
-    let (currMarket) = IMarkets.get_market(inner_address, market_id_);
-    return (currMarket,);
-}
-
-@view
-func get_market_id_from_assets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_id_: felt, collateral_id_: felt
-) -> (market_id: felt) {
-    let (inner_address) = get_inner_contract();
-    let (market_id) = IMarkets.get_market_id_from_assets(inner_address, asset_id_, collateral_id_);
-    return (market_id,);
-}
-
-@view
-func get_asset_collateral_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt
-) -> (asset_id: felt, collateral_id: felt) {
-    let (inner_address) = get_inner_contract();
-    let (asset_id, collateral_id) = IMarkets.get_asset_collateral_from_market(
-        contract_address=inner_address, 
-        market_id_=market_id_
-    );
-    return (asset_id, collateral_id,);
-}
-
-@view
-func get_ttl_from_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt
-) -> (ttl: felt) {
-    let (inner_address) = get_inner_contract();
-    let (ttl) = IMarkets.get_ttl_from_market(
-        contract_address=inner_address, 
-        market_id_=market_id_
-    );
-    return (ttl,);
-}
-
-@view
-func get_all_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    array_list_len: felt, array_list: Market*
-) {
-    let (inner_address) = get_inner_contract();
-    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets(inner_address);
-    return (array_list_len, array_list);
-}
-
-@view
-func get_all_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    is_tradable_: felt, is_archived_: felt
-) -> (
-    array_list_len: felt, array_list: Market*
-) {
-    let (inner_address) = get_inner_contract();
-    let (array_list_len, array_list: Market*) = IMarkets.get_all_markets_by_state(
-        inner_address,
-        is_tradable_,
-        is_archived_
-    );
-    return (array_list_len, array_list);
-}
-
-@view
-func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt
-) -> (link_len: felt, link: felt*) {
-    let (inner_address) = get_inner_contract();
-    let (link_len, link) = IMarkets.get_metadata_link(inner_address, market_id_);
-    return (link_len, link);
 }

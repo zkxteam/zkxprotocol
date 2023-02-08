@@ -4,7 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_nn, assert_not_zero
 from starkware.starknet.common.syscalls import get_block_timestamp
 
-from contracts.Constants import Asset_INDEX, MasterAdmin_ACTION, ManageCollateralPrices_ACTION
+from contracts.Constants import Asset_INDEX, ManageCollateralPrices_ACTION
 from contracts.DataTypes import Asset, CollateralPrice
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
@@ -12,32 +12,27 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
-//#########
-// Events #
-//#########
+// /////////
+// Events //
+// /////////
 
 // Event emitted whenever update_collateral_price() is called
 @event
 func update_collateral_price_called(collateral_id: felt, price: felt) {
 }
 
-// this event is emitted whenever the version for this contract is changed by the admin
-@event
-func contract_version_changed(new_version: felt) {
-}
-
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Mapping between collateral ID and collateral Prices
 @storage_var
 func collateral_prices(id: felt) -> (res: CollateralPrice) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor for the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -50,9 +45,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice function to get collateral price
 // @param collateral_id_ - Id of the collateral
@@ -64,9 +59,9 @@ func get_collateral_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     return (collateral_price=res);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice function to update collateral price
 // @param collateral_id_ - Id of the collateral
@@ -110,9 +105,8 @@ func update_collateral_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // Create a struct object for the collateral prices
     tempvar new_collateral_price: CollateralPrice = CollateralPrice(
-        timestamp=timestamp_,
-        price_in_usd=price_,
-        );
+        timestamp=timestamp_, price_in_usd=price_
+    );
 
     collateral_prices.write(id=collateral_id_, value=new_collateral_price);
 

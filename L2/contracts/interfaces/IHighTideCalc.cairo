@@ -2,9 +2,7 @@
 
 @contract_interface
 namespace IHighTideCalc {
-    // ////////
-    // View //
-    // ////////
+    // View functions
 
     func get_funds_flow_per_market(season_id_: felt, market_id_: felt) -> (funds_flow: felt) {
     }
@@ -28,9 +26,7 @@ namespace IHighTideCalc {
     func get_hightide_state(season_id_: felt, market_id_: felt) -> (state: felt) {
     }
 
-    // ////////////
-    // External //
-    // ////////////
+    // External functions
 
     func calculate_high_tide_factors(season_id_: felt) {
     }

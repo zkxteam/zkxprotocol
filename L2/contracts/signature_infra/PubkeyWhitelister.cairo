@@ -5,9 +5,9 @@ from starkware.cairo.common.math import assert_not_zero
 from contracts.Constants import MasterAdmin_ACTION
 from contracts.libraries.Utils import verify_caller_authority
 
-//##########
-// Events  #
-//##########
+// /////////
+// Events //
+// /////////
 
 // event emitted whenever a public key is whitelisted
 @event
@@ -19,9 +19,9 @@ func pubkey_added_to_whitelist(pubkey: felt) {
 func pubkey_removed_from_whitelist(pubkey: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // this stores a mapping from pubkey to whether it is whitelisted
 @storage_var
@@ -38,9 +38,9 @@ func registry_address() -> (address: felt) {
 func version() -> (res: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -56,9 +56,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice - returns whether a public key is whitelisted or not
 @view
@@ -85,9 +85,9 @@ func get_current_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     return (current_version,);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 @external
 func set_version{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(

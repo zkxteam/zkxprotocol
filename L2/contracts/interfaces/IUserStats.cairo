@@ -4,16 +4,8 @@ from contracts.DataTypes import TraderStats, VolumeMetaData
 
 @contract_interface
 namespace IUserStats {
-    // external functions
-    func record_trader_stats(
-        season_id_: felt,
-        market_id_: felt,
-        trader_stats_list_len: felt,
-        trader_stats_list: TraderStats*,
-    ) {
-    }
-
     // View functions
+
     func get_trader_fee(season_id_: felt, market_id_: felt, trader_address_: felt) -> (
         fee_64x61: felt
     ) {
@@ -30,6 +22,16 @@ namespace IUserStats {
     }
     func get_trader_margin_amount(season_id_: felt, market_id_: felt, trader_address_: felt) -> (
         margin_amount_64x61: felt
+    ) {
+    }
+
+    // External functions
+
+    func record_trader_stats(
+        season_id_: felt,
+        market_id_: felt,
+        trader_stats_list_len: felt,
+        trader_stats_list: TraderStats*,
     ) {
     }
 }

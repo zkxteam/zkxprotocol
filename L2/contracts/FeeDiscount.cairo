@@ -1,16 +1,16 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_lt, assert_nn, assert_not_zero
+from starkware.cairo.common.math import assert_lt, assert_nn
 
 from contracts.Constants import ManageGovernanceToken_ACTION
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_add, Math64x61_sub
 
-//##########
-// Events  #
-//##########
+// /////////
+// Events //
+// /////////
 
 // this event is emitted when tokens are added to a user's token count
 @event
@@ -22,18 +22,18 @@ func tokens_added(user_address: felt, value_added: felt, prev_value: felt) {
 func tokens_removed(user_address: felt, value_removed: felt, prev_value: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // Stores number of tokens each user holds
 @storage_var
 func user_tokens(address: felt) -> (number_of_tokens: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param registry_address_ Address of the AuthorizedRegistry contract
@@ -46,9 +46,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice Function to get user_tokens
 // @param address - Address of the user
@@ -61,9 +61,9 @@ func get_user_tokens{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return (value=number_of_tokens);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice Function to add user_tokens
 // @param address - Address of the user

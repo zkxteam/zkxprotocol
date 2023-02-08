@@ -4,9 +4,12 @@ from contracts.DataTypes import QuoteL1Message
 
 @contract_interface
 namespace IQuoteL1Fee {
-    ////////////////////////
-    // External Functions //
-    ////////////////////////
+    // View functions
+
+    func get_withdrawal_request_data(index_) -> (message: QuoteL1Message) {
+    }
+
+    // External functions
 
     func check_and_add_message(
         user_l1_address_: felt,
@@ -16,12 +19,5 @@ namespace IQuoteL1Fee {
         L1_fee_amount_: felt,
         L1_fee_asset_id_: felt,
     ) -> (result: felt) {
-    }
-
-    ////////////////////
-    // View functions //
-    ////////////////////
-
-    func get_withdrawal_request_data(index_) -> (message: QuoteL1Message) {
     }
 }

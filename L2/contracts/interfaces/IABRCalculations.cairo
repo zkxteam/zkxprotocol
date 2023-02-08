@@ -2,6 +2,8 @@
 
 @contract_interface
 namespace IABRCalculations {
+    // External functions
+
     func calculate_abr(
         perp_index_len: felt,
         perp_index: felt*,

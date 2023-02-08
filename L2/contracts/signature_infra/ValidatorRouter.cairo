@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
+from starkware.cairo.common.math import assert_not_zero, assert_le
 from starkware.starknet.common.syscalls import call_contract
 from contracts.Constants import (
     MasterAdmin_ACTION,
@@ -14,9 +14,9 @@ from contracts.interfaces.IPubkeyWhitelister import IPubkeyWhitelister
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.libraries.Utils import SignatureVerification, verify_caller_authority
 
-//##########
-// Events  #
-//##########
+// /////////
+// Events //
+// /////////
 
 // event emitted whenever a function is called through the signature handling infrastructure
 @event
@@ -28,9 +28,9 @@ func core_function_called(index: felt, version: felt, function_selector: felt) {
 func signature_check_toggled(prev_value: felt, new_value: felt) {
 }
 
-//##########
-// Storage #
-//##########
+// //////////
+// Storage //
+// //////////
 
 // this var stores the registry address
 @storage_var
@@ -54,9 +54,9 @@ func nonce() -> (res: felt) {
 func check_sig() -> (res: felt) {
 }
 
-//##############
-// Constructor #
-//##############
+// //////////////
+// Constructor //
+// //////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -72,9 +72,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//#################
-// View Functions #
-//#################
+// ///////
+// View //
+// ///////
 
 // @notice - this function returns the current signature check switch status
 @view
@@ -110,9 +110,9 @@ func get_nonce{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     return (current_nonce,);
 }
 
-//#####################
-// External Functions #
-//#####################
+// ///////////
+// External //
+// ///////////
 
 // @notice - this is the main function which is called by signature nodes
 // @param - index, version together give the exact contract address
@@ -136,16 +136,13 @@ func call_core_function{
 ) -> (retdata_len: felt, retdata: felt*) {
     alloc_locals;
 
-    local core_function_call: CoreFunctionCall = CoreFunctionCall(index,
-        version_,
-        nonce_,
-        function_selector,
-        calldata_len,
-        calldata);
+    local core_function_call: CoreFunctionCall = CoreFunctionCall(
+        index, version_, nonce_, function_selector, calldata_len, calldata
+    );
 
-    local core_function: CoreFunction = CoreFunction(core_function_call.index,
-        core_function_call.version,
-        core_function_call.function_selector);
+    local core_function: CoreFunction = CoreFunction(
+        core_function_call.index, core_function_call.version, core_function_call.function_selector
+    );
 
     let (current_registry_address) = registry_address.read();
     let (current_version) = version.read();
@@ -248,7 +245,6 @@ func call_core_function{
     }
 
     let (current_registry_address) = registry_address.read();
-    let (current_version) = version.read();
 
     let (contract_address) = IAuthorizedRegistry.get_contract_address(
         current_registry_address, core_function_call.index, core_function_call.version
@@ -279,9 +275,9 @@ func toggle_check_sig{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return ();
 }
 
-//#####################
-// Internal Functions #
-//#####################
+// ///////////
+// Internal //
+// ///////////
 
 // @notice - goes through the list of signatures and verifies that the hash was signed by the private key
 // corresponding to the public key in the same index position

@@ -2,7 +2,13 @@
 
 @contract_interface
 namespace IHolding {
-    // external functions
+    // View functions
+
+    func balance(asset_id_: felt) -> (amount: felt) {
+    }
+
+    // External functions
+
     func fund(asset_id_: felt, amount: felt) {
     }
 
@@ -13,10 +19,5 @@ namespace IHolding {
     }
 
     func withdraw(asset_id_: felt, amount: felt) {
-    }
-
-    // view functions
-
-    func balance(asset_id_: felt) -> (amount: felt) {
     }
 }

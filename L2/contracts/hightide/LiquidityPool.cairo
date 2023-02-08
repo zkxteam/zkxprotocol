@@ -14,18 +14,18 @@ from contracts.interfaces.IHighTide import IHighTide
 from contracts.interfaces.IStarkway import IStarkway
 from contracts.libraries.CommonLibrary import CommonLib
 
-// ///////////
+// //////////
 // Storage //
-// ///////////
+// //////////
 
 // Stores hightide id of the corresponding liquidity pool contract
 @storage_var
 func hightide_id() -> (id: felt) {
 }
 
-// ///////////////
+// //////////////
 // Constructor //
-// ///////////////
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param high_tide_id_ - id of hightide
