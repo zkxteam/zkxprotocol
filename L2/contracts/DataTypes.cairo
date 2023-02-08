@@ -67,6 +67,7 @@ struct MultipleOrder {
     life_cycle: felt,
 }
 
+
 // @notice struct to pass price data to the contract
 struct PriceData {
     assetID: felt,
@@ -111,6 +112,7 @@ struct PositionDetailsForRiskManagement {
     position_size: felt,
     margin_amount: felt,
     borrowed_amount: felt,
+    leverage: felt,
 }
 
 struct PositionDetailsWithMarket {

@@ -129,7 +129,7 @@ func find_under_collateralized_position{
     );
 
     if (liquidatable_position.amount_to_be_sold != 0) {
-        return (1, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0);
+        return (1, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
     }
 
     // Fetch all the positions from the Account contract
@@ -141,7 +141,7 @@ func find_under_collateralized_position{
 
     // Check if the list is empty
     if (positions_len == 0) {
-        return (0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0);
+        return (0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
     }
 
     // Get Market contract address
@@ -182,7 +182,7 @@ func find_under_collateralized_position{
         total_account_value_=0,
         total_maintenance_requirement_=0,
         least_collateral_ratio_=Math64x61_ONE,
-        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_asset_price_=0,
     );
 
@@ -316,7 +316,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         total_account_value_=account_value,
         total_maintenance_requirement_=maintenance_requirement,
         least_collateral_ratio_=Math64x61_ONE,
-        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_asset_price_=0,
     );
 
@@ -427,7 +427,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // ttl has passed, return 0
     let status = is_le(time_difference, ttl);
     if (status == FALSE) {
-        return (0, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0, 0);
+        return (0, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0, 0);
     }
 
     let (req_margin) = IMarkets.get_maintenance_margin(
@@ -465,20 +465,47 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     let (denominator) = Math64x61_mul([positions_].position_size, market_price.price);
     let (collateral_ratio_position) = Math64x61_div(numerator, denominator);
 
-    let is_lesser = is_le(collateral_ratio_position, least_collateral_ratio_);
-
     // If it is the lowest, update least_collateral_ratio and least_collateral_ratio_position
     local least_collateral_ratio;
     local least_collateral_ratio_position: PositionDetailsForRiskManagement;
     local least_collateral_ratio_position_asset_price;
-    if (is_lesser == TRUE) {
-        assert least_collateral_ratio = collateral_ratio_position;
-        assert least_collateral_ratio_position = [positions_];
-        assert least_collateral_ratio_position_asset_price = market_price.price;
+
+    if (is_le(collateral_ratio_position, least_collateral_ratio_) == TRUE) {
+        if ([positions_].direction == LONG) {
+            if ([positions_].leverage == Math64x61_ONE) {
+                assert least_collateral_ratio = least_collateral_ratio_;
+                assert least_collateral_ratio_position = least_collateral_ratio_position_;
+                assert least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price_;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                assert least_collateral_ratio = collateral_ratio_position;
+                assert least_collateral_ratio_position = [positions_];
+                assert least_collateral_ratio_position_asset_price = market_price.price;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            }
+        } else {
+            assert least_collateral_ratio = collateral_ratio_position;
+            assert least_collateral_ratio_position = [positions_];
+            assert least_collateral_ratio_position_asset_price = market_price.price;
+
+             tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
     } else {
         assert least_collateral_ratio = least_collateral_ratio_;
         assert least_collateral_ratio_position = least_collateral_ratio_position_;
         assert least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price_;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     let (total_maintenance_requirement) = Math64x61_add(
