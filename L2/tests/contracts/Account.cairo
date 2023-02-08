@@ -8,10 +8,9 @@ from starkware.starknet.common.syscalls import get_tx_info
 
 from openzeppelin.account.library import Account, AccountCallArray
 
-
-//
-// Constructor
-//
+// //////////////
+// Constructor //
+// //////////////
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -21,9 +20,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-//
-// Getters
-//
+// ///////
+// View //
+// ///////
 
 @view
 func getPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
@@ -40,9 +39,17 @@ func supportsInterface{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return Account.supports_interface(interfaceId);
 }
 
-//
-// Setters
-//
+@view
+func isValidSignature{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
+}(hash: felt, signature_len: felt, signature: felt*) -> (isValid: felt) {
+    let (isValid: felt) = Account.is_valid_signature(hash, signature_len, signature);
+    return (isValid=isValid);
+}
+
+// ///////////
+// External //
+// ///////////
 
 @external
 func setPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -50,18 +57,6 @@ func setPublicKey{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 ) {
     Account.set_public_key(newPublicKey);
     return ();
-}
-
-//
-// Business logic
-//
-
-@view
-func isValidSignature{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ecdsa_ptr: SignatureBuiltin*, range_check_ptr
-}(hash: felt, signature_len: felt, signature: felt*) -> (isValid: felt) {
-    let (isValid: felt) = Account.is_valid_signature(hash, signature_len, signature);
-    return (isValid=isValid);
 }
 
 @external

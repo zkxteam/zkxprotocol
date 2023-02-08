@@ -5,10 +5,18 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
 
+// //////////
+// Storage //
+// //////////
+
 // @notice Stores the address of FeeBalance contract
 @storage_var
 func fee_address() -> (contract_address: felt) {
 }
+
+// //////////////
+// Constructor //
+// //////////////
 
 // @notice Constructor of the smart-contract
 // @param _authAddress Address of the FeeBalance contract
@@ -19,6 +27,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     fee_address.write(value=_authAddress);
     return ();
 }
+
+// ///////////
+// External //
+// ///////////
 
 // @notice Function to call update_fee_mapping of FeeBalance contract
 // @param _address - address of the user whose fee is to be updated

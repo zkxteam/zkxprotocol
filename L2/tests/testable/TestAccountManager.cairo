@@ -45,6 +45,10 @@ from contracts.AccountManager import (
 )
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
+// ///////////
+// External //
+// ///////////
+
 // #### TODO: Remove; Only for testing purposes #####
 @external
 func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(

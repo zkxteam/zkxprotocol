@@ -12,6 +12,10 @@ from contracts.Math_64x61 import (
     Math64x61_round,
 )
 
+// ///////
+// View //
+// ///////
+
 @view
 func calc{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     x: felt, precision: felt

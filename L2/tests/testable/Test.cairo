@@ -6,6 +6,10 @@ from starkware.starknet.common.syscalls import get_block_timestamp
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math_cmp import is_le
 
+// //////////
+// Storage //
+// //////////
+
 // @notice Stores the contract version
 @storage_var
 func timestamp() -> (res: felt) {
@@ -15,6 +19,22 @@ func timestamp() -> (res: felt) {
 @storage_var
 func test() -> (res: felt) {
 }
+
+// ///////
+// View //
+// ///////
+
+@view
+func return_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    res: felt
+) {
+    let (block_timestamp) = get_block_timestamp();
+    return (block_timestamp,);
+}
+
+// ///////////
+// External //
+// ///////////
 
 @external
 func calc_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(x: felt) -> (
@@ -39,12 +59,4 @@ func calc_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(x
         // tempvar pedersen_ptr : HashBuiltin* = pedersen_ptr
         // tempvar range_check_ptr = range_check_ptr
     }
-}
-
-@view
-func return_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    res: felt
-) {
-    let (block_timestamp) = get_block_timestamp();
-    return (block_timestamp,);
 }

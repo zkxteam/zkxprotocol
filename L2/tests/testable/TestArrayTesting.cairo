@@ -6,10 +6,18 @@ from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.math import assert_not_zero, assert_nn, assert_le
 from starkware.cairo.common.alloc import alloc
 
+// //////////
+// Structs //
+// //////////
+
 struct Position {
     asset_id: felt,
     coll_id: felt,
 }
+
+// //////////
+// Storage //
+// //////////
 
 @storage_var
 func position_mapping(position_id: felt) -> (position: Position) {
@@ -26,6 +34,41 @@ func position_array(index: felt) -> (position_id: felt) {
 @storage_var
 func arr_len() -> (len: felt) {
 }
+
+// ///////
+// View //
+// ///////
+
+@view
+func return_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    array_list_len: felt, array_list: Position*
+) {
+    alloc_locals;
+
+    let (array_list: Position*) = alloc();
+    return populate_array(array_list_len=0, array_list=array_list);
+}
+
+@view
+func get_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id_: felt) -> (
+    res: Position
+) {
+    let (pos) = position_mapping.read(position_id=id_);
+    return (pos,);
+}
+
+@view
+func get_position_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    id_: felt
+) -> (res: Position) {
+    let (pos) = position_array.read(index=id_);
+    let (pos_deets) = position_mapping.read(position_id=pos);
+    return (pos_deets,);
+}
+
+// ///////////
+// External //
+// ///////////
 
 @external
 func add_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -56,6 +99,10 @@ func remove_from_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (1,);
 }
 
+// ///////////
+// Internal //
+// ///////////
+
 func add_to_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id_: felt) -> (
     res: felt
 ) {
@@ -82,31 +129,4 @@ func populate_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 
     assert array_list[array_list_len] = pos_deets;
     return populate_array(array_list_len + 1, array_list);
-}
-
-@view
-func return_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    array_list_len: felt, array_list: Position*
-) {
-    alloc_locals;
-
-    let (array_list: Position*) = alloc();
-    return populate_array(array_list_len=0, array_list=array_list);
-}
-
-@view
-func get_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(id_: felt) -> (
-    res: Position
-) {
-    let (pos) = position_mapping.read(position_id=id_);
-    return (pos,);
-}
-
-@view
-func get_position_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    id_: felt
-) -> (res: Position) {
-    let (pos) = position_array.read(index=id_);
-    let (pos_deets) = position_mapping.read(position_id=pos);
-    return (pos_deets,);
 }

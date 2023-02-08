@@ -42,9 +42,13 @@ from contracts.hightide.HighTide import (
     populate_hightide_list_recurse,
     previous_trading_season,
     market_under_hightide,
-    is_market_under_hightide
+    is_market_under_hightide,
 )
 from starkware.cairo.common.cairo_builtins import HashBuiltin
+
+// ///////////
+// External //
+// ///////////
 
 // @notice - This function is used to activate high tide
 // @param hightide_id - id of hightide
