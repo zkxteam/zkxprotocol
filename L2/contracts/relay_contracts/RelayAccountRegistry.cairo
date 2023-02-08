@@ -19,6 +19,10 @@ from contracts.libraries.RelayLibrary import (
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
+// //////////////
+// Constructor //
+// //////////////
+
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -27,6 +31,34 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     initialize(registry_address_, version_, index_);
     return ();
 }
+
+// ///////
+// View //
+// ///////
+
+@view
+func get_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    starting_index_: felt, num_accounts_: felt
+) -> (account_registry_len: felt, account_registry: felt*) {
+    let (inner_address) = get_inner_contract();
+    let (res_len, res: felt*) = IAccountRegistry.get_account_registry(
+        inner_address, starting_index_, num_accounts_
+    );
+    return (res_len, res);
+}
+
+@view
+func is_registered_user{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    address_: felt
+) -> (present: felt) {
+    let (inner_address) = get_inner_contract();
+    let (res) = IAccountRegistry.is_registered_user(inner_address, address_);
+    return (res,);
+}
+
+// ///////////
+// External //
+// ///////////
 
 // @notice - All the following are mirror functions for AccountRegistry.cairo - just record call details and forward call
 @external
@@ -47,24 +79,4 @@ func remove_from_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     let (inner_address) = get_inner_contract();
     IAccountRegistry.remove_from_account_registry(inner_address, id_);
     return ();
-}
-
-@view
-func get_account_registry{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    starting_index_: felt, num_accounts_: felt
-) -> (account_registry_len: felt, account_registry: felt*) {
-    let (inner_address) = get_inner_contract();
-    let (res_len, res: felt*) = IAccountRegistry.get_account_registry(
-        inner_address, starting_index_, num_accounts_
-    );
-    return (res_len, res);
-}
-
-@view
-func is_registered_user{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    address_: felt
-) -> (present: felt) {
-    let (inner_address) = get_inner_contract();
-    let (res) = IAccountRegistry.is_registered_user(inner_address, address_);
-    return (res,);
 }

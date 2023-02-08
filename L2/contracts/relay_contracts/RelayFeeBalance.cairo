@@ -20,6 +20,10 @@ from contracts.libraries.RelayLibrary import (
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
+// //////////////
+// Constructor //
+// //////////////
+
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -29,17 +33,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// @notice - All the following are mirror functions for FeeBalance.cairo - just record call details and forward call
-
-@external
-func update_fee_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    address: felt, assetID_: felt, fee_to_add: felt
-) {
-    record_call_details('update_fee_mapping');
-    let (inner_address) = get_inner_contract();
-    IFeeBalance.update_fee_mapping(inner_address, address, assetID_, fee_to_add);
-    return ();
-}
+// ///////
+// View //
+// ///////
 
 @view
 func get_total_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -57,4 +53,19 @@ func get_user_fee{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     let (inner_address) = get_inner_contract();
     let (res) = IFeeBalance.get_user_fee(inner_address, address, assetID_);
     return (res,);
+}
+
+// ///////////
+// External //
+// ///////////
+
+// @notice - All the following are mirror functions for FeeBalance.cairo - just record call details and forward call
+@external
+func update_fee_mapping{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    address: felt, assetID_: felt, fee_to_add: felt
+) {
+    record_call_details('update_fee_mapping');
+    let (inner_address) = get_inner_contract();
+    IFeeBalance.update_fee_mapping(inner_address, address, assetID_, fee_to_add);
+    return ();
 }

@@ -21,6 +21,10 @@ from contracts.libraries.RelayLibrary import (
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from contracts.Constants import ManageFunds_ACTION
 
+// //////////////
+// Constructor //
+// //////////////
+
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -30,8 +34,24 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-// @notice - All the following are mirror functions for EmergencyFund.cairo - just record call details and forward call
+// ///////
+// View //
+// ///////
 
+@view
+func balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(asset_id_: felt) -> (
+    amount: felt
+) {
+    let (inner_address) = get_inner_contract();
+    let (res) = IEmergencyFund.balance(inner_address, asset_id_);
+    return (res,);
+}
+
+// ///////////
+// External //
+// ///////////
+
+// @notice - All the following are mirror functions for EmergencyFund.cairo - just record call details and forward call
 @external
 func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount: felt
@@ -118,13 +138,4 @@ func defund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let (inner_address) = get_inner_contract();
     IEmergencyFund.defund_liquidity(inner_address, asset_id, amount);
     return ();
-}
-
-@view
-func balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(asset_id_: felt) -> (
-    amount: felt
-) {
-    let (inner_address) = get_inner_contract();
-    let (res) = IEmergencyFund.balance(inner_address, asset_id_);
-    return (res,);
 }

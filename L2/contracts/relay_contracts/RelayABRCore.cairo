@@ -19,6 +19,10 @@ from contracts.libraries.RelayLibrary import (
 from contracts.DataTypes import ABRDetails
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
+// //////////////
+// Constructor //
+// //////////////
+
 // @notice - This will call initialize to set the registry address, version and index of underlying contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -28,118 +32,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return ();
 }
 
-@external
-func set_abr_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_abr_interval_: felt
-) {
-    alloc_locals;
-
-    record_call_details('set_abr_interval');
-    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    let (inner_address) = get_inner_contract();
-    let () = IABRCore.set_abr_interval(
-        contract_address=inner_address, new_abr_interval_=new_abr_interval_
-    );
-
-    return ();
-}
-
-@external
-func set_base_abr_rate{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_base_abr_: felt
-) {
-    alloc_locals;
-
-    record_call_details('set_base_abr_rate');
-    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    let (inner_address) = get_inner_contract();
-    let () = IABRCore.set_base_abr_rate(
-        contract_address=inner_address, new_base_abr_=new_base_abr_
-    );
-
-    return ();
-}
-
-@external
-func set_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_bollinger_width_: felt
-) {
-    alloc_locals;
-
-    record_call_details('set_base_abr_rate');
-    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    let (inner_address) = get_inner_contract();
-    let () = IABRCore.set_bollinger_width(
-        contract_address=inner_address, new_bollinger_width_=new_bollinger_width_
-    );
-
-    return ();
-}
-
-@external
-func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_no_of_users_per_batch: felt
-) {
-    alloc_locals;
-
-    record_call_details('set_no_of_users_per_batch');
-    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    let (inner_address) = get_inner_contract();
-    let () = IABRCore.set_no_of_users_per_batch(
-        contract_address=inner_address, new_no_of_users_per_batch=new_no_of_users_per_batch
-    );
-
-    return ();
-}
-
-@external
-func set_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_timestamp: felt
-) {
-    alloc_locals;
-
-    record_call_details('set_abr_timestamp');
-    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    let (inner_address) = get_inner_contract();
-    let () = IABRCore.set_abr_timestamp(
-        contract_address=inner_address, new_timestamp=new_timestamp
-    );
-
-    return ();
-}
-
-@external
-func set_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt, perp_index_len: felt, perp_index: felt*, perp_mark_len: felt, perp_mark: felt*
-) {
-    alloc_locals;
-
-    record_call_details('set_abr_value');
-    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    let (inner_address) = get_inner_contract();
-    let () = IABRCore.set_abr_value(
-        contract_address=inner_address,
-        market_id_=market_id_,
-        perp_index_len=perp_index_len,
-        perp_index=perp_index,
-        perp_mark_len=perp_mark_len,
-        perp_mark=perp_mark,
-    );
-
-    return ();
-}
-
-@external
-func make_abr_payments{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
-    alloc_locals;
-
-    record_call_details('make_abr_payments');
-    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    let (inner_address) = get_inner_contract();
-    let () = IABRCore.make_abr_payments(contract_address=inner_address);
-
-    return ();
-}
+// ///////
+// View //
+// ///////
 
 @view
 func get_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (res: felt) {
@@ -252,4 +147,121 @@ func get_previous_abr_values{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         n_=n_,
     );
     return (abr_values_list_len, abr_values_list);
+}
+
+// ///////////
+// External //
+// ///////////
+
+@external
+func set_abr_interval{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_abr_interval_: felt
+) {
+    alloc_locals;
+
+    record_call_details('set_abr_interval');
+    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let (inner_address) = get_inner_contract();
+    let () = IABRCore.set_abr_interval(
+        contract_address=inner_address, new_abr_interval_=new_abr_interval_
+    );
+
+    return ();
+}
+
+@external
+func set_base_abr_rate{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_base_abr_: felt
+) {
+    alloc_locals;
+
+    record_call_details('set_base_abr_rate');
+    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let (inner_address) = get_inner_contract();
+    let () = IABRCore.set_base_abr_rate(
+        contract_address=inner_address, new_base_abr_=new_base_abr_
+    );
+
+    return ();
+}
+
+@external
+func set_bollinger_width{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_bollinger_width_: felt
+) {
+    alloc_locals;
+
+    record_call_details('set_base_abr_rate');
+    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let (inner_address) = get_inner_contract();
+    let () = IABRCore.set_bollinger_width(
+        contract_address=inner_address, new_bollinger_width_=new_bollinger_width_
+    );
+
+    return ();
+}
+
+@external
+func set_no_of_users_per_batch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_no_of_users_per_batch: felt
+) {
+    alloc_locals;
+
+    record_call_details('set_no_of_users_per_batch');
+    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let (inner_address) = get_inner_contract();
+    let () = IABRCore.set_no_of_users_per_batch(
+        contract_address=inner_address, new_no_of_users_per_batch=new_no_of_users_per_batch
+    );
+
+    return ();
+}
+
+@external
+func set_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    new_timestamp: felt
+) {
+    alloc_locals;
+
+    record_call_details('set_abr_timestamp');
+    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let (inner_address) = get_inner_contract();
+    let () = IABRCore.set_abr_timestamp(
+        contract_address=inner_address, new_timestamp=new_timestamp
+    );
+
+    return ();
+}
+
+@external
+func set_abr_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_id_: felt, perp_index_len: felt, perp_index: felt*, perp_mark_len: felt, perp_mark: felt*
+) {
+    alloc_locals;
+
+    record_call_details('set_abr_value');
+    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let (inner_address) = get_inner_contract();
+    let () = IABRCore.set_abr_value(
+        contract_address=inner_address,
+        market_id_=market_id_,
+        perp_index_len=perp_index_len,
+        perp_index=perp_index,
+        perp_mark_len=perp_mark_len,
+        perp_mark=perp_mark,
+    );
+
+    return ();
+}
+
+@external
+func make_abr_payments{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() {
+    alloc_locals;
+
+    record_call_details('make_abr_payments');
+    local pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let (inner_address) = get_inner_contract();
+    let () = IABRCore.make_abr_payments(contract_address=inner_address);
+
+    return ();
 }
