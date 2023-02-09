@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "ganache": "^7.7.4"
+  }
+}

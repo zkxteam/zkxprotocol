@@ -328,6 +328,17 @@ func get_withdrawal_history{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     return populate_withdrawals_array(0, withdrawal_list);
 }
 
+// @notice view function to get withdrawal history by status
+// @return withdrawal_list_len - Length of the withdrawal list
+// @return withdrawal_list - Fully populated list of withdrawals
+@view
+func get_withdrawal_history_by_status{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(status_: felt) -> (withdrawal_list_len: felt, withdrawal_list: WithdrawalHistory*) {
+    let (withdrawal_list: WithdrawalHistory*) = alloc();
+    return populate_withdrawals_array_by_status(status_, 0, 0, withdrawal_list);
+}
+
 // @notice view function to get amount to withdraw
 // @param collateral_id_ - ID of the collateral
 // @return safe_withdrawal_amount_64x61 - returns the safe amount to withdraw before position gets deleveraged or liquidated
@@ -1325,6 +1336,36 @@ func populate_withdrawals_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 
     assert withdrawal_list_[withdrawal_list_len_] = withdrawal_history;
     return populate_withdrawals_array(withdrawal_list_len_ + 1, withdrawal_list_);
+}
+
+// @notice Internal Function called by get_withdrawal_history_by_status to recursively add WithdrawalRequest to the array and return it
+// @param status_ - Status of the withdrawal
+// @param index_ - Index to fetch withdrawal history
+// @param withdrawal_list_len_ - Stores the current length of the populated withdrawals array
+// @param withdrawal_list_ - Array of WithdrawalRequest filled up to the index
+// @return withdrawal_list_len - Length of the withdrawal_list
+// @return withdrawal_list - Fully populated list of Withdrawals
+func populate_withdrawals_array_by_status{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    status_: felt, index_: felt, withdrawal_list_len_: felt, withdrawal_list_: WithdrawalHistory*
+) -> (withdrawal_list_len: felt, withdrawal_list: WithdrawalHistory*) {
+    alloc_locals;
+    let (withdrawal_history) = withdrawal_history_array.read(index=withdrawal_list_len_);
+
+    if (withdrawal_history.collateral_id == 0) {
+        return (withdrawal_list_len_, withdrawal_list_);
+    }
+
+    local withdrawal_list_len;
+    if (withdrawal_history.status == status_) {
+        assert withdrawal_list_[withdrawal_list_len_] = withdrawal_history;
+        withdrawal_list_len = withdrawal_list_len_ + 1;
+    }
+
+    return populate_withdrawals_array_by_status(
+        status_, index_ + 1, withdrawal_list_len, withdrawal_list_
+    );
 }
 
 // @notice Internal Function called by return_array_collaterals to recursively add collateralBalance to the array and return it
