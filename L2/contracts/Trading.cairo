@@ -941,7 +941,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     tempvar range_check_ptr = range_check_ptr;
                 } else {
                     // Transfer the remaining amount from Insurance Fund
-                    let (insurance_amount_claim) = Math64x61_sub(deficit, user_balance);
                     let (balance_less_than_zero_res) = Math64x61_is_le(
                         user_balance, 0, collateral_token_decimal_
                     );

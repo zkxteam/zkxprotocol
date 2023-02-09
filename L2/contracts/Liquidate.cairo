@@ -392,11 +392,27 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         // /////////////////
 
         // Check if the maintenance margin is not satisfied
-        let (is_liquidation) = Math64x61_is_le(
+        local is_liquidation;
+        let (is_below_maintanence) = Math64x61_is_le(
             total_account_value_collateral,
             total_maintenance_requirement_,
             collateral_token_decimal_,
         );
+
+        // If it's a long position with 1x leverage, ignore it
+        if (is_below_maintanence == 1) {
+            if (least_collateral_ratio_position_.direction == LONG) {
+                if (least_collateral_ratio_position_.leverage == Math64x61_ONE) {
+                    assert is_liquidation = 0;
+                } else {
+                    assert is_liquidation = 1;
+                }
+            } else {
+                assert is_liquidation = 1;
+            }
+        } else {
+            assert is_liquidation = 0;
+        }
 
         // Return if the account should be liquidated or not and the orderId of the least colalteralized position
         return (
@@ -443,7 +459,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // Calculate pnl to check if it is the least collateralized position
 
     local price_diff_;
-    if ([positions_].direction == 1) {
+    if ([positions_].direction == LONG) {
         let (price_diff) = Math64x61_sub(market_price.price, [positions_].avg_execution_price);
         price_diff_ = price_diff;
     } else {
@@ -471,41 +487,13 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     local least_collateral_ratio_position_asset_price;
 
     if (is_le(collateral_ratio_position, least_collateral_ratio_) == TRUE) {
-        if ([positions_].direction == LONG) {
-            if ([positions_].leverage == Math64x61_ONE) {
-                assert least_collateral_ratio = least_collateral_ratio_;
-                assert least_collateral_ratio_position = least_collateral_ratio_position_;
-                assert least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price_;
-
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-            } else {
-                assert least_collateral_ratio = collateral_ratio_position;
-                assert least_collateral_ratio_position = [positions_];
-                assert least_collateral_ratio_position_asset_price = market_price.price;
-
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-            }
-        } else {
-            assert least_collateral_ratio = collateral_ratio_position;
-            assert least_collateral_ratio_position = [positions_];
-            assert least_collateral_ratio_position_asset_price = market_price.price;
-
-             tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+        assert least_collateral_ratio = collateral_ratio_position;
+        assert least_collateral_ratio_position = [positions_];
+        assert least_collateral_ratio_position_asset_price = market_price.price;
     } else {
         assert least_collateral_ratio = least_collateral_ratio_;
         assert least_collateral_ratio_position = least_collateral_ratio_position_;
         assert least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price_;
-
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
     }
 
     let (total_maintenance_requirement) = Math64x61_add(
@@ -588,7 +576,7 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Calculate the leverage after deleveraging
     let (position_value) = Math64x61_add(margin_amount, borrowed_amount);
-    let (amount_to_be_sold_value) = Math64x61_mul(amount_to_be_sold, asset_price_);
+    let (amount_to_be_sold_value) = Math64x61_mul(amount_to_be_sold, position_.avg_execution_price);
     let (remaining_position_value) = Math64x61_sub(position_value, amount_to_be_sold_value);
     let (leverage_after_deleveraging) = Math64x61_div(remaining_position_value, margin_amount);
 
