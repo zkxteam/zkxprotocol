@@ -330,6 +330,7 @@ func get_withdrawal_history{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 }
 
 // @notice view function to get withdrawal history by status
+// @param status_ - Withdrawal history status
 // @return withdrawal_list_len - Length of the withdrawal list
 // @return withdrawal_list - Fully populated list of withdrawals
 @view
@@ -1323,6 +1324,7 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // ///////////
 
 // @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
+// @param iterator_ - Index to fetch withdrawal history
 // @param withdrawal_list_len_ - Stores the current length of the populated withdrawals array
 // @param withdrawal_list_ - Array of WithdrawalRequest filled up to the index
 // @return withdrawal_list_len - Length of the withdrawal_list
