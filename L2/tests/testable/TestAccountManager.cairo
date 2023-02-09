@@ -15,6 +15,7 @@ from contracts.AccountManager import (
     get_portion_executed,
     return_array_collaterals,
     get_withdrawal_history,
+    get_withdrawal_history_by_status,
     deposit,
     transfer_from,
     transfer_from_abr,
