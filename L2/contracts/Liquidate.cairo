@@ -129,7 +129,7 @@ func find_under_collateralized_position{
     );
 
     if (liquidatable_position.amount_to_be_sold != 0) {
-        return (1, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0);
+        return (TRUE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
     }
 
     // Fetch all the positions from the Account contract
@@ -141,7 +141,7 @@ func find_under_collateralized_position{
 
     // Check if the list is empty
     if (positions_len == 0) {
-        return (0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0);
+        return (FALSE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
     }
 
     // Get Market contract address
@@ -182,7 +182,7 @@ func find_under_collateralized_position{
         total_account_value_=0,
         total_maintenance_requirement_=0,
         least_collateral_ratio_=Math64x61_ONE,
-        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_asset_price_=0,
     );
 
@@ -316,7 +316,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         total_account_value_=account_value,
         total_maintenance_requirement_=maintenance_requirement,
         least_collateral_ratio_=Math64x61_ONE,
-        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position_=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_asset_price_=0,
     );
 
@@ -392,11 +392,27 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         // /////////////////
 
         // Check if the maintenance margin is not satisfied
-        let (is_liquidation) = Math64x61_is_le(
+        local is_liquidation;
+        let (is_below_maintanence) = Math64x61_is_le(
             total_account_value_collateral,
             total_maintenance_requirement_,
             collateral_token_decimal_,
         );
+
+        // If it's a long position with 1x leverage, ignore it
+        if (is_below_maintanence == TRUE) {
+            if (least_collateral_ratio_position_.direction == LONG) {
+                if (least_collateral_ratio_position_.leverage == Math64x61_ONE) {
+                    assert is_liquidation = FALSE;
+                } else {
+                    assert is_liquidation = TRUE;
+                }
+            } else {
+                assert is_liquidation = TRUE;
+            }
+        } else {
+            assert is_liquidation = FALSE;
+        }
 
         // Return if the account should be liquidated or not and the orderId of the least colalteralized position
         return (
@@ -427,7 +443,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // ttl has passed, return 0
     let status = is_le(time_difference, ttl);
     if (status == FALSE) {
-        return (0, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0), 0, 0, 0);
+        return (FALSE, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0, 0);
     }
 
     let (req_margin) = IMarkets.get_maintenance_margin(
@@ -443,7 +459,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // Calculate pnl to check if it is the least collateralized position
 
     local price_diff_;
-    if ([positions_].direction == 1) {
+    if ([positions_].direction == LONG) {
         let (price_diff) = Math64x61_sub(market_price.price, [positions_].avg_execution_price);
         price_diff_ = price_diff;
     } else {
@@ -465,13 +481,12 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     let (denominator) = Math64x61_mul([positions_].position_size, market_price.price);
     let (collateral_ratio_position) = Math64x61_div(numerator, denominator);
 
-    let is_lesser = is_le(collateral_ratio_position, least_collateral_ratio_);
-
     // If it is the lowest, update least_collateral_ratio and least_collateral_ratio_position
     local least_collateral_ratio;
     local least_collateral_ratio_position: PositionDetailsForRiskManagement;
     local least_collateral_ratio_position_asset_price;
-    if (is_lesser == TRUE) {
+
+    if (is_le(collateral_ratio_position, least_collateral_ratio_) == TRUE) {
         assert least_collateral_ratio = collateral_ratio_position;
         assert least_collateral_ratio_position = [positions_];
         assert least_collateral_ratio_position_asset_price = market_price.price;
@@ -561,14 +576,14 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     // Calculate the leverage after deleveraging
     let (position_value) = Math64x61_add(margin_amount, borrowed_amount);
-    let (amount_to_be_sold_value) = Math64x61_mul(amount_to_be_sold, asset_price_);
+    let (amount_to_be_sold_value) = Math64x61_mul(amount_to_be_sold, position_.avg_execution_price);
     let (remaining_position_value) = Math64x61_sub(position_value, amount_to_be_sold_value);
     let (leverage_after_deleveraging) = Math64x61_div(remaining_position_value, margin_amount);
 
     // to64x61(2) == 4611686018427387904
     let (can_be_liquidated) = Math64x61_is_le(leverage_after_deleveraging, 4611686018427387904, 5);
     if (can_be_liquidated == TRUE) {
-        return (0,);
+        return (FALSE,);
     } else {
         // position_to_be_deleveraged event is emitted
         position_to_be_deleveraged.emit(position=position_, amount_to_be_sold=amount_to_be_sold);
