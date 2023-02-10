@@ -25,6 +25,9 @@ eth_test_utils = EthTestUtils()
 
 DUMMY_WITHDRAWAL_REQUEST_ADDRESS=12345
 
+WITHDRAWAL_INITIATED = 1
+WITHDRAWAL_SUCCEEDED = 2
+
 def generate_asset_info():
     global counter
     counter += 1
@@ -209,6 +212,14 @@ async def test_withdraw_positive_flow(adminAuth_factory):
                                       asset_id,
                                       2*(10**18), # here amount is being given as uint256 not as 64x61 value
                                       request_id)
+    
+    # get withdrawals whose status is in initiaited state
+    execution_info = await new_account_contract.get_withdrawal_history_by_status(WITHDRAWAL_INITIATED).call()
+    parsed_list = list(execution_info.result.withdrawal_list)[0]
+    assert parsed_list.collateral_id == asset_id
+    assert parsed_list.amount == to64x61(2)
+    assert parsed_list.fee == to64x61(1)
+    assert parsed_list.status == WITHDRAWAL_INITIATED
 
     await postman.flush()
 
@@ -242,7 +253,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     result=result.result.withdrawal_list[0]
     assert result.request_id == request_id
     assert result.collateral_id == asset_id
-    assert result.status == 0
+    assert result.status == WITHDRAWAL_INITIATED
 
     result = await withdrawal_request.get_withdrawal_request_data(request_id).call()
  
@@ -260,7 +271,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     result=result.result.withdrawal_list[0]
     assert result.request_id == request_id
     assert result.collateral_id == asset_id
-    assert result.status == 1 # status should be updated
+    assert result.status == WITHDRAWAL_SUCCEEDED # status should be updated
 
     result = await withdrawal_request.get_withdrawal_request_data(request_id).call()
     result=result.result.withdrawal_request
@@ -268,6 +279,14 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     assert result.user_l2_address == 0
     assert result.asset_id == 0
     assert result.amount == 0
+
+    # get withdrawals whose status is in succeded state. 
+    execution_info = await new_account_contract.get_withdrawal_history_by_status(WITHDRAWAL_SUCCEEDED).call()
+    parsed_list = list(execution_info.result.withdrawal_list)[0]
+    assert parsed_list.collateral_id == asset_id
+    assert parsed_list.amount == to64x61(2)
+    assert parsed_list.fee == to64x61(1)
+    assert parsed_list.status == WITHDRAWAL_SUCCEEDED
 
 
 @pytest.mark.asyncio

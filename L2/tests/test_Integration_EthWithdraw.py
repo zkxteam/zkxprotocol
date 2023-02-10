@@ -25,6 +25,9 @@ ETH_ID = 4543560
 ETH_NAME = str_to_felt("ETH")
 DUMMY_WITHDRAWAL_REQUEST_ADDRESS=12345
 
+WITHDRAWAL_INITIATED = 1
+WITHDRAWAL_SUCCEEDED = 2
+
 def generate_asset_info():
     global counter
     counter += 1
@@ -196,8 +199,16 @@ async def test_withdraw_positive_flow(adminAuth_factory):
         l1_zkx_contract.withdrawEth.transact(eth_test_utils.accounts[0].address,
                                       2*(10**18), # here amount is being given as uint256 not as 64x61 value
                                       request_id)
-    await postman.flush()
 
+    # get withdrawals whose status is in initiaited state
+    execution_info = await new_account_contract.get_withdrawal_history_by_status(WITHDRAWAL_INITIATED).call()
+    parsed_list = list(execution_info.result.withdrawal_list)[0]
+    assert parsed_list.collateral_id == ETH_ID
+    assert parsed_list.amount == to64x61(2)
+    assert parsed_list.fee == to64x61(1)
+    assert parsed_list.status == WITHDRAWAL_INITIATED
+
+    await postman.flush()
 
     l1_zkx_contract.withdrawEth.transact(eth_test_utils.accounts[0].address,
                                       2*(10**18), # here amount is being given as uint256 not as 64x61 value
@@ -219,7 +230,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     result=result.result.withdrawal_list[0]
     assert result.request_id == request_id
     assert result.collateral_id == ETH_ID
-    assert result.status == 0
+    assert result.status == WITHDRAWAL_INITIATED
 
     result = await withdrawal_request.get_withdrawal_request_data(request_id).call()
  
@@ -236,7 +247,7 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     result=result.result.withdrawal_list[0]
     assert result.request_id == request_id
     assert result.collateral_id == ETH_ID
-    assert result.status == 1
+    assert result.status == WITHDRAWAL_SUCCEEDED
 
     result = await withdrawal_request.get_withdrawal_request_data(request_id).call()
     result=result.result.withdrawal_request
@@ -244,6 +255,14 @@ async def test_withdraw_positive_flow(adminAuth_factory):
     assert result.user_l2_address == 0
     assert result.asset_id == 0
     assert result.amount == 0
+
+    # get withdrawals whose status is in succeded state. 
+    execution_info = await new_account_contract.get_withdrawal_history_by_status(WITHDRAWAL_SUCCEEDED).call()
+    parsed_list = list(execution_info.result.withdrawal_list)[0]
+    assert parsed_list.collateral_id == ETH_ID
+    assert parsed_list.amount == to64x61(2)
+    assert parsed_list.fee == to64x61(1)
+    assert parsed_list.status == WITHDRAWAL_SUCCEEDED
 
 
 @pytest.mark.asyncio
@@ -382,9 +401,6 @@ async def test_withdraw_impersonater_ZKX_L1(adminAuth_factory):
 
     # restoring L1_ZKX_address on L2
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, int(l1_zkx_contract.address, 16)])
-
-
-    
 
 
 @pytest.mark.asyncio
