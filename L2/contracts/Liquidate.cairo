@@ -129,7 +129,7 @@ func find_under_collateralized_position{
     );
 
     if (liquidatable_position.amount_to_be_sold != 0) {
-        return (1, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
+        return (TRUE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
     }
 
     // Fetch all the positions from the Account contract
@@ -141,7 +141,7 @@ func find_under_collateralized_position{
 
     // Check if the list is empty
     if (positions_len == 0) {
-        return (0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
+        return (FALSE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
     }
 
     // Get Market contract address
@@ -400,18 +400,18 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         );
 
         // If it's a long position with 1x leverage, ignore it
-        if (is_below_maintanence == 1) {
+        if (is_below_maintanence == TRUE) {
             if (least_collateral_ratio_position_.direction == LONG) {
                 if (least_collateral_ratio_position_.leverage == Math64x61_ONE) {
-                    assert is_liquidation = 0;
+                    assert is_liquidation = FALSE;
                 } else {
-                    assert is_liquidation = 1;
+                    assert is_liquidation = TRUE;
                 }
             } else {
-                assert is_liquidation = 1;
+                assert is_liquidation = TRUE;
             }
         } else {
-            assert is_liquidation = 0;
+            assert is_liquidation = FALSE;
         }
 
         // Return if the account should be liquidated or not and the orderId of the least colalteralized position
@@ -443,7 +443,7 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     // ttl has passed, return 0
     let status = is_le(time_difference, ttl);
     if (status == FALSE) {
-        return (0, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0, 0);
+        return (FALSE, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0, 0);
     }
 
     let (req_margin) = IMarkets.get_maintenance_margin(
@@ -583,7 +583,7 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     // to64x61(2) == 4611686018427387904
     let (can_be_liquidated) = Math64x61_is_le(leverage_after_deleveraging, 4611686018427387904, 5);
     if (can_be_liquidated == TRUE) {
-        return (0,);
+        return (FALSE,);
     } else {
         // position_to_be_deleveraged event is emitted
         position_to_be_deleveraged.emit(position=position_, amount_to_be_sold=amount_to_be_sold);
