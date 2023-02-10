@@ -71,6 +71,7 @@ from contracts.Math_64x61 import (
     Math64x61_is_le,
     Math64x61_mul,
     Math64x61_ONE,
+    Math64x61_round,
     Math64x61_sub,
 )
 
@@ -1365,6 +1366,16 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
     }
 
+    tempvar syscall_ptr = syscall_ptr;
+    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    tempvar range_check_ptr = range_check_ptr;
+
+    let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_token_decimal_);
+    let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_token_decimal_);
+    let (execution_price_rounded) = Math64x61_round(
+        average_execution_price, collateral_token_decimal_
+    );
+
     // Create a temporary order object
     let temp_order_request: OrderRequest = OrderRequest(
         order_id=[request_list_].order_id,
@@ -1392,9 +1403,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         request=temp_order_request,
         signature=temp_signature,
         size=quantity_to_execute,
-        execution_price=average_execution_price,
-        margin_amount=margin_amount,
-        borrowed_amount=borrowed_amount,
+        execution_price=execution_price_rounded,
+        margin_amount=margin_amount_rounded,
+        borrowed_amount=borrowed_amount_rounded,
         market_id=market_id_,
         collateral_id_=collateral_id_,
         pnl=pnl,
