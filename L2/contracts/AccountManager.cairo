@@ -1332,12 +1332,11 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func populate_withdrawals_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     iterator_: felt, withdrawal_list_len_: felt, withdrawal_list_: WithdrawalHistory*
 ) -> (withdrawal_list_len: felt, withdrawal_list: WithdrawalHistory*) {
-    let (withdrawal_history) = withdrawal_history_array.read(index=iterator_);
-
     if (iterator_ == withdrawal_list_len_) {
         return (withdrawal_list_len_, withdrawal_list_);
     }
 
+    let (withdrawal_history) = withdrawal_history_array.read(index=iterator_);
     assert withdrawal_list_[iterator_] = withdrawal_history;
     return populate_withdrawals_array(iterator_ + 1, withdrawal_list_len_, withdrawal_list_);
 }
@@ -1360,13 +1359,12 @@ func populate_withdrawals_array_by_status{
     withdrawal_list_: WithdrawalHistory*,
 ) -> (withdrawal_list_len: felt, withdrawal_list: WithdrawalHistory*) {
     alloc_locals;
-    let (withdrawal_history) = withdrawal_history_array.read(index=iterator_);
-
     if (iterator_ == withdrawal_array_len_) {
         return (withdrawal_list_len_, withdrawal_list_);
     }
 
     local withdrawal_list_len;
+    let (withdrawal_history) = withdrawal_history_array.read(index=iterator_);
     if (withdrawal_history.status == status_) {
         assert withdrawal_list_[withdrawal_list_len_] = withdrawal_history;
         withdrawal_list_len = withdrawal_list_len_ + 1;
