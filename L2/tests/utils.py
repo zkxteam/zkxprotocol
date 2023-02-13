@@ -257,8 +257,11 @@ def assert_events_emitted(tx_exec_info, events):
 
         raise BaseException("Event not fired or not fired correctly")
 
+
 def assert_event_with_custom_keys_emitted(tx_exec_info, from_address, keys, data, order=0):
-    assert_events_with_custom_keys_emitted(tx_exec_info,[(order, from_address, keys, data)])
+    assert_events_with_custom_keys_emitted(
+        tx_exec_info, [(order, from_address, keys, data)])
+
 
 def assert_events_with_custom_keys_emitted(tx_exec_info, events):
     """Assert events are fired with correct data."""
