@@ -20,6 +20,7 @@ from starkware.starknet.common.syscalls import (
 from contracts.Constants import (
     ABR_PAYMENT_INDEX,
     Asset_INDEX,
+    BUY,
     DELEVERAGING_ORDER,
     IoC,
     L1_ZKX_Address_INDEX,
@@ -27,7 +28,6 @@ from contracts.Constants import (
     LIQUIDATION_ORDER,
     LONG,
     Market_INDEX,
-    OPEN,
     SHORT,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
@@ -842,7 +842,7 @@ func execute_order{
 
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position
-    if (request.life_cycle == OPEN) {
+    if (request.side == BUY) {
         local created_timestamp;
         let (is_equal) = Math64x61_is_equal(position_details.position_size, 0, asset_decimals);
         if (is_equal == TRUE) {
@@ -1467,7 +1467,7 @@ func populate_positions_risk_management{
             position_size=long_position.position_size,
             margin_amount=long_position.margin_amount,
             borrowed_amount=long_position.borrowed_amount,
-            leverage=long_position.leverage
+            leverage=long_position.leverage,
         );
         assert positions_array_[positions_array_len_] = curr_position;
         assert is_long = 1;
@@ -1485,7 +1485,7 @@ func populate_positions_risk_management{
             position_size=short_position.position_size,
             margin_amount=short_position.margin_amount,
             borrowed_amount=short_position.borrowed_amount,
-            leverage=long_position.leverage
+            leverage=long_position.leverage,
         );
         assert positions_array_[positions_array_len_ + is_long] = curr_position;
         assert is_short = 1;

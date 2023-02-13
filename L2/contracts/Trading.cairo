@@ -17,7 +17,7 @@ from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.Constants import (
     AccountRegistry_INDEX,
     Asset_INDEX,
-    CLOSE,
+    BUY,
     DELEVERAGING_ORDER,
     FeeBalance_INDEX,
     FoK,
@@ -32,7 +32,7 @@ from contracts.Constants import (
     Market_INDEX,
     MarketPrices_INDEX,
     MasterAdmin_ACTION,
-    OPEN,
+    SELL,
     SHORT,
     TAKER,
     TradingFees_INDEX,
@@ -615,7 +615,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         trader_address=order_.user_address,
         fee_64x61=fees,
         order_volume_64x61=order_volume_64x61,
-        life_cycle=OPEN,
+        side=BUY,
         pnl_64x61=0,
         margin_amount_64x61=0,
     );
@@ -689,44 +689,33 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     local order_id;
     assert order_id = order_.order_id;
 
-    // Get the direction of the position that is to be closed
-    local parent_direction;
-
-    if (order_.direction == LONG) {
-        assert parent_direction = SHORT;
-    } else {
-        assert parent_direction = LONG;
-    }
-
     // Get order details
-    let (parent_position: PositionDetails) = IAccountManager.get_position_data(
-        contract_address=order_.user_address, market_id_=market_id_, direction_=parent_direction
+    let (current_position: PositionDetails) = IAccountManager.get_position_data(
+        contract_address=order_.user_address, market_id_=market_id_, direction_=order_.direction
     );
 
-    with_attr error_message("0517: {order_id} {parent_direction}") {
-        assert_not_zero(parent_position.position_size);
+    with_attr error_message("0517: {order_id} {current_position.position_size}") {
+        assert_not_zero(current_position.position_size);
     }
 
-    let margin_amount = parent_position.margin_amount;
-    let borrowed_amount = parent_position.borrowed_amount;
-    average_execution_price_close = parent_position.avg_execution_price;
+    let margin_amount = current_position.margin_amount;
+    let borrowed_amount = current_position.borrowed_amount;
+    average_execution_price_close = current_position.avg_execution_price;
 
     local diff;
     local actual_execution_price;
     local margin_plus_pnl;
 
-    // current order is short order
-    if (order_.direction == SHORT) {
-        // Open order was a long order
+    // current order is a long order
+    if (order_.direction == LONG) {
         assert actual_execution_price = execution_price_;
-        let (diff_felt) = Math64x61_sub(execution_price_, parent_position.avg_execution_price);
+        let (diff_felt) = Math64x61_sub(execution_price_, current_position.avg_execution_price);
         assert diff = diff_felt;
     } else {
-        // Open order was a short order
-        let (diff_felt) = Math64x61_sub(parent_position.avg_execution_price, execution_price_);
+        let (diff_felt) = Math64x61_sub(current_position.avg_execution_price, execution_price_);
         assert diff = diff_felt;
         let (actual_exexution_price_felt) = Math64x61_add(
-            parent_position.avg_execution_price, diff
+            current_position.avg_execution_price, diff
         );
         assert actual_execution_price = actual_exexution_price_felt;
     }
@@ -740,7 +729,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
 
     // Calculate the amount that needs to be returned to liquidity fund
-    let (ratio_of_position) = Math64x61_div(order_size_, parent_position.position_size);
+    let (ratio_of_position) = Math64x61_div(order_size_, current_position.position_size);
     let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, ratio_of_position);
     let (margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
     local margin_amount_open_64x61;
@@ -771,7 +760,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         trader_address=order_.user_address,
         fee_64x61=0,
         order_volume_64x61=order_volume_64x61,
-        life_cycle=CLOSE,
+        side=SELL,
         pnl_64x61=pnl,
         margin_amount_64x61=margin_amount_open_64x61,
     );
@@ -789,7 +778,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     if (not_liquidation == TRUE) {
         // If no leverage is used
         // to64x61(1) == 2305843009213693952
-        if (parent_position.leverage == LEVERAGE_ONE) {
+        if (current_position.leverage == LEVERAGE_ONE) {
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1306,7 +1295,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local pnl;
 
     // If the order is to be opened
-    if ([request_list_].life_cycle == OPEN) {
+    if ([request_list_].side == BUY) {
         let (
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
@@ -1377,7 +1366,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         order_type=[request_list_].order_type,
         time_in_force=[request_list_].time_in_force,
         post_only=[request_list_].post_only,
-        life_cycle=[request_list_].life_cycle,
+        side=[request_list_].side,
         liquidator_address=[request_list_].liquidator_address,
     );
 

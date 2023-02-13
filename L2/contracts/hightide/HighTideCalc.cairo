@@ -1039,12 +1039,12 @@ func calculate_d{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 ) -> (d: felt) {
     // Create a VolumeMetadata struct for open orders
     let volume_metadata_market_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, market_id=market_id_, life_cycle=OPEN
+        season_id=season_id_, market_id=market_id_, side=OPEN
     );
 
     // Create a VolumeMetadata struct for close orders
     let volume_metadata_market_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, market_id=market_id_, life_cycle=CLOSE
+        season_id=season_id_, market_id=market_id_, side=CLOSE
     );
 
     // Get the order volume for open orders
