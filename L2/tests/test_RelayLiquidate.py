@@ -11,7 +11,7 @@ from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61
 from utils_trading import (
     User, Liquidator, OrderExecutor,
-    order_direction, order_types, order_life_cycles, fund_mapping,
+    order_direction, order_types, side, fund_mapping,
     set_balance, execute_and_compare, find_under_collateralized_position,
     compare_fund_balances, compare_user_balances, compare_user_positions, compare_liquidatable_position, compare_debugging_values
 )
@@ -762,7 +762,8 @@ async def test_deleveraging_invalid_order_type(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["liquidation"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     error_at_index = 1
@@ -801,7 +802,8 @@ async def test_deleveraging_invalid_order_size(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["deleverage"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     error_at_index = 1
@@ -839,7 +841,8 @@ async def test_deleveraging_in_multiple_orders(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["deleverage"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -872,7 +875,8 @@ async def test_deleveraging_in_multiple_orders(adminAuth_factory):
         "market_id": market_id_2,
         "order_type": order_types["deleverage"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -921,7 +925,8 @@ async def test_liquidation_invalid_order_type(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["deleverage"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     error_at_index = 1
@@ -967,7 +972,8 @@ async def test_liquidation_invalid_size(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["liquidation"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     error_at_index = 1
@@ -1013,7 +1019,8 @@ async def test_liquidation_in_multiple_orders(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["liquidation"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1042,7 +1049,8 @@ async def test_liquidation_in_multiple_orders(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["liquidation"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1117,7 +1125,8 @@ async def test_liquidation_underwater(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["liquidation"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1187,7 +1196,8 @@ async def test_should_liquidate_after_deleveraging(adminAuth_factory):
         "market_id": market_id_1,
         "order_type": order_types["liquidation"],
         "liquidator_address": liquidator.contract_address,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
