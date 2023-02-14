@@ -248,7 +248,8 @@ func execute_batch{
         insurance_fund_address_=insurance_fund_address,
         max_leverage_=market.currently_allowed_leverage,
         min_quantity_=market.minimum_order_size,
-        maker_direction_=0,
+        maker1_direction_=[request_list].direction,
+        maker1_side_=[request_list].side,
         trader_stats_list_=trader_stats_list,
         executed_sizes_list_=executed_sizes_list,
         total_order_volume_=0,
@@ -1008,7 +1009,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param insurance_fund_address_ - Address of the Insurance Fund contract
 // @param max_leverage_ - Maximum Leverage for the market set by the first order
 // @param min_quantity_ - Minimum quantity for the market set by the first order
-// @param maker_direction_ - Direction of the maker order
+// @param maker1_direction_ - Direction of the first maker order
+// @param maker1_side_ - Side of the first maker order
 // @param trader_stats_list_ - This list contains trader addresses along with fee charged
 // @param total_order_volume_ - This stores the sum of size*execution_price for each maker order
 // @param taker_execution_price - The price to be stored for the market price in execute_batch
@@ -1037,7 +1039,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     insurance_fund_address_: felt,
     max_leverage_: felt,
     min_quantity_: felt,
-    maker_direction_: felt,
+    maker1_direction_: felt,
+    maker1_side_: felt,
     trader_stats_list_: TraderStats*,
     executed_sizes_list_: felt*,
     total_order_volume_: felt,
@@ -1056,7 +1059,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local current_quantity_executed;
     local current_order_side;
     local current_open_interest;
-    local maker_direction;
 
     // Local variables to be passed as arguments in error_messages
     local order_id;
@@ -1064,7 +1066,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local market_id_order;
     local quantity_order;
     local user_address;
-    local direction_order;
 
     // Error messages require local variables to be passed in params
     local current_index;
@@ -1080,7 +1081,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     assert leverage = [request_list_].leverage;
     assert quantity_order = [request_list_].quantity;
     assert user_address = [request_list_].user_address;
-    assert direction_order = [request_list_].direction;
     assert market_id_order = [request_list_].market_id;
 
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
@@ -1114,24 +1114,16 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Direction Check
     if (request_list_len_ == 1) {
-        tempvar direction_check = maker_direction_ - [request_list_].direction;
-        with_attr error_message("0511: {order_id} {direction_order}") {
-            assert_not_zero(direction_check);
-        }
-
-        maker_direction = maker_direction_;
+        validate_taker(
+            maker1_direction_, maker1_side_, [request_list_].direction, [request_list_].side
+        );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
-        if (maker_direction_ == 0) {
-            maker_direction = direction_order;
-        } else {
-            maker_direction = maker_direction_;
-            with_attr error_message("0512: {order_id} {direction_order}") {
-                assert maker_direction_ = direction_order;
-            }
-        }
+        validate_maker(
+            maker1_direction_, maker1_side_, [request_list_].direction, [request_list_].side
+        );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -1416,11 +1408,72 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         insurance_fund_address_=insurance_fund_address_,
         max_leverage_=max_leverage_,
         min_quantity_=min_quantity_,
-        maker_direction_=maker_direction,
+        maker1_direction_=maker1_direction_,
+        maker1_side_=maker1_side_,
         trader_stats_list_=trader_stats_list_ + TraderStats.SIZE,
         executed_sizes_list_=executed_sizes_list_ + 1,
         total_order_volume_=new_total_order_volume,
         taker_execution_price=execution_price,
         open_interest_=new_open_interest,
     );
+}
+
+func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    maker1_direction_: felt, maker1_side_: felt, current_direction_: felt, current_side_: felt
+) {
+    alloc_locals;
+    let (local opposite_direction) = get_opposite(maker1_direction_);
+    let (local opposite_side) = get_opposite(maker1_side_);
+    if (current_direction_ == maker1_direction_) {
+        if (current_side_ == maker1_side_) {
+            return ();
+        }
+    }
+
+    if (current_direction_ == opposite_direction) {
+        if (current_side_ == opposite_side) {
+            return ();
+        }
+    }
+
+    with_attr error_message(
+            "0511: Maker direction {current_direction_} or side {current_side_} is not valid ") {
+        assert 0 = 1;
+    }
+    return ();
+}
+
+func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    maker1_direction_: felt, maker1_side_: felt, current_direction_: felt, current_side_: felt
+) {
+    alloc_locals;
+    let (local opposite_direction) = get_opposite(maker1_direction_);
+    let (local opposite_side) = get_opposite(maker1_side_);
+    if (current_direction_ == maker1_direction_) {
+        if (current_side_ == opposite_side) {
+            return ();
+        }
+    }
+
+    if (current_direction_ == opposite_direction) {
+        if (current_side_ == maker1_side_) {
+            return ();
+        }
+    }
+
+    with_attr error_message(
+            "0512: Taker direction {current_direction_} or side {current_side_} is not valid") {
+        assert 0 = 1;
+    }
+    return ();
+}
+
+func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    side_or_direction_: felt
+) -> (res: felt) {
+    if (side_or_direction_ == 1) {
+        return (res=2);
+    } else {
+        return (res=1);
+    }
 }
