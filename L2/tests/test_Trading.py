@@ -8,7 +8,7 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, PRIME, PRIME_HALF, assert_event_emitted
-from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, get_fund_balance_python
+from utils_trading import User, order_direction, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, get_fund_balance_python
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -1362,7 +1362,6 @@ async def test_revert_if_taker_fk_partial_order(trading_test_initializer):
         "quantity": 2,
         "direction": order_direction["short"],
         "time_in_force": order_time_in_force["fill_or_kill"]
-
     }]
 
     error_at_index = 1
@@ -1522,12 +1521,12 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     # Create orders
     orders_2 = [{
         "quantity": 3,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"]
     }, {
         "quantity": 3,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1598,12 +1597,12 @@ async def test_opening_and_closing_full_orders_with_leverage(trading_test_initia
     # Create orders
     orders_2 = [{
         "quantity": 1.523,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"]
     }, {
         "quantity": 1.523,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1675,12 +1674,12 @@ async def test_opening_and_closing_three_orders_full_with_leverage(trading_test_
     # Create orders
     orders_2 = [{
         "quantity": 0.53,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"]
     }, {
         "quantity": 0.53,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1866,22 +1865,16 @@ async def test_closing_partial_orders(trading_test_initializer):
     # Create orders
     orders_1 = [{
         "quantity": 2,
-        "life_cycle": order_life_cycles["close"],
-        "direction": order_direction["short"],
+        "side": side["sell"],
         "order_type": order_types["limit"]
     }, {
         "quantity": 0.343,
         "direction": order_direction["long"],
     }]
 
-    user_short = bob_test.get_position(
-        market_id=market_id_1, direction=order_direction["short"])
-
     # execute order
     (_, complete_orders_1, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
 
-    user_short = bob_test.get_position(
-        market_id=market_id_1, direction=order_direction["short"])
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
@@ -1916,7 +1909,7 @@ async def test_closing_partial_orders(trading_test_initializer):
         data=[
             to64x61(quantity_locked_2),
             to64x61(1000),
-            2
+            1
         ]
     )
 
@@ -1991,14 +1984,14 @@ async def test_opening_and_closing_full_orders_different_market(trading_test_ini
         "market_id": ETH_USD_ID,
         "quantity": 4.5,
         "price": 130.2,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"]
     }, {
         "market_id": ETH_USD_ID,
         "quantity": 4.5,
         "price": 130.2,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -2061,7 +2054,7 @@ async def test_placing_order_directly(trading_test_initializer):
         1,
         # post_only
         0,
-        # life_cycle
+        # side
         2,
         # liquidator_address
         0,
@@ -2145,12 +2138,12 @@ async def test_closing_more_than_parent_size(trading_test_initializer):
     # Create orders
     orders_2 = [{
         "quantity": 4,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"]
     }, {
         "quantity": 4,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     error_at_index = 0
@@ -2214,13 +2207,13 @@ async def test_invalid_liquidation(trading_test_initializer):
     orders_2 = [{
         "quantity": 3,
         "price": 1500,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"],
     }, {
         "quantity": 3,
         "price": 1500,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
         "order_type": order_types["liquidation"]
     }]
 
@@ -2285,13 +2278,13 @@ async def test_invalid_deleverage(trading_test_initializer):
     orders_2 = [{
         "quantity": 3,
         "price": 1500,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"],
     }, {
         "quantity": 3,
         "price": 1500,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
         "order_type": order_types["deleverage"]
     }]
 
@@ -2418,7 +2411,8 @@ async def test_revert_if_parent_position_is_empty(trading_test_initializer):
     orders_1 = [{
         "quantity": 1,
         "order_type": order_types["limit"],
-        "life_cycle": order_life_cycles["close"]
+        "direction": order_direction["short"],
+        "side": side["sell"]
     }, {
         "quantity": 2,
         "direction": order_direction["short"],

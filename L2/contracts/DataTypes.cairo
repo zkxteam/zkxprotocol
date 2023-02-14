@@ -64,9 +64,8 @@ struct MultipleOrder {
     order_type: felt,
     time_in_force: felt,
     post_only: felt,
-    life_cycle: felt,
+    side: felt,
 }
-
 
 // @notice struct to pass price data to the contract
 struct PriceData {
@@ -88,7 +87,7 @@ struct OrderRequest {
     order_type: felt,
     time_in_force: felt,
     post_only: felt,
-    life_cycle: felt,
+    side: felt,
     liquidator_address: felt,
 }
 
@@ -232,7 +231,7 @@ struct CollateralPrice {
 struct VolumeMetaData {
     season_id: felt,
     market_id: felt,
-    life_cycle: felt,  // open/close
+    side: felt,  // open/close
 }
 
 // Struct to store trading season data
@@ -290,7 +289,7 @@ struct TraderStats {
     trader_address: felt,
     fee_64x61: felt,
     order_volume_64x61: felt,
-    life_cycle: felt,  // 1 for open order, 2 for close order
+    side: felt,  // 1 for open order, 2 for close order
     pnl_64x61: felt,
     margin_amount_64x61: felt,
 }

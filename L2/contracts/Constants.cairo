@@ -91,6 +91,9 @@ const IoC = 3;
 const OPEN = 1;
 const CLOSE = 2;
 
+const BUY = 1;
+const SELL = 2;
+
 const ABR_STATE_0 = 0;
 const ABR_STATE_1 = 1;
 const ABR_STATE_2 = 2;

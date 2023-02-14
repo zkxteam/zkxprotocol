@@ -17,7 +17,7 @@ from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.Constants import (
     AccountRegistry_INDEX,
     Asset_INDEX,
-    CLOSE,
+    BUY,
     DELEVERAGING_ORDER,
     FeeBalance_INDEX,
     FoK,
@@ -33,7 +33,7 @@ from contracts.Constants import (
     MARKET_ORDER,
     MarketPrices_INDEX,
     MasterAdmin_ACTION,
-    OPEN,
+    SELL,
     SHORT,
     TAKER,
     TradingFees_INDEX,
@@ -249,7 +249,8 @@ func execute_batch{
         insurance_fund_address_=insurance_fund_address,
         max_leverage_=market.currently_allowed_leverage,
         min_quantity_=market.minimum_order_size,
-        maker_direction_=0,
+        maker1_direction_=[request_list].direction,
+        maker1_side_=[request_list].side,
         trader_stats_list_=trader_stats_list,
         executed_sizes_list_=executed_sizes_list,
         total_order_volume_=0,
@@ -617,7 +618,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         trader_address=order_.user_address,
         fee_64x61=fees,
         order_volume_64x61=order_volume_64x61,
-        life_cycle=OPEN,
+        side=BUY,
         pnl_64x61=0,
         margin_amount_64x61=0,
     );
@@ -689,46 +690,37 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     local realized_pnl;
     // To be passed as arguments to error_message
     local order_id;
+    local order_direction;
     assert order_id = order_.order_id;
-
-    // Get the direction of the position that is to be closed
-    local parent_direction;
-
-    if (order_.direction == LONG) {
-        assert parent_direction = SHORT;
-    } else {
-        assert parent_direction = LONG;
-    }
+    assert order_direction = order_.direction;
 
     // Get order details
-    let (parent_position: PositionDetails) = IAccountManager.get_position_data(
-        contract_address=order_.user_address, market_id_=market_id_, direction_=parent_direction
+    let (current_position: PositionDetails) = IAccountManager.get_position_data(
+        contract_address=order_.user_address, market_id_=market_id_, direction_=order_.direction
     );
 
-    with_attr error_message("0517: {order_id} {parent_direction}") {
-        assert_not_zero(parent_position.position_size);
+    with_attr error_message("0517: {order_id} {order_direction}") {
+        assert_not_zero(current_position.position_size);
     }
 
-    let margin_amount = parent_position.margin_amount;
-    let borrowed_amount = parent_position.borrowed_amount;
-    average_execution_price_close = parent_position.avg_execution_price;
+    let margin_amount = current_position.margin_amount;
+    let borrowed_amount = current_position.borrowed_amount;
+    average_execution_price_close = current_position.avg_execution_price;
 
     local diff;
     local actual_execution_price;
     local margin_plus_pnl;
 
-    // current order is short order
-    if (order_.direction == SHORT) {
-        // Open order was a long order
+    // current order is a long order
+    if (order_.direction == LONG) {
         assert actual_execution_price = execution_price_;
-        let (diff_felt) = Math64x61_sub(execution_price_, parent_position.avg_execution_price);
+        let (diff_felt) = Math64x61_sub(execution_price_, current_position.avg_execution_price);
         assert diff = diff_felt;
     } else {
-        // Open order was a short order
-        let (diff_felt) = Math64x61_sub(parent_position.avg_execution_price, execution_price_);
+        let (diff_felt) = Math64x61_sub(current_position.avg_execution_price, execution_price_);
         assert diff = diff_felt;
         let (actual_exexution_price_felt) = Math64x61_add(
-            parent_position.avg_execution_price, diff
+            current_position.avg_execution_price, diff
         );
         assert actual_execution_price = actual_exexution_price_felt;
     }
@@ -742,7 +734,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
 
     // Calculate the amount that needs to be returned to liquidity fund
-    let (ratio_of_position) = Math64x61_div(order_size_, parent_position.position_size);
+    let (ratio_of_position) = Math64x61_div(order_size_, current_position.position_size);
     let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, ratio_of_position);
     let (margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
     local margin_amount_open_64x61;
@@ -773,7 +765,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         trader_address=order_.user_address,
         fee_64x61=0,
         order_volume_64x61=order_volume_64x61,
-        life_cycle=CLOSE,
+        side=SELL,
         pnl_64x61=pnl,
         margin_amount_64x61=margin_amount_open_64x61,
     );
@@ -791,7 +783,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     if (not_liquidation == TRUE) {
         // If no leverage is used
         // to64x61(1) == 2305843009213693952
-        if (parent_position.leverage == LEVERAGE_ONE) {
+        if (current_position.leverage == LEVERAGE_ONE) {
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1021,7 +1013,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param insurance_fund_address_ - Address of the Insurance Fund contract
 // @param max_leverage_ - Maximum Leverage for the market set by the first order
 // @param min_quantity_ - Minimum quantity for the market set by the first order
-// @param maker_direction_ - Direction of the maker order
+// @param maker1_direction_ - Direction of the first maker order
+// @param maker1_side_ - Side of the first maker order
 // @param trader_stats_list_ - This list contains trader addresses along with fee charged
 // @param total_order_volume_ - This stores the sum of size*execution_price for each maker order
 // @param taker_execution_price - The price to be stored for the market price in execute_batch
@@ -1051,7 +1044,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     insurance_fund_address_: felt,
     max_leverage_: felt,
     min_quantity_: felt,
-    maker_direction_: felt,
+    maker1_direction_: felt,
+    maker1_side_: felt,
     trader_stats_list_: TraderStats*,
     executed_sizes_list_: felt*,
     total_order_volume_: felt,
@@ -1071,7 +1065,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local current_quantity_executed;
     local current_order_side;
     local current_open_interest;
-    local maker_direction;
 
     // Local variables to be passed as arguments in error_messages
     local order_id;
@@ -1079,7 +1072,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local market_id_order;
     local quantity_order;
     local user_address;
-    local direction_order;
 
     // Error messages require local variables to be passed in params
     local current_index;
@@ -1095,7 +1087,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     assert leverage = [request_list_].leverage;
     assert quantity_order = [request_list_].quantity;
     assert user_address = [request_list_].user_address;
-    assert direction_order = [request_list_].direction;
     assert market_id_order = [request_list_].market_id;
 
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
@@ -1129,27 +1120,33 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     // Direction Check
     if (request_list_len_ == 1) {
-        tempvar direction_check = maker_direction_ - [request_list_].direction;
-        with_attr error_message("0511: {order_id} {direction_order}") {
-            assert_not_zero(direction_check);
-        }
-
-        maker_direction = maker_direction_;
+        validate_taker(
+            order_id,
+            maker1_direction_,
+            maker1_side_,
+            [request_list_].direction,
+            [request_list_].side,
+        );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
-        if (maker_direction_ == 0) {
-            maker_direction = direction_order;
+        if (request_list_len_ != orders_len_) {
+            validate_maker(
+                order_id,
+                maker1_direction_,
+                maker1_side_,
+                [request_list_].direction,
+                [request_list_].side,
+            );
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         } else {
-            maker_direction = maker_direction_;
-            with_attr error_message("0512: {order_id} {direction_order}") {
-                assert maker_direction_ = direction_order;
-            }
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
     }
 
     tempvar syscall_ptr = syscall_ptr;
@@ -1310,7 +1307,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local pnl;
 
     // If the order is to be opened
-    if ([request_list_].life_cycle == OPEN) {
+    if ([request_list_].side == BUY) {
         let (
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
@@ -1381,7 +1378,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         order_type=[request_list_].order_type,
         time_in_force=[request_list_].time_in_force,
         post_only=[request_list_].post_only,
-        life_cycle=[request_list_].life_cycle,
+        side=[request_list_].side,
         liquidator_address=[request_list_].liquidator_address,
     );
 
@@ -1431,7 +1428,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         insurance_fund_address_=insurance_fund_address_,
         max_leverage_=max_leverage_,
         min_quantity_=min_quantity_,
-        maker_direction_=maker_direction,
+        maker1_direction_=maker1_direction_,
+        maker1_side_=maker1_side_,
         trader_stats_list_=trader_stats_list_ + TraderStats.SIZE,
         executed_sizes_list_=executed_sizes_list_ + 1,
         total_order_volume_=new_total_order_volume,
@@ -1439,4 +1437,85 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         open_interest_=new_open_interest,
         oracle_price_=oracle_price_,
     );
+}
+
+// @notice Internal function to validate maker orders
+// @param order_id_ - Id of the maker order
+// @param maker1_direction_ - Direction of first maker order
+// @param maker1_side_ - Side of first maker order
+// @param current_direction_ - Direction of current maker order
+// @param current_side_ -  Side of current maker order
+func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    order_id_: felt,
+    maker1_direction_: felt,
+    maker1_side_: felt,
+    current_direction_: felt,
+    current_side_: felt,
+) {
+    alloc_locals;
+    let (local opposite_direction) = get_opposite(maker1_direction_);
+    let (local opposite_side) = get_opposite(maker1_side_);
+    if (current_direction_ == maker1_direction_) {
+        if (current_side_ == maker1_side_) {
+            return ();
+        }
+    }
+
+    if (current_direction_ == opposite_direction) {
+        if (current_side_ == opposite_side) {
+            return ();
+        }
+    }
+
+    with_attr error_message("0512: {order_id_} {current_direction_}") {
+        assert 0 = 1;
+    }
+    return ();
+}
+
+// @notice Internal function to validate taker orders
+// @param order_id_ - Id of the taker order
+// @param maker1_direction_ - Direction of first maker order
+// @param maker1_side_ - Side of first maker order
+// @param current_direction_ - Direction of current maker order
+// @param current_side_ -  Side of current maker order
+func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    order_id_: felt,
+    maker1_direction_: felt,
+    maker1_side_: felt,
+    current_direction_: felt,
+    current_side_: felt,
+) {
+    alloc_locals;
+    let (local opposite_direction) = get_opposite(maker1_direction_);
+    let (local opposite_side) = get_opposite(maker1_side_);
+    if (current_direction_ == maker1_direction_) {
+        if (current_side_ == opposite_side) {
+            return ();
+        }
+    }
+
+    if (current_direction_ == opposite_direction) {
+        if (current_side_ == maker1_side_) {
+            return ();
+        }
+    }
+
+    with_attr error_message("0511: {order_id_} {current_direction_}") {
+        assert 0 = 1;
+    }
+    return ();
+}
+
+// @notice Internal function to get oppsite side or direction of the order
+// @param side_or_direction_ - Argument represents either side or direction
+// @return res - Returns either opposite side or opposite direction of the order
+func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    side_or_direction_: felt
+) -> (res: felt) {
+    if (side_or_direction_ == 1) {
+        return (res=2);
+    } else {
+        return (res=1);
+    }
 }

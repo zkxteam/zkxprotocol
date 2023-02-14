@@ -12,7 +12,7 @@ from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_or
 from utils_links import DEFAULT_LINK_1, prepare_starknet_string
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
-from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
+from utils_trading import User, order_direction, order_types, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -1089,14 +1089,14 @@ async def test_closing_orders_day_1(hightide_test_initializer):
     orders_1 = [{
         "quantity": 1,
         "price": 6000,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
         "order_type": order_types["limit"],
 
     }, {
         "quantity": 1,
         "price": 6000,
-        "life_cycle": order_life_cycles["close"],
-        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1118,15 +1118,15 @@ async def test_closing_orders_day_1(hightide_test_initializer):
         "quantity": 2,
         "price": 400,
         "market_id": ETH_USD_ID,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
         "order_type": order_types["limit"],
 
     }, {
         "quantity": 2,
         "price": 400,
         "market_id": ETH_USD_ID,
-        "life_cycle": order_life_cycles["close"],
-        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1148,15 +1148,15 @@ async def test_closing_orders_day_1(hightide_test_initializer):
         "quantity": 3,
         "price": 40,
         "market_id": TSLA_USD_ID,
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"],
-        "direction": order_direction["short"],
 
     }, {
         "quantity": 3,
         "price": 40,
         "market_id": TSLA_USD_ID,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -1312,7 +1312,8 @@ async def test_opening_closing_orders_day_3(hightide_test_initializer):
         "quantity": 2,
         "price": 7000,
         "order_type": order_types["limit"],
-        "life_cycle": order_life_cycles["close"]
+        "direction": order_direction["short"],
+        "side": side["sell"]
     }, {
         "quantity": 2,
         "price": 7000,
@@ -1360,8 +1361,7 @@ async def test_opening_closing_orders_day_4(hightide_test_initializer):
         "market_id": TSLA_USD_ID,
         "price": 30,
         "order_type": order_types["limit"],
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"]
+        "side": side["sell"]
     }, {
         "quantity": 1,
         "market_id": TSLA_USD_ID,

@@ -20,6 +20,7 @@ from starkware.starknet.common.syscalls import (
 from contracts.Constants import (
     ABR_PAYMENT_INDEX,
     Asset_INDEX,
+    BUY,
     DELEVERAGING_ORDER,
     IoC,
     L1_ZKX_Address_INDEX,
@@ -27,7 +28,6 @@ from contracts.Constants import (
     LIQUIDATION_ORDER,
     LONG,
     Market_INDEX,
-    OPEN,
     SHORT,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
@@ -842,7 +842,7 @@ func execute_order{
 
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position
-    if (request.life_cycle == OPEN) {
+    if (request.side == BUY) {
         local created_timestamp;
         let (is_equal) = Math64x61_is_equal(position_details.position_size, 0, asset_decimals);
         if (is_equal == TRUE) {
@@ -893,23 +893,16 @@ func execute_order{
         tempvar range_check_ptr = range_check_ptr;
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     } else {
-        local parent_direction;
         // Calculate the new leverage if it's a deleveraging order
         local new_leverage;
 
-        if (request.direction == LONG) {
-            assert parent_direction = SHORT;
-        } else {
-            assert parent_direction = LONG;
-        }
-
-        // Get the parent position details
-        let (parent_position_details) = position_mapping.read(
-            market_id=market_id, direction=parent_direction
+        // Get the current position details
+        let (current_position_details) = position_mapping.read(
+            market_id=market_id, direction=request.direction
         );
-        let (new_position_size) = Math64x61_sub(parent_position_details.position_size, size);
+        let (new_position_size) = Math64x61_sub(current_position_details.position_size, size);
 
-        // Assert that the size amount can be closed from the parent position
+        // Assert that the size amount can be closed from the existing position
         with_attr error_message("0003: {order_id} {size}") {
             Math64x61_assert_le(0, new_position_size, asset_decimals);
         }
@@ -925,7 +918,7 @@ func execute_order{
 
             with_attr error_message("0004: {order_id} {market_id}") {
                 assert liq_position.market_id = market_id;
-                assert liq_position.direction = parent_direction;
+                assert liq_position.direction = request.direction;
             }
 
             with_attr error_message("0005: {order_id} {size}") {
@@ -970,13 +963,13 @@ func execute_order{
                     assert liq_position.liquidatable = TRUE;
                 }
 
-                assert new_leverage = parent_position_details.leverage;
+                assert new_leverage = current_position_details.leverage;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
         } else {
-            assert new_leverage = parent_position_details.leverage;
+            assert new_leverage = current_position_details.leverage;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1001,7 +994,7 @@ func execute_order{
             // Write to the mapping
             position_mapping.write(
                 market_id=market_id,
-                direction=parent_direction,
+                direction=request.direction,
                 value=PositionDetails(
                     avg_execution_price=0,
                     position_size=0,
@@ -1018,7 +1011,7 @@ func execute_order{
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
-            let (current_pnl: felt) = Math64x61_add(parent_position_details.realized_pnl, pnl);
+            let (current_pnl: felt) = Math64x61_add(current_position_details.realized_pnl, pnl);
 
             // Create a new struct with the updated details
             let updated_position = PositionDetails(
@@ -1027,13 +1020,13 @@ func execute_order{
                 margin_amount=margin_amount,
                 borrowed_amount=borrowed_amount,
                 leverage=new_leverage,
-                created_timestamp=parent_position_details.created_timestamp,
+                created_timestamp=current_position_details.created_timestamp,
                 modified_timestamp=current_timestamp,
                 realized_pnl=current_pnl,
             );
 
             position_mapping.write(
-                market_id=market_id, direction=parent_direction, value=updated_position
+                market_id=market_id, direction=request.direction, value=updated_position
             );
 
             tempvar syscall_ptr = syscall_ptr;
@@ -1467,7 +1460,7 @@ func populate_positions_risk_management{
             position_size=long_position.position_size,
             margin_amount=long_position.margin_amount,
             borrowed_amount=long_position.borrowed_amount,
-            leverage=long_position.leverage
+            leverage=long_position.leverage,
         );
         assert positions_array_[positions_array_len_] = curr_position;
         assert is_long = 1;
@@ -1485,7 +1478,7 @@ func populate_positions_risk_management{
             position_size=short_position.position_size,
             margin_amount=short_position.margin_amount,
             borrowed_amount=short_position.borrowed_amount,
-            leverage=long_position.leverage
+            leverage=long_position.leverage,
         );
         assert positions_array_[positions_array_len_ + is_long] = curr_position;
         assert is_short = 1;

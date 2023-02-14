@@ -8,7 +8,7 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61
-from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
+from utils_trading import User, order_direction, order_types, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -582,11 +582,11 @@ async def test_closing_orders_day_1(adminAuth_factory):
     orders_2 = [{
         "price": 6000,
         "order_type": order_types["limit"],
-        "life_cycle": order_life_cycles["close"]
+        "direction": order_direction["short"],
+        "side": side["sell"]
     }, {
         "price": 6000,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"]
+        "side": side["sell"]
     }]
 
     # execute order
@@ -796,12 +796,12 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
 
     orders_6 = [{
         "price": 7000,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
         "order_type": order_types["limit"]
     }, {
         "price": 7000,
-        "life_cycle": order_life_cycles["close"],
-        "direction": order_direction["short"]
+        "side": side["sell"],
     }]
 
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_6, users_test=[alice_test, bob_test], quantity_locked=quantity_locked_4, market_id=market_id_4, oracle_price=oracle_price_4, trading=trading, is_reverted=0, error_code=0)
