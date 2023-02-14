@@ -8,11 +8,11 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.starknet.core.os.class_hash import compute_class_hash
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import Signer, uint, str_to_felt, MAX_UINT256, assert_revert, hash_order, from64x61, to64x61, print_parsed_positions, print_parsed_collaterals, assert_events_emitted
-from utils_links import DEFAULT_LINK_1, prepare_starknet_string
+from utils import Signer, str_to_felt, MAX_UINT256, assert_revert, from64x61, to64x61
+from utils_links import DEFAULT_LINK_1
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
-from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
+from utils_trading import User, order_direction, order_types, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -481,7 +481,7 @@ async def test_placing_orders_day_0(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     print(order_volume)
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
@@ -501,12 +501,12 @@ async def test_placing_orders_day_0(adminAuth_factory):
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_1 * oracle_price_1
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_1 * oracle_price_1
@@ -566,7 +566,7 @@ async def test_placing_orders_day_0(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     print(order_volume)
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
@@ -586,12 +586,12 @@ async def test_placing_orders_day_0(adminAuth_factory):
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_2*oracle_price_2
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_2*oracle_price_2
@@ -651,7 +651,7 @@ async def test_placing_orders_day_0(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     print(order_volume)
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
@@ -671,12 +671,12 @@ async def test_placing_orders_day_0(adminAuth_factory):
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_3 * oracle_price_3
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_3 * oracle_price_3
@@ -734,14 +734,14 @@ async def test_closing_orders_day_1(adminAuth_factory):
     orders_2 = [{
         "quantity": 1,
         "price": 6000,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
         "order_type": order_types["limit"],
 
     }, {
         "quantity": 1,
         "price": 6000,
-        "life_cycle": order_life_cycles["close"],
-        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -764,12 +764,12 @@ async def test_closing_orders_day_1(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_1 * execution_price_1
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["sell"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_2 * oracle_price_2
@@ -788,11 +788,11 @@ async def test_closing_orders_day_1(adminAuth_factory):
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["sell"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, side["sell"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
@@ -827,15 +827,15 @@ async def test_closing_orders_day_1(adminAuth_factory):
         "quantity": 2,
         "price": 400,
         "market_id": ETH_USD_ID,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
         "order_type": order_types["limit"],
 
     }, {
         "quantity": 2,
         "price": 400,
         "market_id": ETH_USD_ID,
-        "life_cycle": order_life_cycles["close"],
-        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -859,13 +859,13 @@ async def test_closing_orders_day_1(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_1 * execution_price_1
     print("final short volume ETH", from64x61(order_volume.result[1]))
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["sell"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_2 * oracle_price_2
@@ -885,12 +885,12 @@ async def test_closing_orders_day_1(adminAuth_factory):
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["sell"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, side["sell"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
@@ -925,15 +925,15 @@ async def test_closing_orders_day_1(adminAuth_factory):
         "quantity": 3,
         "price": 40,
         "market_id": TSLA_USD_ID,
-        "life_cycle": order_life_cycles["close"],
+        "side": side["sell"],
         "order_type": order_types["limit"],
-        "direction": order_direction["short"],
 
     }, {
         "quantity": 3,
         "price": 40,
         "market_id": TSLA_USD_ID,
-        "life_cycle": order_life_cycles["close"],
+        "direction": order_direction["short"],
+        "side": side["sell"],
     }]
 
     # execute order
@@ -957,13 +957,13 @@ async def test_closing_orders_day_1(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_1 * execution_price_1
     print("final short volume TSLA", from64x61(order_volume.result[1]))
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["sell"])).call()
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
         quantity_locked_2 * oracle_price_2
@@ -983,12 +983,12 @@ async def test_closing_orders_day_1(adminAuth_factory):
     assert from64x61(total_fee.result.total_fee_64x61) == from64x61(
         trader1_fee.result.fee_64x61) + from64x61(trader2_fee.result.fee_64x61)
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["sell"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader1_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(bob.contract_address, (season_id, market_id, side["sell"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_2 * oracle_price_2
@@ -1073,13 +1073,13 @@ async def test_opening_orders_day_2(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     print(order_volume.result)
     assert order_volume.result[0] == 4
     assert from64x61(order_volume.result[1]) == 2*quantity_locked_1 * \
         execution_price_1 + 2*quantity_locked_3*oracle_price_3
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["sell"])).call()
     print("real", order_volume.result)
     assert order_volume.result[0] == 2
     assert from64x61(order_volume.result[1]) == 2 * \
@@ -1129,13 +1129,13 @@ async def test_opening_orders_day_2(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 4
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     print(order_volume.result)
     assert order_volume.result[0] == 6
     assert from64x61(order_volume.result[1]) == 2*quantity_locked_1 * \
         execution_price_1 + 4*quantity_locked_3*oracle_price_3
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["sell"])).call()
     print("real", order_volume.result)
     #print("expected", [2, 2*to64x61(size2*execution_price2)])
     assert order_volume.result[0] == 2
@@ -1222,12 +1222,12 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
         "quantity": 2,
         "price": 7000,
         "order_type": order_types["limit"],
-        "life_cycle": order_life_cycles["close"]
+        "direction": order_direction["short"],
+        "side": side["sell"]
     }, {
         "quantity": 2,
         "price": 7000,
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"]
+        "side": side["sell"]
     }]
 
     # execute order
@@ -1252,14 +1252,14 @@ async def test_opening_closing_orders_day_3(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 4
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     print(order_volume.result)
     assert order_volume.result[0] == 8
     assert from64x61(order_volume.result[1]) == (2*quantity_locked_1*execution_price_1 + 4*quantity_locked_3*execution_price_3
                                                  + 2*quantity_locked_4*oracle_price_4)
     print("final short volume BTC", from64x61(order_volume.result[1]))
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["sell"])).call()
     print(order_volume.result)
     assert order_volume.result[0] == 4
     assert from64x61(order_volume.result[1]) == (2*quantity_locked_2*execution_price_2
@@ -1297,8 +1297,7 @@ async def test_opening_closing_orders_day_4(adminAuth_factory):
         "market_id": TSLA_USD_ID,
         "price": 30,
         "order_type": order_types["limit"],
-        "direction": order_direction["short"],
-        "life_cycle": order_life_cycles["close"]
+        "side": side["sell"]
     }, {
         "quantity": 1,
         "market_id": TSLA_USD_ID,
@@ -1326,12 +1325,12 @@ async def test_opening_closing_orders_day_4(adminAuth_factory):
     max_trades = await trading_stats.get_max_trades_in_day(season_id, market_id).call()
     assert max_trades.result.res == 2
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["open"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["buy"])).call()
     assert order_volume.result[0] == 3
     assert from64x61(order_volume.result[1]) == ((2*4*50) + (1*1*30))
     print("final short volume TSLA", from64x61(order_volume.result[1]))
 
-    order_volume = await trading_stats.get_order_volume((season_id, market_id, order_life_cycles["close"])).call()
+    order_volume = await trading_stats.get_order_volume((season_id, market_id, side["sell"])).call()
     assert order_volume.result[0] == 3
     assert from64x61(order_volume.result[1]) == ((2*3*40) + (1*1*30))
     print("final long volume TSLA", from64x61(order_volume.result[1]))
@@ -1347,12 +1346,12 @@ async def test_opening_closing_orders_day_4(adminAuth_factory):
     total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     assert from64x61(total_fee.result.total_fee_64x61) == 0.1503499999999998
 
-    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, order_life_cycles["close"])).call()
+    trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["sell"])).call()
     assert trader1_order_volume.result.number_of_orders == 2
     assert from64x61(trader1_order_volume.result.total_volume_64x61) == (
         (3*40) + quantity_locked_1 * oracle_price_1)
 
-    trader2_order_volume = await user_stats.get_trader_order_volume(charlie.contract_address, (season_id, market_id, order_life_cycles["open"])).call()
+    trader2_order_volume = await user_stats.get_trader_order_volume(charlie.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader2_order_volume.result.number_of_orders == 1
     assert from64x61(
         trader2_order_volume.result.total_volume_64x61) == quantity_locked_1 * oracle_price_1
