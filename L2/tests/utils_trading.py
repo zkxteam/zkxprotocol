@@ -59,7 +59,6 @@ side = {
     "sell": 2
 }
 
-
 fund_mapping = {
     "liquidity_fund": 1,
     "fee_balance": 2,
@@ -884,7 +883,7 @@ class OrderExecutor:
             margin_amount = 0
             borrowed_amount = 0
             avg_execution_price = 0
-            side = 0
+            trade_side = 0
             if quantity_remaining == 0:
                 if i != len(request_list) - 1:
                     print("Taker order must be the last order in the list")
@@ -930,7 +929,7 @@ class OrderExecutor:
                         if execution_price < request_list[i]["price"]:
                             print("Bad short limit order")
                             return
-                side = order_side["taker"]
+                trade_side = order_side["taker"]
             else:
                 if i == (len(request_list) - 1):
                     print("Taker order must be the last order in the list")
@@ -951,13 +950,13 @@ class OrderExecutor:
 
                 running_weighted_sum += execution_price*quantity_to_execute
 
-                side = order_side["maker"]
+                trade_side = order_side["maker"]
 
             pnl = 0
 
             if request_list[i]["side"] == side["buy"]:
                 (avg_execution_price, margin_amount, borrowed_amount, trading_fees) = self.__process_open_orders(
-                    user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=side)
+                    user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=trade_side)
                 pnl = trading_fees
                 if avg_execution_price == 0:
                     print("Cannot execute batch; returning")
