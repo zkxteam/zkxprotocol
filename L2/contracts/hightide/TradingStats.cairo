@@ -225,12 +225,12 @@ func get_average_order_volume{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 
     // Create a VolumeMetadata struct for open orders
     let volume_metadata_market_open: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, market_id=market_id_, life_cycle=OPEN
+        season_id=season_id_, market_id=market_id_, side=OPEN
     );
 
     // Create a VolumeMetadata struct for close orders
     let volume_metadata_market_close: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, market_id=market_id_, life_cycle=CLOSE
+        season_id=season_id_, market_id=market_id_, side=CLOSE
     );
 
     // Get the order volume for open orders
@@ -434,7 +434,7 @@ func record_trade_batch_stats_recurse{
 
     // Update running total of order volume
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, market_id=market_id_, life_cycle=[request_list_].life_cycle
+        season_id=season_id_, market_id=market_id_, side=[request_list_].side
     );
 
     let (current_len) = num_orders.read(volume_metadata);
@@ -508,7 +508,7 @@ func record_trade_batch_stats_recurse{
         season_id_,
         market_id_,
         [request_list_].user_address,
-        [request_list_].life_cycle,
+        [request_list_].side,
         [executed_sizes_list_],
         execution_price_64x61_,
     );

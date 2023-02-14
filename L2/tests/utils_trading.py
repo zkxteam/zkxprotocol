@@ -54,11 +54,10 @@ order_time_in_force = {
 }
 
 
-order_life_cycles = {
-    "open": 1,
-    "close": 2
+side = {
+    "buy": 1,
+    "sell": 2
 }
-
 
 fund_mapping = {
     "liquidity_fund": 1,
@@ -125,7 +124,7 @@ class User:
             "order_type": order["order_type"],
             "time_in_force": order["time_in_force"],
             "post_only": order["post_only"],
-            "life_cycle": order["life_cycle"],
+            "side": order["side"],
             "liquidator_address": order["liquidator_address"]
         }
 
@@ -190,7 +189,7 @@ class User:
             "order_type": order["order_type"],
             "time_in_force": order["time_in_force"],
             "post_only": order["post_only"],
-            "life_cycle": order["life_cycle"],
+            "side": order["side"],
         }
 
         return multiple_order
@@ -411,7 +410,7 @@ class User:
         self.__set_portion_executed(
             order_id=order["order_id"], new_amount=new_portion_executed)
 
-        if order["life_cycle"] == 1:
+        if order["side"] == 1:
             current_pnl = 0
             created_timestamp = 0
 
@@ -451,13 +450,10 @@ class User:
         else:
             new_leverage = 0
 
-            parent_direction = order_direction["short"] if order[
-                "direction"] == order_direction["long"] else order_direction["long"]
+            current_position = self.get_position(
+                market_id=order["market_id"], direction=order["direction"])
 
-            parent_position = self.get_position(
-                market_id=order["market_id"], direction=parent_direction)
-
-            new_position_size = parent_position["position_size"] - size
+            new_position_size = current_position["position_size"] - size
 
             if new_position_size < 0:
                 print("Cannot close more thant the positionSize")
@@ -503,9 +499,9 @@ class User:
                     if liq_position["liquidatable"] == 0:
                         print("AccountManager: Position not marked as deleveragable")
                         return ()
-                    new_leverage = parent_position["leverage"]
+                    new_leverage = current_position["leverage"]
             else:
-                new_leverage = parent_position["leverage"]
+                new_leverage = current_position["leverage"]
 
             updated_position = {}
             if new_position_size == 0:
@@ -524,24 +520,24 @@ class User:
                     "realized_pnl": 0,
                 }
             else:
-                current_pnl = parent_position["realized_pnl"] + pnl
+                current_pnl = current_position["realized_pnl"] + pnl
                 updated_position = {
                     "avg_execution_price": price,
                     "position_size": new_position_size,
                     "margin_amount": margin_amount,
                     "borrowed_amount": borrowed_amount,
                     "leverage": new_leverage,
-                    "created_timestamp": parent_position["created_timestamp"],
+                    "created_timestamp": current_position["created_timestamp"],
                     "modified_timestamp": timestamp,
                     "realized_pnl": current_pnl,
                 }
 
             updated_dict = {
-                parent_direction: updated_position,
+                order["direction"]: updated_position,
             }
 
             self.__update_position(
-                market_id=order["market_id"], direction=parent_direction, updated_dict=updated_dict, updated_position=updated_position)
+                market_id=order["market_id"], direction=order["direction"], updated_dict=updated_dict, updated_position=updated_position)
 
     def get_position(self, market_id: int = BTC_USD_ID, direction: int = order_direction["long"]) -> Dict:
         try:
@@ -578,7 +574,7 @@ class User:
         order_type: int = order_types["market"],
         time_in_force: int = order_time_in_force["good_till_time"],
         post_only: int = 0,
-        life_cycle: int = order_life_cycles["open"],
+        side: int = side["buy"],
         liquidator_address: int = 0,
     ) -> Tuple[Dict, Dict]:
         # Checks for input
@@ -589,7 +585,7 @@ class User:
         assert order_type in order_types.values(), "Invalid order_type"
         assert time_in_force in order_time_in_force.values(), "Invalid time_in_force"
         assert post_only in (0, 1), "Invalid post_only"
-        assert life_cycle in (1, 2), "Invalid life_cycle"
+        assert side in (1, 2), "Invalid side"
 
         new_order = {
             "order_id": order_id if order_id else random_string(12),
@@ -602,7 +598,7 @@ class User:
             "order_type": order_type,
             "time_in_force": time_in_force,
             "post_only": post_only,
-            "life_cycle": life_cycle,
+            "side": side,
             "liquidator_address": liquidator_address
         }
         # Signed order for python implementation
@@ -730,13 +726,11 @@ class OrderExecutor:
         return (average_execution_price, margin_amount, borrowed_amount, trading_fees)
 
     def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, market_id) -> Tuple[float, float, float, float]:
-        current_direction = order_direction["short"] if order[
-            "direction"] == order_direction["long"] else order_direction["long"]
 
         # Get the user position
-        position = user.get_position(order["market_id"], current_direction)
+        position = user.get_position(order["market_id"], order["direction"])
         if position["position_size"] == 0:
-            print("The parentPosition size cannot be 0")
+            print("The current position size cannot be 0")
             return (0, 0, 0, 0)
 
         # Values to be populated for position object
@@ -751,8 +745,8 @@ class OrderExecutor:
         diff = 0
         # Using 2*avg_execution_price - execution_price to simplify the calculations
         actual_execution_price = 0
-        # Current order is short order
-        if order["direction"] == order_direction["short"]:
+        # Current order is long order
+        if order["direction"] == order_direction["long"]:
             # Actual execution price is same as execution price
             actual_execution_price = execution_price
             diff = execution_price - position["avg_execution_price"]
@@ -889,7 +883,7 @@ class OrderExecutor:
             margin_amount = 0
             borrowed_amount = 0
             avg_execution_price = 0
-            side = 0
+            trade_side = 0
             if quantity_remaining == 0:
                 if i != len(request_list) - 1:
                     print("Taker order must be the last order in the list")
@@ -935,7 +929,7 @@ class OrderExecutor:
                         if execution_price < request_list[i]["price"]:
                             print("Bad short limit order")
                             return
-                side = order_side["taker"]
+                trade_side = order_side["taker"]
             else:
                 if i == (len(request_list) - 1):
                     print("Taker order must be the last order in the list")
@@ -956,13 +950,13 @@ class OrderExecutor:
 
                 running_weighted_sum += execution_price*quantity_to_execute
 
-                side = order_side["maker"]
+                trade_side = order_side["maker"]
 
             pnl = 0
 
-            if request_list[i]["life_cycle"] == order_life_cycles["open"]:
+            if request_list[i]["side"] == side["buy"]:
                 (avg_execution_price, margin_amount, borrowed_amount, trading_fees) = self.__process_open_orders(
-                    user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=side)
+                    user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=trade_side)
                 pnl = trading_fees
                 if avg_execution_price == 0:
                     print("Cannot execute batch; returning")

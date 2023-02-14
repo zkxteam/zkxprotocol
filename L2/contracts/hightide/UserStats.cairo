@@ -240,8 +240,8 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     local total_fee_64x61;
 
     // 1. Update trader fee
-    // Fee is charged only for open orders. So, if life_cycle is 1 (open order) we record the fee.
-    if ([trader_stats_list].life_cycle == OPEN) {
+    // Fee is charged only for open orders. So, if side is 1 (open order) we record the fee.
+    if ([trader_stats_list].side == OPEN) {
         let fee_64x61 = [trader_stats_list].fee_64x61;
         let (current_trader_fee_64x61) = trader_fee_by_market.read(
             season_id_, market_id_, trader_address
@@ -269,7 +269,7 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     // Order volume is recorded for all order types
     let order_volume_64x61 = [trader_stats_list].order_volume_64x61;
     let volume_metadata: VolumeMetaData = VolumeMetaData(
-        season_id=season_id_, market_id=market_id_, life_cycle=[trader_stats_list].life_cycle
+        season_id=season_id_, market_id=market_id_, side=[trader_stats_list].side
     );
 
     let (current_order_volume_64x61) = trader_order_volume_by_market.read(
@@ -299,7 +299,7 @@ func update_trader_stats_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     // 3. Update PnL
     // Realized PnL is calculated when trader closes a position. So, we record PnL for close orders.
-    if ([trader_stats_list].life_cycle == CLOSE) {
+    if ([trader_stats_list].side == CLOSE) {
         let pnl_64x61 = [trader_stats_list].pnl_64x61;
         let abs_pnl_64x61 = abs_value(pnl_64x61);
         let (current_pnl_64x61) = trader_pnl_by_market.read(season_id_, market_id_, trader_address);
