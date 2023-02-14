@@ -310,6 +310,11 @@ func execute_batch{
 // Internal //
 // ///////////
 
+// @notice Internal function to check to check the slippage of a market order
+// @param order_id_ - Order ID of the order
+// @param slippage_ - Slippage % of the order
+// @param oracle_price_ - Oracle price of the batch
+// @param execution_price_ - Execution price of the order
 func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_id_: felt, slippage_: felt, oracle_price_: felt, execution_price_: felt
 ) {
@@ -332,24 +337,48 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return ();
 }
 
+// @notice Internal function to check if the execution_price of a limit order is valid (TAKER)
+// @param order_id_ - Order ID of the order
+// @param price_ - Limit price of the order
+// @param execution_price_ - Execution price of the order
+// @param side_ - Side of the order BUY/SELL
+// @param collateral_token_decimal_ - Number of decimals for the collateral
 func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_id_: felt,
     price_: felt,
     execution_price_: felt,
     direction_: felt,
+    side_: felt,
     collateral_token_decimal_: felt,
 ) {
-    // if it's a limit order
+    alloc_locals;
+
     if (direction_ == LONG) {
         // if it's a long order
-        with_attr error_message("0508: {order_id_} {execution_price_}") {
-            Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
+        if (side_ == BUY) {
+            // if it's a buy order
+            with_attr error_message("0508: {order_id_} {execution_price_}") {
+                Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
+            }
+        } else {
+            // if it's a sell order
+            with_attr error_message("0507: {order_id_} {execution_price_}") {
+                Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
+            }
         }
         tempvar range_check_ptr = range_check_ptr;
     } else {
         // if it's a short order
-        with_attr error_message("0507: {order_id_} {execution_price_}") {
-            Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
+        if (side_ == BUY) {
+            // if it's a buy order
+            with_attr error_message("0507: {order_id_} {execution_price_}") {
+                Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
+            }
+        } else {
+            // if it's a sell order
+            with_attr error_message("0508: {order_id_} {execution_price_}") {
+                Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
+            }
         }
         tempvar range_check_ptr = range_check_ptr;
     }
@@ -1213,6 +1242,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 price_=[request_list_].price,
                 execution_price_=new_execution_price,
                 direction_=[request_list_].direction,
+                side_=[request_list_].side,
                 collateral_token_decimal_=collateral_token_decimal_,
             );
         }
