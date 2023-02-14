@@ -6,7 +6,7 @@ from calculate_abr import calculate_abr
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, assert_event_emitted, to64x61, convertTo64x61, assert_revert, from64x61, PRIME
-from utils_trading import User, order_direction, order_types, order_time_in_force, order_life_cycles, OrderExecutor, User, ABR, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, compare_abr_values, check_batch_status, set_abr_value, make_abr_payments
+from utils_trading import User, order_direction, order_types, order_time_in_force, OrderExecutor, User, ABR, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, compare_abr_values, check_batch_status, set_abr_value, make_abr_payments
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
