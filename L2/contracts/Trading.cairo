@@ -688,14 +688,16 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     local realized_pnl;
     // To be passed as arguments to error_message
     local order_id;
+    local order_direction;
     assert order_id = order_.order_id;
+    assert order_direction = order_.direction;
 
     // Get order details
     let (current_position: PositionDetails) = IAccountManager.get_position_data(
         contract_address=order_.user_address, market_id_=market_id_, direction_=order_.direction
     );
 
-    with_attr error_message("0517: {order_id} {current_position.position_size}") {
+    with_attr error_message("0517: {order_id} {order_direction}") {
         assert_not_zero(current_position.position_size);
     }
 
@@ -1115,7 +1117,11 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Direction Check
     if (request_list_len_ == 1) {
         validate_taker(
-            maker1_direction_, maker1_side_, [request_list_].direction, [request_list_].side
+            order_id,
+            maker1_direction_,
+            maker1_side_,
+            [request_list_].direction,
+            [request_list_].side,
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1123,7 +1129,11 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     } else {
         if (request_list_len_ != orders_len_) {
             validate_maker(
-                maker1_direction_, maker1_side_, [request_list_].direction, [request_list_].side
+                order_id,
+                maker1_direction_,
+                maker1_side_,
+                [request_list_].direction,
+                [request_list_].side,
             );
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1425,12 +1435,17 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 }
 
 // @notice Internal function to validate maker orders
+// @param order_id_ - Id of the maker order
 // @param maker1_direction_ - Direction of first maker order
 // @param maker1_side_ - Side of first maker order
 // @param current_direction_ - Direction of current maker order
 // @param current_side_ -  Side of current maker order
 func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    maker1_direction_: felt, maker1_side_: felt, current_direction_: felt, current_side_: felt
+    order_id_: felt,
+    maker1_direction_: felt,
+    maker1_side_: felt,
+    current_direction_: felt,
+    current_side_: felt,
 ) {
     alloc_locals;
     let (local opposite_direction) = get_opposite(maker1_direction_);
@@ -1447,20 +1462,24 @@ func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         }
     }
 
-    with_attr error_message(
-            "0511: Maker direction {current_direction_} or side {current_side_} is not valid ") {
+    with_attr error_message("0512: {order_id_} {current_direction_}") {
         assert 0 = 1;
     }
     return ();
 }
 
 // @notice Internal function to validate taker orders
+// @param order_id_ - Id of the taker order
 // @param maker1_direction_ - Direction of first maker order
 // @param maker1_side_ - Side of first maker order
 // @param current_direction_ - Direction of current maker order
 // @param current_side_ -  Side of current maker order
 func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    maker1_direction_: felt, maker1_side_: felt, current_direction_: felt, current_side_: felt
+    order_id_: felt,
+    maker1_direction_: felt,
+    maker1_side_: felt,
+    current_direction_: felt,
+    current_side_: felt,
 ) {
     alloc_locals;
     let (local opposite_direction) = get_opposite(maker1_direction_);
@@ -1477,8 +1496,7 @@ func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         }
     }
 
-    with_attr error_message(
-            "0512: Taker direction {current_direction_} or side {current_side_} is not valid") {
+    with_attr error_message("0511: {order_id_} {current_direction_}") {
         assert 0 = 1;
     }
     return ();
