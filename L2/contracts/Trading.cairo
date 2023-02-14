@@ -1418,6 +1418,11 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     );
 }
 
+// @notice Internal function to validate maker orders
+// @param maker1_direction_ - Direction of first maker order
+// @param maker1_side_ - Side of first maker order
+// @param current_direction_ - Direction of current maker order
+// @param current_side_ -  Side of current maker order
 func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     maker1_direction_: felt, maker1_side_: felt, current_direction_: felt, current_side_: felt
 ) {
@@ -1443,6 +1448,11 @@ func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     return ();
 }
 
+// @notice Internal function to validate taker orders
+// @param maker1_direction_ - Direction of first maker order
+// @param maker1_side_ - Side of first maker order
+// @param current_direction_ - Direction of current maker order
+// @param current_side_ -  Side of current maker order
 func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     maker1_direction_: felt, maker1_side_: felt, current_direction_: felt, current_side_: felt
 ) {
@@ -1468,6 +1478,9 @@ func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     return ();
 }
 
+// @notice Internal function to get oppsite side or direction of the order
+// @param side_or_direction_ - Argument represents either side or direction
+// @return res - Returns either opposite side or opposite direction of the order
 func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     side_or_direction_: felt
 ) -> (res: felt) {
