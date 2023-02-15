@@ -28,6 +28,8 @@ from contracts.Constants import (
     LIQUIDATION_ORDER,
     LONG,
     Market_INDEX,
+    MarketPrices_INDEX,
+    OPEN,
     SHORT,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
@@ -40,6 +42,7 @@ from contracts.DataTypes import (
     CollateralBalance,
     LiquidatablePosition,
     Market,
+    MarketPrice,
     OrderRequest,
     PositionDetails,
     PositionDetailsForRiskManagement,
@@ -55,6 +58,7 @@ from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.ILiquidate import ILiquidate
 from contracts.interfaces.IMarkets import IMarkets
+from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
 from contracts.interfaces.IWithdrawalRequest import IWithdrawalRequest
 from contracts.libraries.CommonLibrary import CommonLib
@@ -64,11 +68,19 @@ from contracts.Math_64x61 import (
     Math64x61_div,
     Math64x61_fromDecimalFelt,
     Math64x61_is_equal,
+    Math64x61_is_le,
     Math64x61_min,
+    Math64x61_mul,
     Math64x61_round,
     Math64x61_sub,
     Math64x61_toDecimalFelt,
 )
+
+// ////////////
+// Constants //
+// ////////////
+
+const TWO_POINT_FIVE = 5764607523034234880;
 
 // /////////
 // Events //
@@ -348,10 +360,25 @@ func get_withdrawal_history_by_status{
 @view
 func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     collateral_id_: felt
-) -> (safe_withdrawal_amount_64x61: felt) {
+) -> (safe_withdrawal_amount: felt, withdrawable_amount: felt) {
+    alloc_locals;
+    local safe_withdrawal_amount_64x61;
+
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
     let (user_l2_address) = get_contract_address();
+
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
+    let token_decimals = asset.token_decimal;
+
+    let (current_balance) = balance.read(assetID=collateral_id_);
+    let (is_balance_negative) = Math64x61_is_le(current_balance, 0, token_decimals);
+    if (is_balance_negative == TRUE) {
+        return (0, 0);
+    }
 
     // Get Liquidate contract address
     let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
@@ -368,17 +395,47 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         collateral_id_=collateral_id_,
     );
 
-    // Returns 0, if the position is to be deleveraged or liquiditable
-    if (liq_result == 1) {
-        return (0,);
+    // if TMR == 0, it means that market price is not within TTL, so user should be possible to withdraw whole balance
+    if (total_maintenance_requirement == 0) {
+        return (current_balance, current_balance);
     }
 
-    // Compute current balance
-    let (current_balance) = balance.read(assetID=collateral_id_);
+    // if TAV <= 0, it means that user is already under water and thus withdrawal is not possible
+    let (is_less) = Math64x61_is_le(total_account_value, 0, token_decimals);
+    if (is_less == TRUE) {
+        return (0, 0);
+    }
 
-    let (safe_amount) = Math64x61_sub(total_account_value, total_maintenance_requirement);
-    let (safe_withdrawal_amount_64x61) = Math64x61_min(current_balance, safe_amount);
-    return (safe_withdrawal_amount_64x61,);
+    // Returns 0, if the position is to be deleveraged or liquiditable
+    if (liq_result == 1) {
+        assert safe_withdrawal_amount_64x61 = 0;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        let (safe_amount) = Math64x61_sub(total_account_value, total_maintenance_requirement);
+        let (safe_withdrawal_amount_64x61_temp) = Math64x61_min(current_balance, safe_amount);
+        if (safe_withdrawal_amount_64x61_temp == current_balance) {
+            return (safe_withdrawal_amount_64x61_temp, safe_withdrawal_amount_64x61_temp);
+        }
+        assert safe_withdrawal_amount_64x61 = safe_withdrawal_amount_64x61_temp;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    let (withdrawable_amount_64x61) = get_amount_to_withdraw(
+        total_account_value,
+        total_maintenance_requirement,
+        least_collateral_ratio_position,
+        collateral_id_,
+        token_decimals,
+    );
+
+    // REMOVEEEEEEEEEEEEEEEEEE
+    // return (total_account_value, total_maintenance_requirement);
+
+    return (safe_withdrawal_amount_64x61, withdrawable_amount_64x61);
 }
 
 // /////////////
@@ -1166,15 +1223,6 @@ func withdraw{
     );
     let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
 
-    // Compute current balance
-    let (current_balance) = balance.read(assetID=collateral_id_);
-    with_attr error_message("AccountManager: Insufficient balance to withdraw") {
-        Math64x61_assert_le(amount_, current_balance, asset.token_decimal);
-    }
-    let (new_balance) = Math64x61_sub(current_balance, amount_);
-    // Update the new balance
-    balance.write(assetID=collateral_id_, value=new_balance);
-
     // Check whether any position is already marked to be deleveraged or liquidatable
     let (position: LiquidatablePosition) = deleveragable_or_liquidatable_position.read(
         collateral_id_
@@ -1186,25 +1234,18 @@ func withdraw{
     }
 
     // Check whether the withdrawal leads to the position to be liquidatable or deleveraged
-    // Get Liquidate contract address
-    let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Liquidate_INDEX, version=version
-    );
-    let (
-        liq_result: felt,
-        least_collateral_ratio_position: PositionDetailsForRiskManagement,
-        total_account_value: felt,
-        total_maintenance_requirement: felt,
-    ) = ILiquidate.find_under_collateralized_position(
-        contract_address=liquidate_address,
-        account_address_=user_l2_address,
-        collateral_id_=collateral_id_,
-    );
+    let (_, withdrawable_amount) = get_safe_amount_to_withdraw(collateral_id_);
 
     with_attr error_message(
             "AccountManager: This withdrawal will lead to either deleveraging or liquidation") {
-        assert liq_result = 0;
+        Math64x61_assert_le(amount_, withdrawable_amount, asset.token_decimal);
     }
+
+    // Compute current balance
+    let (current_balance) = balance.read(assetID=collateral_id_);
+    let (new_balance) = Math64x61_sub(current_balance, amount_);
+    // Update the new balance
+    balance.write(assetID=collateral_id_, value=new_balance);
 
     // Calculate the timestamp
     let (timestamp_) = get_block_timestamp();
@@ -1315,6 +1356,107 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 // ///////////
 // Internal //
 // ///////////
+
+// @notice Internal function to calculate maximum amount withdrawable by user which will not result in liquidation
+// Withdrawing this amount may result in deleveraging
+// @param total_account_value - current total account value including all positions and balance
+// @param total_maintenance_requirement - current total maintenance requirement for all positions
+// @param least_collateral_ratio_position - details of position with least collateral ratio
+// @return withdrawable_amount - amount that can be withdrawn by the user
+func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    total_account_value_: felt,
+    total_maintenance_requirement_: felt,
+    least_collateral_ratio_position_: PositionDetailsForRiskManagement,
+    collateral_id_: felt,
+    token_decimals_: felt,
+) -> (withdrawable_amount: felt) {
+    alloc_locals;
+
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    let (current_balance) = balance.read(assetID=collateral_id_);
+
+    // This function will only be called in these cases:
+    // i) if TAV < TMR ii) if (TAV - TMR) < balance
+    // we calculate maximum amount that can be sold so that the position won't get liquidated
+    // calculate new TAV and new TMR to get maximum withdrawable amount
+    // amount_to_sell = initial_size - ((2.5 * margin_amount)/current_asset_price)
+    let (market_price_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=MarketPrices_INDEX, version=version
+    );
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+    let (market_price: MarketPrice) = IMarketPrices.get_market_price(
+        contract_address=market_price_address, id=least_collateral_ratio_position_.market_id
+    );
+
+    let (min_leverage_times_margin) = Math64x61_mul(
+        TWO_POINT_FIVE, least_collateral_ratio_position_.margin_amount
+    );
+    let (new_size) = Math64x61_div(min_leverage_times_margin, market_price.price);
+
+    // calculate account value and maintenance requirement of least collateral position before reducing size
+    // AV = (size * current_price) - borrowed_amount
+    // MR = req_margin * size * avg_execution_price
+    let (account_value_initial_temp) = Math64x61_mul(
+        least_collateral_ratio_position_.position_size, market_price.price
+    );
+    let (account_value_initial) = Math64x61_sub(
+        account_value_initial_temp, least_collateral_ratio_position_.borrowed_amount
+    );
+    let (req_margin) = IMarkets.get_maintenance_margin(
+        contract_address=market_address, market_id_=least_collateral_ratio_position_.market_id
+    );
+    let (leveraged_position_value_initial) = Math64x61_mul(
+        least_collateral_ratio_position_.position_size,
+        least_collateral_ratio_position_.avg_execution_price,
+    );
+    let (maintenance_requirement_initial) = Math64x61_mul(
+        req_margin, leveraged_position_value_initial
+    );
+
+    // calculate account value and maintenance requirement of least collateral position after reducing size
+    let (account_value_after_temp) = Math64x61_mul(new_size, market_price.price);
+    let (ratio_of_position) = Math64x61_div(
+        new_size, least_collateral_ratio_position_.position_size
+    );
+    let (amount_to_be_sold) = Math64x61_sub(
+        least_collateral_ratio_position_.position_size, new_size
+    );
+    let (amount_to_be_sold_value) = Math64x61_mul(amount_to_be_sold, market_price.price);
+    let (new_borrowed_amount) = Math64x61_sub(
+        least_collateral_ratio_position_.borrowed_amount, amount_to_be_sold_value
+    );
+    let (account_value_after) = Math64x61_sub(account_value_after_temp, new_borrowed_amount);
+    let (leveraged_position_value_after) = Math64x61_mul(
+        new_size, least_collateral_ratio_position_.avg_execution_price
+    );
+    let (maintenance_requirement_after) = Math64x61_mul(req_margin, leveraged_position_value_after);
+
+    // calculate new TAV and new TMR after reducing size
+    let (account_value_difference) = Math64x61_sub(account_value_after, account_value_initial);
+    let (maintenance_requirement_difference) = Math64x61_sub(
+        maintenance_requirement_after, maintenance_requirement_initial
+    );
+    let (new_tav) = Math64x61_add(total_account_value_, account_value_difference);
+    let (new_tmr) = Math64x61_add(
+        total_maintenance_requirement_, maintenance_requirement_difference
+    );
+
+    let (new_sub_result) = Math64x61_sub(new_tav, new_tmr);
+    let (is_zero_or_less) = Math64x61_is_le(new_sub_result, 0, token_decimals_);
+    if (is_zero_or_less == TRUE) {
+        return (0,);
+    }
+    let (is_new_tav_greater) = Math64x61_is_le(current_balance, new_sub_result, token_decimals_);
+    if (is_new_tav_greater == TRUE) {
+        return (current_balance,);
+    } else {
+        return (new_sub_result,);
+    }
+}
 
 // @notice Internal Function called by get_withdrawal_history to recursively add WithdrawalRequest to the array and return it
 // @param iterator_ - Index to fetch withdrawal history
