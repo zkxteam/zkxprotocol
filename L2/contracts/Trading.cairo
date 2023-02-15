@@ -30,6 +30,7 @@ from contracts.Constants import (
     LONG,
     MAKER,
     Market_INDEX,
+    MARKET_ORDER,
     MarketPrices_INDEX,
     MasterAdmin_ACTION,
     SELL,
@@ -255,6 +256,7 @@ func execute_batch{
         total_order_volume_=0,
         taker_execution_price=0,
         open_interest_=0,
+        oracle_price_=oracle_price_,
     );
 
     // Get Market price for the corresponding market Id
@@ -269,7 +271,7 @@ func execute_batch{
     // update market price
     if (status == FALSE) {
         IMarketPrices.update_market_price(
-            contract_address=market_prices_address, id=market_id_, price=taker_execution_price
+            contract_address=market_prices_address, id=market_id_, price=oracle_price_
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -308,21 +310,26 @@ func execute_batch{
 // Internal //
 // ///////////
 
+// @notice Internal function to check to check the slippage of a market order
+// @param order_id_ - Order ID of the order
+// @param slippage_ - Slippage % of the order
+// @param oracle_price_ - Oracle price of the batch
+// @param execution_price_ - Execution price of the order
 func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_id_: felt, slippage_: felt, price_: felt, execution_price_: felt
+    order_id_: felt, slippage_: felt, oracle_price_: felt, execution_price_: felt
 ) {
     // To remove
     alloc_locals;
-    with_attr error_message("Trading: Slippage percentage must be positive & below 15") {
-        assert_nn(slippage_);
+    with_attr error_message("0521: {order_id_} {slippage_}") {
+        assert_lt(0, slippage_);
         assert_le(slippage_, FIFTEEN_PERCENTAGE);
     }
 
     let (percentage) = Math64x61_div(slippage_, HUNDRED);
-    let (threshold) = Math64x61_mul(percentage, price_);
+    let (threshold) = Math64x61_mul(percentage, oracle_price_);
 
-    let (lower_limit: felt) = Math64x61_sub(price_, threshold);
-    let (upper_limit: felt) = Math64x61_add(price_, threshold);
+    let (lower_limit: felt) = Math64x61_sub(oracle_price_, threshold);
+    let (upper_limit: felt) = Math64x61_add(oracle_price_, threshold);
 
     with_attr error_message("0506: {order_id_} {execution_price_}") {
         assert_in_range(execution_price_, lower_limit, upper_limit);
@@ -330,24 +337,48 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     return ();
 }
 
+// @notice Internal function to check if the execution_price of a limit order is valid (TAKER)
+// @param order_id_ - Order ID of the order
+// @param price_ - Limit price of the order
+// @param execution_price_ - Execution price of the order
+// @param side_ - Side of the order BUY/SELL
+// @param collateral_token_decimal_ - Number of decimals for the collateral
 func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_id_: felt,
     price_: felt,
     execution_price_: felt,
     direction_: felt,
+    side_: felt,
     collateral_token_decimal_: felt,
 ) {
-    // if it's a limit order
+    alloc_locals;
+
     if (direction_ == LONG) {
         // if it's a long order
-        with_attr error_message("0508: {order_id_} {execution_price_}") {
-            Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
+        if (side_ == BUY) {
+            // if it's a buy order
+            with_attr error_message("0508: {order_id_} {execution_price_}") {
+                Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
+            }
+        } else {
+            // if it's a sell order
+            with_attr error_message("0507: {order_id_} {execution_price_}") {
+                Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
+            }
         }
         tempvar range_check_ptr = range_check_ptr;
     } else {
         // if it's a short order
-        with_attr error_message("0507: {order_id_} {execution_price_}") {
-            Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
+        if (side_ == BUY) {
+            // if it's a buy order
+            with_attr error_message("0507: {order_id_} {execution_price_}") {
+                Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
+            }
+        } else {
+            // if it's a sell order
+            with_attr error_message("0508: {order_id_} {execution_price_}") {
+                Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
+            }
         }
         tempvar range_check_ptr = range_check_ptr;
     }
@@ -1017,6 +1048,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param total_order_volume_ - This stores the sum of size*execution_price for each maker order
 // @param taker_execution_price - The price to be stored for the market price in execute_batch
 // @param open_interest_ - Open interest corresponding to the current order
+// @param oracle_price_ - Oracle price from the ZKXNode network
 // @return res - returns the net sum of the orders do far
 // @return trader_stats_list_len - length of the trader fee list so far
 // @return open_interest - open interest corresponding to the trade batch
@@ -1048,6 +1080,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     total_order_volume_: felt,
     taker_execution_price: felt,
     open_interest_: felt,
+    oracle_price_: felt,
 ) -> (taker_execution_price: felt, open_interest: felt) {
     alloc_locals;
 
@@ -1196,12 +1229,12 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert execution_price = new_execution_price;
 
         // Price check
-        if ([request_list_].order_type == 1) {
+        if ([request_list_].order_type == MARKET_ORDER) {
             check_within_slippage(
                 order_id_=order_id,
                 slippage_=[request_list_].slippage,
-                price_=[request_list_].price,
-                execution_price_=new_execution_price,
+                oracle_price_=oracle_price_,
+                execution_price_=execution_price,
             );
         } else {
             check_limit_price(
@@ -1209,6 +1242,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 price_=[request_list_].price,
                 execution_price_=new_execution_price,
                 direction_=[request_list_].direction,
+                side_=[request_list_].side,
                 collateral_token_decimal_=collateral_token_decimal_,
             );
         }
@@ -1431,6 +1465,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         total_order_volume_=new_total_order_volume,
         taker_execution_price=execution_price,
         open_interest_=new_open_interest,
+        oracle_price_=oracle_price_,
     );
 }
 
