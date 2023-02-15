@@ -1392,20 +1392,6 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         contract_address=market_price_address, id=least_collateral_ratio_position_.market_id
     );
 
-    // Validate that the market price is still under TTL
-    let (market_ttl: felt) = IMarkets.get_ttl_from_market(
-        contract_address=market_address, market_id_=least_collateral_ratio_position_.market_id
-    );
-    let (current_timestamp) = get_block_timestamp();
-    let ttl = market_ttl;
-    let timestamp = market_price.timestamp;
-    let time_difference = current_timestamp - timestamp;
-    let status = is_le(time_difference, ttl);
-    // ttl has passed, which means market price is not valid anymore
-    if (status == FALSE) {
-        return (current_balance,);
-    }
-
     let (min_leverage_times_margin) = Math64x61_mul(
         TWO_POINT_FIVE, least_collateral_ratio_position_.margin_amount
     );
@@ -1436,8 +1422,12 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let (ratio_of_position) = Math64x61_div(
         new_size, least_collateral_ratio_position_.position_size
     );
-    let (new_borrowed_amount) = Math64x61_mul(
-        ratio_of_position, least_collateral_ratio_position_.borrowed_amount
+    let (amount_to_be_sold) = Math64x61_sub(
+        least_collateral_ratio_position_.position_size, new_size
+    );
+    let (amount_to_be_sold_value) = Math64x61_mul(amount_to_be_sold, market_price.price);
+    let (new_borrowed_amount) = Math64x61_sub(
+        least_collateral_ratio_position_.borrowed_amount, amount_to_be_sold_value
     );
     let (account_value_after) = Math64x61_sub(account_value_after_temp, new_borrowed_amount);
     let (leveraged_position_value_after) = Math64x61_mul(
