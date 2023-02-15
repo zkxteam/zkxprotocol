@@ -1446,6 +1446,10 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     );
 
     let (new_sub_result) = Math64x61_sub(new_tav, new_tmr);
+    let (is_zero_or_less) = Math64x61_is_le(new_sub_result, 0, token_decimals_);
+    if (is_zero_or_less == TRUE) {
+        return (0);
+    }
     let (is_new_tav_greater) = Math64x61_is_le(current_balance, new_sub_result, token_decimals_);
     if (is_new_tav_greater == TRUE) {
         return (current_balance,);
