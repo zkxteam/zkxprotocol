@@ -860,6 +860,8 @@ func execute_order{
     );
     let (asset_details) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
     let asset_decimals = asset_details.token_decimal;
+    let (collateral_details) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
+    let collateral_decimals = collateral_details.token_decimal;
 
     // hash the parameters
     let (hash) = hash_order(&request);
@@ -896,6 +898,7 @@ func execute_order{
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
 
     let (local current_timestamp) = get_block_timestamp();
+    let (execution_price_rounded) = Math64x61_round(execution_price, collateral_decimals);
 
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position
@@ -927,13 +930,15 @@ func execute_order{
         let (new_leverage) = Math64x61_div(total_value, margin_amount);
         let (new_leverage_rounded) = Math64x61_round(new_leverage, 5);
         let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
+        let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
+        let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
 
         // Create a new struct with the updated details
         let updated_position = PositionDetails(
-            avg_execution_price=execution_price,
+            avg_execution_price=execution_price_rounded,
             position_size=new_position_size,
-            margin_amount=margin_amount,
-            borrowed_amount=borrowed_amount,
+            margin_amount=margin_amount_rounded,
+            borrowed_amount=borrowed_amount_rounded,
             leverage=new_leverage_rounded,
             created_timestamp=created_timestamp,
             modified_timestamp=current_timestamp,
@@ -1009,9 +1014,10 @@ func execute_order{
                 with_attr error_message("0007: {order_id} {size}") {
                     assert liq_position.liquidatable = FALSE;
                 }
-                let total_value = margin_amount + borrowed_amount;
+                let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
                 let (leverage_) = Math64x61_div(total_value, margin_amount);
-                assert new_leverage = leverage_;
+                let (leverage_rounded) = Math64x61_round(leverage_, 5);
+                assert new_leverage = leverage_rounded;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -1069,13 +1075,15 @@ func execute_order{
             tempvar range_check_ptr = range_check_ptr;
         } else {
             let (current_pnl: felt) = Math64x61_add(current_position_details.realized_pnl, pnl);
+            let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
+            let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
 
             // Create a new struct with the updated details
             let updated_position = PositionDetails(
-                avg_execution_price=execution_price,
+                avg_execution_price=execution_price_rounded,
                 position_size=new_position_size,
-                margin_amount=margin_amount,
-                borrowed_amount=borrowed_amount,
+                margin_amount=margin_amount_rounded,
+                borrowed_amount=borrowed_amount_rounded,
                 leverage=new_leverage,
                 created_timestamp=current_position_details.created_timestamp,
                 modified_timestamp=current_timestamp,
