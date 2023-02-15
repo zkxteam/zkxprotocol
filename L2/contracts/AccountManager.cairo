@@ -395,6 +395,11 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         collateral_id_=collateral_id_,
     );
 
+    // if TMR == 0, it means that market price is not within TTL, so user should be possible to withdraw whole balance
+    if (total_maintenance_requirement == 0) {
+        return (current_balance, current_balance);
+    }
+
     // if TAV <= 0, it means that user is already under water and thus withdrawal is not possible
     let (is_less) = Math64x61_is_le(total_account_value, 0, token_decimals);
     if (is_less == TRUE) {
@@ -426,6 +431,10 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         collateral_id_,
         token_decimals,
     );
+
+    // REMOVEEEEEEEEEEEEEEEEEE
+    // return (total_account_value, total_maintenance_requirement);
+
     return (safe_withdrawal_amount_64x61, withdrawable_amount_64x61);
 }
 
@@ -1403,8 +1412,13 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let (new_size) = Math64x61_div(min_leverage_times_margin, market_price.price);
 
     // calculate account value and maintenance requirement of least collateral position before reducing size
-    let (account_value_initial) = Math64x61_mul(
+    // AV = (size * current_price) - borrowed_amount
+    // MR = req_margin * size * avg_execution_price
+    let (account_value_initial_temp) = Math64x61_mul(
         least_collateral_ratio_position_.position_size, market_price.price
+    );
+    let (account_value_initial) = Math64x61_sub(
+        account_value_initial_temp, least_collateral_ratio_position_.borrowed_amount
     );
     let (req_margin) = IMarkets.get_maintenance_margin(
         contract_address=market_address, market_id_=least_collateral_ratio_position_.market_id
@@ -1418,7 +1432,14 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     );
 
     // calculate account value and maintenance requirement of least collateral position after reducing size
-    let (account_value_after) = Math64x61_mul(new_size, market_price.price);
+    let (account_value_after_temp) = Math64x61_mul(new_size, market_price.price);
+    let (ratio_of_position) = Math64x61_div(
+        new_size, least_collateral_ratio_position_.position_size
+    );
+    let (new_borrowed_amount) = Math64x61_mul(
+        ratio_of_position, least_collateral_ratio_position_.borrowed_amount
+    );
+    let (account_value_after) = Math64x61_sub(account_value_after_temp, new_borrowed_amount);
     let (leveraged_position_value_after) = Math64x61_mul(
         new_size, least_collateral_ratio_position_.avg_execution_price
     );
