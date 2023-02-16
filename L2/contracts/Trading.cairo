@@ -198,9 +198,6 @@ func execute_batch{
         market_prices_address: felt,
     ) = get_registry_addresses();
 
-    // check oracle price
-    let (lower_limit: felt, upper_limit: felt) = get_price_range(oracle_price_=oracle_price_);
-
     // get collateral id
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
         contract_address=market_address, market_id_=market_id_
@@ -234,8 +231,6 @@ func execute_batch{
         collateral_id_=collateral_id,
         asset_token_decimal_=asset.token_decimal,
         collateral_token_decimal_=collateral.token_decimal,
-        lower_limit_=lower_limit,
-        upper_limit_=upper_limit,
         orders_len_=request_list_len,
         request_list_len_=request_list_len,
         request_list_=request_list,
@@ -483,22 +478,6 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         market_address,
         market_prices_address,
     );
-}
-
-// Internal Function to check if the price is fair for an order
-// @param oracle_price - Mean of the oracle price passed by the Node network
-// @returns lower_limit
-// @returns upper_limit
-func get_price_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    oracle_price_: felt
-) -> (lower_limit: felt, upper_limit: felt) {
-    let (current_threshold_percentage) = threshold_percentage.read();
-    let (percentage) = Math64x61_div(current_threshold_percentage, HUNDRED);
-    let (threshold) = Math64x61_mul(percentage, oracle_price_);
-
-    let (lower_limit: felt) = Math64x61_sub(oracle_price_, threshold);
-    let (upper_limit: felt) = Math64x61_add(oracle_price_, threshold);
-    return (lower_limit, upper_limit);
 }
 
 // @notice Intenal function that processes open orders
@@ -1027,8 +1006,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
 // @param asset_token_decimal_ - No.of token decimals of an asset
 // @param collateral_token_decimal_ - No.of token decimals of collateral
-// @param lower_limit_ - Lower threshold of the passed oracle price
-// @param upper_limit_ - Upper threshold of the passed oracle price
 // @param orders_len_ - Length fo the execute batch (to be used to calculate the index of each order)
 // @param request_list_len_ - No of orders in the batch
 // @param request_list_ - The batch of the orders
@@ -1058,8 +1035,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     collateral_id_: felt,
     asset_token_decimal_: felt,
     collateral_token_decimal_: felt,
-    lower_limit_: felt,
-    upper_limit_: felt,
     orders_len_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
@@ -1329,11 +1304,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    // Price Check
-    with_attr error_message("0519: {order_id} {execution_price}") {
-        assert_in_range(execution_price, lower_limit_, upper_limit_);
-    }
-
     local pnl;
 
     // If the order is to be opened
@@ -1443,8 +1413,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         collateral_id_=collateral_id_,
         asset_token_decimal_=asset_token_decimal_,
         collateral_token_decimal_=collateral_token_decimal_,
-        lower_limit_=lower_limit_,
-        upper_limit_=upper_limit_,
         orders_len_=orders_len_,
         request_list_len_=request_list_len_ - 1,
         request_list_=request_list_ + MultipleOrder.SIZE,
