@@ -388,8 +388,6 @@ async def hightide_test_initializer(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
-    # Set the threshold for oracle price in Trading contract
-    await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
     # Deploy ERC20 contracts
     native_erc20_usdc = await starknet_service.deploy(ContractType.ERC20, [str_to_felt("USDC"), str_to_felt("USDC"), 6, 100, 0, starkway.contract_address, admin1.contract_address])
     native_erc20_ust = await starknet_service.deploy(ContractType.ERC20, [str_to_felt("UST"), str_to_felt("UST"), 18, 100, 0, starkway.contract_address, admin1.contract_address])

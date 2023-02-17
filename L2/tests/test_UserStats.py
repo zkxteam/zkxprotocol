@@ -260,8 +260,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'setup_trade_season', [
         initial_timestamp, to64x61(30)])
 
-    # Set the threshold for oracle price in Trading contract
-    await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
     return starknet_service, adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, dave, fixed_math, holding, feeBalance, marketPrices, liquidate, user_stats, hightide, alice_test, bob_test, python_executor
 
 

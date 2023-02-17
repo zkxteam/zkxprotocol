@@ -98,11 +98,6 @@ func trade_execution(size: felt, execution_price: felt, maker_direction: felt) {
 // Storage //
 // //////////
 
-// Stores threshold percentage
-@storage_var
-func threshold_percentage() -> (res: felt) {
-}
-
 // Stores if a batch id is executed
 @storage_var
 func batch_id_status(batch_id: felt) -> (res: felt) {
@@ -140,26 +135,6 @@ func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // ///////////
 // External //
 // ///////////
-
-// @notice Function to set the threshold percentage can only be called by masterAdmin; all execution_prices must be +/-threshold percentage of oracle price
-// @param new_percentage_ - New value of threshold percentage to be set in the contract
-@external
-func set_threshold_percentage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_percentage_: felt
-) {
-    with_attr error_message("Trading: Unauthorized") {
-        let (registry) = CommonLib.get_registry_address();
-        let (version) = CommonLib.get_contract_version();
-        verify_caller_authority(registry, version, MasterAdmin_ACTION);
-    }
-
-    with_attr error_message("Trading: Invalid percentage passed") {
-        assert_lt(0, new_percentage_);
-        assert_lt(new_percentage_, FIFTEEN_PERCENTAGE);
-    }
-    threshold_percentage.write(value=new_percentage_);
-    return ();
-}
 
 // @notice Function to execute multiple orders in a batch
 // @param quantity_locked_ - Size of the order to be executed

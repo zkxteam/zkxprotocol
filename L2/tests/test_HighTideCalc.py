@@ -412,9 +412,6 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'activate_high_tide', [1])
     await admin1_signer.send_transaction(admin1, hightide.contract_address, 'activate_high_tide', [2])
 
-    # Set the threshold for oracle price in Trading contract
-    await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
-
     # set the no.of users in a batch for Trader's score calculation and reward distribution
     await admin1_signer.send_transaction(admin1, hightideCalc.contract_address, 'set_no_of_users_per_batch', [10])
 

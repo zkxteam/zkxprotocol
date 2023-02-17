@@ -331,9 +331,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [AssetID.DAI, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, insuranceFund.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, insuranceFund.contract_address, 'fund', [AssetID.DAI, to64x61(1000000)])
-    # Set the threshold for oracle price in Trading contract
-    await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
-
+   
     # return relay versions of fees, asset, trading, holding, feeBalance, liquidate
     return (adminAuth, relay_fees, admin1, admin2, relay_asset,
             relay_trading, alice, bob, charlie, daniel, eduard, liquidator,

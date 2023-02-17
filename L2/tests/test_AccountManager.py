@@ -298,9 +298,6 @@ async def trading_test_initializer(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
-    # Set the threshold for oracle price in Trading contract
-    await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
-
     print("Trading contract:", hex(trading.contract_address))
     print("liquidate contract:", hex(liquidate.contract_address))
     print("Market:", hex(market.contract_address))

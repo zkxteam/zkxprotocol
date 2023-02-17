@@ -413,8 +413,6 @@ async def trading_test_initializer(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
-    # Set the threshold for oracle price in Trading contract
-    await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
     return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats
 
 
@@ -1437,47 +1435,6 @@ async def test_revert_if_maker_order_is_market(trading_test_initializer):
     error_at_index = 0
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0518:", error_at_index=error_at_index, param_2=error_at_index)
-
-
-@pytest.mark.asyncio
-async def test_revert_if_price_beyond_threshold(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
-
-    ###################
-    ### Open orders ##
-    ###################
-    # List of users
-    users = [alice, bob]
-    users_test = [alice_test, bob_test]
-
-    # Insufficient balance for users
-    alice_balance = 10000
-    bob_balance = 10000
-    balance_array = [alice_balance, bob_balance]
-
-    # Batch params for OPEN orders
-    quantity_locked_1 = 1
-    market_id_1 = BTC_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 1000
-
-    # Set balance in Starknet & Python
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-    # Create orders
-    orders_1 = [{
-        "quantity": 1,
-        "price": 1050.12,
-        "order_type": order_types["limit"]
-    }, {
-        "quantity": 2,
-        "direction": order_direction["short"],
-    }]
-
-    error_at_index = 0
-    # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=1, error_code=f"0519:", error_at_index=error_at_index, param_2=to64x61(1050.12))
-
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders(trading_test_initializer):
