@@ -329,8 +329,6 @@ async def abr_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [charlie.contract_address])
     await admin1_signer.send_transaction(admin1, accountRegistry.contract_address, 'add_to_account_registry', [dave.contract_address])
 
-    # Set the threshold for oracle price in Trading contract
-    await admin1_signer.send_transaction(admin1, trading.contract_address, 'set_threshold_percentage', [to64x61(5)])
     return (starknet_service, non_admin_1, admin1, trading, fixed_math, alice, bob, charlie, dave, abr_calculations, relay_abr_core, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor)
 
 
