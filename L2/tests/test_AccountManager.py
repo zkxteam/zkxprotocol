@@ -4,7 +4,7 @@ import time
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, PRIME, PRIME_HALF, assert_event_emitted
-from utils_trading import User, order_direction, order_types, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, get_fund_balance_python
+from utils_trading import User, Liquidator,order_direction, order_types, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, get_fund_balance_python, get_safe_amount_to_withdraw_python
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -35,6 +35,7 @@ timestamp = int(time.time())
 timestamp1 = int(time.time()) + 61
 timestamp2 = timestamp1 + 61
 timestamp3 = timestamp2 + 61
+timestamp4 = timestamp3 + 121
 
 
 @pytest.fixture(scope='module')
@@ -59,6 +60,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
 
     python_executor = OrderExecutor()
+    python_liquidator = Liquidator()
     # Deploy user accounts
     account_factory = AccountFactory(
         starknet_service,
@@ -306,12 +308,12 @@ async def trading_test_initializer(starknet_service: StarknetService):
     print("Market:", hex(market.contract_address))
     print("Market Prices:", hex(marketPrices.contract_address))
     print("Auth Registry", hex(registry.contract_address))
-    return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats
+    return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats, python_liquidator
 
 
 @pytest.mark.asyncio
 async def test_for_risk_while_opening_order(trading_test_initializer):
-    starknet_service, python_executor, admin1, _, alice, bob, _, _, _, felix, gary, alice_test, bob_test, _, _, felix_test, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    starknet_service, python_executor, admin1, _, alice, bob, _, _, _, felix, gary, alice_test, bob_test, _, _, felix_test, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, python_liquidator = trading_test_initializer
     
     ### Open orders to set price ###
 
@@ -402,8 +404,11 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_2)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
 
-    w = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    print("Withdrawable: ", w.result)
+    withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
+    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp2)
+
+    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == withdrawable_python[0]
+    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
 
     starknet_service.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp2, gas_price=starknet_service.state.state.block_info.gas_price,
@@ -445,7 +450,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
+    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp2)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
@@ -453,8 +458,11 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     # await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    w = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    print("Withdrawable: ", w.result)
+    withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
+    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp2)
+
+    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == withdrawable_python[0]
+    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
 
     starknet_service.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp3, gas_price=starknet_service.state.state.block_info.gas_price,
@@ -496,13 +504,74 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     }]
 
     # execute order
-    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
+    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp3)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
-    w = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    print("Withdrawable: ", w.result)
+    withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
+    print("starknet: ", withdrawable_starknet.result)
+    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp3)
+    print("python: ", withdrawable_python)
+
+    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == withdrawable_python[0]
+    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
+
+    starknet_service.state.state.block_info = BlockInfo(
+        block_number=1, block_timestamp=timestamp4, gas_price=starknet_service.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.state.state.block_info.sequencer_address,
+        starknet_version=STARKNET_VERSION
+    )
+
+    ### Open orders to set price ###
+
+    # List of users
+    users = [felix, gary]
+    users_test = [felix_test, gary_test]
+
+    # Sufficient balance for users
+    felix_balance = 200
+    gary_balance = 200
+    balance_array = [felix_balance, gary_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 85
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "price": 85,
+        "order_type": order_types["limit"],
+        "leverage": 1
+    }, {
+        "quantity": 1,
+        "price": 85,
+        "leverage": 1,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp4)
+    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
+
+    # # check balances
+    # await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+
+    withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
+    print("starknet: ", withdrawable_starknet.result)
+    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp4)
+    print("python: ", withdrawable_python)
+
+    # assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == withdrawable_python[0]
+    # assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
+
     
