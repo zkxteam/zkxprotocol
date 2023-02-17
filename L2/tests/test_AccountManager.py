@@ -512,9 +512,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
     withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    print("starknet: ", withdrawable_starknet.result)
     withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp3)
-    print("python: ", withdrawable_python)
 
     assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == withdrawable_python[0]
     assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
@@ -562,16 +560,16 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp4)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
-    # # check balances
-    # await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
     withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
     print("starknet: ", withdrawable_starknet.result)
     withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp4)
     print("python: ", withdrawable_python)
 
-    # assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == withdrawable_python[0]
-    # assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == withdrawable_python[0]
+    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
 
     
