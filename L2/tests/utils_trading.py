@@ -95,16 +95,9 @@ market_to_asset_mapping = {
 #### Classes ####
 #################
 
-
-class Liquidator:
-    pass
-
-
-class OrderExecutor:
-    pass
-
-
 # Emulates AccountManager Contract in python
+
+
 class User:
     def __init__(self, private_key: int, user_address: int, liquidator_private_key: int = 0):
         self.signer = Signer(private_key)
