@@ -389,6 +389,8 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         least_collateral_ratio_position: PositionDetailsForRiskManagement,
         total_account_value: felt,
         total_maintenance_requirement: felt,
+        least_collateral_ratio_position_asset_price: felt,
+        least_collateral_ratio: felt,
     ) = ILiquidate.find_under_collateralized_position(
         contract_address=liquidate_address,
         account_address_=user_l2_address,
