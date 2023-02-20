@@ -95,6 +95,12 @@ market_to_asset_mapping = {
 #### Classes ####
 #################
 
+class Liquidator:
+    pass
+
+class OrderExecutor:
+    pass
+
 
 # Emulates AccountManager Contract in python
 class User:
@@ -616,6 +622,60 @@ class User:
             order_64x61, liquidator_address)
         return (multiple_order_format, multiple_order_format_64x61)
 
+    def get_amount_to_withdraw(self, order_executor: OrderExecutor, liquidator: Liquidator, tav: float, tmr: float, position: Dict, collateral_id: int, timestamp: int):
+        current_balance = self.get_balance(collateral_id)
+        price = order_executor.get_market_price(position["market_id"], timestamp)
+        new_size = (2.5 * position["margin_amount"])/price
+
+        # Calculate AV and MR of least collateral position before selling
+        av_position = (position["position_size"] * price)  - position["borrowed_amount"]
+        mr_position = liquidator.maintenance_margin * position["position_size"] * position["avg_execution_price"]
+
+        # Calculate AV and MR of least collateral position after selling
+        amount_to_be_sold_value = price * (position["position_size"] - new_size)
+        new_borrowed_amount = position["borrowed_amount"] - amount_to_be_sold_value
+        av_after = (new_size * price) - new_borrowed_amount
+        mr_after = new_size * position["avg_execution_price"] * liquidator.maintenance_margin
+
+        new_tav = tav - av_position + av_after
+        new_tmr = tmr - mr_position + mr_after
+
+        if new_tav - new_tmr <= 0:
+            return 0
+        if current_balance <= new_tav - new_tmr:
+            return (current_balance)
+        else:
+            return (new_tav - new_tmr)
+
+
+    def get_safe_amount_to_withdraw(self, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[float, float]:
+        current_balance = self.get_balance(collateral_id)
+        if current_balance <= 0:
+            return (0, 0)
+        
+        (liq_res, position, tav, tmr) = find_under_collateralized_position_python_withdrawal(self, liquidator, order_executor, collateral_id, timestamp)
+        
+        if tmr == 0:
+            return (current_balance, current_balance)
+        
+        if tav <= 0:
+            return (0, 0)
+        
+        safe_withdrawal_amount = 0
+        if liq_res == 0:
+            safe_amount = tav - tmr
+            min_amount = min(safe_amount, current_balance)
+            if min_amount == current_balance:
+                return (current_balance, current_balance)
+            safe_withdrawal_amount = min_amount
+
+        print("Position: ", position)
+        
+        withdrawal_amount = self.get_amount_to_withdraw(order_executor, liquidator, tav, tmr, position, collateral_id, timestamp)
+
+        return (safe_withdrawal_amount, withdrawal_amount)
+
+
 
 # Emulates Trading Contract in python
 class OrderExecutor:
@@ -635,7 +695,7 @@ class OrderExecutor:
             last_timestamp = 0
 
         if last_timestamp + self.ttl < current_timestamp:
-            print("timestamp set", last_timestamp, current_timestamp)
+            print("timestamp set", last_timestamp, current_timestamp, price)
             self.market_prices.update({
                 market_id: {
                     "price": price,
@@ -852,6 +912,8 @@ class OrderExecutor:
     def get_market_price(self, market_id: int, timestamp: int) -> float:
         try:
             if self.market_prices[market_id]["timestamp"] + self.ttl < timestamp:
+                print("Details: ", self.market_prices[market_id]["timestamp"], self.ttl, timestamp)
+                print("Price: ", self.market_prices[market_id]["price"])
                 return 0
             else:
                 return self.market_prices[market_id]["price"]
@@ -1020,6 +1082,7 @@ class Liquidator:
             collateral_id=collateral_id)
 
         if liquidatable_position["amount_to_be_sold"] != 0:
+            print("here")
             return (1, {
                     "market_id": 0,
                     "direction": 0,
@@ -1053,6 +1116,7 @@ class Liquidator:
         for i in range(len(positions)):
             market_price = order_executor.get_market_price(
                 market_id=positions[i]["market_id"], timestamp=timestamp)
+            print("Market_id: ", positions[i]["market_id"])
 
             if market_price == 0:
                 print("Outdated market price")
@@ -1331,8 +1395,18 @@ def set_balance_python(user_test: User, asset_id: int, new_balance: float):
 def find_under_collateralized_position_python(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
     result = liquidator.find_under_collateralized_position(
         user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
-    print(result)
     return (result[0], list(result[1].values())[:4], result[2], result[3])
+
+# Liquidation check on the python implementation for withdrawal amount
+def find_under_collateralized_position_python_withdrawal(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
+    result = liquidator.find_under_collateralized_position(
+        user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
+    return (result)
+
+# Get safe withdrawal amount for python implementation
+def get_safe_amount_to_withdraw_python(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[float, float]:
+    result = user_test.get_safe_amount_to_withdraw(liquidator, order_executor, collateral_id, timestamp)
+    return (result[0], result[1])
 
 
 ####################################
