@@ -458,11 +458,6 @@ func set_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     let (last_timestamp) = get_last_abr_timestamp();
 
-    // Enforces last_abr_timestamp + abr_interval < new_timestamp
-    with_attr error_message("ABRCore: New Timstamp must be > last timestamp + abr_interval") {
-        assert_le(last_timestamp + current_abr_interval, new_timestamp);
-    }
-
     local new_epoch;
     // First epoch
     if (current_epoch == 0) {
@@ -473,6 +468,10 @@ func set_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
+        // Enforces last_abr_timestamp + abr_interval < new_timestamp
+        with_attr error_message("ABRCore: New Timstamp must be > last timestamp + abr_interval") {
+            assert_le(last_timestamp + current_abr_interval, new_timestamp);
+        }
         new_epoch = current_epoch;
 
         tempvar syscall_ptr = syscall_ptr;
