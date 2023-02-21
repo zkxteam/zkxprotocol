@@ -100,7 +100,8 @@ async def abr_factory(starknet_service: StarknetService):
     accountRegistry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
     abr_calculations = await starknet_service.deploy(ContractType.ABRCalculations, [])
     print("abr_calculations contract:", hex(abr_calculations.contract_address))
-    abr_core = await starknet_service.deploy(ContractType.ABRCore, [registry.contract_address, 1])
+    # Set the initial timestamp to be 4 hours before from the time of deployment
+    abr_core = await starknet_service.deploy(ContractType.ABRCore, [registry.contract_address, 1, timestamp - 14400])
     print("abr_core contract:", hex(abr_core.contract_address))
     abr_fund = await starknet_service.deploy(ContractType.ABRFund, [registry.contract_address, 1])
     abr_payment = await starknet_service.deploy(ContractType.ABRPayment, [registry.contract_address, 1])
@@ -367,6 +368,18 @@ def assert_events_emitted_from_all_calls(tx_exec_info, events):
 
 
 @pytest.mark.asyncio
+async def test_fund_called_by_non_authorized_address(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    amount = to64x61(1000000)
+    await assert_revert(
+        admin2_signer.send_transaction(
+            admin2, abr_fund.contract_address, "fund", [BTC_USD_ID, amount]),
+        reverted_with="FundLib: Unauthorized call to manage funds"
+    )
+
+
+@pytest.mark.asyncio
 async def test_fund_called_by_authorized_address(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
     amount = to64x61(1000000)
@@ -400,6 +413,70 @@ async def test_fund_called_by_authorized_address(abr_factory):
 
 
 @pytest.mark.asyncio
+async def test_set_abr_state_0(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    arguments_64x61 = [ETH_UST_ID, 480, *convertTo64x61(
+        ABR_data.btc_usd_perp_spot_1), 480, *convertTo64x61(ABR_data.btc_usd_perp_1)]
+    # Set BTC_USD ABR
+    await assert_revert(
+        admin1_signer.send_transaction(
+            admin1, relay_abr.contract_address, 'set_abr_value', arguments_64x61),
+        "ABRCore: Invalid State"
+    )
+
+
+@pytest.mark.asyncio
+async def test_pay_abr_state_0(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+    # Set BTC_USD ABR
+    await assert_revert(
+        admin1_signer.send_transaction(
+            admin1, relay_abr.contract_address, 'make_abr_payments', []
+        ),
+        "ABRCore: Invalid State"
+    )
+
+
+@pytest.mark.asyncio
+async def test_defund_called_by_non_authorized_address(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    amount = to64x61(500000)
+    abr_fund_balance_before = await abr_fund.balance(BTC_USD_ID).call()
+    await assert_revert(
+        admin2_signer.send_transaction(
+            admin2, abr_fund.contract_address, "defund", [BTC_USD_ID, amount]),
+        reverted_with="FundLib: Unauthorized call to manage funds"
+    )
+
+    abr_fund_balance = await abr_fund.balance(BTC_USD_ID).call()
+    assert abr_fund_balance.result.amount == abr_fund_balance_before.result.amount
+
+
+@pytest.mark.asyncio
+async def test_defund_called_by_authorized_address(abr_factory):
+    starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
+
+    amount = to64x61(500000)
+    abr_fund_balance_before = await abr_fund.balance(BTC_USD_ID).call()
+    defund_tx = await admin1_signer.send_transaction(admin1, abr_fund.contract_address, "defund", [BTC_USD_ID, amount])
+
+    assert_event_emitted(
+        defund_tx,
+        from_address=abr_fund.contract_address,
+        name="defund_ABR_called",
+        data=[
+            BTC_USD_ID,
+            amount
+        ]
+    )
+
+    abr_fund_balance = await abr_fund.balance(BTC_USD_ID).call()
+    assert abr_fund_balance.result.amount == abr_fund_balance_before.result.amount - amount
+
+
+@pytest.mark.asyncio
 async def test_set_no_of_users_in_a_batch(abr_factory):
     starknet_service, non_admin, admin1, trading, fixed_math, alice,  bob, charlie, dave, abr_calculations, relay_abr, abr_core, abr_fund, abr_payment, timestamp, admin2, alice_test, bob_test, charlie_test, dave_test, python_executor, abr_executor = abr_factory
 
@@ -421,7 +498,7 @@ async def test_view_functions_state_0(abr_factory):
     assert state_query.result.res == 0
 
     next_timestamp_query = await relay_abr.get_next_abr_timestamp().call()
-    assert next_timestamp_query.result.res == timestamp_1
+    assert next_timestamp_query.result.res == timestamp + 14400
 
     remaining_pay_abr_query = await relay_abr.get_remaining_pay_abr_calls().call()
     assert remaining_pay_abr_query.result.res == 0
@@ -532,6 +609,7 @@ async def test_trades_different_markets(abr_factory):
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
 
 @pytest.mark.asyncio
 async def test_set_timestamp(abr_factory):
