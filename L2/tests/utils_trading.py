@@ -1420,6 +1420,14 @@ def mark_under_collateralized_position_python(user_test: User, liquidator: Liqui
 def find_under_collateralized_position_python_withdrawal(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
     result = liquidator.find_under_collateralized_position(
         user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
+    return (result[0], list(result[1].values())[:4], result[2], result[3])
+
+# Liquidation check on the python implementation for withdrawal amount
+
+
+def find_under_collateralized_position_python_withdrawal(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
+    result = liquidator.find_under_collateralized_position(
+        user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
     return (result)
 
 # Get safe withdrawal amount for python implementation
