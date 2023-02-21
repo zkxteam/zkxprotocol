@@ -95,6 +95,15 @@ market_to_asset_mapping = {
 #### Classes ####
 #################
 
+
+# class Liquidator:
+#     pass
+
+
+# class OrderExecutor:
+#     pass
+
+
 # Emulates AccountManager Contract in python
 
 
@@ -617,7 +626,7 @@ class User:
             order_64x61, liquidator_address)
         return (multiple_order_format, multiple_order_format_64x61)
 
-    def get_amount_to_withdraw(self, order_executor: OrderExecutor, liquidator: Liquidator, tav: float, tmr: float, position: Dict, collateral_id: int, timestamp: int):
+    def get_amount_to_withdraw(self, order_executor: 'OrderExecutor', liquidator: 'Liquidator', tav: float, tmr: float, position: Dict, collateral_id: int, timestamp: int):
         current_balance = self.get_balance(collateral_id)
         price = order_executor.get_market_price(
             position["market_id"], timestamp)
@@ -648,7 +657,7 @@ class User:
         else:
             return (new_tav - new_tmr)
 
-    def get_safe_amount_to_withdraw(self, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[float, float]:
+    def get_safe_amount_to_withdraw(self, liquidator: 'Liquidator', order_executor: 'OrderExecutor', collateral_id: int, timestamp: int) -> Tuple[float, float]:
         current_balance = self.get_balance(collateral_id)
         if current_balance <= 0:
             return (0, 0)
