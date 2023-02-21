@@ -45,25 +45,25 @@ async def adminAuth_factory(starknet_service: StarknetService):
         ContractType.Trading)
     contract_class_liquidate = starknet_service.contracts_holder.get_contract_class(
         ContractType.Liquidate)
-    contract_class_abr = starknet_service.contracts_holder.get_contract_class(
-        ContractType.ABRCore)
+    contract_class_asset = starknet_service.contracts_holder.get_contract_class(
+        ContractType.Asset)
 
     class_hash_trading_, _ = await starknet_service.starknet.state.declare(contract_class_trading)
     class_hash_liquidate_, _ = await starknet_service.starknet.state.declare(contract_class_liquidate)
-    class_hash_abr_, _ = await starknet_service.starknet.state.declare(contract_class_abr)
+    class_hash_asset_, _ = await starknet_service.starknet.state.declare(contract_class_asset)
 
     class_hash_trading = int.from_bytes(class_hash_trading_, 'big')
     class_hash_liquidate = int.from_bytes(class_hash_liquidate_, 'big')
-    class_hash_abr = int.from_bytes(class_hash_abr_, 'big')
+    class_hash_asset = int.from_bytes(class_hash_asset_, 'big')
 
-    print(class_hash_trading, class_hash_liquidate, class_hash_abr)
+    print(class_hash_trading, class_hash_liquidate, class_hash_asset)
 
-    return admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_abr
+    return admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_asset
 
 
 @pytest.mark.asyncio
 async def test_deploy_non_admin(adminAuth_factory):
-    admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_abr = adminAuth_factory
+    admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_asset = adminAuth_factory
 
     await assert_revert(
         signer3.send_transaction(user1, zkxDeployer.contract_address, 'deploy_contracts', [
@@ -73,7 +73,7 @@ async def test_deploy_non_admin(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_deploy_admin(adminAuth_factory):
-    admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_abr = adminAuth_factory
+    admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_asset = adminAuth_factory
     print(class_hash_trading, class_hash_liquidate)
     await signer1.send_transaction(admin1, zkxDeployer.contract_address, 'deploy_contracts', [2, class_hash_trading, class_hash_liquidate])
 
@@ -83,11 +83,11 @@ async def test_deploy_admin(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_salt(adminAuth_factory):
-    admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_abr = adminAuth_factory
+    admin1, admin2, user1, zkxDeployer, class_hash_trading, class_hash_liquidate, class_hash_asset = adminAuth_factory
 
     res_deployed_before = await zkxDeployer.populate_deployed_addresses().call()
 
-    await signer1.send_transaction(admin1, zkxDeployer.contract_address, 'deploy_contracts', [3, class_hash_trading, class_hash_liquidate, class_hash_abr])
+    await signer1.send_transaction(admin1, zkxDeployer.contract_address, 'deploy_contracts', [3, class_hash_trading, class_hash_liquidate, class_hash_asset])
 
     res_deployed_after = await zkxDeployer.populate_deployed_addresses().call()
     assert len(res_deployed_after.result.array) == 3
