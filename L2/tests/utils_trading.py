@@ -679,11 +679,8 @@ class User:
                 return (current_balance, current_balance)
             safe_withdrawal_amount = min_amount
 
-        print("Position: ", position)
-
         withdrawal_amount = self.get_amount_to_withdraw(
-            order_executor, liquidator, tav, tmr, position, collateral_id, timestamp)
-
+            order_executor=order_executor, liquidator=liquidator, tav=tav, tmr=tmr, position=position, collateral_id=collateral_id, timestamp=timestamp)
         return (safe_withdrawal_amount, withdrawal_amount)
 
 
@@ -1426,18 +1423,12 @@ def mark_under_collateralized_position_python(user_test: User, liquidator: Liqui
 # Liquidation check on the python implementation for withdrawal amount
 
 
-def find_under_collateralized_position_python_withdrawal(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
+def find_under_collateralized_position_python_withdrawal(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, float, float]:
     result = liquidator.find_under_collateralized_position(
         user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
-    return (result[0], list(result[1].values())[:4], result[2], result[3])
 
-# Liquidation check on the python implementation for withdrawal amount
-
-
-def find_under_collateralized_position_python_withdrawal(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
-    result = liquidator.find_under_collateralized_position(
-        user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
-    return (result)
+    print("withdrawal_result", result)
+    return (result[0], result[1], result[2], result[3])
 
 # Get safe withdrawal amount for python implementation
 
