@@ -124,12 +124,12 @@ func bollinger_width() -> (value: felt) {
 // @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address_: felt, version_: felt
+    registry_address_: felt, version_: felt, abr_epoch_0_timestamp_:felt
 ) {
     CommonLib.initialize(registry_address_, version_);
     let (block_timestamp) = get_block_timestamp();
     // initialize epoch 0 with timestamp at deployment
-    epoch_to_timestamp.write(epoch=0, value=block_timestamp);
+    epoch_to_timestamp.write(epoch=0, value=abr_epoch_0_timestamp_);
     // 8 hours
     abr_interval.write(value=28800);
     // 0.0000125 in 64x61
@@ -458,6 +458,11 @@ func set_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     let (last_timestamp) = get_last_abr_timestamp();
 
+    // Enforces last_abr_timestamp + abr_interval < new_timestamp
+    with_attr error_message("ABRCore: New Timstamp must be > last timestamp + abr_interval") {
+        assert_le(last_timestamp + current_abr_interval, new_timestamp);
+    }
+
     local new_epoch;
     // First epoch
     if (current_epoch == 0) {
@@ -468,10 +473,6 @@ func set_abr_timestamp{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
-        // Enforces last_abr_timestamp + abr_interval < new_timestamp
-        with_attr error_message("ABRCore: New Timstamp must be > last timestamp + abr_interval") {
-            assert_le(last_timestamp + current_abr_interval, new_timestamp);
-        }
         new_epoch = current_epoch;
 
         tempvar syscall_ptr = syscall_ptr;
