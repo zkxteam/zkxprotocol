@@ -43,6 +43,12 @@ func maintenance() -> (maintenance: felt) {
 func acc_value() -> (acc_value: felt) {
 }
 
+
+// /////////////////
+// View functions //
+// /////////////////
+
+// @notice Function to return maintenance requirement of last called collateral_id of a user
 @view
 func return_maintenance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     res: felt
@@ -51,6 +57,7 @@ func return_maintenance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     return (res=_maintenance);
 }
 
+// @notice Function to return account value of last called collateral_id of a user
 @view
 func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
     res: felt
@@ -59,58 +66,16 @@ func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return (res=_acc_value);
 }
 
-// /////////
-// Events //
-// /////////
-
-// Event emitted whenever find_under_collateralized_position() is called
-@event
-func find_under_collateralized_position_called(
-    account_address: felt,
-    liq_result: felt,
-    least_collateral_ratio_position: PositionDetailsForRiskManagement,
-) {
-}
-
-// Event emitted whenever check_for_risk() is called
-@event
-func can_order_be_opened(order: MultipleOrder) {
-}
-
-// Event emitted whenever position can be deleveraged
-@event
-func position_to_be_deleveraged(
-    position: PositionDetailsForRiskManagement, amount_to_be_sold: felt
-) {
-}
-
-// //////////////
-// Constructor //
-// //////////////
-
-// @notice Constructor of the smart-contract
-// @param registry_address_ Address of the AuthorizedRegistry contract
-// @param version_ Version of this contract
-@constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address_: felt, version_: felt
-) {
-    CommonLib.initialize(registry_address_, version_);
-    return ();
-}
-
-// ///////////
-// External //
-// ///////////
-
-// @notice Function to check and mark the positions to be liquidated
+// @notice Function to find the positions to be liquidated/deleveraged
 // @param account_address_ - Account address of the user
 // @param collateral_id_ - Collateral Id of the isolated cross-margin order_value_with_fee
 // @return liq_result_ - 1 if to be liq/del,
 // @return least_collateral_ratio_position - Position which has the least collateral ratio
 // @return total_account_value - Total account value of the positions for the corresponding collateral
 // @return total_maintenance_requirement - Total maintenece requirement of the positions for the corresponding collateral
-@external
+// @return least_collateral_ratio_position_asset_price - Asset price of the least collateralized position
+// @return least_collateral_ratio - Collateral ratio of the least least collateralized position
+@view
 func find_under_collateralized_position{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(account_address_: felt, collateral_id_: felt) -> (
@@ -118,19 +83,11 @@ func find_under_collateralized_position{
     least_collateral_ratio_position: PositionDetailsForRiskManagement,
     total_account_value: felt,
     total_maintenance_requirement: felt,
+    least_collateral_ratio_position_asset_price: felt,
+    least_collateral_ratio: felt,
 ) {
     alloc_locals;
     // Check if the caller is a node
-
-    let (
-        liquidatable_position: LiquidatablePosition
-    ) = IAccountManager.get_deleveragable_or_liquidatable_position(
-        contract_address=account_address_, collateral_id_=collateral_id_
-    );
-
-    if (liquidatable_position.amount_to_be_sold != 0) {
-        return (TRUE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
-    }
 
     // Fetch all the positions from the Account contract
     let (
@@ -141,7 +98,7 @@ func find_under_collateralized_position{
 
     // Check if the list is empty
     if (positions_len == 0) {
-        return (FALSE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
+        return (FALSE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0, 0, 0);
     }
 
     // Get Market contract address
@@ -186,6 +143,116 @@ func find_under_collateralized_position{
         least_collateral_ratio_position_asset_price_=0,
     );
 
+    return (
+        liq_result,
+        least_collateral_ratio_position,
+        total_account_value,
+        total_maintenance_requirement,
+        least_collateral_ratio_position_asset_price,
+        least_collateral_ratio,
+    );
+}
+
+// /////////
+// Events //
+// /////////
+
+// Event emitted whenever mark_under_collateralized_position() is called
+@event
+func mark_under_collateralized_position_called(
+    account_address: felt,
+    liq_result: felt,
+    least_collateral_ratio_position: PositionDetailsForRiskManagement,
+) {
+}
+
+// Event emitted whenever check_for_risk() is called
+@event
+func can_order_be_opened(order: MultipleOrder) {
+}
+
+// Event emitted whenever position can be deleveraged
+@event
+func position_to_be_deleveraged(
+    position: PositionDetailsForRiskManagement, amount_to_be_sold: felt
+) {
+}
+
+// //////////////
+// Constructor //
+// //////////////
+
+// @notice Constructor of the smart-contract
+// @param registry_address_ Address of the AuthorizedRegistry contract
+// @param version_ Version of this contract
+@constructor
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    registry_address_: felt, version_: felt
+) {
+    CommonLib.initialize(registry_address_, version_);
+    return ();
+}
+
+// ///////////
+// External //
+// ///////////
+
+// @notice Function to find and mark the positions to be liquidated/deleveraged
+// @param account_address_ - Account address of the user
+// @param collateral_id_ - Collateral Id of the isolated cross-margin order_value_with_fee
+// @return liq_result_ - 1 if to be liq/del,
+// @return least_collateral_ratio_position - Position which has the least collateral ratio
+// @return total_account_value - Total account value of the positions for the corresponding collateral
+// @return total_maintenance_requirement - Total maintenece requirement of the positions for the corresponding collateral
+@external
+func mark_under_collateralized_position{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(account_address_: felt, collateral_id_: felt) -> (
+    liq_result: felt,
+    least_collateral_ratio_position: PositionDetailsForRiskManagement,
+    total_account_value: felt,
+    total_maintenance_requirement: felt,
+) {
+    alloc_locals;
+
+    let (
+        liquidatable_position: LiquidatablePosition
+    ) = IAccountManager.get_deleveragable_or_liquidatable_position(
+        contract_address=account_address_, collateral_id_=collateral_id_
+    );
+
+    if (liquidatable_position.amount_to_be_sold != 0) {
+        return (TRUE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
+    }
+
+    let (
+        liq_result: felt,
+        least_collateral_ratio_position: PositionDetailsForRiskManagement,
+        total_account_value: felt,
+        total_maintenance_requirement: felt,
+        least_collateral_ratio_position_asset_price: felt,
+        least_collateral_ratio: felt,
+    ) = find_under_collateralized_position(
+        account_address_=account_address_, collateral_id_=collateral_id_
+    );
+
+    if (least_collateral_ratio_position_asset_price == 0) {
+        return (FALSE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
+    }
+
+    // /////////////////
+    // TO BE REMOVED //
+    maintenance.write(total_maintenance_requirement);
+    acc_value.write(total_account_value);
+    // /////////////////
+
+    // Get Market contract address
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+    let (local market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
     if (liq_result == TRUE) {
         // if margin ratio is <=0, we directly perform liquidation else we check for deleveraging
         if (is_le(least_collateral_ratio, 0) == FALSE) {
@@ -220,8 +287,8 @@ func find_under_collateralized_position{
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    // find_under_collateralized_position_called event is emitted
-    find_under_collateralized_position_called.emit(
+    // mark_under_collateralized_position_called event is emitted
+    mark_under_collateralized_position_called.emit(
         account_address=account_address_,
         liq_result=liq_result,
         least_collateral_ratio_position=least_collateral_ratio_position,
@@ -384,12 +451,6 @@ func check_liquidation_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
         // Add the collateral value to the total_account_value_
         let (total_account_value_collateral) = Math64x61_add(total_account_value_, user_balance);
-
-        // /////////////////
-        // TO BE REMOVED //
-        maintenance.write(total_maintenance_requirement_);
-        acc_value.write(total_account_value_collateral);
-        // /////////////////
 
         // Check if the maintenance margin is not satisfied
         local is_liquidation;

@@ -9,7 +9,7 @@ from starkware.starknet.testing.contract import StarknetContract
 from utils_trading import (
     User, Liquidator, OrderExecutor,
     order_direction, order_types, side, fund_mapping,
-    set_balance, execute_and_compare, find_under_collateralized_position,
+    set_balance, execute_and_compare, mark_under_collateralized_position,
     compare_fund_balances, compare_user_balances, compare_user_positions, compare_debugging_values, compare_liquidatable_position
 )
 from utils_links import DEFAULT_LINK_1, prepare_starknet_string
@@ -376,7 +376,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
     #################################################
     ######## Alice's liquidation result USDC ########
     #################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
@@ -384,7 +384,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
     ################################################
     ####### Bob's liquidation result USDC ##########
     ################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
@@ -421,7 +421,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
     ###################################################
     ######## Alice's liquidation result USDC 2 ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
@@ -430,7 +430,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
     ####### Bob's liquidation result USDC 2 ##########
     ##################################################
 
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
@@ -463,7 +463,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     ###################################################
     ######## Alice's liquidation result USDC 3 ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_1)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_1)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
@@ -482,13 +482,13 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
         market_id=market_id_1, timestamp=timestamp_2)
     print(BTC_market_price, BTC_market_price_python)
 
-    # Order executed within beyond the ttl, hence the price becomes 7200
+    # Order executed within beyond the ttl, hence the price becomes 7128
     assert BTC_market_price_python == BTC_market_price == 7128.0
 
     ###################################################
     ######## Alice's liquidation result USDC 4 ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
@@ -501,7 +501,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     ###################################################
     ######## Alice's liquidation result USDC 5 ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
@@ -509,7 +509,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     ######## Alice's liquidation result USDC 6 ########
     ###################################################
     # will return (1, (0,0,0,0,0,0)) as a position has already been set as liquidatable
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
@@ -572,7 +572,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     ##################################################
     ######## Alice's liquidation result DAI 1 ########
     ##################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
@@ -580,7 +580,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     #################################################
     ####### Bob's liquidation result DAI 1 ##########
     #################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
@@ -603,7 +603,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     ##################################################
     ######## Alice's liquidation result DAI 2 ########
     ##################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_3)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_3)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
@@ -611,7 +611,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     #################################################
     ####### Bob's liquidation result DAI 2 ##########
     #################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_3)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_3)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
@@ -636,7 +636,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     ###################################################
     ######## Alice's liquidation result DAI 3 #########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_4)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_4)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
@@ -645,7 +645,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     ####### Bob's liquidation result DAI 3 ###########
     ##################################################
 
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_4)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=bob, user_test=bob_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_4)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
@@ -1016,7 +1016,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_3(adminAuth_factory)
     ###################################################
     ######## Alice's liquidation result USDC 8 ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_5)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_5)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
@@ -1088,7 +1088,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_4(adminAuth_factory)
     ###################################################
     ######## Alice's liquidation result USDC 9 ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_6)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_6)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
@@ -1194,7 +1194,7 @@ async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
     ###################################################
     ######## Daniel's liquidation result USDC ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_6)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_6)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
@@ -1202,7 +1202,7 @@ async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
     ###################################################
     ####### Eduard's liquidation result USDC ##########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_6)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_6)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test, collateral_id=collateral_id_1)
@@ -1216,7 +1216,7 @@ async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
     ###################################################
     ######## Daniel's liquidation result USDC ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_7)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_7)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
@@ -1224,7 +1224,7 @@ async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
     ###################################################
     ####### Eduard's liquidation result USDC ##########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_7)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_7)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test, collateral_id=collateral_id_1)
@@ -1246,7 +1246,7 @@ async def test_should_liquidate_short_leverage_1(adminAuth_factory):
     ###################################################
     ######## Daniel's liquidation result USDC ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_8)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_8)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
@@ -1254,7 +1254,7 @@ async def test_should_liquidate_short_leverage_1(adminAuth_factory):
     ###################################################
     ####### Eduard's liquidation result USDC ##########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_8)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_8)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test, collateral_id=collateral_id_1)
@@ -1324,7 +1324,7 @@ async def test_shouldnt_liquidate_multiple_leverage_1(adminAuth_factory):
     ###################################################
     ######## Daniel's liquidation result USDC ########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_9)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_9)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
@@ -1332,7 +1332,7 @@ async def test_shouldnt_liquidate_multiple_leverage_1(adminAuth_factory):
     ###################################################
     ####### Eduard's liquidation result USDC ##########
     ###################################################
-    await find_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_8)
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_8)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test, collateral_id=collateral_id_1)
