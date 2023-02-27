@@ -95,11 +95,6 @@ async def test_add_new_market_not_admin(adminAuth_factory):
 @pytest.mark.asyncio
 async def test_add_new_market_invalid_leverage(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
-
-    await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
-        DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(11), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
-        reverted_with="Markets: Leverage must be <= MAX leverage"
-    )
     
     await assert_revert( signer1.send_transaction(admin1, market.contract_address, 'add_market', [
         DEFAULT_MARKET_ID, str_to_felt("32f0406jz7qj8"), str_to_felt("32f0406jz7qj7"), to64x61(0), 1, 0, 60, 1, 1, 10, 1, 5, 3, 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1)),
@@ -338,23 +333,10 @@ async def test_remove_market(adminAuth_factory):
     assert fetched_market.leverage == 0
 
 @pytest.mark.asyncio
-async def test_change_leverage_unauthorized(adminAuth_factory):
-    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
-
-    await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_leverage', [to64x61(100)]))
-
-@pytest.mark.asyncio
 async def test_change_ttl_unauthorized(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     await assert_revert(signer3.send_transaction(user1, market.contract_address, 'change_max_ttl', [to64x61(7200)]))
-
-
-@pytest.mark.asyncio
-async def test_change_leverage_authorized(adminAuth_factory):
-    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
-
-    await signer1.send_transaction(admin1, market.contract_address, 'change_max_leverage', [to64x61(100)])
 
 @pytest.mark.asyncio
 async def test_change_ttl_authorized(adminAuth_factory):

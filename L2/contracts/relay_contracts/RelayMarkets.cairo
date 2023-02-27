@@ -157,17 +157,6 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 }
 
 @external
-func change_max_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_max_leverage_: felt
-) {
-    verify_caller_authority(ManageMarkets_ACTION);
-    record_call_details('change_max_leverage');
-    let (inner_address) = get_inner_contract();
-    IMarkets.change_max_leverage(inner_address, new_max_leverage_);
-    return ();
-}
-
-@external
 func change_max_ttl{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     new_max_ttl_: felt
 ) {
