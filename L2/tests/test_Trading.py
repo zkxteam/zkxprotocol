@@ -2068,6 +2068,8 @@ async def test_placing_order_directly(trading_test_initializer):
         556715728833533465056602594347606394,
         # collateral_id
         AssetID.USDC,
+        # fee
+        0,
         # pnl
         0,
         # side,

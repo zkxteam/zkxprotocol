@@ -61,6 +61,7 @@ namespace IAccountManager {
         borrowed_amount: felt,
         market_id: felt,
         collateral_id_: felt,
+        fee: felt,
         pnl: felt,
         side: felt,
     ) -> (res: felt) {

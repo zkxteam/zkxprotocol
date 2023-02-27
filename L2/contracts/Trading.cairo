@@ -1280,6 +1280,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     local pnl;
+    local fee;
 
     // If the order is to be opened
     if ([request_list_].side == BUY) {
@@ -1306,6 +1307,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
+        assert fee = trading_fee;
         assert pnl = trading_fee;
         assert current_open_interest = quantity_to_execute;
 
@@ -1333,6 +1335,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
+        assert fee = 0;
         assert pnl = realized_pnl;
         assert current_open_interest = 0 - quantity_to_execute;
 
@@ -1373,6 +1376,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         borrowed_amount=borrowed_amount,
         market_id=market_id_,
         collateral_id_=collateral_id_,
+        fee=fee,
         pnl=pnl,
         side=current_order_side,
     );

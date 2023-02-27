@@ -828,6 +828,7 @@ func execute_order{
     borrowed_amount: felt,
     market_id: felt,
     collateral_id_: felt,
+    fee: felt,
     pnl: felt,
     side: felt,
 ) -> (res: felt) {
@@ -1117,10 +1118,11 @@ func execute_order{
     assert data[3] = request.quantity;
     assert data[4] = request.order_type;
     assert data[5] = execution_price;
-    assert data[6] = pnl;
-    assert data[7] = side;
+    assert data[6] = fee;
+    assert data[7] = pnl;
+    assert data[8] = side;
 
-    emit_event(1, keys, 8, data);
+    emit_event(1, keys, 9, data);
 
     return (1,);
 }
