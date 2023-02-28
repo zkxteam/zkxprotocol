@@ -13,7 +13,7 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.StringLib import StringLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61
+from contracts.Math_64x61 import Math64x61_assertPositive64x61
 
 // ////////////
 // Constants //
@@ -412,9 +412,15 @@ func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 ) {
     verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
-    validate_leverage(market_id_, leverage_);
 
     let (market: Market) = market_by_id.read(market_id_);
+    with_attr error_message("Markets: Currently allowed leverage must be >= MIN leverage") {
+        Math64x61_assertPositive64x61(leverage_);
+        assert_le(market.minimum_leverage, leverage_);
+    }
+    with_attr error_message("Markets: Currently allowed leverage must be <= MAX leverage") {
+        assert_le(leverage_, market.maximum_leverage);
+    }
 
     market_by_id.write(
         market_id=market_id_,
@@ -808,20 +814,6 @@ func verify_market_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     return ();
 }
 
-// @notice Internal function to validate the leverage value
-// @param market_id - ID of the Market
-// @param leverage - Leverage value to validate
-func validate_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt, leverage_: felt
-) {
-    let (market: Market) = market_by_id.read(market_id_);
-    with_attr error_message("Markets: Leverage must be in 64x61 format") {
-        Math64x61_assert64x61(leverage_);
-    }
-    
-    return ();
-}
-
 // @param Internal function to resolve updated market tradable status
 // @praram market - struct of type Market
 func resolve_tradable_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -915,6 +907,7 @@ func validate_market_trading_settings{
         assert_le(market_.minimum_leverage, market_.maximum_leverage);
     }
     with_attr error_message("Markets: Currently allowed leverage must be >= MIN leverage") {
+        Math64x61_assertPositive64x61(market_.currently_allowed_leverage);
         assert_le(market_.minimum_leverage, market_.currently_allowed_leverage);
     }
     with_attr error_message("Markets: Currently allowed leverage must be <= MAX leverage") {
