@@ -66,11 +66,6 @@ func market_metadata_link_update(market_id: felt) {
 // Storage //
 // //////////
 
-// Stores the max leverage possible in the system
-@storage_var
-func max_leverage() -> (leverage: felt) {
-}
-
 // Stores the max ttl for a market in the system
 @storage_var
 func max_ttl() -> (ttl: felt) {
@@ -128,7 +123,6 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     registry_address_: felt, version_: felt
 ) {
     CommonLib.initialize(registry_address_, version_);
-    max_leverage.write(10 * Math64x61_ONE);
     max_ttl.write(3600);
     return ();
 }
@@ -246,20 +240,6 @@ func get_metadata_link{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // ///////////
 // External //
 // ///////////
-
-// @notice Function called by admin to change the max leverage allowed in the system
-// @param new_max_leverage - New maximmum leverage
-@external
-func change_max_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    new_max_leverage_: felt
-) {
-    verify_market_manager_authority();
-    with_attr error_message("Markets: Max leverage must be >= MIN leverage") {
-        assert_le(MIN_LEVERAGE, new_max_leverage_);
-    }
-    max_leverage.write(new_max_leverage_);
-    return ();
-}
 
 // @notice Function called by admin to change the max ttl allowed in the system
 // @param new_max_ttl - New maximum ttl
@@ -848,10 +828,6 @@ func validate_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
     with_attr error_message("Markets: Leverage must be >= MIN leverage") {
         assert_le(MIN_LEVERAGE, leverage_);
-    }
-    with_attr error_message("Markets: Leverage must be <= MAX leverage") {
-        let (maximum_leverage) = max_leverage.read();
-        assert_le(leverage_, maximum_leverage);
     }
     return ();
 }
