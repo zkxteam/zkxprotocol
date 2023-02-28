@@ -21,6 +21,9 @@ namespace IAccountManager {
     func get_balance(assetID_: felt) -> (res: felt) {
     }
 
+    func get_available_margin(asset_id_: felt) -> (res: felt) {
+    }
+
     func get_positions() -> (
         positions_array_len: felt, positions_array: PositionDetailsWithMarket*
     ) {
@@ -63,6 +66,7 @@ namespace IAccountManager {
         collateral_id_: felt,
         pnl: felt,
         side: felt,
+        margin_lock_update_amount: felt,
     ) -> (res: felt) {
     }
 

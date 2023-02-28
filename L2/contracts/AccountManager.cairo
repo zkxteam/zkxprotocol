@@ -105,6 +105,11 @@ func public_key() -> (res: felt) {
 func balance(assetID: felt) -> (res: felt) {
 }
 
+// Stores the locked amount of margin for a collateral
+@storage_var
+func margin_locked(asset_id: felt) -> (res: felt) {
+}
+
 // Mapping of marketID, direction to PositionDetails struct
 @storage_var
 func position_mapping(market_id: felt, direction: felt) -> (res: PositionDetails) {
@@ -276,6 +281,20 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 ) -> (res: felt) {
     let (res) = balance.read(assetID=assetID_);
     return (res=res);
+}
+
+// @notice view function to get the available margin of an asset
+// @param asset_id_ - ID of an asset
+// @return res - balance of an asset
+@view
+func get_available_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    asset_id_: felt
+) -> (res: felt) {
+    let (collateral_balance) = balance.read(assetID=asset_id_);
+    let (margin_locked_amount) = margin_locked.read(asset_id=asset_id_);
+    let (available_margin) = Math64x61_sub(collateral_balance, margin_locked_amount);
+
+    return (available_margin,);
 }
 
 @view
@@ -830,6 +849,7 @@ func execute_order{
     collateral_id_: felt,
     pnl: felt,
     side: felt,
+    margin_lock_update_amount: felt,
 ) -> (res: felt) {
     alloc_locals;
 
@@ -951,6 +971,11 @@ func execute_order{
         position_mapping.write(
             market_id=market_id, direction=request.direction, value=updated_position
         );
+
+        let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+        let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_update_amount);
+        // Add to previous locked amount
+        margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1100,6 +1125,11 @@ func execute_order{
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
+
+        let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+        let (new_margin_locked) = Math64x61_sub(current_margin_locked, margin_lock_update_amount);
+        // Subtract from previous locked amount
+        margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;

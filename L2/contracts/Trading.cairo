@@ -490,6 +490,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     margin_amount_open: felt,
     borrowed_amount_open: felt,
     trading_fee: felt,
+    margin_lock_amount: felt,
 ) {
     alloc_locals;
 
@@ -556,27 +557,27 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // Error messages need local variables to be passed in params
     local order_id_;
-    local user_balance_;
+    local available_margin_;
 
-    let (user_balance) = IAccountManager.get_balance(
-        contract_address=order_.user_address, assetID_=collateral_id_
+    let (available_margin) = IAccountManager.get_available_margin(
+        contract_address=order_.user_address, asset_id_=collateral_id_
     );
 
-    assert user_balance_ = user_balance;
+    assert available_margin_ = available_margin;
     assert order_id_ = order_.order_id;
 
     // User must be able to pay the amount
-    with_attr error_message("0501: {order_id_} {user_balance_}") {
-        Math64x61_assert_le(order_value_with_fee, user_balance, collateral_token_decimal_);
+    with_attr error_message("0501: {order_id_} {available_margin_}") {
+        Math64x61_assert_le(order_value_with_fee, available_margin, collateral_token_decimal_);
     }
 
-    // Deduct the margin amount from account contract
-    IAccountManager.transfer_from(
-        contract_address=order_.user_address,
-        assetID_=collateral_id_,
-        amount_=margin_order_value,
-        invoked_for_='holding',
-    );
+    // // Deduct the margin amount from account contract
+    // IAccountManager.transfer_from(
+    //     contract_address=order_.user_address,
+    //     assetID_=collateral_id_,
+    //     amount_=margin_order_value,
+    //     invoked_for_='holding',
+    // );
 
     // Deduct the feefrom account contract
     IAccountManager.transfer_from(
@@ -631,7 +632,13 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_order_value
     );
 
-    return (average_execution_price_open, margin_amount_open, borrowed_amount_open, trading_fee);
+    return (
+        average_execution_price_open,
+        margin_amount_open,
+        borrowed_amount_open,
+        trading_fee,
+        margin_order_value,
+    );
 }
 
 // @notice Intenal function that processes close orders including Liquidation & Deleveraging
@@ -664,6 +671,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     borrowed_amount_close: felt,
     average_execution_price_close: felt,
     realized_pnl: felt,
+    margin_unlock_amount: felt,
 ) {
     alloc_locals;
 
@@ -671,6 +679,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     local borrowed_amount_close;
     local average_execution_price_close;
     local realized_pnl;
+    local margin_unlock_amount;
     // To be passed as arguments to error_message
     local order_id;
     local order_direction;
@@ -725,6 +734,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Calculate new values for margin and borrowed amounts
     if (order_.order_type == DELEVERAGING_ORDER) {
         let (borrowed_amount_close_felt) = Math64x61_sub(borrowed_amount, leveraged_amount_out);
+        assert margin_unlock_amount = leveraged_amount_out;
         assert borrowed_amount_close = borrowed_amount_close_felt;
         margin_amount_close = margin_amount;
         margin_amount_open_64x61 = 0;
@@ -735,6 +745,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         assert borrowed_amount_close = borrowed_amount_close_felt;
 
         let (margin_amount_close_felt) = Math64x61_sub(margin_amount, margin_amount_to_be_reduced);
+        assert margin_unlock_amount = margin_amount_to_be_reduced;
         assert margin_amount_close = margin_amount_close_felt;
         margin_amount_open_64x61 = margin_amount_to_be_reduced;
     }
@@ -971,7 +982,11 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     return (
-        average_execution_price_close, margin_amount_close, borrowed_amount_close, realized_pnl
+        average_execution_price_close,
+        margin_amount_close,
+        borrowed_amount_close,
+        realized_pnl,
+        margin_unlock_amount,
     );
 }
 
@@ -1037,6 +1052,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local execution_price;
     local margin_amount;
     local borrowed_amount;
+    local margin_lock_update_amount;
     local average_execution_price;
     local trader_stats_list: TraderStats*;
     local new_total_order_volume;
@@ -1288,6 +1304,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             margin_amount_temp: felt,
             borrowed_amount_temp: felt,
             trading_fee: felt,
+            margin_lock_amount: felt,
         ) = process_open_orders(
             order_=[request_list_],
             execution_price_=execution_price,
@@ -1308,6 +1325,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert average_execution_price = average_execution_price_temp;
         assert pnl = trading_fee;
         assert current_open_interest = quantity_to_execute;
+        assert margin_lock_update_amount = margin_lock_amount;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1318,6 +1336,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             margin_amount_temp: felt,
             borrowed_amount_temp: felt,
             realized_pnl: felt,
+            margin_unlock_amount: felt,
         ) = process_close_orders(
             order_=[request_list_],
             execution_price_=execution_price,
@@ -1335,6 +1354,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert average_execution_price = average_execution_price_temp;
         assert pnl = realized_pnl;
         assert current_open_interest = 0 - quantity_to_execute;
+        assert margin_lock_update_amount = margin_unlock_amount;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1375,6 +1395,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         collateral_id_=collateral_id_,
         pnl=pnl,
         side=current_order_side,
+        margin_lock_update_amount=margin_lock_update_amount,
     );
 
     // Set the order size in executed_sizes_list array

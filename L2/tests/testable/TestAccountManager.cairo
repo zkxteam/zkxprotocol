@@ -7,6 +7,7 @@ from contracts.AccountManager import (
     get_public_key,
     is_valid_signature,
     is_valid_signature_order,
+    get_available_margin,
     get_balance,
     get_position_data,
     get_L1_address,
