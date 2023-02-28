@@ -13,14 +13,13 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.StringLib import StringLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61, Math64x61_ONE
+from contracts.Math_64x61 import Math64x61_assert64x61, Math64x61_assertPositive64x61
 
 // ////////////
 // Constants //
 // ////////////
 
 const MAX_TRADABLE = 2;
-const MIN_LEVERAGE = Math64x61_ONE;
 const METADATA_LINK_TYPE = 'MARKET_METADATA_LINK';
 
 // /////////
@@ -287,7 +286,6 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
             id=new_market_.id,
             asset=new_market_.asset,
             asset_collateral=new_market_.asset_collateral,
-            leverage=new_market_.leverage,
             is_tradable=new_tradable,
             is_archived=new_market_.is_archived,
             ttl=new_market_.ttl,
@@ -378,7 +376,6 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
             id=market_id_,
             asset=0,
             asset_collateral=0,
-            leverage=0,
             is_tradable=0,
             is_archived=0,
             ttl=0,
@@ -415,7 +412,7 @@ func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 ) {
     verify_market_manager_authority();
     verify_market_id_exists(market_id_, should_exist_=TRUE);
-    validate_leverage(leverage_);
+    validate_leverage(market_id_, leverage_);
 
     let (market: Market) = market_by_id.read(market_id_);
 
@@ -425,7 +422,6 @@ func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
             id=market.id,
             asset=market.asset,
             asset_collateral=market.asset_collateral,
-            leverage=leverage_,
             is_tradable=market.is_tradable,
             is_archived=market.is_archived,
             ttl=market.ttl,
@@ -434,7 +430,7 @@ func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
             minimum_order_size=market.minimum_order_size,
             minimum_leverage=market.minimum_leverage,
             maximum_leverage=market.maximum_leverage,
-            currently_allowed_leverage=market.currently_allowed_leverage,
+            currently_allowed_leverage=leverage_,
             maintenance_margin_fraction=market.maintenance_margin_fraction,
             initial_margin_fraction=market.initial_margin_fraction,
             incremental_initial_margin_fraction=market.incremental_initial_margin_fraction,
@@ -479,7 +475,6 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
                 id=market.id,
                 asset=market.asset,
                 asset_collateral=market.asset_collateral,
-                leverage=market.leverage,
                 is_tradable=asset1.is_tradable,
                 is_archived=market.is_archived,
                 ttl=market.ttl,
@@ -512,7 +507,6 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
                 id=market.id,
                 asset=market.asset,
                 asset_collateral=market.asset_collateral,
-                leverage=market.leverage,
                 is_tradable=is_tradable_,
                 is_archived=market.is_archived,
                 ttl=market.ttl,
@@ -557,7 +551,6 @@ func modify_archived_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
             id=market.id,
             asset=market.asset,
             asset_collateral=market.asset_collateral,
-            leverage=market.leverage,
             is_tradable=market.is_tradable,
             is_archived=is_archived_,
             ttl=market.ttl,
@@ -582,7 +575,7 @@ func modify_archived_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 }
 
 // @notice Modify trade settings of market
-// @param market_id_ -
+// @param market_id_ - Market ID
 // @param tick_size_ - new tradable flag value for the market
 // @param step_size_ - new collateral flag value for the market
 // @param minimum_order_size_ - new minimum_order_size value for the market
@@ -621,7 +614,6 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         id=market.id,
         asset=market.asset,
         asset_collateral=market.asset_collateral,
-        leverage=market.leverage,
         is_tradable=market.is_tradable,
         is_archived=market.is_archived,
         ttl=market.ttl,
@@ -650,7 +642,7 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 }
 
 // @notice Update market metadata link
-// @param market_id_ - ID of Asset to be updated
+// @param market_id_ - ID of Market to be updated
 // @param link_len_ - Length of a link
 // @param link_ - Link characters
 @external
@@ -703,7 +695,6 @@ func populate_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
             id=market_id,
             asset=market_details.asset,
             asset_collateral=market_details.asset_collateral,
-            leverage=market_details.leverage,
             is_tradable=market_details.is_tradable,
             is_archived=market_details.is_archived,
             ttl=market_details.ttl,
@@ -764,7 +755,6 @@ func populate_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
                     id=market_id,
                     asset=market_details.asset,
                     asset_collateral=market_details.asset_collateral,
-                    leverage=market_details.leverage,
                     is_tradable=market_details.is_tradable,
                     is_archived=market_details.is_archived,
                     ttl=market_details.ttl,
@@ -819,16 +809,16 @@ func verify_market_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 }
 
 // @notice Internal function to validate the leverage value
+// @param market_id - ID of the Market
 // @param leverage - Leverage value to validate
 func validate_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    leverage_: felt
+    market_id_: felt, leverage_: felt
 ) {
+    let (market: Market) = market_by_id.read(market_id_);
     with_attr error_message("Markets: Leverage must be in 64x61 format") {
         Math64x61_assert64x61(leverage_);
     }
-    with_attr error_message("Markets: Leverage must be >= MIN leverage") {
-        assert_le(MIN_LEVERAGE, leverage_);
-    }
+    
     return ();
 }
 
@@ -867,8 +857,6 @@ func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     with_attr error_message("Markets: market id can't be zero") {
         assert_not_zero(market.id);
     }
-    validate_leverage(market.leverage);
-
     with_attr error_message("Markets: ttl must be in range [1...max_ttl]") {
         let (maximum_ttl) = max_ttl.read();
         assert_le(1, market.ttl);
@@ -926,9 +914,10 @@ func validate_market_trading_settings{
         Math64x61_assertPositive64x61(market_.maximum_leverage);
         assert_le(market_.minimum_leverage, market_.maximum_leverage);
     }
-    with_attr error_message("Markets: Invalid currently allowed leverage") {
-        Math64x61_assertPositive64x61(market_.currently_allowed_leverage);
+    with_attr error_message("Markets: Currently allowed leverage must be >= MIN leverage") {
         assert_le(market_.minimum_leverage, market_.currently_allowed_leverage);
+    }
+    with_attr error_message("Markets: Currently allowed leverage must be <= MAX leverage") {
         assert_le(market_.currently_allowed_leverage, market_.maximum_leverage);
     }
     with_attr error_message("Markets: Invalid position size settings") {
