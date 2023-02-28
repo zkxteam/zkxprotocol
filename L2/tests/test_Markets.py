@@ -217,19 +217,6 @@ async def test_add_new_market_default_tradable(adminAuth_factory):
     assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
 
 @pytest.mark.asyncio
-async def test_modify_leverage(adminAuth_factory):
-    adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
-
-    await signer1.send_transaction(admin1, market.contract_address, 'modify_leverage', [DEFAULT_MARKET_ID, to64x61(5)])
-
-    execution_info = await market.get_market(DEFAULT_MARKET_ID).call()
-    fetched_market = execution_info.result.currMarket
-
-    assert fetched_market.asset == str_to_felt("32f0406jz7qj8")
-    assert fetched_market.asset_collateral == str_to_felt("32f0406jz7qj7")
-    assert fetched_market.currently_allowed_leverage == to64x61(5)
-
-@pytest.mark.asyncio
 async def test_modify_tradable_unauthorized_user(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 

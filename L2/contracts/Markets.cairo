@@ -36,11 +36,6 @@ func market_added(market_id: felt, market: Market) {
 func market_removed(market_id: felt) {
 }
 
-// Event emitted whenever a market's leverage is modified
-@event
-func market_leverage_modified(market_id: felt, leverage: felt) {
-}
-
 // Event emitted whenever a market's is_tradable parameter is modified
 @event
 func market_tradable_modified(market_id: felt, is_tradable: felt) {
@@ -400,53 +395,6 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     // Emit event
     market_removed.emit(market_id_);
 
-    return ();
-}
-
-// @notice Modify leverage for market
-// @param market_id_ - string to felt value of selected market
-// @param leverage_ - new value for leverage
-@external
-func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt, leverage_: felt
-) {
-    verify_market_manager_authority();
-    verify_market_id_exists(market_id_, should_exist_=TRUE);
-
-    let (market: Market) = market_by_id.read(market_id_);
-    with_attr error_message("Markets: Currently allowed leverage must be >= MIN leverage") {
-        Math64x61_assertPositive64x61(leverage_);
-        assert_le(market.minimum_leverage, leverage_);
-    }
-    with_attr error_message("Markets: Currently allowed leverage must be <= MAX leverage") {
-        assert_le(leverage_, market.maximum_leverage);
-    }
-
-    market_by_id.write(
-        market_id=market_id_,
-        value=Market(
-            id=market.id,
-            asset=market.asset,
-            asset_collateral=market.asset_collateral,
-            is_tradable=market.is_tradable,
-            is_archived=market.is_archived,
-            ttl=market.ttl,
-            tick_size=market.tick_size,
-            step_size=market.step_size,
-            minimum_order_size=market.minimum_order_size,
-            minimum_leverage=market.minimum_leverage,
-            maximum_leverage=market.maximum_leverage,
-            currently_allowed_leverage=leverage_,
-            maintenance_margin_fraction=market.maintenance_margin_fraction,
-            initial_margin_fraction=market.initial_margin_fraction,
-            incremental_initial_margin_fraction=market.incremental_initial_margin_fraction,
-            incremental_position_size=market.incremental_position_size,
-            baseline_position_size=market.baseline_position_size,
-            maximum_position_size=market.maximum_position_size,
-        ),
-    );
-
-    market_leverage_modified.emit(market_id=market_id_, leverage=leverage_);
     return ();
 }
 
