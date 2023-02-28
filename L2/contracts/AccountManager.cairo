@@ -287,14 +287,297 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param asset_id_ - ID of an asset
 // @return res - balance of an asset
 @view
-func get_available_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt
-) -> (res: felt) {
-    let (collateral_balance) = balance.read(assetID=asset_id_);
-    let (margin_locked_amount) = margin_locked.read(asset_id=asset_id_);
-    let (available_margin) = Math64x61_sub(collateral_balance, margin_locked_amount);
+) -> (total_margin: felt, available_margin: felt, maintenance_margin_requirement: felt) {
+    // Get registry and version of the Authorized Registry
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
 
-    return (available_margin,);
+    // Get the address of the market prices contract
+    let (market_prices_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=MarketPrices_INDEX, version=version
+    );
+
+    // Get the address of the market contract
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    // Get Asset contract address
+    let (asset_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Asset_INDEX, version=version
+    );
+
+    // Get collateral to fetch number of token decimals of a collateral
+    let (collateral: Asset) = IAsset.get_asset(contract_address=asset_address, id=asset_id_);
+
+    // Get the length of the market array for the given collateral
+    let (markets_array_len) = collateral_to_market_array_len.read(collateral_id=asset_id_);
+
+    if (markets_array_len == 0) {
+        // ToDo: Appropiate return
+    }
+
+    // Get unrealized_pnl_sum and maintanence margin requirement of the given collateral vault
+    let (unrealized_pnl_sum, maintenance_margin_requirement, least_collateral_ratio, least_collateral_ratio_position, least_collateral_ratio_position_asset_price) = get_margin_info_recurse(
+        collateral_id_=asset_id_,
+        iterator_=0,
+        markets_array_len_=markets_array_len,
+        asset_address_=asset_address,
+        market_address_=market_address,
+        market_prices_address_=market_prices_address,
+        collateral_token_decimal_=collateral.token_decimal,
+        unrealized_pnl_sum_=0,
+        maintenance_margin_requirement_=0,
+        least_collateral_ratio=1,
+        least_collateral_ratio_position= PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+        least_collateral_ratio_position_asset_price=0,
+    );
+
+    // Get collateral balance for the given asset
+    let (collateral_balance) = balance.read(assetID=asset_id_);
+
+    // Get the sum of initial margin of all positions under the given collateral
+    let (initial_margin_sum) = margin_locked.read(asset_id=asset_id_);
+
+    // Compute total margin of the given collateral
+    let (total_margin) = Math64x61_add(collateral_balance, unrealized_pnl_sum);
+
+    // Compute available margin of the given collateral
+    let (available_margin) = Math64x61_sub(total_margin, initial_margin_sum);
+
+    // Return the computed values
+    return (total_margin, available_margin, maintenance_margin_requirement);
+}
+
+func get_risk_parameters_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    position: PositionDetails, direction_:felt, market_price_: felt, market_address_ : felt, market_id_: felt
+) -> (pnl: felt, maintanence_requirement: felt, collateral_ratio: felt) {
+    alloc_locals;
+
+    let (req_margin) = IMarkets.get_maintenance_margin(
+        contract_address=market_address_, market_id_=market_id_
+    );
+
+    // Calculate the required margin
+    let (maintenance_position) = Math64x61_mul(
+        position.avg_execution_price, position.position_size
+    );
+    let (maintenance_requirement) = Math64x61_mul(req_margin, maintenance_position);
+
+    // Calculate pnl to check if it is the least collateralized position
+    local price_diff_;
+    if (direction_ == LONG) {
+        let (price_diff) = Math64x61_sub(market_price_, position.avg_execution_price);
+        price_diff_ = price_diff;
+    } else {
+        let (price_diff) = Math64x61_sub(position.avg_execution_price, market_price_);
+        price_diff_ = price_diff;
+    }
+
+    let (pnl) = Math64x61_mul(price_diff_, position.position_size);
+
+    // Margin ratio calculation
+    let (numerator) = Math64x61_add(position.margin_amount, pnl);
+    let (denominator) = Math64x61_mul(position.position_size, market_price_);
+    let (collateral_ratio_position) = Math64x61_div(numerator, denominator);
+
+    return (pnl, maintenance_requirement, collateral_ratio_position);
+}
+
+func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    collateral_id_: felt,
+    iterator_: felt,
+    markets_array_len_: felt,
+    asset_address_:felt,
+    market_address_: felt,
+    market_prices_address_: felt,
+    collateral_token_decimal_: felt,
+    unrealized_pnl_sum_: felt,
+    maintenance_margin_requirement_: felt,
+    least_collateral_ratio: felt,
+    least_collateral_ratio_position: PositionDetails,
+    least_collateral_ratio_position_asset_price,
+) -> (unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt) {
+    alloc_locals;
+
+    // If we reached the end of the array, then return
+    if (markets_array_len_ == iterator_) {
+        return (
+            unrealized_pnl_sum_,
+            maintenance_margin_requirement_,
+            least_collateral_ratio,
+            least_collateral_ratio_position,
+            least_collateral_ratio_position_asset_price
+        );
+    }
+
+    // Get the market id at that position
+    let (curr_market_id: felt) = collateral_to_market_array.read(
+        collateral_id=collateral_id_, index=iterator_
+    );
+
+    // Get Long position
+    let (long_position: PositionDetails) = position_mapping.read(
+        market_id=curr_market_id, direction=LONG
+    );
+
+    // Get Short position
+    let (short_position: PositionDetails) = position_mapping.read(
+        market_id=curr_market_id, direction=SHORT
+    );
+
+    let (market_price: MarketPrice) = IMarketPrices.get_market_price(
+        contract_address=market_prices_address_, id=curr_market_id
+    );
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_address_, market_id_=curr_market_id
+    );
+
+    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address_, id=market.asset);
+
+    // Get the market ttl from the market contract
+    let (market_ttl: felt) = IMarkets.get_ttl_from_market(
+        contract_address=market_address_, market_id_=curr_market_id
+    );
+
+    // Calculate the timestamp
+    let (current_timestamp) = get_block_timestamp();
+    let ttl = market_ttl;
+    let timestamp = market_price.timestamp;
+    let time_difference = current_timestamp - timestamp;
+
+    // ttl has passed, return 0
+    let status = is_le(time_difference, ttl);
+    // if (status == FALSE) {
+    //    return (FALSE, 0, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0, 0);
+    // }
+
+    local is_long;
+    local is_short;
+
+    local long_maintanence_requirement;
+    local long_pnl;
+    local long_asset_price;
+    local long_collateral_ratio;
+
+    local short_maintanence_requirement;
+    local short_pnl;
+    local short_asset_price;
+    local short_collateral_ratio;
+
+    local current_least_collateral_ratio;
+
+    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
+    if (is_long_zero == TRUE) {
+        assert is_long = 0;
+        assert long_collateral_ratio = 2;
+        assert long_maintanence_requirement = 0;
+        assert long_asset_price = 0;
+        assert long_pnl = 0;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        // Get risk parameters of the position
+        let (pnl, maintanence_requirement, collateral_ratio
+        ) = get_risk_parameters_position(position=long_position, direction_=LONG, market_price_=market_price.price, market_address_=market_address_, market_id_ = curr_market_id);
+
+        assert is_long = 1;
+        assert long_collateral_ratio = collateral_ratio;
+        assert long_maintanence_requirement = maintanence_requirement;
+        assert long_asset_price = market_price.price;
+        assert long_pnl = pnl;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
+    
+    tempvar syscall_ptr = syscall_ptr;
+    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    tempvar range_check_ptr = range_check_ptr;
+
+    if (is_short_zero == TRUE) {
+        assert is_short = 0;
+        assert short_collateral_ratio = 2;
+        assert short_maintanence_requirement = 0;
+        assert short_asset_price = 0;
+        assert short_pnl = 0;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        // Get risk parameters of the position
+        let ( pnl, maintanence_requirement, collateral_ratio
+        ) = get_risk_parameters_position(position=long_position, direction_=SHORT, market_price_=market_price.price, market_address_=market_address_, market_id_ = curr_market_id);
+
+        assert is_short = 1;
+        assert short_collateral_ratio = collateral_ratio;
+        assert short_maintanence_requirement = maintanence_requirement;
+        assert short_asset_price = market_price.price;
+        assert short_pnl = pnl;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    local new_least_collateral_ratio;
+    local new_least_collateral_ratio_position: PositionDetails;
+    local new_least_collateral_ratio_position_asset_price;
+
+    let is_le_least_short = is_le(least_collateral_ratio, short_collateral_ratio);
+    let is_le_least_long = is_le(least_collateral_ratio, short_collateral_ratio);
+
+    if (is_le_least_short * is_le_least_long == 1) {
+        assert new_least_collateral_ratio = least_collateral_ratio;
+        assert new_least_collateral_ratio_position = least_collateral_ratio_position;
+        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        if (is_le(long_collateral_ratio, short_collateral_ratio) == 1) {
+            assert new_least_collateral_ratio = long_collateral_ratio;
+            assert new_least_collateral_ratio_position = long_position;
+            assert new_least_collateral_ratio_position_asset_price = market_price.price;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            assert new_least_collateral_ratio = short_collateral_ratio;
+            assert new_least_collateral_ratio_position = short_position;
+            assert new_least_collateral_ratio_position_asset_price = market_price.price;
+        
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+    }
+
+    return get_margin_info_recurse(
+        collateral_id_=collateral_id_,
+        iterator_=iterator_ + 1,
+        markets_array_len_=markets_array_len_,
+        asset_address_=asset_address_,
+        market_address_=market_address_,
+        market_prices_address_=market_prices_address_,
+        collateral_token_decimal_=collateral_token_decimal_,
+        unrealized_pnl_sum_=unrealized_pnl_sum_ + short_pnl + long_pnl,
+        maintenance_margin_requirement_=maintenance_margin_requirement_ +
+        short_maintanence_requirement + long_maintanence_requirement,
+        least_collateral_ratio=new_least_collateral_ratio,
+        least_collateral_ratio_position=new_least_collateral_ratio_position,
+        least_collateral_ratio_position_asset_price=new_least_collateral_ratio_position_asset_price,
+    );
 }
 
 @view
