@@ -15,6 +15,7 @@ from contracts.AccountManager import (
     get_positions_for_risk_management,
     get_portion_executed,
     get_safe_amount_to_withdraw,
+    get_margin_info,
     return_array_collaterals,
     get_withdrawal_history,
     get_withdrawal_history_by_status,

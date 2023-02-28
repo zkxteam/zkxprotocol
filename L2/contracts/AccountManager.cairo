@@ -288,8 +288,8 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @return res - balance of an asset
 @view
 func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_id_: felt
-) -> (total_margin: felt, available_margin: felt, maintenance_margin_requirement: felt) {
+    asset_id_: felt, new_position_maintanence_requirement_ : felt, new_position_margin_ : felt
+) -> (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt) {
     // Get registry and version of the Authorized Registry
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -329,7 +329,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         market_prices_address_=market_prices_address,
         collateral_token_decimal_=collateral.token_decimal,
         unrealized_pnl_sum_=0,
-        maintenance_margin_requirement_=0,
+        maintenance_margin_requirement_=new_position_maintanence_requirement_,
         least_collateral_ratio=1,
         least_collateral_ratio_position= PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_asset_price=0,
@@ -340,15 +340,17 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     // Get the sum of initial margin of all positions under the given collateral
     let (initial_margin_sum) = margin_locked.read(asset_id=asset_id_);
+    let (total_initial_margin_sum) = Math64x61_add(initial_margin_sum, new_position_margin_);
 
     // Compute total margin of the given collateral
     let (total_margin) = Math64x61_add(collateral_balance, unrealized_pnl_sum);
 
     // Compute available margin of the given collateral
-    let (available_margin) = Math64x61_sub(total_margin, initial_margin_sum);
+    let (available_margin) = Math64x61_sub(total_margin, total_initial_margin_sum);
 
+    let is_liquidation = is_le(available_margin, maintenance_margin_requirement);
     // Return the computed values
-    return (total_margin, available_margin, maintenance_margin_requirement);
+    return (is_liquidation, total_margin, available_margin, unrealized_pnl_sum, maintenance_margin_requirement, least_collateral_ratio, least_collateral_ratio_position, least_collateral_ratio_position_asset_price);
 }
 
 func get_risk_parameters_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -496,12 +498,11 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
-    
     tempvar syscall_ptr = syscall_ptr;
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     tempvar range_check_ptr = range_check_ptr;
 
+    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
     if (is_short_zero == TRUE) {
         assert is_short = 0;
         assert short_collateral_ratio = 2;
