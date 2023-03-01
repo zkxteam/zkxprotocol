@@ -7,7 +7,6 @@ struct Market {
     id: felt,
     asset: felt,
     asset_collateral: felt,
-    leverage: felt,
     is_tradable: felt,
     is_archived: felt,
     ttl: felt,

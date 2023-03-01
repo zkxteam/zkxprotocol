@@ -8,7 +8,6 @@ class MarketProperties:
   id: int
   asset: int
   asset_collateral: int
-  leverage: int
   is_tradable: bool
   is_archived: bool
   ttl: int
@@ -31,7 +30,6 @@ class MarketProperties:
       self.id, 
       self.asset, 
       self.asset_collateral, 
-      self.leverage, 
       self.is_tradable, 
       self.is_archived, 
       self.ttl,

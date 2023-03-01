@@ -42,9 +42,6 @@ namespace IMarkets {
     func remove_market(market_id_: felt) {
     }
 
-    func modify_leverage(market_id_: felt, leverage_: felt) {
-    }
-
     func modify_tradable(market_id_: felt, is_tradable_: felt) {
     }
 

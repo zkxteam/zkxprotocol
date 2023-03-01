@@ -135,17 +135,6 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 }
 
 @external
-func modify_leverage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_id_: felt, leverage_: felt
-) {
-    verify_caller_authority(ManageMarkets_ACTION);
-    record_call_details('modify_leverage');
-    let (inner_address) = get_inner_contract();
-    IMarkets.modify_leverage(inner_address, market_id_, leverage_);
-    return ();
-}
-
-@external
 func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, is_tradable_: felt
 ) {
