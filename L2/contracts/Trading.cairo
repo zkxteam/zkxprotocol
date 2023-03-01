@@ -712,7 +712,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Calculate new values for margin and borrowed amounts
     if (order_.order_type == DELEVERAGING_ORDER) {
         let (borrowed_amount_close_felt) = Math64x61_sub(borrowed_amount, leveraged_amount_out);
-        assert margin_unlock_amount = leveraged_amount_out;
+        assert margin_unlock_amount = 0;
         assert borrowed_amount_close = borrowed_amount_close_felt;
         margin_amount_close = margin_amount;
         margin_amount_open_64x61 = 0;
@@ -876,7 +876,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 // Absolute value of the acc value
                 let deficit = abs_value(margin_plus_pnl);
 
-                // Get the user balance
                 // Get the user balance
                 let (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt,) = IAccountManager.get_margin_info(
                     contract_address=order_.user_address, asset_id_=collateral_id_, new_position_maintanence_requirement_ = 0, new_position_margin_ = 0

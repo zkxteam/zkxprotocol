@@ -605,7 +605,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     local new_least_collateral_ratio_position_asset_price;
 
     let is_le_least_short = is_le(least_collateral_ratio, short_collateral_ratio);
-    let is_le_least_long = is_le(least_collateral_ratio, short_collateral_ratio);
+    let is_le_least_long = is_le(least_collateral_ratio, long_collateral_ratio);
 
     if (is_le_least_short * is_le_least_long == 1) {
         assert new_least_collateral_ratio = least_collateral_ratio;
