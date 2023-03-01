@@ -13,13 +13,14 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.StringLib import StringLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import Math64x61_assertPositive64x61
+from contracts.Math_64x61 import Math64x61_assertPositive64x61, Math64x61_ONE
 
 // ////////////
 // Constants //
 // ////////////
 
 const MAX_TRADABLE = 2;
+const MIN_LEVERAGE = Math64x61_ONE;
 const METADATA_LINK_TYPE = 'MARKET_METADATA_LINK';
 
 // /////////
@@ -849,6 +850,7 @@ func validate_market_trading_settings{
     }
     with_attr error_message("Markets: Invalid min leverage") {
         Math64x61_assertPositive64x61(market_.minimum_leverage);
+        assert_le(MIN_LEVERAGE, market_.minimum_leverage);
     }
     with_attr error_message("Markets: Invalid max leverage") {
         Math64x61_assertPositive64x61(market_.maximum_leverage);
