@@ -550,36 +550,14 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // Check if the position can be opened
     ILiquidate.check_for_risk(
         contract_address=liquidate_address_,
-        order=order_,
+        order_=order_,
         size=order_size_,
-        execution_price=execution_price_,
+        execution_price_=execution_price_,
+        margin_amount_=margin_order_value,
     );
 
-    // Error messages need local variables to be passed in params
-    local order_id_;
-    local available_margin_;
 
-    let (available_margin) = IAccountManager.get_available_margin(
-        contract_address=order_.user_address, asset_id_=collateral_id_
-    );
-
-    assert available_margin_ = available_margin;
-    assert order_id_ = order_.order_id;
-
-    // User must be able to pay the amount
-    with_attr error_message("0501: {order_id_} {available_margin_}") {
-        Math64x61_assert_le(order_value_with_fee, available_margin, collateral_token_decimal_);
-    }
-
-    // // Deduct the margin amount from account contract
-    // IAccountManager.transfer_from(
-    //     contract_address=order_.user_address,
-    //     assetID_=collateral_id_,
-    //     amount_=margin_order_value,
-    //     invoked_for_='holding',
-    // );
-
-    // Deduct the feefrom account contract
+    // Deduct the fee from account contract
     IAccountManager.transfer_from(
         contract_address=order_.user_address,
         assetID_=collateral_id_,

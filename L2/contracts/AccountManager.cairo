@@ -299,6 +299,8 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     least_collateral_ratio_position: PositionDetails,
     least_collateral_ratio_position_asset_price: felt,
 ) {
+    alloc_locals;
+    
     // Get registry and version of the Authorized Registry
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -325,7 +327,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (markets_array_len) = collateral_to_market_array_len.read(collateral_id=asset_id_);
 
     // Get collateral balance for the given asset
-    let (collateral_balance) = balance.read(assetID=asset_id_);
+    let (local collateral_balance) = balance.read(assetID=asset_id_);
 
     // Get the sum of initial margin of all positions under the given collateral
     let (initial_margin_sum) = margin_locked.read(asset_id=asset_id_);

@@ -24,7 +24,7 @@ namespace ILiquidate {
 
     // External functions
 
-    func check_for_risk(order: MultipleOrder, size: felt, execution_price: felt) {
+    func check_for_risk(order_: MultipleOrder, size: felt, execution_price_: felt, margin_amount_:felt) {
     }
 
     func mark_under_collateralized_position(account_address_: felt, collateral_id_: felt) -> (
