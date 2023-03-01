@@ -20,7 +20,7 @@ namespace IAccountManager {
 
     func get_balance(assetID_: felt) -> (res: felt) {
     }
-
+    
     func get_positions() -> (
         positions_array_len: felt, positions_array: PositionDetailsWithMarket*
     ) {
@@ -50,6 +50,11 @@ namespace IAccountManager {
     ) {
     }
 
+    func get_margin_info(
+        asset_id_: felt, new_position_maintanence_requirement_ : felt, new_position_margin_ : felt
+    ) -> (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt) {
+    }
+
     // External functions
 
     func execute_order(
@@ -63,6 +68,7 @@ namespace IAccountManager {
         collateral_id_: felt,
         pnl: felt,
         side: felt,
+        margin_lock_update_amount: felt,
     ) -> (res: felt) {
     }
 

@@ -99,7 +99,7 @@ func find_under_collateralized_position{
 
 @external
 func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order: MultipleOrder, size: felt, execution_price: felt
+    order_: MultipleOrder, size_: felt, execution_price_: felt, margin_amount_: felt
 ) -> () {
     alloc_locals;
 
@@ -108,7 +108,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 
     record_call_details('check_for_risk');
     let (inner_address) = get_inner_contract();
-    ILiquidate.check_for_risk(inner_address, order, size, execution_price);
+    ILiquidate.check_for_risk(inner_address, order_, size_, execution_price_, margin_amount_);
     return ();
 }
 

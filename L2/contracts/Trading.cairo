@@ -490,6 +490,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     margin_amount_open: felt,
     borrowed_amount_open: felt,
     trading_fee: felt,
+    margin_lock_amount: felt,
 ) {
     alloc_locals;
 
@@ -497,6 +498,8 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     local borrowed_amount_open;
     local average_execution_price_open;
     local trading_fee;
+    local user_available_balance;
+    local order_id;
 
     // Get the fees from Trading Fee contract
     let (fees_rate, base_fee_tier, discount_tier) = ITradingFees.get_discounted_fee_rate_for_user(
@@ -547,38 +550,24 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     tempvar order_value_with_fee = order_value_with_fee_felt;
 
     // Check if the position can be opened
-    ILiquidate.check_for_risk(
+    let (available_margin) = ILiquidate.check_for_risk(
         contract_address=liquidate_address_,
-        order=order_,
+        order_=order_,
         size=order_size_,
-        execution_price=execution_price_,
+        execution_price_=execution_price_,
+        margin_amount_=margin_order_value,
     );
 
-    // Error messages need local variables to be passed in params
-    local order_id_;
-    local user_balance_;
-
-    let (user_balance) = IAccountManager.get_balance(
-        contract_address=order_.user_address, assetID_=collateral_id_
-    );
-
-    assert user_balance_ = user_balance;
-    assert order_id_ = order_.order_id;
+    assert user_available_balance = available_margin;
+    assert order_id = order_.order_id;
 
     // User must be able to pay the amount
-    with_attr error_message("0501: {order_id_} {user_balance_}") {
-        Math64x61_assert_le(order_value_with_fee, user_balance, collateral_token_decimal_);
+    with_attr error_message("0501: {order_id} {user_available_balance}") {
+        Math64x61_assert_le(order_value_with_fee, user_available_balance, collateral_token_decimal_);
     }
 
-    // Deduct the margin amount from account contract
-    IAccountManager.transfer_from(
-        contract_address=order_.user_address,
-        assetID_=collateral_id_,
-        amount_=margin_order_value,
-        invoked_for_='holding',
-    );
 
-    // Deduct the feefrom account contract
+    // Deduct the fee from account contract
     IAccountManager.transfer_from(
         contract_address=order_.user_address,
         assetID_=collateral_id_,
@@ -631,7 +620,13 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_order_value
     );
 
-    return (average_execution_price_open, margin_amount_open, borrowed_amount_open, trading_fee);
+    return (
+        average_execution_price_open,
+        margin_amount_open,
+        borrowed_amount_open,
+        trading_fee,
+        margin_order_value,
+    );
 }
 
 // @notice Intenal function that processes close orders including Liquidation & Deleveraging
@@ -664,6 +659,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     borrowed_amount_close: felt,
     average_execution_price_close: felt,
     realized_pnl: felt,
+    margin_unlock_amount: felt,
 ) {
     alloc_locals;
 
@@ -671,6 +667,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     local borrowed_amount_close;
     local average_execution_price_close;
     local realized_pnl;
+    local margin_unlock_amount;
     // To be passed as arguments to error_message
     local order_id;
     local order_direction;
@@ -725,6 +722,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Calculate new values for margin and borrowed amounts
     if (order_.order_type == DELEVERAGING_ORDER) {
         let (borrowed_amount_close_felt) = Math64x61_sub(borrowed_amount, leveraged_amount_out);
+        assert margin_unlock_amount = 0;
         assert borrowed_amount_close = borrowed_amount_close_felt;
         margin_amount_close = margin_amount;
         margin_amount_open_64x61 = 0;
@@ -735,6 +733,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         assert borrowed_amount_close = borrowed_amount_close_felt;
 
         let (margin_amount_close_felt) = Math64x61_sub(margin_amount, margin_amount_to_be_reduced);
+        assert margin_unlock_amount = margin_amount_to_be_reduced;
         assert margin_amount_close = margin_amount_close_felt;
         margin_amount_open_64x61 = margin_amount_to_be_reduced;
     }
@@ -789,7 +788,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         let (is_negative) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
 
         if (is_negative == TRUE) {
-            // If yes, deduct the difference from user's balance, can go negative
+            // If yes, deduct the difference from user's balance; balance can go negative
             let (amount_to_transfer_from) = Math64x61_sub(
                 borrowed_amount_to_be_returned, leveraged_amount_out
             );
@@ -801,17 +800,17 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             );
 
             // Get the user balance
-            let (user_balance) = IAccountManager.get_balance(
-                contract_address=order_.user_address, assetID_=collateral_id_
+            let (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt,) = IAccountManager.get_margin_info(
+                contract_address=order_.user_address, asset_id_=collateral_id_, new_position_maintanence_requirement_ = 0, new_position_margin_ = 0
             );
 
             // Check if the user's balance can cover the deficit
             let (balance_check) = Math64x61_is_le(
-                amount_to_transfer_from, user_balance, collateral_token_decimal_
+                amount_to_transfer_from, available_margin, collateral_token_decimal_
             );
             if (balance_check == FALSE) {
                 let (balance_less_than_zero_res) = Math64x61_is_le(
-                    user_balance, 0, collateral_token_decimal_
+                    available_margin, 0, collateral_token_decimal_
                 );
                 if (balance_less_than_zero_res == TRUE) {
                     IInsuranceFund.withdraw(
@@ -825,7 +824,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     tempvar range_check_ptr = range_check_ptr;
                 } else {
                     let (deduct_from_insurance) = Math64x61_sub(
-                        amount_to_transfer_from, user_balance
+                        amount_to_transfer_from, available_margin
                     );
                     IInsuranceFund.withdraw(
                         contract_address=insurance_fund_address_,
@@ -851,13 +850,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             tempvar range_check_ptr = range_check_ptr;
         } else {
             // If not, transfer the remaining to user
-            let (amount_to_transfer) = Math64x61_sub(
-                leveraged_amount_out, borrowed_amount_to_be_returned
-            );
             IAccountManager.transfer(
                 contract_address=order_.user_address,
                 assetID_=collateral_id_,
-                amount_=amount_to_transfer,
+                amount_=pnl,
                 invoked_for_='holding',
             );
             tempvar syscall_ptr = syscall_ptr;
@@ -884,8 +880,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 let deficit = abs_value(margin_plus_pnl);
 
                 // Get the user balance
-                let (user_balance) = IAccountManager.get_balance(
-                    contract_address=order_.user_address, assetID_=collateral_id_
+                let (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt,) = IAccountManager.get_margin_info(
+                    contract_address=order_.user_address, asset_id_=collateral_id_, new_position_maintanence_requirement_ = 0, new_position_margin_ = 0
                 );
 
                 // Transfer the deficit from user balance. User balance can go negative
@@ -897,7 +893,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 );
 
                 let (balance_check) = Math64x61_is_le(
-                    deficit, user_balance, collateral_token_decimal_
+                    deficit, available_margin, collateral_token_decimal_
                 );
                 if (balance_check == TRUE) {
                     realized_pnl = margin_plus_pnl;
@@ -907,9 +903,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 } else {
                     // Transfer the remaining amount from Insurance Fund
                     let (balance_less_than_zero_res) = Math64x61_is_le(
-                        user_balance, 0, collateral_token_decimal_
+                        available_margin, 0, collateral_token_decimal_
                     );
-                    if (balance_less_than_zero_res == FALSE) {
+                    if (balance_less_than_zero_res == TRUE) {
                         IInsuranceFund.withdraw(
                             contract_address=insurance_fund_address_,
                             asset_id_=collateral_id_,
@@ -917,7 +913,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                             position_id_=order_.order_id,
                         );
                     } else {
-                        let (difference) = Math64x61_sub(deficit, user_balance);
+                        let (difference) = Math64x61_sub(deficit, available_margin);
                         IInsuranceFund.withdraw(
                             contract_address=insurance_fund_address_,
                             asset_id_=collateral_id_,
@@ -926,7 +922,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                         );
                     }
 
-                    let (realized_pnl_) = Math64x61_add(user_balance, margin_amount);
+                    let (realized_pnl_) = Math64x61_add(available_margin, margin_amount);
                     let (signed_realized_pnl_) = Math64x61_mul(realized_pnl_, NEGATIVE_ONE);
                     realized_pnl = signed_realized_pnl_;
                     tempvar syscall_ptr = syscall_ptr;
@@ -971,7 +967,11 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     return (
-        average_execution_price_close, margin_amount_close, borrowed_amount_close, realized_pnl
+        average_execution_price_close,
+        margin_amount_close,
+        borrowed_amount_close,
+        realized_pnl,
+        margin_unlock_amount,
     );
 }
 
@@ -1037,6 +1037,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local execution_price;
     local margin_amount;
     local borrowed_amount;
+    local margin_lock_update_amount;
     local average_execution_price;
     local trader_stats_list: TraderStats*;
     local new_total_order_volume;
@@ -1288,6 +1289,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             margin_amount_temp: felt,
             borrowed_amount_temp: felt,
             trading_fee: felt,
+            margin_lock_amount: felt,
         ) = process_open_orders(
             order_=[request_list_],
             execution_price_=execution_price,
@@ -1308,6 +1310,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert average_execution_price = average_execution_price_temp;
         assert pnl = trading_fee;
         assert current_open_interest = quantity_to_execute;
+        assert margin_lock_update_amount = margin_lock_amount;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1318,6 +1321,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             margin_amount_temp: felt,
             borrowed_amount_temp: felt,
             realized_pnl: felt,
+            margin_unlock_amount: felt,
         ) = process_close_orders(
             order_=[request_list_],
             execution_price_=execution_price,
@@ -1335,6 +1339,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert average_execution_price = average_execution_price_temp;
         assert pnl = realized_pnl;
         assert current_open_interest = 0 - quantity_to_execute;
+        assert margin_lock_update_amount = margin_unlock_amount;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1375,6 +1380,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         collateral_id_=collateral_id_,
         pnl=pnl,
         side=current_order_side,
+        margin_lock_update_amount=margin_lock_update_amount,
     );
 
     // Set the order size in executed_sizes_list array
