@@ -790,8 +790,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             );
 
             // Get the user balance
-            let (available_margin) = IAccountManager.get_available_margin(
-                contract_address=order_.user_address, asset_id_=collateral_id_
+            let (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt,) = IAccountManager.get_margin_info(
+                contract_address=order_.user_address, asset_id_=collateral_id_, new_position_maintanence_requirement_ = 0, new_position_margin_ = 0
             );
 
             // Check if the user's balance can cover the deficit
@@ -877,8 +877,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 let deficit = abs_value(margin_plus_pnl);
 
                 // Get the user balance
-                let (available_margin) = IAccountManager.get_available_margin(
-                    contract_address=order_.user_address, asset_id_=collateral_id_
+                // Get the user balance
+                let (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt,) = IAccountManager.get_margin_info(
+                    contract_address=order_.user_address, asset_id_=collateral_id_, new_position_maintanence_requirement_ = 0, new_position_margin_ = 0
                 );
 
                 // Transfer the deficit from user balance. User balance can go negative
@@ -902,7 +903,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     let (balance_less_than_zero_res) = Math64x61_is_le(
                         available_margin, 0, collateral_token_decimal_
                     );
-                    if (balance_less_than_zero_res == FALSE) {
+                    if (balance_less_than_zero_res == TRUE) {
                         IInsuranceFund.withdraw(
                             contract_address=insurance_fund_address_,
                             asset_id_=collateral_id_,
