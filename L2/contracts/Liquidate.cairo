@@ -310,7 +310,7 @@ func mark_under_collateralized_position{
 @external
 func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder, size_: felt, execution_price_: felt, margin_amount_: felt
-) {
+) -> (available_margin: felt){
     alloc_locals;
 
     can_order_be_opened.emit(order=order_);
@@ -354,7 +354,7 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     with_attr error_message("1101: {order_id} {market_id}") {
         assert is_liquidation = FALSE;
     }
-    return ();
+    return (available_margin,);
 }
 
 // ////////////

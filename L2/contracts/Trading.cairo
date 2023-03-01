@@ -498,6 +498,8 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     local borrowed_amount_open;
     local average_execution_price_open;
     local trading_fee;
+    local user_available_balance;
+    local order_id;
 
     // Get the fees from Trading Fee contract
     let (fees_rate, base_fee_tier, discount_tier) = ITradingFees.get_discounted_fee_rate_for_user(
@@ -548,13 +550,21 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     tempvar order_value_with_fee = order_value_with_fee_felt;
 
     // Check if the position can be opened
-    ILiquidate.check_for_risk(
+    let (available_margin) = ILiquidate.check_for_risk(
         contract_address=liquidate_address_,
         order_=order_,
         size=order_size_,
         execution_price_=execution_price_,
         margin_amount_=margin_order_value,
     );
+
+    assert user_available_balance = available_margin;
+    assert order_id = order_.order_id;
+
+    // User must be able to pay the amount
+    with_attr error_message("0501: {order_id} {user_available_balance}") {
+        Math64x61_assert_le(order_value_with_fee, user_available_balance, collateral_token_decimal_);
+    }
 
 
     // Deduct the fee from account contract
@@ -840,17 +850,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             tempvar range_check_ptr = range_check_ptr;
         } else {
             // If not, transfer the remaining to user
-            let (amount_to_transfer_plus_margin) = Math64x61_sub(
-                leveraged_amount_out, borrowed_amount_to_be_returned
-            );
-
-            let (amount_to_transfer) = Math64x61_sub(
-                amount_to_transfer_plus_margin, margin_unlock_amount
-            );
             IAccountManager.transfer(
                 contract_address=order_.user_address,
                 assetID_=collateral_id_,
-                amount_=amount_to_transfer,
+                amount_=pnl,
                 invoked_for_='holding',
             );
             tempvar syscall_ptr = syscall_ptr;
