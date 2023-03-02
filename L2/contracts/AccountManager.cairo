@@ -373,7 +373,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         return(
             is_liquidation=FALSE,
             total_margin=collateral_balance,
-            available_margin=collateral_balance,
+            available_margin=collateral_balance - initial_margin_sum,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
             least_collateral_ratio=1,
