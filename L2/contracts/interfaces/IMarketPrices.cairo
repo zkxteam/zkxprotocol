@@ -6,7 +6,7 @@ from contracts.DataTypes import MarketPrice
 namespace IMarketPrices {
     // View functions
 
-    func get_market_price(id: felt) -> (res: MarketPrice) {
+    func get_market_price(id: felt) -> (market_price: felt) {
     }
 
     // External functions
