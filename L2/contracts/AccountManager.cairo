@@ -1722,14 +1722,32 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     local new_least_collateral_ratio_position: PositionDetailsForRiskManagement;
     local new_least_collateral_ratio_position_asset_price;
 
+    let curr_long_position = PositionDetailsForRiskManagement(
+        market_id=curr_market_id,
+        direction=LONG,
+        avg_execution_price=long_position.avg_execution_price,
+        position_size=long_position.position_size,
+        margin_amount=long_position.margin_amount,
+        borrowed_amount=long_position.borrowed_amount,
+        leverage=long_position.leverage,
+    );
+    let curr_short_position = PositionDetailsForRiskManagement(
+        market_id=curr_market_id,
+        direction=SHORT,
+        avg_execution_price=short_position.avg_execution_price,
+        position_size=short_position.position_size,
+        margin_amount=short_position.margin_amount,
+        borrowed_amount=short_position.borrowed_amount,
+        leverage=short_position.leverage,
+    );
+
     let is_le_least_short = is_le(least_collateral_ratio, short_collateral_ratio);
     let is_le_least_long = is_le(least_collateral_ratio, long_collateral_ratio);
 
     if (is_le_least_short * is_le_least_long == 1) {
         assert new_least_collateral_ratio = least_collateral_ratio;
         assert new_least_collateral_ratio_position = least_collateral_ratio_position;
-        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price
-            ;
+        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1739,14 +1757,14 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
         if (is_le(long_collateral_ratio, short_collateral_ratio) == 1) {
             assert new_least_collateral_ratio = long_collateral_ratio;
-            assert new_least_collateral_ratio_position = long_position;
+            assert new_least_collateral_ratio_position = curr_long_position;
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
             assert new_least_collateral_ratio = short_collateral_ratio;
-            assert new_least_collateral_ratio_position = short_position;
+            assert new_least_collateral_ratio_position = curr_short_position;
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;

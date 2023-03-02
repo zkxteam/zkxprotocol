@@ -46,6 +46,7 @@ from contracts.DataTypes import (
     MultipleOrder,
     OrderRequest,
     PositionDetails,
+    PositionDetailsForRiskManagement,
     Signature,
     TraderStats,
 )
@@ -563,9 +564,10 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // User must be able to pay the amount
     with_attr error_message("0501: {order_id} {user_available_balance}") {
-        Math64x61_assert_le(order_value_with_fee, user_available_balance, collateral_token_decimal_);
+        Math64x61_assert_le(
+            order_value_with_fee, user_available_balance, collateral_token_decimal_
+        );
     }
-
 
     // Deduct the fee from account contract
     IAccountManager.transfer_from(
@@ -800,8 +802,20 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             );
 
             // Get the user balance
-            let (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt,) = IAccountManager.get_margin_info(
-                contract_address=order_.user_address, asset_id_=collateral_id_, new_position_maintanence_requirement_ = 0, new_position_margin_ = 0
+            let (
+                is_liquidation: felt,
+                total_margin: felt,
+                available_margin: felt,
+                unrealized_pnl_sum: felt,
+                maintenance_margin_requirement: felt,
+                least_collateral_ratio: felt,
+                least_collateral_ratio_position: PositionDetailsForRiskManagement,
+                least_collateral_ratio_position_asset_price: felt,
+            ) = IAccountManager.get_margin_info(
+                contract_address=order_.user_address,
+                asset_id_=collateral_id_,
+                new_position_maintanence_requirement_=0,
+                new_position_margin_=0,
             );
 
             // Check if the user's balance can cover the deficit
@@ -880,8 +894,20 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 let deficit = abs_value(margin_plus_pnl);
 
                 // Get the user balance
-                let (is_liquidation: felt, total_margin: felt, available_margin: felt, unrealized_pnl_sum: felt, maintenance_margin_requirement: felt, least_collateral_ratio: felt, least_collateral_ratio_position: PositionDetails, least_collateral_ratio_position_asset_price: felt,) = IAccountManager.get_margin_info(
-                    contract_address=order_.user_address, asset_id_=collateral_id_, new_position_maintanence_requirement_ = 0, new_position_margin_ = 0
+                let (
+                    is_liquidation: felt,
+                    total_margin: felt,
+                    available_margin: felt,
+                    unrealized_pnl_sum: felt,
+                    maintenance_margin_requirement: felt,
+                    least_collateral_ratio: felt,
+                    least_collateral_ratio_position: PositionDetailsForRiskManagement,
+                    least_collateral_ratio_position_asset_price: felt,
+                ) = IAccountManager.get_margin_info(
+                    contract_address=order_.user_address,
+                    asset_id_=collateral_id_,
+                    new_position_maintanence_requirement_=0,
+                    new_position_margin_=0,
                 );
 
                 // Transfer the deficit from user balance. User balance can go negative
