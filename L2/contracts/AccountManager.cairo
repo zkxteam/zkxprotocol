@@ -283,8 +283,17 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }
 
 // @notice view function to get the available margin of an asset
-// @param asset_id_ - ID of an asset
-// @return res - balance of an asset
+// @param asset_id_ - ID of collateral asset
+// @param new_position_maintanence_requirement_ - maintenance requirement of new position, if any
+// @param new_position_margin_ - margin of new position, if any
+// @return is_liquidation - 1 if position can be liquidated, otherwise 0
+// @return total_margin - total margin corresponding to the collateral
+// @return available_margin - available margin corresponding to the collateral
+// @return unrealized_pnl_sum - unrealized pnl for all markets with the specified collateral
+// @return maintenance_margin_requirement - total maintenance requirement
+// @return least_collateral_ratio - least collateral ratio amoung all positions
+// @return least_collateral_ratio_position - details of position with least collateral ratio
+// @return least_collateral_ratio_position_asset_price - asset price of least collateral ratio position
 @view
 func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, new_position_maintanence_requirement_: felt, new_position_margin_: felt
@@ -391,7 +400,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (available_margin) = Math64x61_sub(total_margin, total_initial_margin_sum);
 
     local is_liquidation;
-    let is_below_maintanence = is_le(available_margin, maintenance_margin_requirement);
+    let is_below_maintanence = is_le(total_margin, maintenance_margin_requirement);
 
     // If it's a long position with 1x leverage, ignore it
     if (is_below_maintanence == TRUE) {
@@ -599,16 +608,14 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     );
     let (
         liq_result: felt,
-        least_collateral_ratio_position: PositionDetailsForRiskManagement,
         total_account_value: felt,
+        available_margin: felt,
+        unrealized_pnl_sum: felt,
         total_maintenance_requirement: felt,
-        least_collateral_ratio_position_asset_price: felt,
         least_collateral_ratio: felt,
-    ) = ILiquidate.find_under_collateralized_position(
-        contract_address=liquidate_address,
-        account_address_=user_l2_address,
-        collateral_id_=collateral_id_,
-    );
+        least_collateral_ratio_position: PositionDetailsForRiskManagement,
+        least_collateral_ratio_position_asset_price: felt
+    ) = get_margin_info(asset_id_=collateral_id_, new_position_maintanence_requirement_=0, new_position_margin_=0);
 
     // if TMR == 0, it means that market price is not within TTL, so user should be possible to withdraw whole balance
     if (total_maintenance_requirement == 0) {
@@ -646,9 +653,6 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         collateral_id_,
         token_decimals,
     );
-
-    // REMOVEEEEEEEEEEEEEEEEEE
-    // return (total_account_value, total_maintenance_requirement);
 
     return (safe_withdrawal_amount_64x61, withdrawable_amount_64x61);
 }
@@ -974,28 +978,22 @@ func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     );
 }
 
-// @notice function called by the Liquidate Contract to get the array of net positions of the user
-// @param collateral_id_ - collateral id
+// @notice External function called by the Liquidate Contract to get the array of net positions of the user
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of positions
 @view
-func get_positions_for_risk_management{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(collateral_id_: felt) -> (
-    positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*
+func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    positions_array_len: felt, positions_array: PositionDetailsWithMarket*
 ) {
     alloc_locals;
 
-    let (positions_array: PositionDetailsForRiskManagement*) = alloc();
-    let (markets_array_len: felt) = collateral_to_market_array_len.read(
-        collateral_id=collateral_id_
-    );
-    return populate_positions_risk_management(
-        collateral_id_=collateral_id_,
+    let (positions_array: PositionDetailsWithMarket*) = alloc();
+    let (collateral_array_len_) = collateral_array_len.read();
+    return populate_positions_collaterals_recurse(
         positions_array_len_=0,
         positions_array_=positions_array,
-        iterator_=0,
-        markets_array_len_=markets_array_len,
+        collateral_array_iterator_=0,
+        collateral_array_len_=collateral_array_len_,
     );
 }
 
@@ -1994,107 +1992,6 @@ func populate_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 
     assert array_list_[array_list_len_] = collateral_balance_struct;
     return populate_array_collaterals(array_list_len_ + 1, array_list_, final_len_);
-}
-
-// @notice Internal Function called by get_positions_for_risk_management to recursively add active positions to the array and return it
-// @param collateral_id_ - collateral id
-// @param positions_array_len_ - Length of the array
-// @param positions_array_ - Required array of positions
-// @param iterator_ - Current length of traversed array
-// @param markets_array_len_ - Length of the markets array
-// @returns positions_array_len - Length of the positions array
-// @returns positions_array - Array with the positions
-func populate_positions_risk_management{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(
-    collateral_id_: felt,
-    positions_array_len_: felt,
-    positions_array_: PositionDetailsForRiskManagement*,
-    iterator_: felt,
-    markets_array_len_: felt,
-) -> (positions_array_len: felt, positions_array: PositionDetailsForRiskManagement*) {
-    alloc_locals;
-
-    // If we reached the end of the array, then return
-    if (markets_array_len_ == iterator_) {
-        return (positions_array_len_, positions_array_);
-    }
-
-    // Get the market id at that position
-    let (curr_market_id: felt) = collateral_to_market_array.read(
-        collateral_id=collateral_id_, index=iterator_
-    );
-
-    // Get Long position
-    let (long_position: PositionDetails) = position_mapping.read(
-        market_id=curr_market_id, direction=LONG
-    );
-
-    // Get Short position
-    let (short_position: PositionDetails) = position_mapping.read(
-        market_id=curr_market_id, direction=SHORT
-    );
-
-    // Get asset token decimal
-    let (registry) = CommonLib.get_registry_address();
-    let (version) = CommonLib.get_contract_version();
-    let (market_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Market_INDEX, version=version
-    );
-    let (market: Market) = IMarkets.get_market(
-        contract_address=market_address, market_id_=curr_market_id
-    );
-    let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Asset_INDEX, version=version
-    );
-    let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
-
-    local is_long;
-    local is_short;
-
-    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
-    if (is_long_zero == TRUE) {
-        assert is_long = 0;
-    } else {
-        // Store it in the array
-        let curr_position = PositionDetailsForRiskManagement(
-            market_id=curr_market_id,
-            direction=LONG,
-            avg_execution_price=long_position.avg_execution_price,
-            position_size=long_position.position_size,
-            margin_amount=long_position.margin_amount,
-            borrowed_amount=long_position.borrowed_amount,
-            leverage=long_position.leverage,
-        );
-        assert positions_array_[positions_array_len_] = curr_position;
-        assert is_long = 1;
-    }
-
-    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
-    if (is_short_zero == TRUE) {
-        assert is_short = 0;
-    } else {
-        // Store it in the array
-        let curr_position = PositionDetailsForRiskManagement(
-            market_id=curr_market_id,
-            direction=SHORT,
-            avg_execution_price=short_position.avg_execution_price,
-            position_size=short_position.position_size,
-            margin_amount=short_position.margin_amount,
-            borrowed_amount=short_position.borrowed_amount,
-            leverage=long_position.leverage,
-        );
-        assert positions_array_[positions_array_len_ + is_long] = curr_position;
-        assert is_short = 1;
-    }
-
-    return populate_positions_risk_management(
-        collateral_id_=collateral_id_,
-        positions_array_len_=positions_array_len_ + is_long + is_short,
-        positions_array_=positions_array_,
-        iterator_=iterator_ + 1,
-        markets_array_len_=markets_array_len_,
-    );
 }
 
 // @notice Internal Function called by get_positions to recursively add active positions to the array and return it
