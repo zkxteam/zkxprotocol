@@ -90,14 +90,10 @@ async def test_update_market_price(adminAuth_factory):
     await admin1_signer.send_transaction(admin1, market_prices.contract_address, 'update_market_price', [ETH_USD_ID, 1000])
 
     fetched_market_prices1 = await market_prices.get_market_price(BTC_USD_ID).call()
-    assert fetched_market_prices1.result.market_price.asset_id == AssetID.BTC
-    assert fetched_market_prices1.result.market_price.collateral_id == AssetID.USDC
-    assert fetched_market_prices1.result.market_price.price == 500
+    assert fetched_market_prices1.result.market_price == 500
 
     fetched_market_prices2 = await market_prices.get_market_price(ETH_USD_ID).call()
-    assert fetched_market_prices2.result.market_price.asset_id == AssetID.ETH
-    assert fetched_market_prices2.result.market_price.collateral_id == AssetID.USDC
-    assert fetched_market_prices2.result.market_price.price == 1000
+    assert fetched_market_prices2.result.market_price == 1000
 
 @pytest.mark.asyncio
 async def test_unauthorized_add_market_price_to_market_prices(adminAuth_factory):
