@@ -161,7 +161,7 @@ func mark_under_collateralized_position{
     // /////////////////
     // TO BE REMOVED //
     maintenance.write(maintenance_margin_requirement);
-    acc_value.write(available_margin);
+    acc_value.write(total_margin);
     // /////////////////
 
     // Get Market contract address
