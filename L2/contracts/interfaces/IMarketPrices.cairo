@@ -1,7 +1,5 @@
 %lang starknet
 
-from contracts.DataTypes import MarketPrice
-
 @contract_interface
 namespace IMarketPrices {
     // View functions

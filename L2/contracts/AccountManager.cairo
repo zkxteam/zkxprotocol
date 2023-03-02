@@ -29,7 +29,6 @@ from contracts.Constants import (
     LONG,
     Market_INDEX,
     MarketPrices_INDEX,
-    OPEN,
     SHORT,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
@@ -42,7 +41,6 @@ from contracts.DataTypes import (
     CollateralBalance,
     LiquidatablePosition,
     Market,
-    MarketPrice,
     OrderRequest,
     PositionDetails,
     PositionDetailsForRiskManagement,
@@ -1360,8 +1358,6 @@ func withdraw{
     with_attr error_message("AccountManager: Amount cannot be negative") {
         assert_nn(amount_);
     }
-    // get L2 Account contract address
-    let (user_l2_address) = get_contract_address();
     // Update the fees to be paid by user in withdrawal fee balance contract
     let (withdrawal_fee_balance_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=WithdrawalFeeBalance_INDEX, version=version
@@ -1639,8 +1635,6 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     local short_asset_price;
     local short_collateral_ratio;
 
-    local current_least_collateral_ratio;
-
     let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
     if (is_long_zero == TRUE) {
         assert long_collateral_ratio = 1;
@@ -1838,9 +1832,7 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     // calculate account value and maintenance requirement of least collateral position after reducing size
     let (account_value_after_temp) = Math64x61_mul(new_size, market_price);
-    let (ratio_of_position) = Math64x61_div(
-        new_size, least_collateral_ratio_position_.position_size
-    );
+    
     let (amount_to_be_sold) = Math64x61_sub(
         least_collateral_ratio_position_.position_size, new_size
     );
