@@ -427,7 +427,7 @@ class User:
             collateral_id: liquidatable_position
         })
 
-    def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int, timestamp: int, pnl: int):
+    def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int, timestamp: int, pnl: float, margin_update: float):
         position = self.get_position(
             market_id=order["market_id"], direction=order["direction"])
         order_portion_executed = self.get_portion_executed(
@@ -443,7 +443,7 @@ class User:
         self.__set_portion_executed(
             order_id=order["order_id"], new_amount=new_portion_executed)
 
-        if order["side"] == 1:
+        if order["side"] == side["buy"]:
             current_pnl = 0
             created_timestamp = 0
 
@@ -479,7 +479,10 @@ class User:
 
             self.__update_position(
                 market_id=order["market_id"], direction=order["direction"], updated_dict=updated_dict, updated_position=updated_position)
-
+            current_locked_margin = self.get_locked_margin(
+                asset_id=market_to_collateral_mapping[market_id])
+            self.set_locked_margin(new_locked_margin=current_locked_margin +
+                                   margin_update, asset_id=market_to_collateral_mapping[market_id])
         else:
             new_leverage = 0
 
@@ -571,6 +574,11 @@ class User:
 
             self.__update_position(
                 market_id=order["market_id"], direction=order["direction"], updated_dict=updated_dict, updated_position=updated_position)
+
+            current_locked_margin = self.get_locked_margin(
+                asset_id=market_to_collateral_mapping[market_id])
+            self.set_locked_margin(new_locked_margin=current_locked_margin -
+                                   margin_update, asset_id=market_to_collateral_mapping[market_id])
 
     def get_position(self, market_id: int = BTC_USD_ID, direction: int = order_direction["long"]) -> Dict:
         try:
@@ -890,7 +898,7 @@ class OrderExecutor:
         print(margin_amount)
         return (average_execution_price, margin_amount, borrowed_amount, trading_fees, order_value_wo_leverage)
 
-    def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, timestamp: int) -> Tuple[float, float, float, float]:
+    def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, timestamp: int) -> Tuple[float, float, float, float, float]:
 
         # Get the user position
         position = user.get_position(order["market_id"], order["direction"])
@@ -936,6 +944,7 @@ class OrderExecutor:
             position["position_size"]
         borrowed_amount_to_be_returned = borrowed_amount*percent_of_position
         margin_amount_to_be_reduced = margin_amount*percent_of_position
+        margin_unlock_amount = 0
 
         if order["order_type"] == order_types["deleverage"]:
             borrowed_amount_close = borrowed_amount - leveraged_amount_out
@@ -943,7 +952,7 @@ class OrderExecutor:
         else:
             borrowed_amount_close = borrowed_amount - borrowed_amount_to_be_returned
             margin_amount_close = margin_amount - margin_amount_to_be_reduced
-
+            margin_unlock_amount = margin_amount_to_be_reduced
             user.modify_balance(
                 mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_amount_to_be_reduced)
 
@@ -964,28 +973,29 @@ class OrderExecutor:
                     order["market_id"]]
             )
 
-            if deficit <= available_margin:
-                realized_pnl = net_account_value
-            else:
+            if deficit > available_margin:
                 if available_margin < 0:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
                 else:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - available_margin)
-                realized_pnl = (available_margin+margin_amount)*-1
-
+            user.modify_balance(
+                mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
+            realized_pnl = deficit
         else:
             if order["order_type"] <= 3:
                 user.modify_balance(
                     mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_amount_to_be_reduced)
                 realized_pnl = pnl
-            else:
+            elif order["order_type"] == order_types["liquidation"]:
                 self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
-                realized_pnl = net_account_value
+                realized_pnl = net_account_value*-1
+            else:
+                realized_pnl = 0
 
-        return (average_execution_price, margin_amount_close, borrowed_amount_close, realized_pnl)
+        return (average_execution_price, margin_amount_close, borrowed_amount_close, realized_pnl, margin_unlock_amount)
 
     def __get_fee(self, user: User, side: int) -> float:
         # ToDo change this logic when we add user discounts
@@ -1111,22 +1121,25 @@ class OrderExecutor:
                 trade_side = order_side["maker"]
 
             pnl = 0
+            margin_update = 0
 
             if request_list[i]["side"] == side["buy"]:
-                (avg_execution_price, margin_amount, borrowed_amount, trading_fees) = self.__process_open_orders(
+                (avg_execution_price, margin_amount, borrowed_amount, trading_fees, margin_lock_update) = self.__process_open_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, market_id=market_id, side=trade_side, timestamp=timestamp)
                 pnl = trading_fees
+                margin_update = margin_lock_update
                 if avg_execution_price == 0:
                     print("Cannot execute batch; returning")
                     return
             else:
-                (avg_execution_price, margin_amount, borrowed_amount, realized_pnl) = self.__process_close_orders(
+                (avg_execution_price, margin_amount, borrowed_amount, realized_pnl, margin_unlock_amount) = self.__process_close_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, timestamp=timestamp)
                 pnl = realized_pnl
+                margin_update = margin_unlock_amount
                 if avg_execution_price == 0:
                     return
             user_list[i].execute_order(order=request_list[i], size=quantity_to_execute, price=avg_execution_price,
-                                       margin_amount=margin_amount, borrowed_amount=borrowed_amount, market_id=market_id, timestamp=timestamp, pnl=pnl)
+                                       margin_amount=margin_amount, borrowed_amount=borrowed_amount, market_id=market_id, timestamp=timestamp, pnl=pnl, margin_update=margin_update)
 
         self.batch_id_status[batch_id] = 1
         return

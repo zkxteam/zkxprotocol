@@ -881,7 +881,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             invoked_for_='holding',
         );
 
-        realized_pnl = amount_to_transfer_from;
+        let (signed_realized_pnl) = Math64x61_mul(amount_to_transfer_from, NEGATIVE_ONE);
+        realized_pnl = signed_realized_pnl;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
