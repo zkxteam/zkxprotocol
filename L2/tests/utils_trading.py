@@ -821,7 +821,7 @@ class OrderExecutor:
 
         self.set_fund_balance(fund, asset_id, new_balance)
 
-    def __process_open_orders(self, liquidate: 'Liquidator', user: User, order: Dict, execution_price: float, order_size: float, side: int, timestamp: int) -> Tuple[float, float, float, float]:
+    def __process_open_orders(self, liquidate: 'Liquidator', user: User, order: Dict, execution_price: float, order_size: float, side: int, timestamp: int) -> Tuple[float, float, float, float, float]:
         position = user.get_position(
             market_id=order["market_id"], direction=order["direction"])
 
@@ -872,7 +872,7 @@ class OrderExecutor:
             order_executor=self, timestamp=timestamp, asset_id=market_to_collateral_mapping[
                 order["market_id"]])
 
-        if available_margin <= balance_to_be_deducted:
+        if available_margin < balance_to_be_deducted:
             print("Low balance", balance_to_be_deducted, available_margin)
             return (0, 0, 0, 0)
 
@@ -888,7 +888,7 @@ class OrderExecutor:
             self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["defund"],
                                        asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_be_borrowed)
         print(margin_amount)
-        return (average_execution_price, margin_amount, borrowed_amount, trading_fees)
+        return (average_execution_price, margin_amount, borrowed_amount, trading_fees, order_value_wo_leverage)
 
     def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, timestamp: int) -> Tuple[float, float, float, float]:
 
@@ -937,64 +937,54 @@ class OrderExecutor:
         borrowed_amount_to_be_returned = borrowed_amount*percent_of_position
         margin_amount_to_be_reduced = margin_amount*percent_of_position
 
-        self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["defund"],
-                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
-
-        if order["order_type"] == 5:
+        if order["order_type"] == order_types["deleverage"]:
             borrowed_amount_close = borrowed_amount - leveraged_amount_out
             margin_amount_close = margin_amount
         else:
             borrowed_amount_close = borrowed_amount - borrowed_amount_to_be_returned
             margin_amount_close = margin_amount - margin_amount_to_be_reduced
 
-        if order["order_type"] <= 3:
-            if position["leverage"] > 1:
-                self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
-                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
-            if net_account_value <= 0:
-                deficit = borrowed_amount_to_be_returned - leveraged_amount_out
-                user.modify_balance(
-                    mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
+            user.modify_balance(
+                mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_amount_to_be_reduced)
+
+        self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["defund"],
+                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
+
+        if position["leverage"] > 1:
+            self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
+                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
+
+        if net_account_value <= 0:
+            print("Deficit", net_account_value)
+            deficit = abs(net_account_value)
+
+            # Get position details of the user
+            (_, _, available_margin, _, _, _, _, _) = user.get_margin_info(
+                order_executor=self, timestamp=timestamp, asset_id=market_to_collateral_mapping[
+                    order["market_id"]]
+            )
+
+            if deficit <= available_margin:
+                realized_pnl = net_account_value
             else:
-                amount_to_transfer_from = leveraged_amount_out - borrowed_amount_to_be_returned
-                user.modify_balance(
-                    mode=fund_mode["fund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_transfer_from)
-            realized_pnl = pnl
-        else:
-            if order["order_type"] == order_types["liquidation"]:
-                self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
-                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
-
-                if net_account_value <= 0:
-                    print("Deficit", net_account_value)
-                    deficit = abs(net_account_value)
-
-                    # Get position details of the user
-                    (_, _, available_margin, _, _, _, _, _) = user.get_margin_info(
-                        order_executor=self, timestamp=timestamp, asset_id=market_to_collateral_mapping[
-                            order["market_id"]]
-                    )
-
-                    if deficit <= available_margin:
-                        realized_pnl = net_account_value
-                    else:
-                        if available_margin < 0:
-                            self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
-                        else:
-                            self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - available_margin)
-                        realized_pnl = (available_margin+margin_amount)*-1
-
+                if available_margin < 0:
+                    self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
+                                               asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
                 else:
-                    self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
-                                               asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
-                    realized_pnl = margin_amount
-            else:
-                # Deleveraging order
-                self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
-                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
+                    self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
+                                               asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - available_margin)
+                realized_pnl = (available_margin+margin_amount)*-1
+
+        else:
+            if order["order_type"] <= 3:
+                user.modify_balance(
+                    mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_amount_to_be_reduced)
                 realized_pnl = pnl
+            else:
+                self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
+                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
+                realized_pnl = net_account_value
+
         return (average_execution_price, margin_amount_close, borrowed_amount_close, realized_pnl)
 
     def __get_fee(self, user: User, side: int) -> float:

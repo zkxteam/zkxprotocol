@@ -805,6 +805,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
     }
 
+    tempvar syscall_ptr = syscall_ptr;
+    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    tempvar range_check_ptr = range_check_ptr;
+
     // Check if the account value for the position is negative
     let (is_underwater) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
 
@@ -877,6 +881,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             invoked_for_='holding',
         );
 
+        realized_pnl = amount_to_transfer_from;
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -890,18 +896,31 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 invoked_for_='holding',
             );
 
+            realized_pnl = pnl;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
-            // Deposit the user's remaining margin in Insurance Fund
-            IInsuranceFund.deposit(
-                contract_address=insurance_fund_address_,
-                asset_id_=collateral_id_,
-                amount=margin_plus_pnl,
-                position_id_=order_.order_id,
-            );
+            if (order_.order_type == LIQUIDATION_ORDER) {
+                // Deposit the user's remaining margin in Insurance Fund
+                IInsuranceFund.deposit(
+                    contract_address=insurance_fund_address_,
+                    asset_id_=collateral_id_,
+                    amount=margin_plus_pnl,
+                    position_id_=order_.order_id,
+                );
 
+                let (signed_realized_pnl) = Math64x61_mul(margin_plus_pnl, NEGATIVE_ONE);
+                realized_pnl = signed_realized_pnl;
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                realized_pnl = 0;
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            }
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;

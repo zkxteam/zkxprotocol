@@ -1093,7 +1093,7 @@ func execute_order{
         // Calculate the new leverage if it's a deleveraging order
         local new_leverage;
 
-        let (new_position_size) = Math64x61_sub(current_position_details.position_size, size);
+        let (new_position_size) = Math64x61_sub(position_details.position_size, size);
 
         // Assert that the size amount can be closed from the existing position
         with_attr error_message("0003: {order_id} {size}") {
@@ -1157,13 +1157,13 @@ func execute_order{
                     assert liq_position.liquidatable = TRUE;
                 }
 
-                assert new_leverage = current_position_details.leverage;
+                assert new_leverage = position_details.leverage;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
         } else {
-            assert new_leverage = current_position_details.leverage;
+            assert new_leverage = position_details.leverage;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1205,7 +1205,7 @@ func execute_order{
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
-            let (current_pnl: felt) = Math64x61_add(current_position_details.realized_pnl, pnl);
+            let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
             let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
             let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
 
@@ -1216,7 +1216,7 @@ func execute_order{
                 margin_amount=margin_amount_rounded,
                 borrowed_amount=borrowed_amount_rounded,
                 leverage=new_leverage,
-                created_timestamp=current_position_details.created_timestamp,
+                created_timestamp=position_details.created_timestamp,
                 modified_timestamp=current_timestamp,
                 realized_pnl=current_pnl,
             );
@@ -1706,8 +1706,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     if (is_le_least_short * is_le_least_long == 1) {
         assert new_least_collateral_ratio = least_collateral_ratio;
         assert new_least_collateral_ratio_position = least_collateral_ratio_position;
-        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price
-            ;
+        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
