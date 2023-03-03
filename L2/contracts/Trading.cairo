@@ -732,6 +732,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         // New margin amount of the position
         margin_amount_close = margin_amount;
         margin_amount_open_64x61 = 0;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
         // New borrowed amount of the position
         let (borrowed_amount_close_felt) = Math64x61_sub(
@@ -754,6 +758,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             amount_=margin_amount_to_be_reduced,
             invoked_for_='holding',
         );
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
@@ -787,6 +795,14 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             amount=borrowed_amount_to_be_returned,
             position_id_=order_.order_id,
         );
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Check if the account value for the position is negative
@@ -808,9 +824,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             least_collateral_ratio_position_asset_price: felt,
         ) = IAccountManager.get_margin_info(
             contract_address=order_.user_address,
-            asset_id_=collateral_id,
-            new_position_maintanence_requirement_=maintenance_requirement,
-            new_position_margin_=margin_amount_,
+            asset_id_=collateral_id_,
+            new_position_maintanence_requirement_=0,
+            new_position_margin_=0,
         );
 
         // Check if the user's balance can cover the deficit
@@ -866,13 +882,17 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
     } else {
         // If it's not a liquidation order
-        if (s_le(order_.order_type, 3) == 1) {
+        if (is_le(order_.order_type, 3) == 1) {
             IAccountManager.transfer(
                 contract_address=order_.user_address,
                 assetID_=collateral_id_,
                 amount_=margin_plus_pnl,
                 invoked_for_='holding',
             );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         } else {
             // Deposit the user's remaining margin in Insurance Fund
             IInsuranceFund.deposit(
@@ -881,7 +901,14 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 amount=margin_plus_pnl,
                 position_id_=order_.order_id,
             );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     return (
