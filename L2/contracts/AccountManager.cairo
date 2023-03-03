@@ -440,6 +440,76 @@ func get_position_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (res=res);
 }
 
+// @notice function to get the array of net positions of the user
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of positions
+@view
+func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    positions_array_len: felt, positions_array: PositionDetailsWithMarket*
+) {
+    alloc_locals;
+
+    let (positions_array: PositionDetailsWithMarket*) = alloc();
+    let (collateral_array_len_) = collateral_array_len.read();
+    return populate_positions_collaterals_recurse(
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        collateral_array_iterator_=0,
+        collateral_array_len_=collateral_array_len_,
+    );
+}
+
+// @notice function to get account info corresponding to a collateral
+// @param collateral_id_ - collateral ID of the asset
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of positions
+@view
+func get_account_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    collateral_id_: felt
+) -> (
+    positions_array_len: felt,
+    positions_array: PositionDetailsWithMarket*,
+    available_margin: felt,
+    total_margin: felt,
+    collateral_balance: felt,
+) {
+    alloc_locals;
+    // Get current collateral array length
+    let (current_markets_array_len: felt) = collateral_to_market_array_len.read(
+        collateral_id=collateral_id_
+    );
+
+    let (positions_array: PositionDetailsWithMarket*) = alloc();
+
+    // Recursively call the next market_id
+    let (
+        positions_array_len: felt, positions_array: PositionDetailsWithMarket*
+    ) = populate_positions(
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        markets_iterator_=0,
+        markets_array_len_=current_markets_array_len,
+        current_collateral_id_=collateral_id_,
+    );
+
+    let (
+        liq_result: felt,
+        total_margin: felt,
+        available_margin: felt,
+        unrealized_pnl_sum: felt,
+        maintenance_margin_requirement: felt,
+        least_collateral_ratio: felt,
+        least_collateral_ratio_position: PositionDetailsForRiskManagement,
+        least_collateral_ratio_position_asset_price: felt,
+    ) = get_margin_info(collateral_id_, 0, 0);
+
+    let (collateral_balance) = balance.read(assetID=collateral_id_);
+
+    return (
+        positions_array_len, positions_array, available_margin, total_margin, collateral_balance
+    );
+}
+
 // @notice view function to get L1 address of the user
 // @return res - L1 address of the user
 @view
@@ -904,7 +974,7 @@ func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
     );
 }
 
-// @notice External function called by the Liquidate Contract to get the array of net positions of the user
+// @notice function called by the Liquidate Contract to get the array of net positions of the user
 // @param collateral_id_ - collateral id
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of positions
@@ -926,25 +996,6 @@ func get_positions_for_risk_management{
         positions_array_=positions_array,
         iterator_=0,
         markets_array_len_=markets_array_len,
-    );
-}
-
-// @notice External function called by the Liquidate Contract to get the array of net positions of the user
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of positions
-@view
-func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    positions_array_len: felt, positions_array: PositionDetailsWithMarket*
-) {
-    alloc_locals;
-
-    let (positions_array: PositionDetailsWithMarket*) = alloc();
-    let (collateral_array_len_) = collateral_array_len.read();
-    return populate_positions_collaterals_recurse(
-        positions_array_len_=0,
-        positions_array_=positions_array,
-        collateral_array_iterator_=0,
-        collateral_array_len_=collateral_array_len_,
     );
 }
 
@@ -1832,7 +1883,7 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     // calculate account value and maintenance requirement of least collateral position after reducing size
     let (account_value_after_temp) = Math64x61_mul(new_size, market_price);
-    
+
     let (amount_to_be_sold) = Math64x61_sub(
         least_collateral_ratio_position_.position_size, new_size
     );
@@ -2095,7 +2146,13 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
     );
+    let (market_prices_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=MarketPrices_INDEX, version=version
+    );
     let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
+    let (market_price: felt) = IMarketPrices.get_market_price(
+        contract_address=market_prices_address, id=curr_market_id
+    );
 
     local is_long;
     local is_short;
@@ -2103,7 +2160,18 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
     if (is_long_zero == TRUE) {
         assert is_long = 0;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
+        // Get unrealized pnl and maintenance margin
+        let (pnl, maintanence_requirement, collateral_ratio) = get_risk_parameters_position(
+            position=long_position,
+            direction_=LONG,
+            market_price_=market_price,
+            market_address_=market_address,
+            market_id_=curr_market_id,
+        );
         // Store it in the array
         let curr_position = PositionDetailsWithMarket(
             market_id=curr_market_id,
@@ -2116,15 +2184,35 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             created_timestamp=long_position.created_timestamp,
             modified_timestamp=long_position.modified_timestamp,
             realized_pnl=long_position.realized_pnl,
+            market_price=market_price,
+            maintenance_margin=maintanence_requirement,
+            unrealized_pnl=pnl,
         );
         assert positions_array_[positions_array_len_] = curr_position;
         assert is_long = 1;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
+    tempvar syscall_ptr = syscall_ptr;
+    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    tempvar range_check_ptr = range_check_ptr;
 
     let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
     if (is_short_zero == TRUE) {
         assert is_short = 0;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
+        // Get unrealized pnl and maintenance margin
+        let (pnl, maintanence_requirement, collateral_ratio) = get_risk_parameters_position(
+            position=short_position,
+            direction_=SHORT,
+            market_price_=market_price,
+            market_address_=market_address,
+            market_id_=curr_market_id,
+        );
         // Store it in the array
         let curr_position = PositionDetailsWithMarket(
             market_id=curr_market_id,
@@ -2137,9 +2225,15 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             created_timestamp=short_position.created_timestamp,
             modified_timestamp=short_position.modified_timestamp,
             realized_pnl=short_position.realized_pnl,
+            market_price=market_price,
+            maintenance_margin=maintanence_requirement,
+            unrealized_pnl=pnl,
         );
         assert positions_array_[positions_array_len_ + is_long] = curr_position;
         assert is_short = 1;
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     return populate_positions(
