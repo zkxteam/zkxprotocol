@@ -449,6 +449,27 @@ func get_position_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (res=res);
 }
 
+// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
+// @param timestmap_filter_ - Timestamp by which to filter the array
+// @returns positions_array_len - Length of the array
+// @returns positions_array - Required array of net positions
+@view
+func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    timestamp_filter_: felt
+) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
+    alloc_locals;
+
+    let (positions_array: SimplifiedPosition*) = alloc();
+    let (collateral_array_len_) = collateral_array_len.read();
+    return populate_simplified_positions_collaterals_recurse(
+        positions_array_len_=0,
+        positions_array_=positions_array,
+        collateral_array_iterator_=0,
+        collateral_array_len_=collateral_array_len_,
+        timestamp_filter_=timestamp_filter_,
+    );
+}
+
 // @notice function to get the array of net positions of the user
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of positions
@@ -955,46 +976,6 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     emit_event(1, keys, 6, data);
 
     return ();
-}
-
-// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
-// @param timestmap_filter_ - Timestamp by which to filter the array
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of net positions
-@view
-func get_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    timestamp_filter_: felt
-) -> (positions_array_len: felt, positions_array: SimplifiedPosition*) {
-    alloc_locals;
-
-    let (positions_array: SimplifiedPosition*) = alloc();
-    let (collateral_array_len_) = collateral_array_len.read();
-    return populate_simplified_positions_collaterals_recurse(
-        positions_array_len_=0,
-        positions_array_=positions_array,
-        collateral_array_iterator_=0,
-        collateral_array_len_=collateral_array_len_,
-        timestamp_filter_=timestamp_filter_,
-    );
-}
-
-// @notice External function called by the Liquidate Contract to get the array of net positions of the user
-// @returns positions_array_len - Length of the array
-// @returns positions_array - Required array of positions
-@view
-func get_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    positions_array_len: felt, positions_array: PositionDetailsWithMarket*
-) {
-    alloc_locals;
-
-    let (positions_array: PositionDetailsWithMarket*) = alloc();
-    let (collateral_array_len_) = collateral_array_len.read();
-    return populate_positions_collaterals_recurse(
-        positions_array_len_=0,
-        positions_array_=positions_array,
-        collateral_array_iterator_=0,
-        collateral_array_len_=collateral_array_len_,
-    );
 }
 
 // @notice Function called by Trading Contract
