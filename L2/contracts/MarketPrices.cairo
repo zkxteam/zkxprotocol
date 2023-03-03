@@ -1,7 +1,9 @@
 %lang starknet
 
+from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_nn, assert_not_zero
+from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import AdminAuth_INDEX, ManageMarkets_ACTION, Market_INDEX, Trading_INDEX
@@ -54,9 +56,38 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 @view
 func get_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt
-) -> (market_price: MarketPrice) {
-    let (res) = market_prices.read(id=market_id_);
-    return (market_price=res);
+) -> (market_price: felt) {
+    // Get registry and version of the Authorized Registry
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get the address of the market contract
+    let (market_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    // Get the market ttl from the market contract
+    let (market_ttl: felt) = IMarkets.get_ttl_from_market(
+        contract_address=market_address, market_id_=market_id_
+    );
+
+    // Get market price structure of the specified market id
+    let (market_price: MarketPrice) = market_prices.read(market_id_);
+
+    // Calculate the timestamp
+    let (current_timestamp) = get_block_timestamp();
+    let ttl = market_ttl;
+    let timestamp = market_price.timestamp;
+    let time_difference = current_timestamp - timestamp;
+
+    let status = is_le(time_difference, ttl);
+    // ttl has passed, return 0
+    if (status == FALSE) {
+        return (0,);
+    } else {
+        let price = market_price.price;
+        return (price,);
+    }
 }
 
 // ////////////

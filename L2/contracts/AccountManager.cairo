@@ -29,7 +29,6 @@ from contracts.Constants import (
     LONG,
     Market_INDEX,
     MarketPrices_INDEX,
-    OPEN,
     SHORT,
     Trading_INDEX,
     WithdrawalFeeBalance_INDEX,
@@ -42,7 +41,6 @@ from contracts.DataTypes import (
     CollateralBalance,
     LiquidatablePosition,
     Market,
-    MarketPrice,
     OrderRequest,
     PositionDetails,
     PositionDetailsForRiskManagement,
@@ -1360,8 +1358,6 @@ func withdraw{
     with_attr error_message("AccountManager: Amount cannot be negative") {
         assert_nn(amount_);
     }
-    // get L2 Account contract address
-    let (user_l2_address) = get_contract_address();
     // Update the fees to be paid by user in withdrawal fee balance contract
     let (withdrawal_fee_balance_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=WithdrawalFeeBalance_INDEX, version=version
@@ -1610,7 +1606,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         market_id=curr_market_id, direction=SHORT
     );
 
-    let (market_price: MarketPrice) = IMarketPrices.get_market_price(
+    let (market_price: felt) = IMarketPrices.get_market_price(
         contract_address=market_prices_address_, id=curr_market_id
     );
     let (market: Market) = IMarkets.get_market(
@@ -1619,20 +1615,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     let (asset: Asset) = IAsset.get_asset(contract_address=asset_address_, id=market.asset);
 
-    // Get the market ttl from the market contract
-    let (market_ttl: felt) = IMarkets.get_ttl_from_market(
-        contract_address=market_address_, market_id_=curr_market_id
-    );
-
-    // Calculate the timestamp
-    let (current_timestamp) = get_block_timestamp();
-    let ttl = market_ttl;
-    let timestamp = market_price.timestamp;
-    let time_difference = current_timestamp - timestamp;
-
-    // ttl has passed, return 0
-    let status = is_le(time_difference, ttl);
-    if (status == FALSE) {
+    if (market_price == 0) {
         return (
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
@@ -1652,8 +1635,6 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     local short_asset_price;
     local short_collateral_ratio;
 
-    local current_least_collateral_ratio;
-
     let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
     if (is_long_zero == TRUE) {
         assert long_collateral_ratio = 1;
@@ -1669,14 +1650,14 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         let (pnl, maintanence_requirement, collateral_ratio) = get_risk_parameters_position(
             position=long_position,
             direction_=LONG,
-            market_price_=market_price.price,
+            market_price_=market_price,
             market_address_=market_address_,
             market_id_=curr_market_id,
         );
 
         assert long_collateral_ratio = collateral_ratio;
         assert long_maintanence_requirement = maintanence_requirement;
-        assert long_asset_price = market_price.price;
+        assert long_asset_price = market_price;
         assert long_pnl = pnl;
 
         tempvar syscall_ptr = syscall_ptr;
@@ -1703,14 +1684,14 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         let (pnl, maintanence_requirement, collateral_ratio) = get_risk_parameters_position(
             position=long_position,
             direction_=SHORT,
-            market_price_=market_price.price,
+            market_price_=market_price,
             market_address_=market_address_,
             market_id_=curr_market_id,
         );
 
         assert short_collateral_ratio = collateral_ratio;
         assert short_maintanence_requirement = maintanence_requirement;
-        assert short_asset_price = market_price.price;
+        assert short_asset_price = market_price;
         assert short_pnl = pnl;
 
         tempvar syscall_ptr = syscall_ptr;
@@ -1753,7 +1734,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
-        assert new_least_collateral_ratio_position_asset_price = market_price.price;
+        assert new_least_collateral_ratio_position_asset_price = market_price;
 
         if (is_le(long_collateral_ratio, short_collateral_ratio) == 1) {
             assert new_least_collateral_ratio = long_collateral_ratio;
@@ -1820,20 +1801,20 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     let (market_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Market_INDEX, version=version
     );
-    let (market_price: MarketPrice) = IMarketPrices.get_market_price(
+    let (market_price: felt) = IMarketPrices.get_market_price(
         contract_address=market_price_address, id=least_collateral_ratio_position_.market_id
     );
 
     let (min_leverage_times_margin) = Math64x61_mul(
         TWO_POINT_FIVE, least_collateral_ratio_position_.margin_amount
     );
-    let (new_size) = Math64x61_div(min_leverage_times_margin, market_price.price);
+    let (new_size) = Math64x61_div(min_leverage_times_margin, market_price);
 
     // calculate account value and maintenance requirement of least collateral position before reducing size
     // AV = (size * current_price) - borrowed_amount
     // MR = req_margin * size * avg_execution_price
     let (account_value_initial_temp) = Math64x61_mul(
-        least_collateral_ratio_position_.position_size, market_price.price
+        least_collateral_ratio_position_.position_size, market_price
     );
     let (account_value_initial) = Math64x61_sub(
         account_value_initial_temp, least_collateral_ratio_position_.borrowed_amount
@@ -1850,14 +1831,12 @@ func get_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     );
 
     // calculate account value and maintenance requirement of least collateral position after reducing size
-    let (account_value_after_temp) = Math64x61_mul(new_size, market_price.price);
-    let (ratio_of_position) = Math64x61_div(
-        new_size, least_collateral_ratio_position_.position_size
-    );
+    let (account_value_after_temp) = Math64x61_mul(new_size, market_price);
+    
     let (amount_to_be_sold) = Math64x61_sub(
         least_collateral_ratio_position_.position_size, new_size
     );
-    let (amount_to_be_sold_value) = Math64x61_mul(amount_to_be_sold, market_price.price);
+    let (amount_to_be_sold_value) = Math64x61_mul(amount_to_be_sold, market_price);
     let (new_borrowed_amount) = Math64x61_sub(
         least_collateral_ratio_position_.borrowed_amount, amount_to_be_sold_value
     );

@@ -2,25 +2,19 @@
 
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
-from starkware.starknet.common.syscalls import get_block_timestamp
 
-from contracts.Constants import Asset_INDEX, LONG, Market_INDEX, MarketPrices_INDEX
+from contracts.Constants import Asset_INDEX, LONG, Market_INDEX
 from contracts.DataTypes import (
     Asset,
     LiquidatablePosition,
-    Market,
-    MarketPrice,
     MultipleOrder,
-    PositionDetails,
     PositionDetailsForRiskManagement,
 )
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
-from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import (
     Math64x61_div,
@@ -28,7 +22,6 @@ from contracts.Math_64x61 import (
     Math64x61_mul,
     Math64x61_add,
     Math64x61_sub,
-    Math64x61_ONE,
     Math64x61_round,
 )
 
