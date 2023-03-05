@@ -333,7 +333,6 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (initial_margin_sum) = margin_locked.read(asset_id=asset_id_);
 
     if (markets_array_len == 0) {
-        // ToDo: Appropiate return
         return (
             is_liquidation=0,
             total_margin=collateral_balance,
@@ -391,7 +390,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     // Compute available margin of the given collateral
     let (available_margin) = Math64x61_sub(total_margin, total_initial_margin_sum);
 
-    let is_liquidation = is_le(available_margin, maintenance_margin_requirement);
+    let is_liquidation = is_le(total_margin, maintenance_margin_requirement);
     // Return the computed values
     return (
         is_liquidation,
@@ -1620,6 +1619,17 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         );
     }
 
+    if(market_price.price == 0){
+        return (
+            unrealized_pnl_sum=0,
+            maintenance_margin_requirement=0,
+            least_collateral_ratio=1,
+            least_collateral_ratio_position=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+            least_collateral_ratio_position_asset_price=0,
+        );
+    }
+    
+
     local long_maintanence_requirement;
     local long_pnl;
     local long_asset_price;
@@ -2495,3 +2505,4 @@ func check_for_withdrawal_replay{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     return check_for_withdrawal_replay(request_id_, arr_len_ - 1);
 }
+

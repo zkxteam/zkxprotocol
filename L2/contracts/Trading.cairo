@@ -556,7 +556,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         size=order_size_,
         execution_price_=execution_price_,
         margin_amount_=margin_order_value,
-    );
+     );
 
     assert user_available_balance = available_margin;
     assert order_id = order_.order_id;
@@ -745,14 +745,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         assert margin_amount_close = margin_amount_close_felt;
         margin_amount_open_64x61 = margin_amount_to_be_reduced;
 
-        // Deduct the fee from account contract
-        IAccountManager.transfer_from(
-            contract_address=order_.user_address,
-            assetID_=collateral_id_,
-            amount_=margin_amount_to_be_reduced,
-            invoked_for_='holding',
-        );
-
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -893,6 +885,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     amount_=abs_value(pnl),
                     invoked_for_='holding',
                 );
+               
             } else {
                 IAccountManager.transfer(
                     contract_address=order_.user_address,
