@@ -668,7 +668,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     local borrowed_amount_close;
     local average_execution_price_close;
     local realized_pnl;
-    local margin_unlock_amount;
     // To be passed as arguments to error_message
     local order_id;
     local order_direction;
@@ -718,7 +717,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Calculate the amount that needs to be returned to liquidity fund
     let (ratio_of_position) = Math64x61_div(order_size_, current_position.position_size);
     let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, ratio_of_position);
-    let (margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
+    let (local margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
     local margin_amount_open_64x61;
 
     // Calculate new values for margin and borrowed amounts
@@ -727,8 +726,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         let (borrowed_amount_close_felt) = Math64x61_sub(borrowed_amount, leveraged_amount_out);
         assert borrowed_amount_close = borrowed_amount_close_felt;
 
-        // No margin is unlocked in AccountManager
-        assert margin_unlock_amount = 0;
         // New margin amount of the position
         margin_amount_close = margin_amount;
         margin_amount_open_64x61 = 0;
@@ -746,9 +743,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         // New margin amount of the position
         let (margin_amount_close_felt) = Math64x61_sub(margin_amount, margin_amount_to_be_reduced);
         assert margin_amount_close = margin_amount_close_felt;
-
-        // Margin amount to be unlocked in AccountManager
-        assert margin_unlock_amount = margin_amount_to_be_reduced;
         margin_amount_open_64x61 = margin_amount_to_be_reduced;
 
         // Deduct the fee from account contract
@@ -874,6 +868,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             tempvar range_check_ptr = range_check_ptr;
         }
 
+        // Retrieve locked_margin from the user account
+        let (total_amount_to_transfer_from) = Math64x61_add(amount_to_transfer_from, margin_amount_to_be_reduced);
         IAccountManager.transfer_from(
             contract_address=order_.user_address,
             assetID_=collateral_id_,
@@ -890,12 +886,21 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     } else {
         // If it's not a liquidation order
         if (is_le(order_.order_type, 3) == 1) {
-            IAccountManager.transfer(
-                contract_address=order_.user_address,
-                assetID_=collateral_id_,
-                amount_=margin_plus_pnl,
-                invoked_for_='holding',
-            );
+            if(is_le(pnl, 0) == 1){
+                IAccountManager.transfer_from(
+                    contract_address=order_.user_address,
+                    assetID_=collateral_id_,
+                    amount_=abs_value(pnl),
+                    invoked_for_='holding',
+                );
+            } else {
+                IAccountManager.transfer(
+                    contract_address=order_.user_address,
+                    assetID_=collateral_id_,
+                    amount_=pnl,
+                    invoked_for_='holding',
+                );
+            }
 
             realized_pnl = pnl;
             tempvar syscall_ptr = syscall_ptr;
@@ -909,6 +914,13 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     asset_id_=collateral_id_,
                     amount=margin_plus_pnl,
                     position_id_=order_.order_id,
+                );
+
+                IAccountManager.transfer_from(
+                    contract_address=order_.user_address,
+                    assetID_=collateral_id_,
+                    amount_=margin_amount_to_be_reduced,
+                    invoked_for_='holding',
                 );
 
                 let (signed_realized_pnl) = Math64x61_mul(margin_plus_pnl, NEGATIVE_ONE);
@@ -936,7 +948,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         margin_amount_close,
         borrowed_amount_close,
         realized_pnl,
-        margin_unlock_amount,
+        margin_amount_to_be_reduced,
     );
 }
 
