@@ -753,9 +753,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     );
     assert [trader_stats_list_] = element;
 
-    // Check if the position is to be liquidated
-    let not_liquidation = is_le(order_.order_type, 3);
-
     // Deduct funds from holding contract
     IHolding.withdraw(
         contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_amount_out
