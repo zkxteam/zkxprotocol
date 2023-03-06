@@ -74,6 +74,7 @@ from contracts.Math_64x61 import (
     Math64x61_round,
     Math64x61_sub,
     Math64x61_toDecimalFelt,
+    Math64x61_ONE,
 )
 
 // ////////////
@@ -290,7 +291,7 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func get_locked_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     assetID_: felt
 ) -> (res: felt) {
-    let (res) = locked_margin.read(assetID=assetID_);
+    let (res) = margin_locked.read(asset_id=assetID_);
     return (res=res);
 }
 
@@ -1700,7 +1701,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     } else {
         // Get risk parameters of the position
         let (pnl, maintanence_requirement, collateral_ratio) = get_risk_parameters_position(
-            position=long_position,
+            position=short_position,
             direction_=SHORT,
             market_price_=market_price.price,
             market_address_=market_address_,
@@ -1755,8 +1756,12 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     let (new_unrealized_pnl_sum_temp) = Math64x61_add(unrealized_pnl_sum_, short_pnl);
     let (new_unrealized_pnl_sum) = Math64x61_add(new_unrealized_pnl_sum_temp, long_pnl);
 
-    let (new_maintenance_margin_requirement_temp) = Math64x61_add(maintenance_margin_requirement_, short_maintanence_requirement);
-    let (new_maintenance_margin_requirement) = Math64x61_add(new_maintenance_margin_requirement_temp, long_maintanence_requirement);
+    let (new_maintenance_margin_requirement_temp) = Math64x61_add(
+        maintenance_margin_requirement_, short_maintanence_requirement
+    );
+    let (new_maintenance_margin_requirement) = Math64x61_add(
+        new_maintenance_margin_requirement_temp, long_maintanence_requirement
+    );
 
     return get_margin_info_recurse(
         collateral_id_=collateral_id_,

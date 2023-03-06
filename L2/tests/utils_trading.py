@@ -758,6 +758,7 @@ class User:
                 unrealized_pnl_sum += pnl
                 long_collateral_ratio = (
                     long_position["margin_amount"] + pnl) / (long_position["position_size"] * market_price)
+                print("long_collateral_ratio", long_collateral_ratio)
 
             if short_position["position_size"] != 0:
                 total_maintenance_margin_requirement += short_position["avg_execution_price"] * \
@@ -767,6 +768,7 @@ class User:
                 unrealized_pnl_sum += pnl
                 short_collateral_ratio = (
                     short_position["margin_amount"] + pnl) / (short_position["position_size"] * market_price)
+                print("short_collateral_ratio", short_collateral_ratio)
 
             if least_collateral_ratio > long_collateral_ratio or least_collateral_ratio > short_collateral_ratio:
                 least_collateral_ratio_asset_price = market_price
@@ -1451,6 +1453,8 @@ async def get_user_balance(user: StarknetContract, asset_id: int) -> int:
     return from64x61(user_query.result.res)
 
 # Get the locked balance of the required user in decimals
+
+
 async def get_user_locked_margin(user: StarknetContract, asset_id: int) -> int:
     user_query = await user.get_locked_margin(assetID_=asset_id).call()
     return from64x61(user_query.result.res)
@@ -1534,9 +1538,10 @@ def get_user_balance_python(user: User, asset_id: int) -> float:
     return user.get_balance(asset_id)
 
 # Function to get the balance of a user from the python implementation
+
+
 def get_user_locked_margin_python(user: User, asset_id: int) -> float:
     return user.get_locked_margin(asset_id)
-
 
 
 # Function to get the balance of a fund from the python implementation
@@ -1758,7 +1763,7 @@ async def compare_user_balances(users: List[StarknetContract], user_tests: List[
         user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
         user_balance_python = get_user_balance_python(
             user=user_tests[i], asset_id=asset_id)
-        
+
         user_locked_margin = await get_user_locked_margin(user=users[i], asset_id=asset_id)
         user_locked_margin_python = get_user_locked_margin_python(
             user=user_tests[i], asset_id=asset_id)
@@ -2036,3 +2041,6 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 
 # print("Bob balances:",
 #       bob_test.get_locked_margin(), bob_test.get_balance())
+
+print(from64x61(32011658219928764176720741712))
+print(from64x61(1238201490315633884160))
