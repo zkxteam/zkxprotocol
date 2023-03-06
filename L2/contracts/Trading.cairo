@@ -16,6 +16,7 @@ from contracts.Constants import (
     AccountRegistry_INDEX,
     Asset_INDEX,
     BUY,
+    CLOSE,
     DELEVERAGING_ORDER,
     FeeBalance_INDEX,
     FoK,
@@ -30,6 +31,7 @@ from contracts.Constants import (
     Market_INDEX,
     MARKET_ORDER,
     MarketPrices_INDEX,
+    OPEN,
     SELL,
     TAKER,
     TradingFees_INDEX,
@@ -863,8 +865,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar range_check_ptr = range_check_ptr;
     } else {
         // If it's not a liquidation order
-        if (is_le(order_.order_type, 3) == 1) {
-            if(is_le(pnl, 0) == 1){
+        if (is_le(order_.order_type, 3) == TRUE) {
+            if(is_le(pnl, 0) == TRUE){
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
                     assetID_=collateral_id_,
@@ -902,7 +904,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     invoked_for_='holding',
                 );
 
-                let (signed_realized_pnl) = Math64x61_mul(margin_plus_pnl, NEGATIVE_ONE);
+                let (signed_realized_pnl) = Math64x61_mul(margin_amount_to_be_reduced, NEGATIVE_ONE);
                 realized_pnl = signed_realized_pnl;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1185,7 +1187,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // If yes, make the quantity_to_execute to be quantity_remaining
         // i.e Partial order
-        if (cmp_res == 1) {
+        if (cmp_res == TRUE) {
             assert quantity_to_execute = quantity_remaining;
 
             // If no, make quantity_to_execute to be the [request_list_].quantity
@@ -1447,9 +1449,9 @@ func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     side_or_direction_: felt
 ) -> (res: felt) {
-    if (side_or_direction_ == 1) {
-        return (res=2);
+    if (side_or_direction_ == OPEN) {
+        return (res=CLOSE);
     } else {
-        return (res=1);
+        return (res=OPEN);
     }
 }

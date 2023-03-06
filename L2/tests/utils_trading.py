@@ -1030,7 +1030,7 @@ class OrderExecutor:
                                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
                 user.modify_balance(
                     mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount)
-                realized_pnl = net_account_value*-1
+                realized_pnl = margin_unlock_amount*-1
             else:
                 realized_pnl = 0
 
@@ -2048,6 +2048,3 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 
 # print("Bob balances:",
 #       bob_test.get_locked_margin(), bob_test.get_balance())
-
-print(from64x61(32011658219928764176720741712))
-print(from64x61(1238201490315633884160))
