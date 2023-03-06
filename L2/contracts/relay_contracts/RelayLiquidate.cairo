@@ -60,43 +60,6 @@ func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 // External //
 // ///////////
 
-// @notice - All the following are mirror functions for Liquidate.cairo - just record call details and forward call
-@view
-func find_under_collateralized_position{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
-}(account_address: felt, collateral_id: felt) -> (
-    liq_result: felt,
-    least_collateral_ratio_position: PositionDetailsForRiskManagement,
-    total_account_value: felt,
-    total_maintenance_requirement: felt,
-    least_collateral_ratio_position_asset_price: felt,
-    least_collateral_ratio: felt,
-) {
-    alloc_locals;
-    let (inner_address) = get_inner_contract();
-
-    let (
-        liq_result: felt,
-        least_collateral_ratio_position: PositionDetailsForRiskManagement,
-        total_account_value: felt,
-        total_maintenance_requirement: felt,
-        least_collateral_ratio_position_asset_price: felt,
-        least_collateral_ratio: felt,
-    ) = ILiquidate.find_under_collateralized_position(
-        contract_address=inner_address,
-        account_address_=account_address,
-        collateral_id_=collateral_id,
-    );
-    return (
-        liq_result,
-        least_collateral_ratio_position,
-        total_account_value,
-        total_maintenance_requirement,
-        least_collateral_ratio_position_asset_price,
-        least_collateral_ratio,
-    );
-}
-
 @external
 func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder, size_: felt, execution_price_: felt, margin_amount_: felt

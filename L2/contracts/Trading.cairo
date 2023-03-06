@@ -8,11 +8,9 @@ from starkware.cairo.common.math import (
     assert_in_range,
     assert_le,
     assert_lt,
-    assert_nn,
     assert_not_zero,
 )
 from starkware.cairo.common.math_cmp import is_le
-from starkware.starknet.common.syscalls import get_block_timestamp
 
 from contracts.Constants import (
     AccountRegistry_INDEX,
@@ -32,9 +30,7 @@ from contracts.Constants import (
     Market_INDEX,
     MARKET_ORDER,
     MarketPrices_INDEX,
-    MasterAdmin_ACTION,
     SELL,
-    SHORT,
     TAKER,
     TradingFees_INDEX,
     TradingStats_INDEX,
@@ -42,10 +38,10 @@ from contracts.Constants import (
 from contracts.DataTypes import (
     Asset,
     Market,
-    MarketPrice,
     MultipleOrder,
     OrderRequest,
     PositionDetails,
+    PositionDetailsForRiskManagement,
     Signature,
     TraderStats,
 )
@@ -63,7 +59,6 @@ from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.CommonLibrary import CommonLib
-from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_assert_le,
@@ -155,9 +150,6 @@ func execute_batch{
 ) -> () {
     alloc_locals;
 
-    // Calculate the timestamp
-    let (current_timestamp) = get_block_timestamp();
-
     // Get all the addresses from the auth registry
     let (
         account_registry_address: felt,
@@ -192,8 +184,6 @@ func execute_batch{
     let (market: Market) = IMarkets.get_market(
         contract_address=market_address, market_id_=market_id_
     );
-
-    tempvar ttl = market.ttl;
 
     with_attr error_message("0509: {market_id_}") {
         assert_not_zero(market.is_tradable);
@@ -230,16 +220,12 @@ func execute_batch{
     );
 
     // Get Market price for the corresponding market Id
-    let (market_prices: MarketPrice) = IMarketPrices.get_market_price(
+    let (market_price: felt) = IMarketPrices.get_market_price(
         contract_address=market_prices_address, id=market_id_
     );
 
-    tempvar timestamp = market_prices.timestamp;
-    tempvar time_difference = current_timestamp - timestamp;
-    let status = is_le(time_difference, ttl);
-
     // update market price
-    if (status == FALSE) {
+    if (market_price == 0) {
         IMarketPrices.update_market_price(
             contract_address=market_prices_address, id=market_id_, price=oracle_price_
         );
@@ -810,7 +796,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             unrealized_pnl_sum: felt,
             maintenance_margin_requirement: felt,
             least_collateral_ratio: felt,
-            least_collateral_ratio_position: PositionDetails,
+            least_collateral_ratio_position: PositionDetailsForRiskManagement,
             least_collateral_ratio_position_asset_price: felt,
         ) = IAccountManager.get_margin_info(
             contract_address=order_.user_address,
@@ -1009,7 +995,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local borrowed_amount;
     local margin_lock_update_amount;
     local average_execution_price;
-    local trader_stats_list: TraderStats*;
     local new_total_order_volume;
     local quantity_to_execute;
     local current_quantity_executed;

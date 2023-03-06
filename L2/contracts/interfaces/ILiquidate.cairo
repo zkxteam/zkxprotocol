@@ -12,16 +12,6 @@ namespace ILiquidate {
     func return_maintenance() -> (res: felt) {
     }
 
-    func find_under_collateralized_position(account_address_: felt, collateral_id_: felt) -> (
-        liq_result: felt,
-        least_collateral_ratio_position: PositionDetailsForRiskManagement,
-        total_account_value: felt,
-        total_maintenance_requirement: felt,
-        least_collateral_ratio_position_asset_price: felt,
-        least_collateral_ratio: felt,
-    ) {
-    }
-
     // External functions
 
     func check_for_risk(order_: MultipleOrder, size: felt, execution_price_: felt, margin_amount_:felt) -> (available_margin: felt){

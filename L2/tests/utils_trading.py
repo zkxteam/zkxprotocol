@@ -786,7 +786,14 @@ class User:
         print("npm", new_position_margin)
         available_margin = total_margin - initial_margin_sum - new_position_margin
         print("available margin", available_margin)
-        is_liquidation = total_margin <= total_maintenance_margin_requirement
+        is_liquidation = 0
+
+        if total_margin <= total_maintenance_margin_requirement:
+            if least_collateral_ratio_position["direction"] == order_direction["long"]:
+                if least_collateral_ratio_position["leverage"] != 1:
+                    is_liquidation = 1
+            else:
+                is_liquidation = 1
 
         return (
             is_liquidation,

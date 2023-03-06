@@ -124,6 +124,9 @@ struct PositionDetailsWithMarket {
     created_timestamp: felt,
     modified_timestamp: felt,
     realized_pnl: felt,
+    market_price: felt,
+    maintenance_margin: felt,
+    unrealized_pnl: felt,
 }
 
 // Struct to store the position that is to be Liquidated/Deleveraged
