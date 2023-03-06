@@ -283,6 +283,17 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return (res=res);
 }
 
+// @notice view function to get the locked balance of an asset
+// @param assetID_ - ID of an asset
+// @return res - balance of an asset
+@view
+func get_locked_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    assetID_: felt
+) -> (res: felt) {
+    let (res) = locked_margin.read(assetID=assetID_);
+    return (res=res);
+}
+
 // @notice view function to get the available margin of an asset
 // @param asset_id_ - ID of an asset
 // @return res - balance of an asset
@@ -369,10 +380,11 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     // If any of the position's ttl is outdated
     if (least_collateral_ratio_position_asset_price == 0) {
+        let (available_margin) = Math64x61_sub(collateral_balance, initial_margin_sum);
         return (
             is_liquidation=FALSE,
             total_margin=collateral_balance,
-            available_margin=collateral_balance - initial_margin_sum,
+            available_margin=available_margin,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
             least_collateral_ratio=1,
@@ -1619,7 +1631,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         );
     }
 
-    if(market_price.price == 0){
+    if (market_price.price == 0) {
         return (
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
@@ -1628,7 +1640,6 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             least_collateral_ratio_position_asset_price=0,
         );
     }
-    
 
     local long_maintanence_requirement;
     local long_pnl;
@@ -1741,6 +1752,12 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         }
     }
 
+    let (new_unrealized_pnl_sum_temp) = Math64x61_add(unrealized_pnl_sum_, short_pnl);
+    let (new_unrealized_pnl_sum) = Math64x61_add(new_unrealized_pnl_sum_temp, long_pnl);
+
+    let (new_maintenance_margin_requirement_temp) = Math64x61_add(maintenance_margin_requirement_, short_maintanence_requirement);
+    let (new_maintenance_margin_requirement) = Math64x61_add(new_maintenance_margin_requirement_temp, long_maintanence_requirement);
+
     return get_margin_info_recurse(
         collateral_id_=collateral_id_,
         iterator_=iterator_ + 1,
@@ -1749,9 +1766,8 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         market_address_=market_address_,
         market_prices_address_=market_prices_address_,
         collateral_token_decimal_=collateral_token_decimal_,
-        unrealized_pnl_sum_=unrealized_pnl_sum_ + short_pnl + long_pnl,
-        maintenance_margin_requirement_=maintenance_margin_requirement_ +
-        short_maintanence_requirement + long_maintanence_requirement,
+        unrealized_pnl_sum_=new_unrealized_pnl_sum,
+        maintenance_margin_requirement_=new_maintenance_margin_requirement,
         least_collateral_ratio=new_least_collateral_ratio,
         least_collateral_ratio_position=new_least_collateral_ratio_position,
         least_collateral_ratio_position_asset_price=new_least_collateral_ratio_position_asset_price,
@@ -2505,4 +2521,3 @@ func check_for_withdrawal_replay{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     return check_for_withdrawal_replay(request_id_, arr_len_ - 1);
 }
-

@@ -733,6 +733,9 @@ class User:
         except KeyError:
             return (0, user_balance, user_balance, 0, 0, 1, {0, 0, 0, 0, 0, 0, 0, 0}, 0)
 
+        if len(markets_list) == 0:
+            return (0, user_balance, user_balance, 0, 0, 1, {0, 0, 0, 0, 0, 0, 0, 0}, 0)
+
         for market in markets_list:
             market_price = order_executor.get_market_price(
                 market_id=market, timestamp=timestamp)
@@ -780,7 +783,7 @@ class User:
         print("ims", initial_margin_sum)
         print("npm", new_position_margin)
         available_margin = total_margin - initial_margin_sum - new_position_margin
-
+        print("available margin", available_margin)
         is_liquidation = total_margin <= total_maintenance_margin_requirement
 
         return (
@@ -883,8 +886,6 @@ class OrderExecutor:
         # Balance that the user must stake/pay
         balance_to_be_deducted = order_value_wo_leverage + fees
 
-        print(
-            "market", market_to_collateral_mapping[order["market_id"]], AssetID.USDC)
         (_, _, available_margin, _, _, _, _, _) = user.get_margin_info(
             order_executor=self, timestamp=timestamp, asset_id=market_to_collateral_mapping[
                 order["market_id"]])
@@ -1449,6 +1450,11 @@ async def get_user_balance(user: StarknetContract, asset_id: int) -> int:
     user_query = await user.get_balance(assetID_=asset_id).call()
     return from64x61(user_query.result.res)
 
+# Get the locked balance of the required user in decimals
+async def get_user_locked_margin(user: StarknetContract, asset_id: int) -> int:
+    user_query = await user.get_locked_margin(assetID_=asset_id).call()
+    return from64x61(user_query.result.res)
+
 
 # Convert a 64x61 array to decimals
 def convert_list_from_64x61(fixed_point_list: List[int]) -> List[float]:
@@ -1526,6 +1532,11 @@ def get_liquidatable_position_python(user_test: User, collateral_id: int) -> Lis
 # Function to get the balance of a user from the python implementation
 def get_user_balance_python(user: User, asset_id: int) -> float:
     return user.get_balance(asset_id)
+
+# Function to get the balance of a user from the python implementation
+def get_user_locked_margin_python(user: User, asset_id: int) -> float:
+    return user.get_locked_margin(asset_id)
+
 
 
 # Function to get the balance of a fund from the python implementation
@@ -1747,10 +1758,20 @@ async def compare_user_balances(users: List[StarknetContract], user_tests: List[
         user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
         user_balance_python = get_user_balance_python(
             user=user_tests[i], asset_id=asset_id)
+        
+        user_locked_margin = await get_user_locked_margin(user=users[i], asset_id=asset_id)
+        user_locked_margin_python = get_user_locked_margin_python(
+            user=user_tests[i], asset_id=asset_id)
+
         print("user_balance", user_balance)
         print("user_balance_python", user_balance_python)
+        print("user locked balance", user_locked_margin)
+        print("user locked balance python", user_locked_margin_python)
         assert user_balance_python == pytest.approx(
             user_balance, abs=1e-6)
+
+        assert user_locked_margin_python == pytest.approx(
+            user_locked_margin, abs=1e-6)
 
 
 # Compare user positions on starknet and python
@@ -1768,11 +1789,11 @@ async def compare_user_positions(users: List[StarknetContract], users_test: List
 
         print("user_position_python_long", user_position_python_long)
         print("user_position_starknet_long", user_position_starknet_long)
-        # for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
-        #     assert element_1 == pytest.approx(element_2, abs=1e-4)
+        for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
+            assert element_1 == pytest.approx(element_2, abs=1e-4)
 
-        # for element_1, element_2 in zip(user_position_python_short, user_position_starknet_short):
-        #     assert element_1 == pytest.approx(element_2, abs=1e-4)
+        for element_1, element_2 in zip(user_position_python_short, user_position_starknet_short):
+            assert element_1 == pytest.approx(element_2, abs=1e-4)
 
 
 # Compare fund balances of starknet and python
