@@ -282,6 +282,17 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     return (res=res);
 }
 
+// @notice view function to get the locked balance of an asset
+// @param assetID_ - ID of an asset
+// @return res - balance of an asset
+@view
+func get_locked_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    assetID_: felt
+) -> (res: felt) {
+    let (res) = margin_locked.read(asset_id=assetID_);
+    return (res=res);
+}
+
 // @notice view function to get the available margin of an asset
 // @param asset_id_ - ID of collateral asset
 // @param new_position_maintanence_requirement_ - maintenance requirement of new position, if any
@@ -341,7 +352,6 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (initial_margin_sum) = margin_locked.read(asset_id=asset_id_);
 
     if (markets_array_len == 0) {
-        // ToDo: Appropiate return
         return (
             is_liquidation=0,
             total_margin=collateral_balance,
@@ -1139,11 +1149,7 @@ func execute_order{
         // Calculate the new leverage if it's a deleveraging order
         local new_leverage;
 
-        // Get the current position details
-        let (current_position_details) = position_mapping.read(
-            market_id=market_id, direction=request.direction
-        );
-        let (new_position_size) = Math64x61_sub(current_position_details.position_size, size);
+        let (new_position_size) = Math64x61_sub(position_details.position_size, size);
 
         // Assert that the size amount can be closed from the existing position
         with_attr error_message("0003: {order_id} {size}") {
@@ -1207,13 +1213,13 @@ func execute_order{
                     assert liq_position.liquidatable = TRUE;
                 }
 
-                assert new_leverage = current_position_details.leverage;
+                assert new_leverage = position_details.leverage;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
         } else {
-            assert new_leverage = current_position_details.leverage;
+            assert new_leverage = position_details.leverage;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1255,7 +1261,7 @@ func execute_order{
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
-            let (current_pnl: felt) = Math64x61_add(current_position_details.realized_pnl, pnl);
+            let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
             let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
             let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
 
@@ -1266,7 +1272,7 @@ func execute_order{
                 margin_amount=margin_amount_rounded,
                 borrowed_amount=borrowed_amount_rounded,
                 leverage=new_leverage,
-                created_timestamp=current_position_details.created_timestamp,
+                created_timestamp=position_details.created_timestamp,
                 modified_timestamp=current_timestamp,
                 realized_pnl=current_pnl,
             );
@@ -1655,6 +1661,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         );
     }
 
+
     local long_maintanence_requirement;
     local long_pnl;
     local long_asset_price;
@@ -1712,7 +1719,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     } else {
         // Get risk parameters of the position
         let (pnl, maintanence_requirement, collateral_ratio) = get_risk_parameters_position(
-            position=long_position,
+            position=short_position,
             direction_=SHORT,
             market_price_=market_price,
             market_address_=market_address_,
@@ -1783,6 +1790,16 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         }
     }
 
+    let (new_unrealized_pnl_sum_temp) = Math64x61_add(unrealized_pnl_sum_, short_pnl);
+    let (new_unrealized_pnl_sum) = Math64x61_add(new_unrealized_pnl_sum_temp, long_pnl);
+
+    let (new_maintenance_margin_requirement_temp) = Math64x61_add(
+        maintenance_margin_requirement_, short_maintanence_requirement
+    );
+    let (new_maintenance_margin_requirement) = Math64x61_add(
+        new_maintenance_margin_requirement_temp, long_maintanence_requirement
+    );
+
     return get_margin_info_recurse(
         collateral_id_=collateral_id_,
         iterator_=iterator_ + 1,
@@ -1791,9 +1808,8 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         market_address_=market_address_,
         market_prices_address_=market_prices_address_,
         collateral_token_decimal_=collateral_token_decimal_,
-        unrealized_pnl_sum_=unrealized_pnl_sum_ + short_pnl + long_pnl,
-        maintenance_margin_requirement_=maintenance_margin_requirement_ +
-        short_maintanence_requirement + long_maintanence_requirement,
+        unrealized_pnl_sum_=new_unrealized_pnl_sum,
+        maintenance_margin_requirement_=new_maintenance_margin_requirement,
         least_collateral_ratio=new_least_collateral_ratio,
         least_collateral_ratio_position=new_least_collateral_ratio_position,
         least_collateral_ratio_position_asset_price=new_least_collateral_ratio_position_asset_price,

@@ -16,6 +16,7 @@ from contracts.Constants import (
     AccountRegistry_INDEX,
     Asset_INDEX,
     BUY,
+    CLOSE,
     DELEVERAGING_ORDER,
     FeeBalance_INDEX,
     FoK,
@@ -30,6 +31,7 @@ from contracts.Constants import (
     Market_INDEX,
     MARKET_ORDER,
     MarketPrices_INDEX,
+    OPEN,
     SELL,
     TAKER,
     TradingFees_INDEX,
@@ -542,7 +544,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         size=order_size_,
         execution_price_=execution_price_,
         margin_amount_=margin_order_value,
-    );
+     );
 
     assert user_available_balance = available_margin;
     assert order_id = order_.order_id;
@@ -654,7 +656,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     local borrowed_amount_close;
     local average_execution_price_close;
     local realized_pnl;
-    local margin_unlock_amount;
     // To be passed as arguments to error_message
     local order_id;
     local order_direction;
@@ -689,6 +690,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         let (actual_exexution_price_felt) = Math64x61_add(
             current_position.avg_execution_price, diff
         );
+
         assert actual_execution_price = actual_exexution_price_felt;
     }
 
@@ -703,26 +705,37 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Calculate the amount that needs to be returned to liquidity fund
     let (ratio_of_position) = Math64x61_div(order_size_, current_position.position_size);
     let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, ratio_of_position);
-    let (margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
+    let (local margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
     local margin_amount_open_64x61;
 
     // Calculate new values for margin and borrowed amounts
     if (order_.order_type == DELEVERAGING_ORDER) {
+        // In delevereaging, we only reduce borrowed field
         let (borrowed_amount_close_felt) = Math64x61_sub(borrowed_amount, leveraged_amount_out);
-        assert margin_unlock_amount = 0;
         assert borrowed_amount_close = borrowed_amount_close_felt;
+
+        // New margin amount of the position
         margin_amount_close = margin_amount;
         margin_amount_open_64x61 = 0;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
+        // New borrowed amount of the position
         let (borrowed_amount_close_felt) = Math64x61_sub(
             borrowed_amount, borrowed_amount_to_be_returned
         );
         assert borrowed_amount_close = borrowed_amount_close_felt;
 
+        // New margin amount of the position
         let (margin_amount_close_felt) = Math64x61_sub(margin_amount, margin_amount_to_be_reduced);
-        assert margin_unlock_amount = margin_amount_to_be_reduced;
         assert margin_amount_close = margin_amount_close_felt;
         margin_amount_open_64x61 = margin_amount_to_be_reduced;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
@@ -740,207 +753,139 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     );
     assert [trader_stats_list_] = element;
 
-    // Check if the position is to be liquidated
-    let not_liquidation = is_le(order_.order_type, 3);
-
     // Deduct funds from holding contract
     IHolding.withdraw(
         contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_amount_out
     );
 
-    // If it's just a close order
-    if (not_liquidation == TRUE) {
-        // If no leverage is used
-        // to64x61(1) == 2305843009213693952
-        if (current_position.leverage == LEVERAGE_ONE) {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            ILiquidityFund.deposit(
-                contract_address=liquidity_fund_address_,
-                asset_id_=collateral_id_,
-                amount=borrowed_amount_to_be_returned,
-                position_id_=order_.order_id,
-            );
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+    // If the position is leveraged, deposit the borrowed funds to Liquidity Fund
+    if (current_position.leverage != LEVERAGE_ONE) {
+        ILiquidityFund.deposit(
+            contract_address=liquidity_fund_address_,
+            asset_id_=collateral_id_,
+            amount=borrowed_amount_to_be_returned,
+            position_id_=order_.order_id,
+        );
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
 
-        // Check if the position is underwater
-        let (is_negative) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
+    tempvar syscall_ptr = syscall_ptr;
+    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    tempvar range_check_ptr = range_check_ptr;
 
-        if (is_negative == TRUE) {
-            // If yes, deduct the difference from user's balance; balance can go negative
-            let (amount_to_transfer_from) = Math64x61_sub(
-                borrowed_amount_to_be_returned, leveraged_amount_out
-            );
-            IAccountManager.transfer_from(
-                contract_address=order_.user_address,
-                assetID_=collateral_id_,
-                amount_=amount_to_transfer_from,
-                invoked_for_='holding',
-            );
+    // Check if the account value for the position is negative
+    let (is_underwater) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
 
-            // Get the user balance
-            let (
-                is_liquidation: felt,
-                total_margin: felt,
-                available_margin: felt,
-                unrealized_pnl_sum: felt,
-                maintenance_margin_requirement: felt,
-                least_collateral_ratio: felt,
-                least_collateral_ratio_position: PositionDetailsForRiskManagement,
-                least_collateral_ratio_position_asset_price: felt,
-            ) = IAccountManager.get_margin_info(
-                contract_address=order_.user_address,
-                asset_id_=collateral_id_,
-                new_position_maintanence_requirement_=0,
-                new_position_margin_=0,
-            );
+    if (is_underwater == TRUE) {
+        // If yes, deduct the difference from user's balance; balance can go negative
+        // Absolute value of the acc value
+        let amount_to_transfer_from = abs_value(margin_plus_pnl);
 
-            // Check if the user's balance can cover the deficit
-            let (balance_check) = Math64x61_is_le(
-                amount_to_transfer_from, available_margin, collateral_token_decimal_
+        let (
+            is_liquidation: felt,
+            total_margin: felt,
+            available_margin: felt,
+            unrealized_pnl_sum: felt,
+            maintenance_margin_requirement: felt,
+            least_collateral_ratio: felt,
+            least_collateral_ratio_position: PositionDetailsForRiskManagement,
+            least_collateral_ratio_position_asset_price: felt,
+        ) = IAccountManager.get_margin_info(
+            contract_address=order_.user_address,
+            asset_id_=collateral_id_,
+            new_position_maintanence_requirement_=0,
+            new_position_margin_=0,
+        );
+
+        // Check if the user's balance can cover the deficit
+        let (balance_check) = Math64x61_is_le(
+            amount_to_transfer_from, available_margin, collateral_token_decimal_
+        );
+        if (balance_check == FALSE) {
+            let (balance_less_than_zero_res) = Math64x61_is_le(
+                available_margin, 0, collateral_token_decimal_
             );
-            if (balance_check == FALSE) {
-                let (balance_less_than_zero_res) = Math64x61_is_le(
-                    available_margin, 0, collateral_token_decimal_
+            if (balance_less_than_zero_res == TRUE) {
+                IInsuranceFund.withdraw(
+                    contract_address=insurance_fund_address_,
+                    asset_id_=collateral_id_,
+                    amount=amount_to_transfer_from,
+                    position_id_=order_.order_id,
                 );
-                if (balance_less_than_zero_res == TRUE) {
-                    IInsuranceFund.withdraw(
-                        contract_address=insurance_fund_address_,
-                        asset_id_=collateral_id_,
-                        amount=amount_to_transfer_from,
-                        position_id_=order_.order_id,
-                    );
-                    tempvar syscall_ptr = syscall_ptr;
-                    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                    tempvar range_check_ptr = range_check_ptr;
-                } else {
-                    let (deduct_from_insurance) = Math64x61_sub(
-                        amount_to_transfer_from, available_margin
-                    );
-                    IInsuranceFund.withdraw(
-                        contract_address=insurance_fund_address_,
-                        asset_id_=collateral_id_,
-                        amount=deduct_from_insurance,
-                        position_id_=order_.order_id,
-                    );
-                    tempvar syscall_ptr = syscall_ptr;
-                    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                    tempvar range_check_ptr = range_check_ptr;
-                }
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             } else {
+                let (deduct_from_insurance) = Math64x61_sub(
+                    amount_to_transfer_from, available_margin
+                );
+                IInsuranceFund.withdraw(
+                    contract_address=insurance_fund_address_,
+                    asset_id_=collateral_id_,
+                    amount=deduct_from_insurance,
+                    position_id_=order_.order_id,
+                );
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
-
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
-            // If not, transfer the remaining to user
-            IAccountManager.transfer(
-                contract_address=order_.user_address,
-                assetID_=collateral_id_,
-                amount_=pnl,
-                invoked_for_='holding',
-            );
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
-        realized_pnl = pnl;
+
+        // Retrieve locked_margin from the user account
+        let (total_amount_to_transfer_from) = Math64x61_add(amount_to_transfer_from, margin_amount_to_be_reduced);
+        IAccountManager.transfer_from(
+            contract_address=order_.user_address,
+            assetID_=collateral_id_,
+            amount_=amount_to_transfer_from,
+            invoked_for_='holding',
+        );
+
+        let (signed_realized_pnl) = Math64x61_mul(amount_to_transfer_from, NEGATIVE_ONE);
+        realized_pnl = signed_realized_pnl;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
-        // Liquidation order
-        if (order_.order_type == LIQUIDATION_ORDER) {
-            // Return the borrowed fund to the Liquidity fund
-            ILiquidityFund.deposit(
-                contract_address=liquidity_fund_address_,
-                asset_id_=collateral_id_,
-                amount=borrowed_amount_to_be_returned,
-                position_id_=order_.order_id,
-            );
-
-            // Check if the account value for the position is negative
-            let (is_negative) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
-
-            if (is_negative == TRUE) {
-                // Absolute value of the acc value
-                let deficit = abs_value(margin_plus_pnl);
-
-                // Get the user balance
-                let (
-                    is_liquidation: felt,
-                    total_margin: felt,
-                    available_margin: felt,
-                    unrealized_pnl_sum: felt,
-                    maintenance_margin_requirement: felt,
-                    least_collateral_ratio: felt,
-                    least_collateral_ratio_position: PositionDetailsForRiskManagement,
-                    least_collateral_ratio_position_asset_price: felt,
-                ) = IAccountManager.get_margin_info(
-                    contract_address=order_.user_address,
-                    asset_id_=collateral_id_,
-                    new_position_maintanence_requirement_=0,
-                    new_position_margin_=0,
-                );
-
-                // Transfer the deficit from user balance. User balance can go negative
+        // If it's not a liquidation order
+        if (is_le(order_.order_type, 3) == TRUE) {
+            if(is_le(pnl, 0) == TRUE){
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
                     assetID_=collateral_id_,
-                    amount_=deficit,
-                    invoked_for_='liquidation',
+                    amount_=abs_value(pnl),
+                    invoked_for_='holding',
                 );
-
-                let (balance_check) = Math64x61_is_le(
-                    deficit, available_margin, collateral_token_decimal_
-                );
-                if (balance_check == TRUE) {
-                    realized_pnl = margin_plus_pnl;
-                    tempvar syscall_ptr = syscall_ptr;
-                    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                    tempvar range_check_ptr = range_check_ptr;
-                } else {
-                    // Transfer the remaining amount from Insurance Fund
-                    let (balance_less_than_zero_res) = Math64x61_is_le(
-                        available_margin, 0, collateral_token_decimal_
-                    );
-                    if (balance_less_than_zero_res == TRUE) {
-                        IInsuranceFund.withdraw(
-                            contract_address=insurance_fund_address_,
-                            asset_id_=collateral_id_,
-                            amount=deficit,
-                            position_id_=order_.order_id,
-                        );
-                    } else {
-                        let (difference) = Math64x61_sub(deficit, available_margin);
-                        IInsuranceFund.withdraw(
-                            contract_address=insurance_fund_address_,
-                            asset_id_=collateral_id_,
-                            amount=difference,
-                            position_id_=order_.order_id,
-                        );
-                    }
-
-                    let (realized_pnl_) = Math64x61_add(available_margin, margin_amount);
-                    let (signed_realized_pnl_) = Math64x61_mul(realized_pnl_, NEGATIVE_ONE);
-                    realized_pnl = signed_realized_pnl_;
-                    tempvar syscall_ptr = syscall_ptr;
-                    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                    tempvar range_check_ptr = range_check_ptr;
-                }
+               
             } else {
+                IAccountManager.transfer(
+                    contract_address=order_.user_address,
+                    assetID_=collateral_id_,
+                    amount_=pnl,
+                    invoked_for_='holding',
+                );
+            }
+
+            realized_pnl = pnl;
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            if (order_.order_type == LIQUIDATION_ORDER) {
                 // Deposit the user's remaining margin in Insurance Fund
                 IInsuranceFund.deposit(
                     contract_address=insurance_fund_address_,
@@ -949,31 +894,30 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     position_id_=order_.order_id,
                 );
 
-                realized_pnl = margin_amount;
+                IAccountManager.transfer_from(
+                    contract_address=order_.user_address,
+                    assetID_=collateral_id_,
+                    amount_=margin_amount_to_be_reduced,
+                    invoked_for_='holding',
+                );
+
+                let (signed_realized_pnl) = Math64x61_mul(margin_amount_to_be_reduced, NEGATIVE_ONE);
+                realized_pnl = signed_realized_pnl;
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                realized_pnl = 0;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
-        } else {
-            // Deleveraging order
-            with_attr error_message("Wrong order type passed") {
-                assert order_.order_type = DELEVERAGING_ORDER;
-            }
-            // Return the borrowed fund to the Liquidity fund
-            ILiquidityFund.deposit(
-                contract_address=liquidity_fund_address_,
-                asset_id_=collateral_id_,
-                amount=leveraged_amount_out,
-                position_id_=order_.order_id,
-            );
-
-            realized_pnl = pnl;
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
 
@@ -982,7 +926,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         margin_amount_close,
         borrowed_amount_close,
         realized_pnl,
-        margin_unlock_amount,
+        margin_amount_to_be_reduced,
     );
 }
 
@@ -1240,7 +1184,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // If yes, make the quantity_to_execute to be quantity_remaining
         // i.e Partial order
-        if (cmp_res == 1) {
+        if (cmp_res == TRUE) {
             assert quantity_to_execute = quantity_remaining;
 
             // If no, make quantity_to_execute to be the [request_list_].quantity
@@ -1502,9 +1446,9 @@ func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     side_or_direction_: felt
 ) -> (res: felt) {
-    if (side_or_direction_ == 1) {
-        return (res=2);
+    if (side_or_direction_ == OPEN) {
+        return (res=CLOSE);
     } else {
-        return (res=1);
+        return (res=OPEN);
     }
 }
