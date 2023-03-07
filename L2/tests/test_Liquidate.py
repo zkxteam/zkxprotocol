@@ -376,10 +376,6 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
     #################################################
     ######## Alice's liquidation result USDC ########
     #################################################
-    alice_margin_info = await alice.get_margin_info(AssetID.USDC, 0, 0).call()
-    print("alice_margin_info", alice_margin_info.result)
-    market_prices = await marketPrices.get_market_price(BTC_USD_ID).call()
-    print("market prices:", market_prices.result)
     await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
@@ -415,6 +411,10 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
     }]
 
     # execute order
+    alice_info = await alice.get_margin_info(AssetID.USDC, 0, 0).call()
+    print("Alice info: ", alice_info.result) 
+    bob_info = await bob.get_margin_info(AssetID.USDC, 0, 0).call()
+    print("Bob info: ", bob_info.result)
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp)
 
     # compare

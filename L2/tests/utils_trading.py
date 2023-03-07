@@ -1496,7 +1496,7 @@ def set_balance_python(user_test: User, asset_id: int, new_balance: float):
 def mark_under_collateralized_position_python(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, List, int, int]:
     result = liquidator.mark_under_collateralized_position(
         user=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
-    return (result[0], list(result[1].values())[:10], result[2], result[3])
+    return (result[0], list(result[1].values())[:5], result[2], result[3])
 
 # Get safe withdrawal amount for python implementation
 def get_safe_amount_to_withdraw_python(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[float, float]:
