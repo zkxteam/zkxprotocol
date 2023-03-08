@@ -353,10 +353,11 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (initial_margin_sum) = margin_locked.read(asset_id=asset_id_);
 
     if (markets_array_len == 0) {
+        let (available_margin) = Math64x61_sub(collateral_balance, new_position_margin_);
         return (
             is_liquidation=0,
             total_margin=collateral_balance,
-            available_margin=collateral_balance,
+            available_margin=available_margin,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
             least_collateral_ratio=1,
@@ -393,9 +394,9 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
             is_liquidation=FALSE,
             total_margin=collateral_balance,
             available_margin=collateral_balance - initial_margin_sum,
-            unrealized_pnl_sum=unrealized_pnl_sum,
-            maintenance_margin_requirement=maintenance_margin_requirement,
-            least_collateral_ratio=least_collateral_ratio,
+            unrealized_pnl_sum=0,
+            maintenance_margin_requirement=0,
+            least_collateral_ratio=MATH64x61_ONE,
             least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
             least_collateral_ratio_position_asset_price=0,
         );
