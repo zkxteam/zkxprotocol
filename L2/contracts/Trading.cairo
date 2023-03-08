@@ -11,6 +11,7 @@ from starkware.cairo.common.math import (
     assert_not_zero,
 )
 from starkware.cairo.common.math_cmp import is_le
+from starkware.starknet.common.syscalls import emit_event
 
 from contracts.Constants import (
     AccountRegistry_INDEX,
@@ -81,15 +82,6 @@ const NEGATIVE_ONE = 36185027886661312136973227830950701056231072153315966999707
 const FIFTEEN_PERCENTAGE = 34587645138205409280;
 const HUNDRED = 230584300921369395200;
 const TWO = 4611686018427387904;
-
-// /////////
-// Events //
-// /////////
-
-// Event emitted whenever a trade is executed for a user
-@event
-func trade_execution(size: felt, execution_price: felt, maker_direction: felt) {
-}
 
 // //////////
 // Storage //
@@ -544,7 +536,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         size=order_size_,
         execution_price_=execution_price_,
         margin_amount_=margin_order_value,
-     );
+    );
 
     assert user_available_balance = available_margin;
     assert order_id = order_.order_id;
@@ -559,7 +551,8 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // Deduct the fee from account contract
     IAccountManager.transfer_from(
         contract_address=order_.user_address,
-        assetID_=collateral_id_,
+        asset_id_=collateral_id_,
+        market_id_=0,
         amount_=fees,
         invoked_for_='fee',
     );
@@ -846,10 +839,13 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         }
 
         // Retrieve locked_margin from the user account
-        let (total_amount_to_transfer_from) = Math64x61_add(amount_to_transfer_from, margin_amount_to_be_reduced);
+        let (total_amount_to_transfer_from) = Math64x61_add(
+            amount_to_transfer_from, margin_amount_to_be_reduced
+        );
         IAccountManager.transfer_from(
             contract_address=order_.user_address,
-            assetID_=collateral_id_,
+            asset_id_=collateral_id_,
+            market_id_=market_id_,
             amount_=amount_to_transfer_from,
             invoked_for_='holding',
         );
@@ -863,18 +859,19 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     } else {
         // If it's not a liquidation order
         if (is_le(order_.order_type, 3) == TRUE) {
-            if(is_le(pnl, 0) == TRUE){
+            if (is_le(pnl, 0) == TRUE) {
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
-                    assetID_=collateral_id_,
+                    asset_id_=collateral_id_,
+                    market_id_=market_id_,
                     amount_=abs_value(pnl),
                     invoked_for_='holding',
                 );
-               
             } else {
                 IAccountManager.transfer(
                     contract_address=order_.user_address,
-                    assetID_=collateral_id_,
+                    asset_id_=collateral_id_,
+                    market_id_=market_id_,
                     amount_=pnl,
                     invoked_for_='holding',
                 );
@@ -896,12 +893,15 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
-                    assetID_=collateral_id_,
+                    asset_id_=collateral_id_,
+                    market_id_=market_id_,
                     amount_=margin_amount_to_be_reduced,
                     invoked_for_='holding',
                 );
 
-                let (signed_realized_pnl) = Math64x61_mul(margin_amount_to_be_reduced, NEGATIVE_ONE);
+                let (signed_realized_pnl) = Math64x61_mul(
+                    margin_amount_to_be_reduced, NEGATIVE_ONE
+                );
                 realized_pnl = signed_realized_pnl;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1161,6 +1161,17 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // Set the current side as taker
         assert current_order_side = TAKER;
 
+        // Emit the event
+        let (keys: felt*) = alloc();
+        assert keys[0] = 'trade_execution';
+        assert keys[1] = market_id_;
+        let (data: felt*) = alloc();
+        assert data[0] = quantity_to_execute;
+        assert data[1] = [request_list_].price;
+        assert data[2] = [request_list_].direction;
+
+        emit_event(2, keys, 3, data);
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
@@ -1221,13 +1232,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // Set the current side as maker
         assert current_order_side = MAKER;
-
-        // Emit the event
-        trade_execution.emit(
-            size=quantity_to_execute,
-            execution_price=[request_list_].price,
-            maker_direction=[request_list_].direction,
-        );
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;

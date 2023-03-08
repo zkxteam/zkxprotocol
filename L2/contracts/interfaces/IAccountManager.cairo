@@ -84,7 +84,7 @@ namespace IAccountManager {
     func update_withdrawal_history(request_id_: felt) {
     }
 
-    func transfer_from(assetID_: felt, amount_: felt, invoked_for_: felt) -> () {
+    func transfer_from(asset_id_: felt, market_id_: felt, amount_: felt, invoked_for_: felt) -> () {
     }
 
     func transfer_from_abr(
@@ -107,7 +107,7 @@ namespace IAccountManager {
     ) {
     }
 
-    func transfer(assetID_: felt, amount_: felt, invoked_for_: felt) -> () {
+    func transfer(asset_id_: felt, market_id_: felt, amount_: felt, invoked_for_: felt) -> () {
     }
 
     func liquidate_position(
