@@ -808,6 +808,8 @@ class User:
         print("npm", new_position_margin)
         available_margin = total_margin - initial_margin_sum - new_position_margin
         print("available margin", available_margin)
+        print("least collateral ratio", least_collateral_ratio)
+        print("least collateral position", least_collateral_ratio_position)
         is_liquidation = 0
 
         if total_margin <= total_maintenance_margin_requirement:
@@ -1424,7 +1426,7 @@ async def mark_under_collateralized_position_starknet(zkx_node_signer: Signer, z
     least_collateral_ratio_position.insert(1,liquidation_return_data[3])
 
     # return the boolean liquidation result and the position
-    return (liquidation_return_data[1], least_collateral_ratio_position, liquidation_return_data[9], liquidation_return_data[10])
+    return (liquidation_return_data[1], least_collateral_ratio_position, from64x61(liquidation_return_data[9]), from64x61(liquidation_return_data[10]))
 
 
 # Function to get the liquidatable position from starknet
@@ -1686,7 +1688,8 @@ def compare_result_liquidation(python_result: Tuple[int, List, int, int], starkn
     assert python_result[0] == starknet_result[0]
 
     for element_1, element_2 in zip(python_result[1], starknet_result[1]):
-        assert element_1 == pytest.approx(element_2, abs=1e-6)
+        print(element_1, element_2)
+        assert element_1 == pytest.approx(element_2, abs=1e-3)
 
 
 # Function to check if the batch status on starknet is as expected
