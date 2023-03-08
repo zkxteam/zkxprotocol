@@ -1101,12 +1101,12 @@ class OrderExecutor:
                     print("Post Only order cannot be a taker")
                     return
 
-                if request_list[i]["time_in_force"] == 2:
+                if request_list[i]["time_in_force"] == order_time_in_force["fill_or_kill"]:
                     if request_list[i]["quantity"] != quantity_locked:
                         print("F&K must be executed fully")
                     return
 
-                if request_list[i]["order_type"] == 1:
+                if request_list[i]["order_type"] == order_types["market"]:
                     if request_list[i]["slippage"] < 0:
                         print("Slippage cannot be negative")
                         return

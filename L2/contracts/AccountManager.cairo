@@ -645,8 +645,10 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         total_maintenance_requirement: felt,
         least_collateral_ratio: felt,
         least_collateral_ratio_position: PositionDetailsForRiskManagement,
-        least_collateral_ratio_position_asset_price: felt
-    ) = get_margin_info(asset_id_=collateral_id_, new_position_maintanence_requirement_=0, new_position_margin_=0);
+        least_collateral_ratio_position_asset_price: felt,
+    ) = get_margin_info(
+        asset_id_=collateral_id_, new_position_maintanence_requirement_=0, new_position_margin_=0
+    );
 
     // if TMR == 0, it means that market price is not within TTL, so user should be possible to withdraw whole balance
     if (total_maintenance_requirement == 0) {
@@ -1661,7 +1663,6 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         );
     }
 
-
     local long_maintanence_requirement;
     local long_pnl;
     local long_asset_price;
@@ -1765,7 +1766,8 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     if (is_le_least_short * is_le_least_long == 1) {
         assert new_least_collateral_ratio = least_collateral_ratio;
         assert new_least_collateral_ratio_position = least_collateral_ratio_position;
-        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price;
+        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price
+            ;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;

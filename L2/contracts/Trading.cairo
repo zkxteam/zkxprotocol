@@ -191,6 +191,16 @@ func execute_batch{
         assert_not_zero(market.is_tradable);
     }
 
+    let (maker_execution_sizes: felt*) = alloc();
+
+    let (final_quantity_locked: felt, taker_execution_size: felt) = adjust_quantity_locked(
+        request_list_len_=request_list_len_,
+        request_list_=request_list_,
+        quantity_locked_=quantity_locked_,
+        maker_execution_sizes_=maker_execution_sizes_,
+        iterator_=0,
+    );
+
     // Recursively loop through the orders in the batch
     let (taker_execution_price: felt, open_interest: felt) = check_and_execute(
         quantity_locked_=quantity_locked_,
@@ -267,6 +277,118 @@ func execute_batch{
 // ///////////
 // Internal //
 // ///////////
+
+func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    request_: MultipleOrder, quantity_remaining_: felt
+) -> (taker_execution_size: felt) {
+    // Get the portion executed of the order
+    let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
+        contract_address=user_address, order_id_=order_id
+    );
+
+    // Get min of remaining quantity and the order quantity
+    let (executable_quantity: felt) = Math64x61_sub(request_.quantity, order_portion_executed);
+    let (cmp_res) = Math64x61_is_le(quantity_remaining_, executable_quantity, asset_token_decimal_);
+
+    local quantity_to_execute;
+    local quantity_to_execute_final;
+    // If yes, make the quantity_to_execute to be quantity_remaining
+    // i.e Partial order
+    if (cmp_res == TRUE) {
+        assert quantity_to_execute = quantity_remaining;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        assert quantity_to_execute = executable_quantity;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    with_attr error_message("0520: {order_id} {quantity_remaining}") {
+        assert_not_zero(quantity_to_execute);
+    }
+
+    if (request_.side == CLOSE) {
+        // Get order details
+        let (position_details: PositionDetails) = IAccountManager.get_position_data(
+            contract_address=request_.user_address,
+            market_id_=market_id_,
+            direction_=order_.direction,
+        );
+
+        if (Math64x61_is_le(quantity_to_execute, position_details.position_size) == 0) {
+            quantity_to_execute_final = position_details.position_size;
+        } else {
+            quantity_to_execute_final = quantity_to_execute;
+        }
+    } else {
+        quantity_to_execute_final = quantity_to_execute;
+    }
+
+    return (quantity_to_execute_final);
+}
+
+func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    request_list_len_: felt,
+    request_list_: MultipleOrder*,
+    maker_execution_sizes_: felt,
+    taker_locked_quantity_: felt,
+    quantity_executed_: felt,
+    iterator_: felt,
+) -> (maker_quantity_to_execute: felt) {
+    // Reached the end of maker orders
+    if (request_list_len_ == 1) {
+        return quantity_executed_;
+    }
+    // Find quantity left to be executed
+    let (quantity_remaining) = Math64x61_sub(taker_locked_quantity_, quantity_executed_);
+    // Find quantity that needs to be executed for the current ordet
+    let (quantity_to_execute) = get_quantity_to_execute(
+        request_=[request_list_], quantity_remaining_=quantity_remaining
+    );
+
+    // ToDO: Check if the last value is 0 and handle accordingly
+    maker_execution_sizes_[iterator] = quantity_to_execute;
+
+    // New quantity executed
+    let (quantity_executed_new) = Math64x61_add(quantity_to_execute, quantity_executed_);
+    return get_maker_sizes(
+        request_list_len_=request_list_len_ - 1,
+        request_list_=request_list_ + SIZE(MultipleOrder),
+        maker_execution_sizes_=maker_execution_sizes_,
+        taker_locked_quantity_=taker_locked_quantity_,
+        quantity_executed_=quantity_executed_new,
+        iterator=iterator + 1,
+    );
+}
+
+func adjust_quantity_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    request_list_len_: felt,
+    request_list_: MultipleOrder*,
+    quantity_locked_: felt,
+    maker_execution_sizes_: felt*,
+    iterator_: felt,
+) -> (new_quantity_locked: felt) {
+    let (last_index) = request_list_len_ - 1;
+    let (taker_quantity_to_execute) = get_quantity_to_execute(
+        request_=request_list[last_index], quantity_locked_=quantity_locked_
+    );
+
+    let (maker_quantity_to_execute) = get_maker_sizes(
+        request_list_len_=request_list_len_,
+        request_list_=request_list_,
+        maker_execution_sizes_=maker_execution_sizes_,
+        taker_locked_quantity_=taker_quantity_to_execute,
+        quantity_executed_=0,
+        iterstor_=0,
+    );
+
+    return maker_quantity_to_execute;
+}
 
 // @notice Internal function to check to check the slippage of a market order
 // @param order_id_ - Order ID of the order
@@ -494,7 +616,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         contract_address=trading_fees_address_, address_=order_.user_address, side_=side_
     );
 
-    // Get order details
+    // Get position details
     let (position_details: PositionDetails) = IAccountManager.get_position_data(
         contract_address=order_.user_address, market_id_=market_id_, direction_=order_.direction
     );
@@ -544,7 +666,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         size=order_size_,
         execution_price_=execution_price_,
         margin_amount_=margin_order_value,
-     );
+    );
 
     assert user_available_balance = available_margin;
     assert order_id = order_.order_id;
@@ -846,7 +968,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         }
 
         // Retrieve locked_margin from the user account
-        let (total_amount_to_transfer_from) = Math64x61_add(amount_to_transfer_from, margin_amount_to_be_reduced);
+        let (total_amount_to_transfer_from) = Math64x61_add(
+            amount_to_transfer_from, margin_amount_to_be_reduced
+        );
         IAccountManager.transfer_from(
             contract_address=order_.user_address,
             assetID_=collateral_id_,
@@ -863,14 +987,13 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     } else {
         // If it's not a liquidation order
         if (is_le(order_.order_type, 3) == TRUE) {
-            if(is_le(pnl, 0) == TRUE){
+            if (is_le(pnl, 0) == TRUE) {
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
                     assetID_=collateral_id_,
                     amount_=abs_value(pnl),
                     invoked_for_='holding',
                 );
-               
             } else {
                 IAccountManager.transfer(
                     contract_address=order_.user_address,
@@ -901,7 +1024,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     invoked_for_='holding',
                 );
 
-                let (signed_realized_pnl) = Math64x61_mul(margin_amount_to_be_reduced, NEGATIVE_ONE);
+                let (signed_realized_pnl) = Math64x61_mul(
+                    margin_amount_to_be_reduced, NEGATIVE_ONE
+                );
                 realized_pnl = signed_realized_pnl;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
