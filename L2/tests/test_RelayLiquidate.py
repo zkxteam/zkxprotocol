@@ -515,7 +515,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     BTC_market_price_query_starknet = await marketPrices.get_market_price(
         market_id_1).call()
     BTC_market_price = from64x61(
-        BTC_market_price_query_starknet.result.market_price.price)
+        BTC_market_price_query_starknet.result.market_price)
 
     BTC_market_price_python = python_executor.get_market_price(
         market_id=market_id_1, timestamp=timestamp_1)
@@ -539,7 +539,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     BTC_market_price_query_starknet = await marketPrices.get_market_price(
         market_id_1).call()
     BTC_market_price = from64x61(
-        BTC_market_price_query_starknet.result.market_price.price)
+        BTC_market_price_query_starknet.result.market_price)
 
     BTC_market_price_python = python_executor.get_market_price(
         market_id=market_id_1, timestamp=timestamp_2)
@@ -656,7 +656,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     BTC_market_price_query_starknet = await marketPrices.get_market_price(
         market_id_1).call()
     BTC_market_price = from64x61(
-        BTC_market_price_query_starknet.result.market_price.price)
+        BTC_market_price_query_starknet.result.market_price)
 
     BTC_market_price_python = python_executor.get_market_price(
         market_id=market_id_1, timestamp=timestamp_3)
@@ -688,7 +688,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     BTC_market_price_query_starknet = await marketPrices.get_market_price(
         market_id_1).call()
     BTC_market_price = from64x61(
-        BTC_market_price_query_starknet.result.market_price.price)
+        BTC_market_price_query_starknet.result.market_price)
 
     BTC_market_price_python = python_executor.get_market_price(
         market_id=market_id_1, timestamp=timestamp_4)
