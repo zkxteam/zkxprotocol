@@ -917,6 +917,52 @@ class OrderExecutor:
         print(margin_amount)
         return (average_execution_price, margin_amount, borrowed_amount, trading_fees, order_value_wo_leverage)
 
+    def __get_quantity_to_execute(self, request: Dict, user: User, quantity_remaining: float, side: int) -> float:
+        quantity_to_execute = 0
+        quantity_to_execute_final = 0
+
+        if side == order_side["maker"]:
+            order_portion_executed = user.get_portion_executed(
+                order_id=request["order_id"])
+            executable_quantity = request["quantity"] - \
+                order_portion_executed
+
+            if quantity_remaining < executable_quantity:
+                quantity_to_execute = quantity_remaining
+            else:
+                quantity_to_execute = executable_quantity
+        else:
+            quantity_to_execute = quantity_remaining
+
+        if request['side'] == 2:
+            position = user.get_position(
+                market_id=request["market_id"], direction=request["direction"])
+
+            if quantity_to_execute <= position["position_size"]:
+                quantity_to_execute_final = quantity_to_execute
+            else:
+                quantity_to_execute_final = position["position_size"]
+        else:
+            quantity_to_execute_final = quantity_to_execute
+
+        return quantity_to_execute_final
+
+    def __adjust_quantity_locked(self, request_list: List[Dict], users_list: List[User], quantity_locked: float) -> Tuple[float, List[float]]:
+        taker_quantity_to_execute = self.__get_quantity_to_execute(
+            request=request_list[-1:][0], user=users_list[-1:][0], quantity_remaining=quantity_locked, side=order_side["taker"])
+        print("taker_quantity_to_execute",
+              taker_quantity_to_execute, quantity_locked)
+        maker_execution_sizes = []
+        quantity_executed = 0
+        for i in range(len(request_list) - 1):
+            quantity_to_execute = self.__get_quantity_to_execute(
+                request=request_list[i], user=users_list[i], quantity_remaining=taker_quantity_to_execute - quantity_executed, side=order_side["maker"])
+            maker_execution_sizes.append(quantity_to_execute)
+
+            quantity_executed += quantity_to_execute
+
+        return (quantity_executed, maker_execution_sizes)
+
     def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, timestamp: int) -> Tuple[float, float, float, float, float]:
 
         # Get the user position
@@ -1083,9 +1129,14 @@ class OrderExecutor:
         running_weighted_sum = 0
         quantity_executed = 0
 
+        (new_quantity_locked, maker_execution_sizes) = self.__adjust_quantity_locked(
+            request_list=request_list, users_list=user_list, quantity_locked=quantity_locked)
+        print("adjusted size", new_quantity_locked)
+        print("maker_execution_sizes", maker_execution_sizes)
+
         for i in range(len(request_list)):
             print("order id:", i)
-            quantity_remaining = quantity_locked - quantity_executed
+            quantity_remaining = new_quantity_locked - quantity_executed
             quantity_to_execute = 0
             execution_price = 0
             margin_amount = 0
@@ -1102,7 +1153,7 @@ class OrderExecutor:
                     return
 
                 if request_list[i]["time_in_force"] == order_time_in_force["fill_or_kill"]:
-                    if request_list[i]["quantity"] != quantity_locked:
+                    if request_list[i]["quantity"] != new_quantity_locked:
                         print("F&K must be executed fully")
                     return
 
@@ -1115,8 +1166,8 @@ class OrderExecutor:
                     print("Slippage cannot be > 15")
                     return
 
-                quantity_to_execute = quantity_locked
-                execution_price = running_weighted_sum/quantity_locked
+                quantity_to_execute = new_quantity_locked
+                execution_price = running_weighted_sum/new_quantity_locked
 
                 if request_list[i]["order_type"] == order_types["market"]:
                     threshold = (
@@ -2048,3 +2099,89 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 
 # print("Bob balances:",
 #       bob_test.get_locked_margin(), bob_test.get_balance())
+
+
+##########################################
+### Testing for adjust quantity locked ###
+##########################################
+
+# initialize users
+python_executor = OrderExecutor()
+alice_test = User(123456789987654323, 2)
+bob_test = User(123456789987654324, 1)
+charlie_test = User(123456789987654325, 3)
+dave_test = User(123456789987654326, 4)
+
+# Set balances
+alice_test.set_balance(
+    new_balance=100000, asset_id=market_to_collateral_mapping[BTC_USD_ID])
+bob_test.set_balance(
+    new_balance=100000, asset_id=market_to_collateral_mapping[BTC_USD_ID])
+charlie_test.set_balance(
+    new_balance=100000, asset_id=market_to_collateral_mapping[BTC_USD_ID])
+
+# Test open long-short positions
+(alice_long, _) = alice_test.create_order(leverage=5, quantity=1.5)
+print(alice_long)
+
+(bob_short, _) = bob_test.create_order(
+    direction=order_direction["short"], leverage=5, quantity=1.5)
+print(bob_short)
+
+python_executor.execute_batch(
+    1,
+    [alice_long, bob_short],
+    [alice_test, bob_test],
+    1.5,
+    BTC_USD_ID,
+    1000,
+    100
+)
+
+# Test open long-short positions
+(alice_long, _) = alice_test.create_order(
+    leverage=5, quantity=1.5)
+print(alice_long)
+
+(bob_short, _) = bob_test.create_order(
+    direction=order_direction["short"], leverage=5, quantity=1.5)
+print(bob_short)
+
+python_executor.execute_batch(
+    1,
+    [alice_long, bob_short],
+    [alice_test, bob_test],
+    1.6,
+    BTC_USD_ID,
+    1000,
+    100
+)
+
+
+# Test close long-short positions
+(alice_long, _) = alice_test.create_order(
+    leverage=5, quantity=1.8, side=side["sell"]
+)
+
+(charlie_short, _) = charlie_test.create_order(
+    leverage=5, quantity=2, direction=order_direction["short"]
+)
+
+(dave_short, _) = charlie_test.create_order(
+    leverage=5, quantity=2, direction=order_direction["short"]
+)
+
+(bob_short, _) = bob_test.create_order(
+    direction=order_direction["short"], leverage=5, quantity=4, side=side["sell"]
+)
+print(bob_short)
+
+python_executor.execute_batch(
+    1,
+    [alice_long, charlie_short, dave_short, bob_short],
+    [alice_test, charlie_test, dave_test, bob_test],
+    4,
+    BTC_USD_ID,
+    1000,
+    100
+)

@@ -313,7 +313,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
-        
+
         local order_id;
         local quantity_remaining;
         assert order_id = request_.order_id;
