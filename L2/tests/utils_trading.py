@@ -1082,8 +1082,8 @@ class OrderExecutor:
         try:
             if self.market_prices[market_id]["timestamp"] + self.ttl < timestamp:
                 print(
-                    "Details: ", self.market_prices[market_id]["timestamp"], self.ttl, timestamp)
-                print("Price: ", self.market_prices[market_id]["price"])
+                    "Market price Details: ", self.market_prices[market_id]["timestamp"], self.ttl, timestamp)
+                print("Market Price: ", self.market_prices[market_id]["price"])
                 return 0
             else:
                 return self.market_prices[market_id]["price"]
