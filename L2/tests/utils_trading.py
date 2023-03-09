@@ -720,7 +720,7 @@ class User:
         unrealized_pnl_sum = 0
         total_maintenance_margin_requirement = new_position_maintanence_requirement
         least_collateral_ratio = 1
-        least_collateral_ratio_position = {}
+        least_collateral_ratio_position = {"market_id": 0,"direction": 0,"avg_execution_price": 0, "position_size": 0, "margin_amount": 0, "borrowed_amount": 0,"leverage": 0}
         least_collateral_ratio_asset_price = 0
         print("user balance:", user_balance)
         total_margin = user_balance

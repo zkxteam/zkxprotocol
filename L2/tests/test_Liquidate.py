@@ -1085,7 +1085,6 @@ async def test_should_calculate_correct_liq_USDC_collateral_4(adminAuth_factory)
     ###################################################
     await set_asset_price_by_trading(starknet_service=starknet_service, admin=admin1, trading=trading, python_executor=python_executor, new_timestamp=timestamp_6,  gary=gary,
                                      felix=felix, gary_test=gary_test, felix_test=felix_test, market_id=market_id_1, collateral_id=collateral_id_1, price=150)
-    
     await set_asset_price_by_trading(starknet_service=starknet_service, admin=admin1, trading=trading, python_executor=python_executor, new_timestamp=timestamp_6,  gary=gary,
                                      felix=felix, gary_test=gary_test, felix_test=felix_test, market_id=BTC_USD_ID, collateral_id=collateral_id_1, price=7500)
 
