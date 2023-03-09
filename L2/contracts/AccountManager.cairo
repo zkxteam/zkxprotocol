@@ -1579,6 +1579,10 @@ func get_risk_parameters_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     );
     let (maintenance_requirement) = Math64x61_mul(req_margin, maintenance_position);
 
+    if (market_price_ == 0) {
+        return (0, maintenance_requirement, 0);
+    }
+
     // Calculate pnl to check if it is the least collateralized position
     local price_diff_;
     if (direction_ == LONG) {
