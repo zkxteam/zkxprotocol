@@ -846,7 +846,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             contract_address=order_.user_address,
             asset_id_=collateral_id_,
             market_id_=market_id_,
-            amount_=amount_to_transfer_from,
+            amount_=total_amount_to_transfer_from,
             invoked_for_='holding',
         );
 

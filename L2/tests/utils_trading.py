@@ -689,6 +689,7 @@ class User:
 
     def get_safe_amount_to_withdraw(self, liquidator: 'Liquidator', order_executor: 'OrderExecutor', collateral_id: int, timestamp: int) -> Tuple[float, float]:
         current_balance = self.get_balance(collateral_id)
+        print("collateral balance:", current_balance)
         if current_balance <= 0:
             return (0, 0)
 
