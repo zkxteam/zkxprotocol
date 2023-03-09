@@ -741,7 +741,7 @@ class User:
         for market in markets_list:
             market_price = order_executor.get_market_price(
                 market_id=market, timestamp=timestamp)
-            print("market price, ", market, market_price)
+            print("market price in get_margin_info, ", market, market_price)
 
             if market_price == 0:
                 return (0, user_balance, user_balance - initial_margin_sum, 0, 0, 1, {0, 0, 0, 0, 0, 0, 0}, 0)

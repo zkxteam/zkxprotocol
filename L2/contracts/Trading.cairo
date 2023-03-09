@@ -1167,7 +1167,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert keys[1] = market_id_;
         let (data: felt*) = alloc();
         assert data[0] = quantity_to_execute;
-        assert data[1] = [request_list_].price;
+        assert data[1] = execution_price;
         assert data[2] = [request_list_].direction;
 
         emit_event(2, keys, 3, data);
