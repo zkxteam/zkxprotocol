@@ -80,7 +80,6 @@ from contracts.Math_64x61 import (
 // ////////////
 
 const TWO_POINT_FIVE = 5764607523034234880;
-const MATH64x61_ONE = 2305843009213693952;
 
 // /////////
 // Events //
@@ -383,7 +382,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         collateral_token_decimal_=collateral.token_decimal,
         unrealized_pnl_sum_=0,
         maintenance_margin_requirement_=new_position_maintanence_requirement_,
-        least_collateral_ratio=MATH64x61_ONE,
+        least_collateral_ratio=Math64x61_ONE,
         least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_asset_price=0,
     );
@@ -396,7 +395,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
             available_margin=collateral_balance - initial_margin_sum,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
-            least_collateral_ratio=MATH64x61_ONE,
+            least_collateral_ratio=Math64x61_ONE,
             least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
             least_collateral_ratio_position_asset_price=0,
         );
@@ -1310,7 +1309,7 @@ func execute_order{
     assert data[0] = order_id;
     assert data[1] = market_id;
     assert data[2] = request.direction;
-    assert data[3] = request.quantity;
+    assert data[3] = size;
     assert data[4] = request.order_type;
     assert data[5] = request.side;
     assert data[6] = execution_price;
@@ -1666,7 +1665,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         return (
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
-            least_collateral_ratio=MATH64x61_ONE,
+            least_collateral_ratio=Math64x61_ONE,
             least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
             least_collateral_ratio_position_asset_price=0,
         );
@@ -1684,7 +1683,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
     if (is_long_zero == TRUE) {
-        assert long_collateral_ratio = MATH64x61_ONE;
+        assert long_collateral_ratio = Math64x61_ONE;
         assert long_maintanence_requirement = 0;
         assert long_asset_price = 0;
         assert long_pnl = 0;
@@ -1718,7 +1717,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
     if (is_short_zero == TRUE) {
-        assert short_collateral_ratio = MATH64x61_ONE;
+        assert short_collateral_ratio = Math64x61_ONE;
         assert short_maintanence_requirement = 0;
         assert short_asset_price = 0;
         assert short_pnl = 0;
