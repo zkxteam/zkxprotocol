@@ -2168,3 +2168,5 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 #     1000,
 #     100
 # )
+
+print(from64x61(2305843009213693952))
