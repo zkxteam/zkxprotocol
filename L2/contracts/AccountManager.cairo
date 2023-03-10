@@ -201,13 +201,15 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ///////
 
 // @notice view function to get public key
-// @return res - public key of an account
+// @return pub_key - public key of an account
+// @return auth_reg_addr - Authorized registry address
 @view
 func get_public_key{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    res: felt
+    pub_key: felt, auth_reg_addr: felt
 ) {
-    let (res) = public_key.read();
-    return (res=res);
+    let (pub_key) = public_key.read();
+    let (registry) = CommonLib.get_registry_address();
+    return (pub_key=pub_key, auth_reg_addr=registry);
 }
 
 // @notice view function to check if the transaction signature is valid

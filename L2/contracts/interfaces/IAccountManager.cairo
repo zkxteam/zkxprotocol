@@ -39,7 +39,7 @@ namespace IAccountManager {
     func get_portion_executed(order_id_: felt) -> (res: felt) {
     }
 
-    func get_public_key() -> (res: felt) {
+    func get_public_key() -> (pub_key: felt, auth_reg_addr: felt) {
     }
 
     func return_array_collaterals() -> (array_list_len: felt, array_list: CollateralBalance*) {
