@@ -1227,50 +1227,6 @@ async def test_revert_if_invalid_batch_extra_maker_orders(trading_test_initializ
 
 
 @pytest.mark.asyncio
-async def test_revert_if_insufficient_maker_orders(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
-
-    ###################
-    ### Open orders ##
-    ###################
-    # List of users
-    users = [alice, bob, charlie]
-    users_test = [alice_test, bob_test, charlie_test]
-
-    # Insufficient balance for users
-    alice_balance = 10000
-    bob_balance = 10000
-    charlie_balance = 10000
-    balance_array = [alice_balance, bob_balance, charlie_balance]
-
-    # Batch params for OPEN orders
-    quantity_locked_1 = 2
-    market_id_1 = BTC_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 1000
-
-    # Set balance in Starknet & Python
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-    # Create orders
-    orders_1 = [{
-        "quantity": 0.5,
-        "order_type": order_types["limit"]
-    }, {
-        "quantity": 0.5,
-        "order_type": order_types["limit"]
-    }, {
-        "quantity": 1,
-        "direction": order_direction["short"],
-        "order_type": order_types["limit"]
-    }]
-
-    error_at_index = 2
-    # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0514:", error_at_index=error_at_index, param_2=error_at_index)
-
-
-@pytest.mark.asyncio
 async def test_revert_if_invalid_batch_extra_taker_orders(trading_test_initializer):
     _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
@@ -1430,6 +1386,7 @@ async def test_revert_if_maker_order_is_market(trading_test_initializer):
     error_at_index = 0
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0518:", error_at_index=error_at_index, param_2=error_at_index)
+
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders(trading_test_initializer):

@@ -944,7 +944,7 @@ class OrderExecutor:
 
         return quantity_to_execute_final
 
-    def __adjust_quantity_locked(self, request_list: List[Dict], users_list: List[User], quantity_locked: float) -> Tuple[float, List[float]]:
+    def __adjust_quantity_locked(self, request_list: List[Dict], users_list: List[User], quantity_locked: float) -> Tuple[List[float]]:
         taker_quantity_to_execute = self.__get_quantity_to_execute(
             request=request_list[-1:][0], user=users_list[-1:][0], quantity_remaining=quantity_locked, side=order_side["taker"])
         print("taker_quantity_to_execute",
@@ -957,8 +957,9 @@ class OrderExecutor:
             maker_execution_sizes.append(quantity_to_execute)
 
             quantity_executed += quantity_to_execute
+        maker_execution_sizes.append(quantity_executed)
 
-        return (quantity_executed, maker_execution_sizes)
+        return (maker_execution_sizes)
 
     def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, timestamp: int) -> Tuple[float, float, float, float, float]:
 
@@ -1125,9 +1126,9 @@ class OrderExecutor:
         # Store the quantity executed so far
         running_weighted_sum = 0
 
-        (new_quantity_locked, maker_execution_sizes) = self.__adjust_quantity_locked(
+        (maker_execution_sizes) = self.__adjust_quantity_locked(
             request_list=request_list, users_list=user_list, quantity_locked=quantity_locked)
-        print("adjusted size", new_quantity_locked)
+        print("adjusted size", maker_execution_sizes[-1:])
         print("maker_execution_sizes", maker_execution_sizes)
 
         for i in range(len(request_list)):
@@ -1146,7 +1147,7 @@ class OrderExecutor:
                     return
 
                 if request_list[i]["time_in_force"] == order_time_in_force["fill_or_kill"]:
-                    if request_list[i]["quantity"] != new_quantity_locked:
+                    if request_list[i]["quantity"] != maker_execution_sizes[i]:
                         print("F&K must be executed fully")
                     return
 
@@ -1159,7 +1160,7 @@ class OrderExecutor:
                     print("Slippage cannot be > 15")
                     return
 
-                execution_price = running_weighted_sum/new_quantity_locked
+                execution_price = running_weighted_sum/maker_execution_sizes[i]
 
                 if request_list[i]["order_type"] == order_types["market"]:
                     threshold = (
@@ -1178,12 +1179,12 @@ class OrderExecutor:
                             print("Bad short limit order")
                             return
                 trade_side = order_side["taker"]
-                quantity_to_execute = new_quantity_locked
+                quantity_to_execute = maker_execution_sizes[i]
             else:
                 quantity_to_execute = maker_execution_sizes[i]
 
                 if quantity_to_execute == 0:
-                    print("skipping 0 size order")
+                    print("skipping 0 size order: ", i)
                     continue
                 execution_price = request_list[i]["price"]
 
@@ -1746,8 +1747,8 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
             actual_error_message = error_message
         execution_info = await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
     else:
-        executor.execute_batch(*execute_batch_params_python)
         execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
+        executor.execute_batch(*execute_batch_params_python)
     return (batch_id, complete_orders_python, execution_info)
 
 
@@ -2084,9 +2085,9 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 #       bob_test.get_locked_margin(), bob_test.get_balance())
 
 
-# ##########################################
-# ### Testing for adjust quantity locked ###
-# ##########################################
+##########################################
+### Testing for adjust quantity locked ###
+##########################################
 
 # # initialize users
 # python_executor = OrderExecutor()
@@ -2168,5 +2169,3 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 #     1000,
 #     100
 # )
-
-print(from64x61(2305843009213693952))
