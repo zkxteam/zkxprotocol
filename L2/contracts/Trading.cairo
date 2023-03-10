@@ -178,9 +178,8 @@ func execute_batch{
     // Get collateral to fetch number of token decimals of a collateral
     let (collateral: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id);
 
-    // Initialize trader_stats_list and executed_size arrays
+    // Initialize trader_stats_list
     let (trader_stats_list: TraderStats*) = alloc();
-    let (executed_sizes_list: felt*) = alloc();
 
     // Get the market details
     let (market: Market) = IMarkets.get_market(
@@ -189,6 +188,10 @@ func execute_batch{
 
     with_attr error_message("0509: {market_id_}") {
         assert_not_zero(market.is_tradable);
+    }
+
+    with_attr error_message("0550: {market_id_}") {
+        assert_not_zero(quantity_locked_);
     }
 
     let (maker_execution_sizes: felt*) = alloc();
@@ -204,7 +207,7 @@ func execute_batch{
 
     // Recursively loop through the orders in the batch
     let (taker_execution_price: felt, open_interest: felt) = check_and_execute(
-        quantity_locked_=quantity_locked_,
+        quantity_locked_=final_quantity_locked,
         market_id_=market_id_,
         collateral_id_=collateral_id,
         asset_token_decimal_=asset.token_decimal,
@@ -225,11 +228,11 @@ func execute_batch{
         maker1_direction_=[request_list].direction,
         maker1_side_=[request_list].side,
         trader_stats_list_=trader_stats_list,
-        executed_sizes_list_=executed_sizes_list,
         total_order_volume_=0,
         taker_execution_price=0,
         open_interest_=0,
         oracle_price_=oracle_price_,
+        maker_execution_sizes_=maker_execution_sizes,
     );
 
     // Get Market price for the corresponding market Id
@@ -255,19 +258,19 @@ func execute_batch{
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     tempvar range_check_ptr = range_check_ptr;
 
-    // Record TradingStats
-    ITradingStats.record_trade_batch_stats(
-        contract_address=trading_stats_address,
-        market_id_=market_id_,
-        execution_price_64x61_=taker_execution_price,
-        request_list_len=request_list_len,
-        request_list=request_list,
-        trader_stats_list_len=request_list_len,
-        trader_stats_list=trader_stats_list,
-        executed_sizes_list_len=request_list_len,
-        executed_sizes_list=executed_sizes_list,
-        open_interest_=open_interest,
-    );
+    // // Record TradingStats
+    // ITradingStats.record_trade_batch_stats(
+    //     contract_address=trading_stats_address,
+    //     market_id_=market_id_,
+    //     execution_price_64x61_=taker_execution_price,
+    //     request_list_len=request_list_len,
+    //     request_list=request_list,
+    //     trader_stats_list_len=request_list_len,
+    //     trader_stats_list=trader_stats_list,
+    //     executed_sizes_list_len=request_list_len,
+    //     executed_sizes_list=maker_execution_sizes,
+    //     open_interest_=open_interest,
+    // );
 
     // Change the status of the batch to TRUE
     batch_id_status.write(batch_id=batch_id_, value=TRUE);
@@ -286,52 +289,38 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     local quantity_to_execute;
     local quantity_to_execute_final;
 
-    if (side_ == MAKER) {
-        // Get the portion executed of the order
-        let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
-            contract_address=request_.user_address, order_id_=request_.order_id
-        );
+    // Get the portion executed of the order
+    let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
+        contract_address=request_.user_address, order_id_=request_.order_id
+    );
 
-        // Get min of remaining quantity and the order quantity
-        let (executable_quantity: felt) = Math64x61_sub(request_.quantity, order_portion_executed);
-        let (cmp_res) = Math64x61_is_le(
-            quantity_remaining_, executable_quantity, asset_token_decimal_
-        );
+    // Get min of remaining quantity and the order quantity
+    let (executable_quantity: felt) = Math64x61_sub(request_.quantity, order_portion_executed);
+    let (cmp_res) = Math64x61_is_le(quantity_remaining_, executable_quantity, asset_token_decimal_);
 
-        // If yes, make the quantity_to_execute to be quantity_remaining
-        // i.e Partial order
-        if (cmp_res == TRUE) {
-            assert quantity_to_execute = quantity_remaining_;
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            assert quantity_to_execute = executable_quantity;
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
-
-        local order_id;
-        local quantity_remaining;
-        assert order_id = request_.order_id;
-        assert quantity_remaining = quantity_remaining_;
-
-        with_attr error_message("0520: {order_id} {quantity_remaining}") {
-            assert_not_zero(quantity_to_execute);
-        }
-
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
+    // If yes, make the quantity_to_execute to be quantity_remaining
+    // i.e Partial order
+    if (cmp_res == TRUE) {
         assert quantity_to_execute = quantity_remaining_;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+    } else {
+        assert quantity_to_execute = executable_quantity;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    local order_id;
+    local quantity_remaining;
+    assert order_id = request_.order_id;
+    assert quantity_remaining = quantity_remaining_;
+
+    with_attr error_message("0520: {order_id} {quantity_remaining}") {
+        assert_not_zero(quantity_to_execute);
     }
 
     if (request_.side == SELL) {
@@ -393,7 +382,7 @@ func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     }
     // Find quantity left to be executed
     let (quantity_remaining) = Math64x61_sub(taker_locked_quantity_, quantity_executed_);
-    // Find quantity that needs to be executed for the current ordet
+    // Find quantity that needs to be executed for the current order
     let (quantity_to_execute) = get_quantity_to_execute(
         asset_token_decimal_=asset_token_decimal_,
         request_=[request_list_],
@@ -401,7 +390,7 @@ func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         side_=MAKER,
     );
 
-    // ToDO: Check if the last value is 0 and handle accordingly
+    // Store it in the array
     assert maker_execution_sizes_[iterator_] = quantity_to_execute;
 
     // New quantity executed
@@ -1162,11 +1151,11 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     maker1_direction_: felt,
     maker1_side_: felt,
     trader_stats_list_: TraderStats*,
-    executed_sizes_list_: felt*,
     total_order_volume_: felt,
     taker_execution_price: felt,
     open_interest_: felt,
     oracle_price_: felt,
+    maker_execution_sizes_: felt*,
 ) -> (taker_execution_price: felt, open_interest: felt) {
     alloc_locals;
 
@@ -1180,6 +1169,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local current_quantity_executed;
     local current_order_side;
     local current_open_interest;
+    local pnl;
 
     // Local variables to be passed as arguments in error_messages
     local order_id;
@@ -1200,9 +1190,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
     assert order_id = [request_list_].order_id;
     assert leverage = [request_list_].leverage;
+    assert market_id_order = [request_list_].market_id;
     assert quantity_order = [request_list_].quantity;
     assert user_address = [request_list_].user_address;
-    assert market_id_order = [request_list_].market_id;
 
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
     let (is_registered) = IAccountRegistry.is_registered_user(
@@ -1233,8 +1223,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_le([request_list_].leverage, max_leverage_);
     }
 
-    // Direction Check
+    // Taker Order
     if (request_list_len_ == 1) {
+        // Direction Check
         validate_taker(
             order_id,
             maker1_direction_,
@@ -1242,47 +1233,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             [request_list_].direction,
             [request_list_].side,
         );
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        if (request_list_len_ != orders_len_) {
-            validate_maker(
-                order_id,
-                maker1_direction_,
-                maker1_side_,
-                [request_list_].direction,
-                [request_list_].side,
-            );
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
-    }
-
-    tempvar syscall_ptr = syscall_ptr;
-    tempvar pedersen_ptr = pedersen_ptr;
-    tempvar range_check_ptr = range_check_ptr;
-
-    // Quantity remaining to be executed
-    let (quantity_remaining: felt) = Math64x61_sub(quantity_locked_, quantity_executed_);
-
-    // Get the portion executed of the order
-    let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
-        contract_address=user_address, order_id_=order_id
-    );
-
-    // Taker order
-    let (quantity_remaining_res) = Math64x61_is_equal(quantity_remaining, 0, asset_token_decimal_);
-    if (quantity_remaining_res == TRUE) {
-        // There must only be a single Taker order; hence they must be the last order in the batch
-        with_attr error_message("0513: {order_id} {current_index}") {
-            assert request_list_len_ = 1;
-        }
 
         // Check for post-only flag; they must always be a maker
         with_attr error_message("0515: {order_id} {current_index}") {
@@ -1294,7 +1244,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             let (diff_check) = Math64x61_sub([request_list_].quantity, quantity_locked_);
 
             with_attr error_message("0516: {order_id} {quantity_locked_}") {
-                assert diff_check = 0;
+                let (is_zero) = Math64x61_is_equal(diff_check, 0, asset_token_decimal_);
+                assert is_zero = TRUE;
                 assert [request_list_].order_type = LIMIT_ORDER;
             }
 
@@ -1306,9 +1257,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
-
-        // The matched quanity must be executed for a Taker order
-        assert quantity_to_execute = quantity_locked_;
 
         // The execution price of a taker order is the weighted mean of the Maker orders
         let (new_execution_price: felt) = Math64x61_div(total_order_volume_, quantity_locked_);
@@ -1345,48 +1293,117 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
-        // Maker Order
     } else {
+        // Maker Order
+        // Check the direction of the maker
+        validate_maker(
+            order_id,
+            maker1_direction_,
+            maker1_side_,
+            [request_list_].direction,
+            [request_list_].side,
+        );
+
         with_attr error_message("0518: {order_id} {current_index}") {
             assert [request_list_].order_type = LIMIT_ORDER;
         }
 
-        if (request_list_len_ == 1) {
-            with_attr error_message("0514: {order_id} {current_index}") {
-                assert 1 = 0;
-            }
-        }
+        // Send to AccountManager to emit an event in case the execution_price is 0
+        if ([maker_execution_sizes_] == 0) {
+            // Need to set some value or it gives "Unknown value for memory cell" error
+            assert execution_price = 0;
+            assert margin_amount = 0;
+            assert borrowed_amount = 0;
+            assert margin_lock_update_amount = 0;
+            assert average_execution_price = 0;
+            assert new_total_order_volume = 0;
+            assert quantity_to_execute = 0;
+            assert current_quantity_executed = 0;
+            assert current_order_side = 0;
+            assert current_open_interest = 0;
+            assert pnl = 0;
 
-        // Get min of remaining quantity and the order quantity
-        let (executable_quantity: felt) = Math64x61_sub(quantity_order, order_portion_executed);
-        let (cmp_res) = Math64x61_is_le(
-            quantity_remaining, executable_quantity, asset_token_decimal_
-        );
+            // Create a temporary order object
+            let temp_order_request: OrderRequest = OrderRequest(
+                order_id=[request_list_].order_id,
+                market_id=[request_list_].market_id,
+                direction=[request_list_].direction,
+                price=[request_list_].price,
+                quantity=[request_list_].quantity,
+                leverage=[request_list_].leverage,
+                slippage=[request_list_].slippage,
+                order_type=[request_list_].order_type,
+                time_in_force=[request_list_].time_in_force,
+                post_only=[request_list_].post_only,
+                side=[request_list_].side,
+                liquidator_address=[request_list_].liquidator_address,
+            );
 
-        // If yes, make the quantity_to_execute to be quantity_remaining
-        // i.e Partial order
-        if (cmp_res == TRUE) {
-            assert quantity_to_execute = quantity_remaining;
+            // Create a temporary signature object
+            let temp_signature: Signature = Signature(
+                r_value=[request_list_].sig_r, s_value=[request_list_].sig_s
+            );
 
-            // If no, make quantity_to_execute to be the [request_list_].quantity
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            assert quantity_to_execute = executable_quantity;
+            // Call the account contract to initialize the order
+            IAccountManager.execute_order(
+                contract_address=user_address,
+                request=temp_order_request,
+                signature=temp_signature,
+                size=0,
+                execution_price=[request_list_].price,
+                margin_amount=0,
+                borrowed_amount=0,
+                market_id=market_id_,
+                collateral_id_=collateral_id_,
+                pnl=0,
+                side=MAKER,
+                margin_lock_update_amount=0,
+            );
 
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+            let element: TraderStats = TraderStats(
+                trader_address=user_address,
+                fee_64x61=0,
+                order_volume_64x61=0,
+                side=MAKER,
+                pnl_64x61=0,
+                margin_amount_64x61=0,
+            );
 
-        with_attr error_message("0520: {order_id} {quantity_remaining}") {
-            assert_not_zero(quantity_to_execute);
+            assert [trader_stats_list_] = element;
+
+            return check_and_execute(
+                quantity_locked_=quantity_locked_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                asset_token_decimal_=asset_token_decimal_,
+                collateral_token_decimal_=collateral_token_decimal_,
+                orders_len_=orders_len_,
+                request_list_len_=request_list_len_ - 1,
+                request_list_=request_list_ + MultipleOrder.SIZE,
+                quantity_executed_=quantity_executed_,
+                account_registry_address_=account_registry_address_,
+                holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
+                liquidate_address_=liquidate_address_,
+                liquidity_fund_address_=liquidity_fund_address_,
+                insurance_fund_address_=insurance_fund_address_,
+                max_leverage_=max_leverage_,
+                min_quantity_=min_quantity_,
+                maker1_direction_=maker1_direction_,
+                maker1_side_=maker1_side_,
+                trader_stats_list_=trader_stats_list_ + TraderStats.SIZE,
+                total_order_volume_=total_order_volume_,
+                taker_execution_price=0,
+                open_interest_=open_interest_,
+                oracle_price_=oracle_price_,
+                maker_execution_sizes_=maker_execution_sizes_ + 1,
+            );
         }
 
         // Add the executed quantity to the running sum of quantity executed
         let (current_quantity_executed_felt: felt) = Math64x61_add(
-            quantity_executed_, quantity_to_execute
+            quantity_executed_, [maker_execution_sizes_]
         );
         // Write to local variable
         assert current_quantity_executed = current_quantity_executed_felt;
@@ -1395,7 +1412,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert execution_price = [request_list_].price;
 
         // Add to the weighted sum of the execution prices
-        let (new_order_volume) = Math64x61_mul([request_list_].price, quantity_to_execute);
+        let (new_order_volume) = Math64x61_mul([request_list_].price, [maker_execution_sizes_]);
         let (new_total_order_volume_) = Math64x61_add(new_order_volume, total_order_volume_);
         // Write to local variable
         assert new_total_order_volume = new_total_order_volume_;
@@ -1414,8 +1431,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-
-    local pnl;
 
     // If the order is to be opened
     if ([request_list_].side == BUY) {
@@ -1518,9 +1533,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         margin_lock_update_amount=margin_lock_update_amount,
     );
 
-    // Set the order size in executed_sizes_list array
-    assert [executed_sizes_list_] = quantity_to_execute;
-
     let (new_open_interest) = Math64x61_add(open_interest_, current_open_interest);
 
     return check_and_execute(
@@ -1545,11 +1557,11 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         maker1_direction_=maker1_direction_,
         maker1_side_=maker1_side_,
         trader_stats_list_=trader_stats_list_ + TraderStats.SIZE,
-        executed_sizes_list_=executed_sizes_list_ + 1,
         total_order_volume_=new_total_order_volume,
         taker_execution_price=execution_price,
         open_interest_=new_open_interest,
         oracle_price_=oracle_price_,
+        maker_execution_sizes_=maker_execution_sizes_ + 1,
     );
 }
 

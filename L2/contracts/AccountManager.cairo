@@ -1020,6 +1020,7 @@ func execute_order{
     alloc_locals;
 
     local order_id;
+    local is_final;
     assert order_id = request.order_id;
 
     let (__fp__, _) = get_fp_and_pc();
@@ -1032,9 +1033,23 @@ func execute_order{
     let (trading_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Trading_INDEX, version=version
     );
+
     with_attr error_message("0002: {order_id} {market_id}") {
         assert caller = trading_address;
     }
+
+    // hash the parameters
+    let (hash) = hash_order(&request);
+
+    // Check for hash collision
+    order_hash_check(request.order_id, hash);
+
+    // check if signed by the user/liquidator
+    is_valid_signature_order(hash, signature, request.liquidator_address);
+
+    // Get the portion executed details if already exists
+    let (order_portion_executed) = portion_executed.read(order_id=request.order_id);
+    let (new_position_executed) = Math64x61_add(order_portion_executed, size);
 
     // Get asset and collateral number of decimals
     let (market_address) = IAuthorizedRegistry.get_contract_address(
@@ -1051,28 +1066,32 @@ func execute_order{
     let (collateral_details) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
     let collateral_decimals = collateral_details.token_decimal;
 
-    // hash the parameters
-    let (hash) = hash_order(&request);
+    let (is_final) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
 
-    // Check for hash collision
-    order_hash_check(request.order_id, hash);
+    if (size == 0) {
+        // Emit event for the order
+        let (keys: felt*) = alloc();
+        assert keys[0] = 'trade';
+        let (data: felt*) = alloc();
+        assert data[0] = order_id;
+        assert data[1] = market_id;
+        assert data[2] = request.direction;
+        assert data[3] = size;
+        assert data[4] = request.order_type;
+        assert data[5] = execution_price;
+        assert data[6] = pnl;
+        assert data[7] = side;
+        assert data[8] = is_final;
 
-    // check if signed by the user/liquidator
-    is_valid_signature_order(hash, signature, request.liquidator_address);
+        emit_event(1, keys, 9, data);
+
+        return (1,);
+    }
 
     // Get the details of the position
     let (position_details: PositionDetails) = position_mapping.read(
         market_id=market_id, direction=request.direction
     );
-
-    // Get the portion executed details if already exists
-    let (order_portion_executed) = portion_executed.read(order_id=request.order_id);
-    let (new_position_executed) = Math64x61_add(order_portion_executed, size);
-
-    // Return if the position size after the executing the current order is more than the order's positionSize
-    with_attr error_message("0001: {order_id} {size}") {
-        Math64x61_assert_le(new_position_executed, request.quantity, asset_decimals);
-    }
 
     if (request.time_in_force == IoC) {
         // Update the portion executed to request.quantity if it's an IoC order
@@ -1306,13 +1325,14 @@ func execute_order{
     assert data[0] = order_id;
     assert data[1] = market_id;
     assert data[2] = request.direction;
-    assert data[3] = request.quantity;
+    assert data[3] = size;
     assert data[4] = request.order_type;
     assert data[5] = execution_price;
     assert data[6] = pnl;
     assert data[7] = side;
+    assert data[8] = is_final;
 
-    emit_event(1, keys, 8, data);
+    emit_event(1, keys, 9, data);
 
     return (1,);
 }
@@ -1766,8 +1786,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     if (is_le_least_short * is_le_least_long == 1) {
         assert new_least_collateral_ratio = least_collateral_ratio;
         assert new_least_collateral_ratio_position = least_collateral_ratio_position;
-        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price
-            ;
+        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
