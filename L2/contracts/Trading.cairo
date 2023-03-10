@@ -141,7 +141,7 @@ func execute_batch{
     oracle_price_: felt,
     request_list_len: felt,
     request_list: MultipleOrder*,
-) -> (maker_execution_sizes_len: felt, maker_execution_sizes: felt*) {
+) -> () {
     alloc_locals;
 
     // Get all the addresses from the auth registry
@@ -186,15 +186,14 @@ func execute_batch{
         assert_not_zero(quantity_locked_);
     }
 
-    let (maker_execution_sizes: felt*) = alloc();
+    let (execution_sizes: felt*) = alloc();
 
-    let (final_quantity_locked: felt) = adjust_quantity_locked(
+    adjust_quantity_locked(
         asset_token_decimal_=asset.token_decimal,
         request_list_len_=request_list_len,
         request_list_=request_list,
         quantity_locked_=quantity_locked_,
-        maker_execution_sizes_=maker_execution_sizes,
-        iterator_=0,
+        execution_sizes_=execution_sizes,
     );
 
     // Recursively loop through the orders in the batch
@@ -223,7 +222,7 @@ func execute_batch{
         taker_execution_price=0,
         open_interest_=0,
         oracle_price_=oracle_price_,
-        maker_execution_sizes_=maker_execution_sizes,
+        execution_sizes_=execution_sizes,
     );
 
     // Get Market price for the corresponding market Id
@@ -259,23 +258,29 @@ func execute_batch{
         trader_stats_list_len=request_list_len,
         trader_stats_list=trader_stats_list,
         executed_sizes_list_len=request_list_len,
-        executed_sizes_list=maker_execution_sizes,
+        executed_sizes_list=execution_sizes,
         open_interest_=open_interest,
     );
 
     // Change the status of the batch to TRUE
     batch_id_status.write(batch_id=batch_id_, value=TRUE);
 
-    return (request_list_len, maker_execution_sizes);
+    return ();
 }
 
 // ///////////
 // Internal //
 // ///////////
 
+// @notice Internal function to calculate the amount that must be executed for an order
+// @param asset_token_decimal_ - Number of decimals for the asset 
+// @param request_ - An order request
+// @param quantity_remainging - Max quantity that can be executed for that order
+// @param execution_sizes_ - Array of the calculated execution sizes
+// @returns quantity_to_execute_final - Calculated quantity to execute
 func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_token_decimal_: felt, request_: MultipleOrder, quantity_remaining_: felt
-) -> (taker_execution_size: felt) {
+) -> (quantity_to_execute_final: felt) {
     alloc_locals;
     local quantity_to_execute;
     local quantity_to_execute_final;
@@ -310,6 +315,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     assert order_id = request_.order_id;
     assert quantity_remaining = quantity_remaining_;
 
+    // If it's a sell order, calculate the amount that can be executed
     if (request_.side == SELL) {
         // Get position details
         let (position_details: PositionDetails) = IAccountManager.get_position_data(
@@ -317,7 +323,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             market_id_=request_.market_id,
             direction_=request_.direction,
         );
-
+        // Give an error if the position to be closed is of size 0
         with_attr error_message("0517: {order_id} 0") {
             assert_not_zero(position_details.position_size);
         }
@@ -358,11 +364,21 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     return (quantity_to_execute_final,);
 }
 
+
+// @notice Internal function to recurse through maker orders and 
+// calculate the size that must be executed for each
+// @param asset_token_decimal_ - Number of decimals for the asset 
+// @param request_list_len_ - Length of the requests list 
+// @param request_list_ - Request list of orders
+// @param execution_sizes_ - Array of the calculated execution sizes
+// @param taker_locked_quantity_ - Adjsut taker execution Size
+// @param quantity_executed_ - Quantity that has been locked so far on maker side
+// @param iterator_ - Iterator for the execution_sizes_ array
 func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_token_decimal_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
-    maker_execution_sizes_: felt*,
+    execution_sizes_: felt*,
     taker_locked_quantity_: felt,
     quantity_executed_: felt,
     iterator_: felt,
@@ -381,7 +397,7 @@ func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     );
 
     // Store it in the array
-    assert maker_execution_sizes_[iterator_] = quantity_to_execute;
+    assert execution_sizes_[iterator_] = quantity_to_execute;
 
     // New quantity executed
     let (quantity_executed_new) = Math64x61_add(quantity_to_execute, quantity_executed_);
@@ -389,41 +405,51 @@ func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         asset_token_decimal_=asset_token_decimal_,
         request_list_len_=request_list_len_ - 1,
         request_list_=request_list_ + MultipleOrder.SIZE,
-        maker_execution_sizes_=maker_execution_sizes_,
+        execution_sizes_=execution_sizes_,
         taker_locked_quantity_=taker_locked_quantity_,
         quantity_executed_=quantity_executed_new,
         iterator_=iterator_ + 1,
     );
 }
 
+// @notice Internal function to adjust and calculate the quantity locked and execution sizes
+// @param asset_token_decimal_ - Number of decimals for the asset 
+// @param request_list_len_ - Length of the requests list 
+// @param request_list_ - Request list of orders
+// @param quantity_locked_ - Original quantity lokcked of the batch
+// @param execution_sizes_ - Array of the calculated execution sizes
 func adjust_quantity_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_token_decimal_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
     quantity_locked_: felt,
-    maker_execution_sizes_: felt*,
-    iterator_: felt,
-) -> (new_quantity_locked: felt) {
+    execution_sizes_: felt*,
+) -> () {
+    // Get the index of the Taker order
     let last_index = request_list_len_ - 1;
+
+    // Adjust the quantity to execute on the taker side
     let (taker_quantity_to_execute) = get_quantity_to_execute(
         asset_token_decimal_=asset_token_decimal_,
         request_=request_list_[last_index],
         quantity_remaining_=quantity_locked_,
     );
 
+    // Adjust the quantity to execute on the maker side and fill the execution_sizes_ array
     let (maker_quantity_to_execute) = get_maker_sizes(
         asset_token_decimal_=asset_token_decimal_,
         request_list_len_=request_list_len_,
         request_list_=request_list_,
-        maker_execution_sizes_=maker_execution_sizes_,
+        execution_sizes_=execution_sizes_,
         taker_locked_quantity_=taker_quantity_to_execute,
         quantity_executed_=0,
         iterator_=0,
     );
 
-    assert maker_execution_sizes_[last_index] = maker_quantity_to_execute;
+    // Store the new adjusted execution size of taker order
+    assert execution_sizes_[last_index] = maker_quantity_to_execute;
 
-    return (maker_quantity_to_execute,);
+    return ();
 }
 
 // @notice Internal function to check to check the slippage of a market order
@@ -1088,7 +1114,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 }
 
 // @notice Internal function called by execute_batch
-// @param quantity_locked_ - Size of the order to be executed
 // @param market_id_ - Market ID of the batch
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
 // @param asset_token_decimal_ - No.of token decimals of an asset
@@ -1113,6 +1138,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param taker_execution_price - The price to be stored for the market price in execute_batch
 // @param open_interest_ - Open interest corresponding to the current order
 // @param oracle_price_ - Oracle price from the ZKXNode network
+// @param execution_sizes_ - Execution sizes array 
 // @return res - returns the net sum of the orders do far
 // @return trader_stats_list_len - length of the trader fee list so far
 // @return open_interest - open interest corresponding to the trade batch
@@ -1141,7 +1167,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     taker_execution_price: felt,
     open_interest_: felt,
     oracle_price_: felt,
-    maker_execution_sizes_: felt*,
+    execution_sizes_: felt*,
 ) -> (taker_execution_price: felt, open_interest: felt) {
     alloc_locals;
 
@@ -1226,7 +1252,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         }
 
         local taker_quantity;
-        assert taker_quantity = [maker_execution_sizes_];
+        assert taker_quantity = [execution_sizes_];
         // Check for F&K type of orders; they must only be filled completely or rejected
         if ([request_list_].time_in_force == FoK) {
             let (diff_check) = Math64x61_sub([request_list_].quantity, taker_quantity);
@@ -1310,10 +1336,10 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             assert [request_list_].order_type = LIMIT_ORDER;
         }
 
-        assert quantity_to_execute = [maker_execution_sizes_];
+        assert quantity_to_execute = [execution_sizes_];
 
         // Send to AccountManager to emit an event in case the execution_price is 0
-        if ([maker_execution_sizes_] == 0) {
+        if (quantity_to_execute == 0) {
             // Need to set some value or it gives "Unknown value for memory cell" error
             // assert execution_price = 0;
             // assert margin_amount = 0;
@@ -1399,13 +1425,13 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 taker_execution_price=0,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                maker_execution_sizes_=maker_execution_sizes_ + 1,
+                execution_sizes_=execution_sizes_ + 1,
             );
         }
 
         // Add the executed quantity to the running sum of quantity executed
         let (current_quantity_executed_felt: felt) = Math64x61_add(
-            quantity_executed_, [maker_execution_sizes_]
+            quantity_executed_, [execution_sizes_]
         );
         // Write to local variable
         assert current_quantity_executed = current_quantity_executed_felt;
@@ -1414,7 +1440,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert execution_price = [request_list_].price;
 
         // Add to the weighted sum of the execution prices
-        let (new_order_volume) = Math64x61_mul([request_list_].price, [maker_execution_sizes_]);
+        let (new_order_volume) = Math64x61_mul([request_list_].price, [execution_sizes_]);
         let (new_total_order_volume_) = Math64x61_add(new_order_volume, total_order_volume_);
         // Write to local variable
         assert new_total_order_volume = new_total_order_volume_;
@@ -1555,7 +1581,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         taker_execution_price=execution_price,
         open_interest_=new_open_interest,
         oracle_price_=oracle_price_,
-        maker_execution_sizes_=maker_execution_sizes_ + 1,
+        execution_sizes_=execution_sizes_ + 1,
     );
 }
 
