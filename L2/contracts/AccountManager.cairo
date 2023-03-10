@@ -1310,7 +1310,7 @@ func execute_order{
     assert data[0] = order_id;
     assert data[1] = market_id;
     assert data[2] = request.direction;
-    assert data[3] = request.quantity;
+    assert data[3] = size;
     assert data[4] = request.order_type;
     assert data[5] = request.side;
     assert data[6] = execution_price;
