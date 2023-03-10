@@ -129,7 +129,7 @@ async def test_deploy_account_contract(adminAuth_factory):
 
     #print(result)
 
-    assert result.result.res == pubkey
+    assert result.result.pub_key == pubkey
 
     # check that the account contract has the correct L1 address stored that was used during deployment
 
