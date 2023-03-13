@@ -736,14 +736,15 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // User must be able to pay the amount
     with_attr error_message("0501: {order_id} {user_available_balance}") {
         Math64x61_assert_le(
-            order_value_with_fee, user_available_balance, collateral_token_decimal_
+            fees, user_available_balance, collateral_token_decimal_
         );
     }
 
     // Deduct the fee from account contract
     IAccountManager.transfer_from(
         contract_address=order_.user_address,
-        assetID_=collateral_id_,
+        asset_id_=collateral_id_,
+        market_id_=0,
         amount_=fees,
         invoked_for_='fee',
     );
@@ -1031,7 +1032,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         );
         IAccountManager.transfer_from(
             contract_address=order_.user_address,
-            assetID_=collateral_id_,
+            asset_id_=collateral_id_,
+            market_id_=market_id_,
             amount_=total_amount_to_transfer_from,
             invoked_for_='holding',
         );
@@ -1048,14 +1050,16 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             if (is_le(pnl, 0) == TRUE) {
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
-                    assetID_=collateral_id_,
+                    asset_id_=collateral_id_,
+                    market_id_=market_id_,
                     amount_=abs_value(pnl),
                     invoked_for_='holding',
                 );
             } else {
                 IAccountManager.transfer(
                     contract_address=order_.user_address,
-                    assetID_=collateral_id_,
+                    asset_id_=collateral_id_,
+                    market_id_=market_id_,
                     amount_=pnl,
                     invoked_for_='holding',
                 );
@@ -1077,7 +1081,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
-                    assetID_=collateral_id_,
+                    asset_id_=collateral_id_,
+                    market_id_=market_id_,
                     amount_=margin_amount_to_be_reduced,
                     invoked_for_='holding',
                 );
@@ -1304,7 +1309,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // Set the current side as taker
         assert current_order_side = TAKER;
 
-        // Reset quantity to execute
+        // Set quantity to execute
         assert quantity_to_execute = taker_quantity;
 
         // Emit the event

@@ -201,13 +201,15 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // ///////
 
 // @notice view function to get public key
-// @return res - public key of an account
+// @return pub_key - public key of an account
+// @return auth_reg_addr - Authorized registry address
 @view
 func get_public_key{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
-    res: felt
+    pub_key: felt, auth_reg_addr: felt
 ) {
-    let (res) = public_key.read();
-    return (res=res);
+    let (pub_key) = public_key.read();
+    let (registry) = CommonLib.get_registry_address();
+    return (pub_key=pub_key, auth_reg_addr=registry);
 }
 
 // @notice view function to check if the transaction signature is valid
@@ -352,10 +354,11 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (initial_margin_sum) = margin_locked.read(asset_id=asset_id_);
 
     if (markets_array_len == 0) {
+        let (available_margin) = Math64x61_sub(collateral_balance, new_position_margin_);
         return (
             is_liquidation=0,
             total_margin=collateral_balance,
-            available_margin=collateral_balance,
+            available_margin=available_margin,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
             least_collateral_ratio=1,
@@ -381,7 +384,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         collateral_token_decimal_=collateral.token_decimal,
         unrealized_pnl_sum_=0,
         maintenance_margin_requirement_=new_position_maintanence_requirement_,
-        least_collateral_ratio=1,
+        least_collateral_ratio=Math64x61_ONE,
         least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_asset_price=0,
     );
@@ -394,7 +397,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
             available_margin=collateral_balance - initial_margin_sum,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
-            least_collateral_ratio=1,
+            least_collateral_ratio=Math64x61_ONE,
             least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
             least_collateral_ratio_position_asset_price=0,
         );
@@ -762,11 +765,11 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 // ///////////
 
 // @notice External function called by the Trading Contract
-// @param assetID_ - asset ID of the collateral that needs to be transferred
+// @param asset_id_ - asset ID of the collateral that needs to be transferred
 // @param amount - Amount of funds to transfer from this contract
 @external
 func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    assetID_: felt, amount_: felt, invoked_for_: felt
+    asset_id_: felt, market_id_: felt, amount_: felt, invoked_for_: felt
 ) -> () {
     // Check if the caller is trading contract
     let (caller) = get_caller_address();
@@ -785,28 +788,29 @@ func transfer_from{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         assert_nn(amount_);
     }
 
-    let (balance_) = balance.read(assetID=assetID_);
+    let (balance_) = balance.read(assetID=asset_id_);
     let (new_balance) = Math64x61_sub(balance_, amount_);
-    balance.write(assetID=assetID_, value=new_balance);
+    balance.write(assetID=asset_id_, value=new_balance);
 
     let (keys: felt*) = alloc();
     assert keys[0] = invoked_for_;
+    assert keys[1] = market_id_;
     let (data: felt*) = alloc();
     assert data[0] = -amount_;
     assert data[1] = balance_;
-    assert data[2] = assetID_;
+    assert data[2] = asset_id_;
 
-    emit_event(1, keys, 3, data);
+    emit_event(2, keys, 3, data);
 
     return ();
 }
 
 // @notice External function called by the Trading Contract to transfer funds from account contract
-// @param assetID_ - asset ID of the collateral that needs to be transferred
+// @param asset_id_ - asset ID of the collateral that needs to be transferred
 // @param amount - Amount of funds to transfer to this contract
 @external
 func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    assetID_: felt, amount_: felt, invoked_for_: felt
+    asset_id_: felt, market_id_: felt, amount_: felt, invoked_for_: felt
 ) -> () {
     let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
@@ -823,18 +827,19 @@ func transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         assert_nn(amount_);
     }
 
-    let (balance_) = balance.read(assetID=assetID_);
+    let (balance_) = balance.read(assetID=asset_id_);
     let (new_balance) = Math64x61_add(balance_, amount_);
-    balance.write(assetID=assetID_, value=new_balance);
+    balance.write(assetID=asset_id_, value=new_balance);
 
     let (keys: felt*) = alloc();
     assert keys[0] = invoked_for_;
+    assert keys[1] = market_id_;
     let (data: felt*) = alloc();
     assert data[0] = amount_;
     assert data[1] = balance_;
-    assert data[2] = assetID_;
+    assert data[2] = asset_id_;
 
-    emit_event(1, keys, 3, data);
+    emit_event(2, keys, 3, data);
 
     return ();
 }
@@ -1078,12 +1083,13 @@ func execute_order{
         assert data[2] = request.direction;
         assert data[3] = size;
         assert data[4] = request.order_type;
-        assert data[5] = execution_price;
-        assert data[6] = pnl;
-        assert data[7] = side;
-        assert data[8] = is_final;
+        assert data[5] = request.side;
+        assert data[6] = execution_price;
+        assert data[7] = pnl;
+        assert data[8] = side;
+        assert data[9] = is_final;
 
-        emit_event(1, keys, 9, data);
+        emit_event(1, keys, 10, data);
 
         return (1,);
     }
@@ -1327,12 +1333,13 @@ func execute_order{
     assert data[2] = request.direction;
     assert data[3] = size;
     assert data[4] = request.order_type;
-    assert data[5] = execution_price;
-    assert data[6] = pnl;
-    assert data[7] = side;
-    assert data[8] = is_final;
+    assert data[5] = request.side;
+    assert data[6] = execution_price;
+    assert data[7] = pnl;
+    assert data[8] = side;
+    assert data[9] = is_final;
 
-    emit_event(1, keys, 9, data);
+    emit_event(1, keys, 10, data);
 
     return (1,);
 }
@@ -1596,6 +1603,10 @@ func get_risk_parameters_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
     );
     let (maintenance_requirement) = Math64x61_mul(req_margin, maintenance_position);
 
+    if (market_price_ == 0) {
+        return (0, maintenance_requirement, 0);
+    }
+
     // Calculate pnl to check if it is the least collateralized position
     local price_diff_;
     if (direction_ == LONG) {
@@ -1677,7 +1688,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         return (
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
-            least_collateral_ratio=1,
+            least_collateral_ratio=Math64x61_ONE,
             least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
             least_collateral_ratio_position_asset_price=0,
         );
@@ -1695,7 +1706,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
     if (is_long_zero == TRUE) {
-        assert long_collateral_ratio = 1;
+        assert long_collateral_ratio = Math64x61_ONE;
         assert long_maintanence_requirement = 0;
         assert long_asset_price = 0;
         assert long_pnl = 0;
@@ -1729,7 +1740,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
     if (is_short_zero == TRUE) {
-        assert short_collateral_ratio = 1;
+        assert short_collateral_ratio = Math64x61_ONE;
         assert short_maintanence_requirement = 0;
         assert short_asset_price = 0;
         assert short_pnl = 0;

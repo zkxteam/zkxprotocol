@@ -118,10 +118,7 @@ async def test_math64x61_assert_le(adminAuth_factory):
    # x > y, (x-y) > 10^-6
    x = to64x61(0.5555555555555554)
    y = to64x61(-0.5555555555555553)
-   await assert_revert(
-        test.math64x61_assert_le(x,y,6).call(),
-        "Math64x61_assert_le failed"
-   )
+   await assert_revert(test.math64x61_assert_le(x,y,6).call()) #Assert fails for this
 
    # x < y, (x-y) <= 10^-18
    x = to64x61(-0.5555555555555553)
@@ -132,10 +129,7 @@ async def test_math64x61_assert_le(adminAuth_factory):
    # x > y, (x-y) > 10^-4
    x = to64x61(-1)
    y = to64x61(-1.001)
-   await assert_revert(
-        test.math64x61_assert_le(x,y,4).call(),
-        "Math64x61_assert_le failed"
-   )
+   await assert_revert(test.math64x61_assert_le(x,y,4).call()) # Assert fails for this
 
    # x < y, (x-y) <= 10^-2
    x = to64x61(-1.001)
@@ -248,27 +242,18 @@ async def test_math64x61_assert_equal(adminAuth_factory):
    # x > y, |x-y| > 10^-6
    x = to64x61(0.5555555555555554)
    y = to64x61(-0.5555555555555553)
-   await assert_revert(
-        test.math64x61_assert_equal(x,y,6).call(),
-        "Math64x61_assert_equal failed"
-   )
+   await assert_revert(test.math64x61_assert_equal(x,y,6).call()) # Assert fails for this
 
    # x < y, |x-y| > 10^-18
    x = to64x61(-0.5555555555555553)
    y = to64x61(0.5555555555555554)
-   await assert_revert(
-        test.math64x61_assert_equal(x,y,18).call(),
-        "Math64x61_assert_equal failed"
-   )
+   await assert_revert(test.math64x61_assert_equal(x,y,18).call()) # Assert fails for this
 
    # Case 4: When both are negative 
    # x > y, |x-y| > 10^-4
    x = to64x61(-1)
    y = to64x61(-1.001)
-   await assert_revert(
-        test.math64x61_assert_equal(x,y,4).call(),
-        "Math64x61_assert_equal failed"
-   )
+   await assert_revert(test.math64x61_assert_equal(x,y,4).call()) # Assert fails for this
    
    # x < y, |x-y| <= 10^-2
    x = to64x61(-1.001)

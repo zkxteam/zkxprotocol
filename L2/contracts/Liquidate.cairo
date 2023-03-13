@@ -208,7 +208,7 @@ func mark_under_collateralized_position{
     return (
         liq_result,
         least_collateral_ratio_position,
-        available_margin,
+        total_margin,
         maintenance_margin_requirement,
     );
 }
