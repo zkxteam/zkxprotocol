@@ -182,7 +182,7 @@ func execute_batch{
         assert_not_zero(market.is_tradable);
     }
 
-    with_attr error_message("0550: {market_id_}") {
+    with_attr error_message("0522: {market_id_}") {
         assert_not_zero(quantity_locked_);
     }
 
