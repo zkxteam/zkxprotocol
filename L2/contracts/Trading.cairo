@@ -266,7 +266,7 @@ func execute_batch{
 // @param oracle_price_ - Oracle price of the batch
 // @param execution_price_ - Execution price of the order
 func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_id_: felt, slippage_: felt, oracle_price_: felt, execution_price_: felt
+    order_id_: felt, slippage_: felt, oracle_price_: felt, execution_price_: felt, direction_: felt, side_: felt, collateral_token_decimal_ : felt
 ) {
     // To remove
     alloc_locals;
@@ -281,9 +281,17 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     let (lower_limit: felt) = Math64x61_sub(oracle_price_, threshold);
     let (upper_limit: felt) = Math64x61_add(oracle_price_, threshold);
 
-    with_attr error_message("0506: {order_id_} {execution_price_}") {
-        assert_in_range(execution_price_, lower_limit, upper_limit);
+
+    if (direction_ == side_){
+        with_attr error_message("0506: {order_id_} {execution_price_}") {
+            Math64x61_assert_le(execution_price_, upper_limit, collateral_token_decimal_);
+        }
+    } else {
+        with_attr error_message("0506: {order_id_} {execution_price_}") {
+            Math64x61_assert_le(lower_limit, execution_price_, collateral_token_decimal_);
+        }
     }
+    
     return ();
 }
 
@@ -1140,6 +1148,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 slippage_=[request_list_].slippage,
                 oracle_price_=oracle_price_,
                 execution_price_=execution_price,
+                direction_=[request_list_].direction,
+                side_=[request_list_].side,
+                collateral_token_decimal_=collateral_token_decimal_
             );
         } else {
             check_limit_price(

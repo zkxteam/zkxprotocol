@@ -907,46 +907,6 @@ async def test_revert_if_invalid_slippage_2(trading_test_initializer):
 
 
 @pytest.mark.asyncio
-async def test_revert_if_market_order_slippage_error(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
-    ###################
-    ### Open orders ##
-    ###################
-    # List of users
-    users = [alice, bob]
-    users_test = [alice_test, bob_test]
-
-    # Sufficient balance for users
-    alice_balance = 10000
-    bob_balance = 10000
-    balance_array = [alice_balance, bob_balance]
-
-    # Batch params for OPEN orders
-    quantity_locked_1 = 1
-    market_id_1 = BTC_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 1000
-
-    # Set balance in Starknet & Python
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-    # Create orders
-    orders_1 = [{
-        "quantity": 1,
-        "order_type": order_types["limit"],
-        "price": 1010.01
-    }, {
-        "quantity": 1,
-        "direction": order_direction["short"],
-        "slippage": 1
-    }]
-
-    error_at_index = 1
-    # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0506:", error_at_index=error_at_index, param_2=to64x61(1010.01))
-
-
-@pytest.mark.asyncio
 async def test_revert_if_limit_order_bad_short_limit_price(trading_test_initializer):
     _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
@@ -2260,3 +2220,165 @@ async def test_opening_and_closing_full_orders_new_collateral(trading_test_initi
     bob_positions = await bob.get_positions().call()
     bob_positions_parsed = bob_positions.result.positions_array
     assert len(bob_positions_parsed) == 4
+
+
+@pytest.mark.asyncio
+async def test_revert_if_market_order_slippage_error_lower_limit(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 1000000
+    bob_balance = 1000000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "price": 989.9
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "slippage": 1
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0506:", error_at_index=error_at_index, param_2=to64x61(989.9))
+
+
+@pytest.mark.asyncio
+async def test_revert_if_market_order_slippage_error_upper_limit(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 1000000
+    bob_balance = 1000000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "price": 1010.01,
+        "side": 2,
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "slippage": 1,
+        "side": 2,
+    }]
+
+    error_at_index = 1
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0506:", error_at_index=error_at_index, param_2=to64x61(1010.01))
+
+
+@pytest.mark.asyncio
+async def test_execute_market_order_slippage_lower_limit(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000000
+    bob_balance = 10000000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "price": 1010.01
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "slippage": 1
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
+
+
+@pytest.mark.asyncio
+async def test_execute_market_order_slippage_upper_limit(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000000
+    bob_balance = 10000000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "order_type": order_types["limit"],
+        "price": 989.9,
+        "side": 2,
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "slippage": 1,
+        "side": 2,
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading)
