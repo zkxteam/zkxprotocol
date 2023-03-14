@@ -76,6 +76,7 @@ namespace IAccountManager {
         market_id: felt,
         collateral_id_: felt,
         pnl: felt,
+        opening_fee: felt,
         side: felt,
         margin_lock_update_amount: felt,
     ) -> (res: felt) {
