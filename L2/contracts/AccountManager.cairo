@@ -391,10 +391,11 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
     // If any of the position's ttl is outdated
     if (least_collateral_ratio_position_asset_price == 0) {
+        let (available_margin) = Math64x61_sub(collateral_balance, new_position_margin_);
         return (
             is_liquidation=FALSE,
             total_margin=collateral_balance,
-            available_margin=collateral_balance - initial_margin_sum,
+            available_margin=available_margin,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
             least_collateral_ratio=Math64x61_ONE,
