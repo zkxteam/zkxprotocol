@@ -298,16 +298,8 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     // i.e Partial order
     if (cmp_res == TRUE) {
         assert quantity_to_execute = quantity_remaining_;
-
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
     } else {
         assert quantity_to_execute = executable_quantity;
-
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
     }
 
     local order_id;
@@ -328,26 +320,14 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             assert_not_zero(position_details.position_size);
         }
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-
         let (cmp_res) = Math64x61_is_le(
             quantity_to_execute, position_details.position_size, asset_token_decimal_
         );
 
-        if (cmp_res == 0) {
+        if (cmp_res == FALSE) {
             quantity_to_execute_final = position_details.position_size;
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
         } else {
             quantity_to_execute_final = quantity_to_execute;
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
         }
 
         tempvar syscall_ptr = syscall_ptr;
