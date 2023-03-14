@@ -1785,6 +1785,8 @@ async def test_placing_order_directly(trading_test_initializer):
         AssetID.USDC,
         # pnl
         0,
+        # opening fee
+        0,
         # side,
         1,
         # margin lock update anount

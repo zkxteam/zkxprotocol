@@ -1186,6 +1186,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local current_quantity_executed;
     local current_order_side;
     local current_open_interest;
+    local opening_fee;
     local pnl;
 
     // Local variables to be passed as arguments in error_messages
@@ -1345,18 +1346,6 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // Send to AccountManager to emit an event in case the execution_price is 0
         if (quantity_to_execute == 0) {
-            // Need to set some value or it gives "Unknown value for memory cell" error
-            // assert execution_price = 0;
-            // assert margin_amount = 0;
-            // assert borrowed_amount = 0;
-            // assert margin_lock_update_amount = 0;
-            // assert average_execution_price = 0;
-            // assert new_total_order_volume = 0;
-            // assert current_quantity_executed = 0;
-            // assert current_order_side = 0;
-            // assert current_open_interest = 0;
-            // assert pnl = 0;
-
             // Create a temporary order object
             let temp_order_request: OrderRequest = OrderRequest(
                 order_id=[request_list_].order_id,
@@ -1390,6 +1379,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 market_id=market_id_,
                 collateral_id_=collateral_id_,
                 pnl=0,
+                opening_fee=0,
                 side=MAKER,
                 margin_lock_update_amount=0,
             );
@@ -1485,6 +1475,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
         assert pnl = trading_fee;
+        assert opening_fee = trading_fee;
         assert current_open_interest = quantity_to_execute;
         assert margin_lock_update_amount = margin_lock_amount;
 
@@ -1514,6 +1505,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
         assert pnl = realized_pnl;
+        assert opening_fee = 0;
         assert current_open_interest = 0 - quantity_to_execute;
         assert margin_lock_update_amount = margin_unlock_amount;
 
@@ -1555,6 +1547,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         market_id=market_id_,
         collateral_id_=collateral_id_,
         pnl=pnl,
+        opening_fee=opening_fee,
         side=current_order_side,
         margin_lock_update_amount=margin_lock_update_amount,
     );
