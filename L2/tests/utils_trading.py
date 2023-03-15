@@ -693,9 +693,8 @@ class User:
         if current_balance <= 0:
             return (0, 0)
 
-        (liq_res, total_account_value, _, _, total_maintenance_requirement, _, least_collateral_ratio_position, 
-        _) = self.get_margin_info(order_executor=order_executor, asset_id=collateral_id, timestamp=timestamp)
-
+        (liq_res, total_account_value, _, _, total_maintenance_requirement, _, least_collateral_ratio_position,
+         _) = self.get_margin_info(order_executor=order_executor, asset_id=collateral_id, timestamp=timestamp)
 
         if total_maintenance_requirement == 0:
             return (current_balance, current_balance)
@@ -721,7 +720,8 @@ class User:
         unrealized_pnl_sum = 0
         total_maintenance_margin_requirement = new_position_maintanence_requirement
         least_collateral_ratio = 1
-        least_collateral_ratio_position = {"market_id": 0,"direction": 0,"avg_execution_price": 0, "position_size": 0, "margin_amount": 0, "borrowed_amount": 0,"leverage": 0}
+        least_collateral_ratio_position = {"market_id": 0, "direction": 0, "avg_execution_price": 0,
+                                           "position_size": 0, "margin_amount": 0, "borrowed_amount": 0, "leverage": 0}
         least_collateral_ratio_asset_price = 0
         print("user balance:", user_balance)
         total_margin = user_balance
@@ -771,7 +771,7 @@ class User:
                 short_collateral_ratio = (
                     short_position["margin_amount"] + pnl) / (short_position["position_size"] * market_price)
                 print("short_collateral_ratio", short_collateral_ratio)
-            
+
             updated_long_position = {
                 "market_id": market,
                 "direction": order_direction["long"],
@@ -793,7 +793,8 @@ class User:
             }
 
             if least_collateral_ratio > long_collateral_ratio or least_collateral_ratio > short_collateral_ratio:
-                print("checking collateral ratios", least_collateral_ratio, short_collateral_ratio, long_collateral_ratio)
+                print("checking collateral ratios", least_collateral_ratio,
+                      short_collateral_ratio, long_collateral_ratio)
                 least_collateral_ratio_asset_price = market_price
                 if long_collateral_ratio <= short_collateral_ratio:
                     least_collateral_ratio = long_collateral_ratio
@@ -1124,13 +1125,13 @@ class OrderExecutor:
 
     def get_market_price(self, market_id: int, timestamp: int) -> float:
         try:
-            if self.market_prices[market_id]["timestamp"] + self.ttl < timestamp:
-                print(
-                    "Market price Details: ", self.market_prices[market_id]["timestamp"], self.ttl, timestamp)
-                print("Market Price: ", self.market_prices[market_id]["price"])
-                return 0
-            else:
+            if timestamp - self.market_prices[market_id]["timestamp"] <= self.ttl:
+                print("Market price:", self.market_prices[market_id]["price"])
                 return self.market_prices[market_id]["price"]
+            else:
+                print("Market price out of ttl", 0)
+                return 0
+
         except:
             print("Error while getting market price")
             return 0
@@ -1304,10 +1305,11 @@ class Liquidator:
                     "leverage": 0,
                     }, 0, 0)
 
-        (liq_result, total_margin, _, _, maintenance_margin_requirement, least_collateral_ratio, least_collateral_ratio_position, 
-        least_collateral_ratio_position_asset_price) = user.get_margin_info(order_executor=order_executor, asset_id=collateral_id, timestamp=timestamp)
+        (liq_result, total_margin, _, _, maintenance_margin_requirement, least_collateral_ratio, least_collateral_ratio_position,
+         least_collateral_ratio_position_asset_price) = user.get_margin_info(order_executor=order_executor, asset_id=collateral_id, timestamp=timestamp)
 
-        print("least_collateral_ratio_position_asset_price", least_collateral_ratio_position_asset_price)
+        print("least_collateral_ratio_position_asset_price",
+              least_collateral_ratio_position_asset_price)
         if least_collateral_ratio_position_asset_price == 0:
             return (0, {
                 "market_id": 0,
@@ -1337,6 +1339,7 @@ class Liquidator:
         self.__set_debugging_values(maintenance_requirement=maintenance_margin_requirement,
                                     total_account_value_collateral=total_margin)
         return (liq_result, least_collateral_ratio_position, total_margin, maintenance_margin_requirement)
+
 
 class ABR:
     def __init__(self):
@@ -1457,9 +1460,10 @@ async def mark_under_collateralized_position_starknet(zkx_node_signer: Signer, z
     liquidation_return_data = liquidation_result_object.call_info.retdata
     print("liquidation return data:", liquidation_return_data)
     # Convert the quantity to decimals
-    least_collateral_ratio_position= [from64x61(x) for x in liquidation_return_data[4:9]]
-    least_collateral_ratio_position.insert(0,liquidation_return_data[2])
-    least_collateral_ratio_position.insert(1,liquidation_return_data[3])
+    least_collateral_ratio_position = [
+        from64x61(x) for x in liquidation_return_data[4:9]]
+    least_collateral_ratio_position.insert(0, liquidation_return_data[2])
+    least_collateral_ratio_position.insert(1, liquidation_return_data[3])
 
     # return the boolean liquidation result and the position
     return (liquidation_return_data[1], least_collateral_ratio_position, from64x61(liquidation_return_data[9]), from64x61(liquidation_return_data[10]))
@@ -1558,6 +1562,8 @@ def mark_under_collateralized_position_python(user_test: User, liquidator: Liqui
     return (result[0], list(result[1].values())[:7], result[2], result[3])
 
 # Get safe withdrawal amount for python implementation
+
+
 def get_safe_amount_to_withdraw_python(user_test: User, liquidator: Liquidator, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[float, float]:
     result = user_test.get_safe_amount_to_withdraw(
         liquidator, order_executor, collateral_id, timestamp)
@@ -1717,7 +1723,64 @@ async def compare_debugging_values(liquidate: StarknetContract, liquidator: Liqu
     assert account_value_python == pytest.approx(account_value, abs=1e-3)
 
 
+async def get_user_margin_info_starknet(user: StarknetContract, collateral_id: int) -> Tuple[int, float, float, float, float, float, List, float]:
+    # Get the margin_info from starknet
+    margin_result_query = await user.get_margin_info(collateral_id, 0, 0).call()
+    margin_result = margin_result_query.result
+    (is_liquidation, total_margin, available_margin, unrealized_pnl_sum, maintenance_margin_requirement, least_collateral_ratio, least_collateral_ratio_position, least_collateral_ratio_position_asset_price) = (
+        margin_result.is_liquidation, from64x61(margin_result.total_margin), from64x61(margin_result.available_margin), from64x61(
+            margin_result.unrealized_pnl_sum), from64x61(margin_result.maintenance_margin_requirement),
+        from64x61(margin_result.least_collateral_ratio), margin_result.least_collateral_ratio_position, from64x61(
+            margin_result.least_collateral_ratio_position_asset_price)
+    )
+
+    starknet_position = list(least_collateral_ratio_position)
+    formatted_starknet_position = starknet_position[:2] + [
+        from64x61(x) for x in starknet_position[2:]]
+    return (is_liquidation, total_margin, available_margin, unrealized_pnl_sum, maintenance_margin_requirement, least_collateral_ratio, formatted_starknet_position, least_collateral_ratio_position_asset_price)
+
+
+def get_user_margin_info_python(user_test: User, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> Tuple[int, float, float, float, float, float, List, float]:
+    (is_liquidation, total_margin, available_margin, unrealized_pnl_sum, maintenance_margin_requirement, least_collateral_ratio, least_collateral_ratio_position, least_collateral_ratio_position_asset_price) = user_test.get_margin_info(
+        order_executor=order_executor, timestamp=timestamp, asset_id=collateral_id)
+    formatted_python_position = list(
+        least_collateral_ratio_position.values())
+    return (is_liquidation, total_margin, available_margin, unrealized_pnl_sum, maintenance_margin_requirement, least_collateral_ratio, formatted_python_position, least_collateral_ratio_position_asset_price)
+
+
+async def compare_margin_info(user: StarknetContract, user_test: User, order_executor: OrderExecutor, collateral_id: int, timestamp: int) -> None:
+
+    (s_is_liquidation, s_total_margin, s_available_margin, s_unrealized_pnl_sum, s_maintenance_margin_requirement, s_least_collateral_ratio,
+     s_least_collateral_ratio_position, s_least_collateral_ratio_position_asset_price) = await get_user_margin_info_starknet(user=user, collateral_id=collateral_id)
+
+    (p_is_liquidation, p_total_margin, p_available_margin, p_unrealized_pnl_sum, p_maintenance_margin_requirement, p_least_collateral_ratio,
+     p_least_collateral_ratio_position, p_least_collateral_ratio_position_asset_price) = get_user_margin_info_python(user_test=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
+
+    print("formatted starknet position", s_is_liquidation, s_total_margin, s_available_margin, s_unrealized_pnl_sum, s_maintenance_margin_requirement, s_least_collateral_ratio,
+          s_least_collateral_ratio_position, s_least_collateral_ratio_position_asset_price)
+    print("formatted python position", p_is_liquidation, p_total_margin, p_available_margin, p_unrealized_pnl_sum, p_maintenance_margin_requirement, p_least_collateral_ratio,
+          p_least_collateral_ratio_position, p_least_collateral_ratio_position_asset_price)
+
+    # Compare starknet and python results
+    assert s_is_liquidation == p_is_liquidation
+    assert s_total_margin == pytest.approx(p_total_margin, abs=1e-3)
+    assert s_available_margin == pytest.approx(p_available_margin, abs=1e-3)
+    assert s_unrealized_pnl_sum == pytest.approx(
+        p_unrealized_pnl_sum, abs=1e-3)
+    assert s_maintenance_margin_requirement == pytest.approx(
+        p_maintenance_margin_requirement, abs=1e-3)
+    assert s_least_collateral_ratio == pytest.approx(
+        p_least_collateral_ratio, abs=1e-3)
+    assert s_least_collateral_ratio_position_asset_price == pytest.approx(
+        p_least_collateral_ratio_position_asset_price, abs=1e-3)
+
+    for element_1, element_2 in zip(p_least_collateral_ratio_position, s_least_collateral_ratio_position):
+        assert element_1 == pytest.approx(element_2, abs=1e-4)
+
+
 # Function to check the result of a liquidation call
+
+
 def compare_result_liquidation(python_result: Tuple[int, List, int, int], starknet_result: Tuple[int, List, int, int]):
     print("python_result", python_result)
     print("starknet_result", starknet_result)

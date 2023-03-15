@@ -1,0 +1,13 @@
+{
+  "contracts": {},
+  "tests": {
+    "tests/test_Trading.py": {
+      "coverage": false,
+      "isolated": false,
+      "results": "F",
+      "sha1": "23b5c89be013d830b6fbc9e398a388e0cb66ed7c",
+      "txhash": []
+    }
+  },
+  "tx": {}
+}
