@@ -1197,11 +1197,6 @@ func execute_order{
 
         let (new_position_size) = Math64x61_sub(position_details.position_size, size);
 
-        // Assert that the size amount can be closed from the existing position
-        with_attr error_message("0003: {order_id} {size}") {
-            Math64x61_assert_le(0, new_position_size, asset_decimals);
-        }
-
         // Check if it's liq/delveraging order
         let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
 
