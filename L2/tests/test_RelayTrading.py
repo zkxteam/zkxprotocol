@@ -495,8 +495,8 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     users_test = [felix_test, gary_test]
 
     # Sufficient balance for users
-    felix_balance = 40
-    gary_balance = 100
+    felix_balance = 400
+    gary_balance = 1000
     balance_array = [felix_balance, gary_balance]
 
     # Batch params for OPEN orders
