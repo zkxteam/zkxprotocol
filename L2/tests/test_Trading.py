@@ -399,7 +399,7 @@ def assert_events_emitted_from_all_calls(tx_exec_info, events):
 
 @pytest.mark.asyncio
 async def test_for_risk_while_opening_order(trading_test_initializer):
-    starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -498,6 +498,9 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp1)
 
+    market_price_query = await marketPrices.get_market_price(market_id_1).call()
+    print("The current market price is",
+          from64x61(market_price_query.result.market_price))
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_2)

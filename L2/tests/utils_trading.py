@@ -760,7 +760,8 @@ class User:
                 unrealized_pnl_sum += pnl
                 long_collateral_ratio = (
                     long_position["margin_amount"] + pnl) / (long_position["position_size"] * market_price)
-                print("long_collateral_ratio", long_collateral_ratio)
+                print("long_collateral_ratio:", long_collateral_ratio,
+                      pnl, long_position["margin_amount"])
 
             if short_position["position_size"] != 0:
                 total_maintenance_margin_requirement += short_position["avg_execution_price"] * \
@@ -770,7 +771,8 @@ class User:
                 unrealized_pnl_sum += pnl
                 short_collateral_ratio = (
                     short_position["margin_amount"] + pnl) / (short_position["position_size"] * market_price)
-                print("short_collateral_ratio", short_collateral_ratio)
+                print("short_collateral_ratio:", short_collateral_ratio,
+                      pnl, short_position["margin_amount"])
 
             updated_long_position = {
                 "market_id": market,
@@ -2167,3 +2169,5 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 #     1000,
 #     100
 # )
+
+print(to64x61(2.0))
