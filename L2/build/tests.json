@@ -4,8 +4,8 @@
     "tests/test_Trading.py": {
       "coverage": false,
       "isolated": false,
-      "results": "F",
-      "sha1": "0b2d44283bde29f82328e8891147ffbe28d34b07",
+      "results": ".....................F",
+      "sha1": "aa8f7ea8d188ad3961f764ea07ce5d0051ff5928",
       "txhash": []
     }
   },
