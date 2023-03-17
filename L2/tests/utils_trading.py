@@ -539,8 +539,18 @@ class User:
                         print("AccountManager: Position not marked as deleveragable")
                         return ()
                     new_leverage = position["leverage"]
+
+                    current_locked_margin = self.get_locked_margin(
+                        asset_id=market_to_collateral_mapping[market_id])
+                    self.set_locked_margin(new_locked_margin=current_locked_margin -
+                                           margin_update, asset_id=market_to_collateral_mapping[market_id])
             else:
                 new_leverage = position["leverage"]
+
+                current_locked_margin = self.get_locked_margin(
+                    asset_id=market_to_collateral_mapping[market_id])
+                self.set_locked_margin(new_locked_margin=current_locked_margin -
+                                       margin_update, asset_id=market_to_collateral_mapping[market_id])
 
             updated_position = {}
             if new_position_size == 0:
@@ -583,11 +593,6 @@ class User:
 
             self.__update_position(
                 market_id=order["market_id"], direction=order["direction"], updated_dict=updated_dict, updated_position=updated_position)
-
-            current_locked_margin = self.get_locked_margin(
-                asset_id=market_to_collateral_mapping[market_id])
-            self.set_locked_margin(new_locked_margin=current_locked_margin -
-                                   margin_update, asset_id=market_to_collateral_mapping[market_id])
 
     def get_position(self, market_id: int = BTC_USD_ID, direction: int = order_direction["long"]) -> Dict:
         try:
@@ -1006,9 +1011,6 @@ class OrderExecutor:
 
         # Get the user position
         position = user.get_position(order["market_id"], order["direction"])
-        if position["position_size"] == 0:
-            print("The current position size cannot be 0")
-            return (0, 0, 0, 0, 0)
 
         # Values to be populated for position object
         margin_amount = position["margin_amount"]
@@ -1041,8 +1043,6 @@ class OrderExecutor:
         # Value of asset at current price w leverage
         leveraged_amount_out = order_size * actual_execution_price
 
-        if position["position_size"] == 0:
-            return (0, 0, 0, 0, 0)
         # Calculate the amount that needs to be returned to the user
         percent_of_position = order_size / \
             position["position_size"]
@@ -1776,10 +1776,13 @@ async def compare_margin_info(user: StarknetContract, user_test: User, order_exe
     (p_is_liquidation, p_total_margin, p_available_margin, p_unrealized_pnl_sum, p_maintenance_margin_requirement, p_least_collateral_ratio,
      p_least_collateral_ratio_position, p_least_collateral_ratio_position_asset_price) = get_user_margin_info_python(user_test=user_test, order_executor=order_executor, collateral_id=collateral_id, timestamp=timestamp)
 
-    print("formatted starknet position", s_is_liquidation, s_total_margin, s_available_margin, s_unrealized_pnl_sum, s_maintenance_margin_requirement, s_least_collateral_ratio,
+    print("formatted starknet margin result", s_is_liquidation, s_total_margin, s_available_margin, s_unrealized_pnl_sum, s_maintenance_margin_requirement, s_least_collateral_ratio,
           s_least_collateral_ratio_position, s_least_collateral_ratio_position_asset_price)
-    print("formatted python position", p_is_liquidation, p_total_margin, p_available_margin, p_unrealized_pnl_sum, p_maintenance_margin_requirement, p_least_collateral_ratio,
+    print("formatted python margin result", p_is_liquidation, p_total_margin, p_available_margin, p_unrealized_pnl_sum, p_maintenance_margin_requirement, p_least_collateral_ratio,
           p_least_collateral_ratio_position, p_least_collateral_ratio_position_asset_price)
+
+    for element_1, element_2 in zip(p_least_collateral_ratio_position, s_least_collateral_ratio_position):
+        assert element_1 == pytest.approx(element_2, abs=1e-4)
 
     # Compare starknet and python results
     assert s_is_liquidation == p_is_liquidation
@@ -1789,13 +1792,12 @@ async def compare_margin_info(user: StarknetContract, user_test: User, order_exe
         p_unrealized_pnl_sum, abs=1e-3)
     assert s_maintenance_margin_requirement == pytest.approx(
         p_maintenance_margin_requirement, abs=1e-3)
+    print("s_least_collateral_ratio", s_least_collateral_ratio)
+    print("p_least_collateral_ratio", p_least_collateral_ratio)
     assert s_least_collateral_ratio == pytest.approx(
         p_least_collateral_ratio, abs=1e-3)
     assert s_least_collateral_ratio_position_asset_price == pytest.approx(
         p_least_collateral_ratio_position_asset_price, abs=1e-3)
-
-    for element_1, element_2 in zip(p_least_collateral_ratio_position, s_least_collateral_ratio_position):
-        assert element_1 == pytest.approx(element_2, abs=1e-4)
 
 
 # Function to check the result of a liquidation call
@@ -1854,6 +1856,10 @@ async def compare_user_positions(users: List[StarknetContract], users_test: List
 
         print("user_position_python_long", user_position_python_long)
         print("user_position_starknet_long", user_position_starknet_long)
+
+        print("user_position_python_short", user_position_python_short)
+        print("user_position_starknet_short", user_position_starknet_short)
+
         for element_1, element_2 in zip(user_position_python_long, user_position_starknet_long):
             assert element_1 == pytest.approx(element_2, abs=1e-4)
 

@@ -1123,15 +1123,21 @@ func execute_order{
     if (request.side == BUY) {
         local created_timestamp;
 
-        let (is_zero_current_position) = Math64x61_is_equal(position_details.position_size, 0, asset_decimals);
+        let (is_zero_current_position) = Math64x61_is_equal(
+            position_details.position_size, 0, asset_decimals
+        );
         if (is_zero_current_position == TRUE) {
-            let (opposite_direction: felt) = get_opposite(side_or_direction_ = request.direction);
-            let (opposite_position: PositionDetails) = position_mapping.read(market_id=market_id, direction=opposite_direction);
-            let (is_zero_opposite_position) = Math64x61_is_equal(opposite_position.position_size, 0, asset_decimals);
-            
+            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
+            let (opposite_position: PositionDetails) = position_mapping.read(
+                market_id=market_id, direction=opposite_direction
+            );
+            let (is_zero_opposite_position) = Math64x61_is_equal(
+                opposite_position.position_size, 0, asset_decimals
+            );
+
             if (is_zero_opposite_position == TRUE) {
                 add_to_market_array(market_id_=market_id, collateral_id_=collateral_id_);
-            
+
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -1246,6 +1252,7 @@ func execute_order{
                 let (leverage_) = Math64x61_div(total_value, margin_amount);
                 let (leverage_rounded) = Math64x61_round(leverage_, 5);
                 assert new_leverage = leverage_rounded;
+
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -1255,12 +1262,26 @@ func execute_order{
                 }
 
                 assert new_leverage = position_details.leverage;
+
+                let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+                let (new_margin_locked) = Math64x61_sub(current_margin_locked, margin_lock_update_amount);
+                // Subtract from previous locked amount
+                margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
+                
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
         } else {
             assert new_leverage = position_details.leverage;
+
+            let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+            let (new_margin_locked) = Math64x61_sub(
+                current_margin_locked, margin_lock_update_amount
+            );
+            // Subtract from previous locked amount
+            margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
+
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1271,9 +1292,13 @@ func execute_order{
 
         let (is_zero_current_position) = Math64x61_is_equal(new_position_size, 0, asset_decimals);
         if (is_zero_current_position == TRUE) {
-            let (opposite_direction: felt) = get_opposite(side_or_direction_ = request.direction);
-            let (opposite_position: PositionDetails) = position_mapping.read(market_id=market_id, direction=opposite_direction);
-            let (is_zero_opposite_position) = Math64x61_is_equal(opposite_position.position_size, 0, asset_decimals);
+            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
+            let (opposite_position: PositionDetails) = position_mapping.read(
+                market_id=market_id, direction=opposite_direction
+            );
+            let (is_zero_opposite_position) = Math64x61_is_equal(
+                opposite_position.position_size, 0, asset_decimals
+            );
 
             if (is_zero_opposite_position == 1) {
                 remove_from_market_array(market_id_=market_id, collateral_id_=collateral_id_);
@@ -1330,11 +1355,6 @@ func execute_order{
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
-
-        let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
-        let (new_margin_locked) = Math64x61_sub(current_margin_locked, margin_lock_update_amount);
-        // Subtract from previous locked amount
-        margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
