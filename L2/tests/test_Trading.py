@@ -291,7 +291,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         ttl=60,
         tick_size=1,
         step_size=1,
-        minimum_order_size=10,
+        minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(10),
         currently_allowed_leverage=to64x61(10),

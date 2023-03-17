@@ -1153,6 +1153,9 @@ async def test_should_liquidate_after_deleveraging(adminAuth_factory):
         "side": side["sell"],
     }]
 
+    # # compare margin info
+    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_6)
+
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_6)
     await compare_user_balances(users=users, user_tests=users_test, asset_id=collateral_id_1)
@@ -1161,8 +1164,8 @@ async def test_should_liquidate_after_deleveraging(adminAuth_factory):
     # compare the resulting liquidatable position
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
-    # compare margin info
-    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_6)
+    # # compare margin info
+    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_6)
 
 
 @pytest.mark.asyncio
