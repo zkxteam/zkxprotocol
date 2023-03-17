@@ -1206,7 +1206,7 @@ func execute_order{
         // Check if it's liq/delveraging order
         let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
 
-        if (is_liq == 1) {
+        if (is_liq == TRUE) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
             let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
                 collateral_id=collateral_id_
@@ -1264,10 +1264,12 @@ func execute_order{
                 assert new_leverage = position_details.leverage;
 
                 let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
-                let (new_margin_locked) = Math64x61_sub(current_margin_locked, margin_lock_update_amount);
+                let (new_margin_locked) = Math64x61_sub(
+                    current_margin_locked, margin_lock_update_amount
+                );
                 // Subtract from previous locked amount
                 margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
-                
+
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -1836,7 +1838,8 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     if (is_le_least_short * is_le_least_long == 1) {
         assert new_least_collateral_ratio = least_collateral_ratio;
         assert new_least_collateral_ratio_position = least_collateral_ratio_position;
-        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price;
+        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price
+            ;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
