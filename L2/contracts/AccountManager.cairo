@@ -63,6 +63,7 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import (
     Math64x61_add,
     Math64x61_assert_le,
+    Math64x61_BOUND,
     Math64x61_div,
     Math64x61_fromDecimalFelt,
     Math64x61_is_equal,
@@ -352,7 +353,7 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
             available_margin=available_margin,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
-            least_collateral_ratio=1,
+            least_collateral_ratio=0,
             least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
             least_collateral_ratio_position_asset_price=0,
         );
@@ -375,21 +376,22 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         collateral_token_decimal_=collateral.token_decimal,
         unrealized_pnl_sum_=0,
         maintenance_margin_requirement_=new_position_maintanence_requirement_,
-        least_collateral_ratio=Math64x61_ONE,
+        least_collateral_ratio=Math64x61_BOUND,
         least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
         least_collateral_ratio_position_asset_price=0,
     );
 
     // If any of the position's ttl is outdated
     if (least_collateral_ratio_position_asset_price == 0) {
-        let (available_margin) = Math64x61_sub(collateral_balance, new_position_margin_);
+        let (available_margin_temp) = Math64x61_sub(collateral_balance, new_position_margin_);
+        let (available_margin) = Math64x61_sub(available_margin_temp, initial_margin_sum);
         return (
             is_liquidation=FALSE,
             total_margin=collateral_balance,
             available_margin=available_margin,
             unrealized_pnl_sum=0,
             maintenance_margin_requirement=0,
-            least_collateral_ratio=Math64x61_ONE,
+            least_collateral_ratio=0,
             least_collateral_ratio_position=PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0),
             least_collateral_ratio_position_asset_price=0,
         );
@@ -1111,15 +1113,35 @@ func execute_order{
     // closeOrder == 2 -> Close a position
     if (request.side == BUY) {
         local created_timestamp;
-        let (is_equal) = Math64x61_is_equal(position_details.position_size, 0, asset_decimals);
-        if (is_equal == TRUE) {
-            add_to_market_array(market_id_=market_id, collateral_id_=collateral_id_);
+
+        let (is_zero_current_position) = Math64x61_is_equal(
+            position_details.position_size, 0, asset_decimals
+        );
+        if (is_zero_current_position == TRUE) {
+            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
+            let (opposite_position: PositionDetails) = position_mapping.read(
+                market_id=market_id, direction=opposite_direction
+            );
+            let (is_zero_opposite_position) = Math64x61_is_equal(
+                opposite_position.position_size, 0, asset_decimals
+            );
+
+            if (is_zero_opposite_position == TRUE) {
+                add_to_market_array(market_id_=market_id, collateral_id_=collateral_id_);
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            }
+
             created_timestamp = current_timestamp;
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
         } else {
             created_timestamp = position_details.created_timestamp;
+
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1172,15 +1194,10 @@ func execute_order{
 
         let (new_position_size) = Math64x61_sub(position_details.position_size, size);
 
-        // Assert that the size amount can be closed from the existing position
-        with_attr error_message("0003: {order_id} {size}") {
-            Math64x61_assert_le(0, new_position_size, asset_decimals);
-        }
-
         // Check if it's liq/delveraging order
         let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
 
-        if (is_liq == 1) {
+        if (is_liq == TRUE) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
             let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
                 collateral_id=collateral_id_
@@ -1226,6 +1243,7 @@ func execute_order{
                 let (leverage_) = Math64x61_div(total_value, margin_amount);
                 let (leverage_rounded) = Math64x61_round(leverage_, 5);
                 assert new_leverage = leverage_rounded;
+
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
@@ -1235,12 +1253,28 @@ func execute_order{
                 }
 
                 assert new_leverage = position_details.leverage;
+
+                let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+                let (new_margin_locked) = Math64x61_sub(
+                    current_margin_locked, margin_lock_update_amount
+                );
+                // Subtract from previous locked amount
+                margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
+
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
         } else {
             assert new_leverage = position_details.leverage;
+
+            let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+            let (new_margin_locked) = Math64x61_sub(
+                current_margin_locked, margin_lock_update_amount
+            );
+            // Subtract from previous locked amount
+            margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
+
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1249,9 +1283,17 @@ func execute_order{
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
 
-        let (is_equal) = Math64x61_is_equal(new_position_size, 0, asset_decimals);
-        if (is_equal == TRUE) {
-            if (position_details.position_size == 0) {
+        let (is_zero_current_position) = Math64x61_is_equal(new_position_size, 0, asset_decimals);
+        if (is_zero_current_position == TRUE) {
+            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
+            let (opposite_position: PositionDetails) = position_mapping.read(
+                market_id=market_id, direction=opposite_direction
+            );
+            let (is_zero_opposite_position) = Math64x61_is_equal(
+                opposite_position.position_size, 0, asset_decimals
+            );
+
+            if (is_zero_opposite_position == 1) {
                 remove_from_market_array(market_id_=market_id, collateral_id_=collateral_id_);
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1306,11 +1348,6 @@ func execute_order{
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
-
-        let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
-        let (new_margin_locked) = Math64x61_sub(current_margin_locked, margin_lock_update_amount);
-        // Subtract from previous locked amount
-        margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1708,7 +1745,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
     if (is_long_zero == TRUE) {
-        assert long_collateral_ratio = Math64x61_ONE;
+        assert long_collateral_ratio = Math64x61_BOUND;
         assert long_maintanence_requirement = 0;
         assert long_asset_price = 0;
         assert long_pnl = 0;
@@ -1742,7 +1779,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
     if (is_short_zero == TRUE) {
-        assert short_collateral_ratio = Math64x61_ONE;
+        assert short_collateral_ratio = Math64x61_BOUND;
         assert short_maintanence_requirement = 0;
         assert short_asset_price = 0;
         assert short_pnl = 0;
@@ -2536,4 +2573,17 @@ func check_for_withdrawal_replay{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     }
 
     return check_for_withdrawal_replay(request_id_, arr_len_ - 1);
+}
+
+// @notice Internal function to get oppsite side or direction of the order
+// @param side_or_direction_ - Argument represents either side or direction
+// @return res - Returns either opposite side or opposite direction of the order
+func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    side_or_direction_: felt
+) -> (res: felt) {
+    if (side_or_direction_ == LONG) {
+        return (res=SHORT);
+    } else {
+        return (res=LONG);
+    }
 }

@@ -10,7 +10,7 @@ from utils_trading import (
     User, Liquidator, OrderExecutor,
     order_direction, order_types, side, fund_mapping,
     set_balance, execute_and_compare, mark_under_collateralized_position,
-    compare_fund_balances, compare_user_balances, compare_user_positions, compare_debugging_values, compare_liquidatable_position
+    compare_fund_balances, compare_user_balances, compare_user_positions, compare_debugging_values, compare_liquidatable_position, compare_margin_info
 )
 from utils_links import DEFAULT_LINK_1, prepare_starknet_string
 from utils_asset import AssetID, build_asset_properties
@@ -373,6 +373,9 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
     #################################################
     ######## Alice's liquidation result USDC ########
     #################################################
@@ -417,6 +420,10 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
 
     ###################################################
     ######## Alice's liquidation result USDC 2 ########
@@ -467,6 +474,9 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_1)
+
     ###################################################
     ######## Set new price for the market #############
     ###################################################
@@ -492,6 +502,9 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_2)
+
     ###################################################
     ######## Set new price for the market #############
     ###################################################
@@ -505,6 +518,9 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_2)
+
     ###################################################
     ######## Alice's liquidation result USDC 6 ########
     ###################################################
@@ -515,6 +531,9 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
 
     is_liquidatable = await alice.get_deleveragable_or_liquidatable_position(AssetID.USDC).call()
     print("alice liq position", is_liquidatable.result.position)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_2)
 
 
 @pytest.mark.asyncio
@@ -569,6 +588,9 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_2)
+
     ##################################################
     ######## Alice's liquidation result DAI 1 ########
     ##################################################
@@ -608,6 +630,9 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_3)
+
     #################################################
     ####### Bob's liquidation result DAI 2 ##########
     #################################################
@@ -615,6 +640,9 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_3)
 
     ###################################################
     ######## Set new price for the market #############
@@ -641,6 +669,9 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_4)
+
     ##################################################
     ####### Bob's liquidation result DAI 3 ###########
     ##################################################
@@ -649,6 +680,9 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=bob, user_test=bob_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_4)
 
     alice_balance = alice_test.get_balance(AssetID.DAI)
     print("alice balance", alice_balance)
@@ -782,6 +816,11 @@ async def test_deleveraging_in_multiple_orders(adminAuth_factory):
 
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_4)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=collateral_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_4)
 
     is_liquidatable = await alice.get_deleveragable_or_liquidatable_position(AssetID.USDC).call()
     print("alice liq position", is_liquidatable.result.position)
@@ -817,9 +856,13 @@ async def test_deleveraging_in_multiple_orders(adminAuth_factory):
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_4)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=collateral_id_1)
 
     # compare the resulting liquidatable position
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_4)
 
 
 @pytest.mark.asyncio
@@ -869,53 +912,6 @@ async def test_liquidation_invalid_order_type(adminAuth_factory):
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0007:", error_at_index=error_at_index, param_2=to64x61(quantity_locked_1), timestamp=timestamp_4)
 
 
-# @pytest.mark.asyncio
-# async def test_liquidation_invalid_size(adminAuth_factory):
-#     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
-
-#     ####### Opening of Deleveraged Order #######
-#     # List of users
-#     users = [charlie, alice]
-#     users_test = [charlie_test, alice_test]
-
-#     # Batch params
-#     quantity_locked_1 = 3.0
-#     market_id_1 = BTC_DAI_ID
-#     collateral_id_1 = AssetID.DAI
-#     oracle_price_1 = 7450.0
-
-#     # Sufficient balance for users
-#     charlie_balance_usdc = 10000
-#     alice_balance_usdc = 10
-
-#     balance_array_usdc = [charlie_balance_usdc, alice_balance_usdc]
-
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array_usdc, asset_id=collateral_id_1)
-
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": quantity_locked_1,
-#         "price": 7450.0,
-#         "leverage": 5,
-#         "market_id": market_id_1,
-#         "order_type": order_types["limit"],
-#         "direction": order_direction["short"]
-#     }, {
-#         "quantity": quantity_locked_1,
-#         "price": 7450.0,
-#         "market_id": market_id_1,
-#         "order_type": order_types["liquidation"],
-#         "liquidator_address": liquidator.contract_address,
-#         "direction": order_direction["short"],
-#         "side": side["sell"],
-#     }]
-
-#     error_at_index = 1
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"0003:", error_at_index=error_at_index, param_2=to64x61(quantity_locked_1), timestamp=timestamp_4)
-
-
 @pytest.mark.asyncio
 async def test_liquidation_in_multiple_orders(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
@@ -960,6 +956,11 @@ async def test_liquidation_in_multiple_orders(adminAuth_factory):
 
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_4)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=collateral_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_4)
 
     ####### Opening of Deleveraged Order #######
     # List of users
@@ -990,10 +991,14 @@ async def test_liquidation_in_multiple_orders(adminAuth_factory):
 
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_4)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=collateral_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     # compare the resulting liquidatable position
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_4)
 
 
 @pytest.mark.asyncio
@@ -1019,6 +1024,9 @@ async def test_should_calculate_correct_liq_USDC_collateral_3(adminAuth_factory)
     await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_5)
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_5)
 
 
 @pytest.mark.asyncio
@@ -1066,10 +1074,15 @@ async def test_liquidation_underwater(adminAuth_factory):
 
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_5)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=collateral_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     # compare the resulting liquidatable position
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_5)
 
 
 @pytest.mark.asyncio
@@ -1094,6 +1107,9 @@ async def test_should_calculate_correct_liq_USDC_collateral_4(adminAuth_factory)
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_6)
 
 
 @pytest.mark.asyncio
@@ -1137,11 +1153,19 @@ async def test_should_liquidate_after_deleveraging(adminAuth_factory):
         "side": side["sell"],
     }]
 
+    # # compare margin info
+    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_6)
+
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_6)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=collateral_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     # compare the resulting liquidatable position
     await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
+
+    # # compare margin info
+    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_6)
 
 
 @pytest.mark.asyncio
@@ -1193,6 +1217,9 @@ async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=daniel, user_test=daniel_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_6)
+    await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_6)
     ###################################################
     ######## Daniel's liquidation result USDC ########
     ###################################################
@@ -1223,6 +1250,9 @@ async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=daniel, user_test=daniel_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_7)
+
     ###################################################
     ####### Eduard's liquidation result USDC ##########
     ###################################################
@@ -1230,6 +1260,9 @@ async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_7)
 
 
 @pytest.mark.asyncio
@@ -1253,6 +1286,9 @@ async def test_should_liquidate_short_leverage_1(adminAuth_factory):
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=daniel, user_test=daniel_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_8)
+
     ###################################################
     ####### Eduard's liquidation result USDC ##########
     ###################################################
@@ -1260,6 +1296,9 @@ async def test_should_liquidate_short_leverage_1(adminAuth_factory):
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_8)
 
 
 @pytest.mark.asyncio
@@ -1314,6 +1353,9 @@ async def test_shouldnt_liquidate_multiple_leverage_1(adminAuth_factory):
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
+    # compare margin info
+    await compare_margin_info(user=daniel, user_test=daniel_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_8)
+    await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_8)
     ###################################################
     ######## Set new price for the market #############
     ###################################################
@@ -1331,6 +1373,8 @@ async def test_shouldnt_liquidate_multiple_leverage_1(adminAuth_factory):
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
 
+    await compare_margin_info(user=daniel, user_test=daniel_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_9)
+
     ###################################################
     ####### Eduard's liquidation result USDC ##########
     ###################################################
@@ -1338,3 +1382,5 @@ async def test_shouldnt_liquidate_multiple_leverage_1(adminAuth_factory):
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
     await compare_liquidatable_position(user=eduard, user_test=eduard_test, collateral_id=collateral_id_1)
+
+    await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_9)
