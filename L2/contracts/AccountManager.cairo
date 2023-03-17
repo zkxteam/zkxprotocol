@@ -81,15 +81,6 @@ from contracts.Math_64x61 import (
 
 const TWO_POINT_FIVE = 5764607523034234880;
 
-// /////////
-// Events //
-// /////////
-
-// Event emitted whenever a position is marked to be liquidated/deleveraged
-@event
-func liquidate_deleverage(market_id: felt, direction: felt, amount_to_be_sold: felt) {
-}
-
 // //////////
 // Storage //
 // //////////
@@ -1578,9 +1569,16 @@ func liquidate_position{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         collateral_id=collateral_id_, value=liquidatable_position
     );
 
-    liquidate_deleverage.emit(
-        market_id=position_.market_id, direction=position_.direction, amount_to_be_sold=amount
-    );
+    let (keys: felt*) = alloc();
+    assert keys[0] = 'liquidate_or_deleverage';
+    let (data: felt*) = alloc();
+    assert data[0] = position_.market_id;
+    assert data[1] = position_.direction;
+    assert data[2] = amount;
+    assert data[3] = liquidatable;
+
+    emit_event(1, keys, 4, data);
+
     return ();
 }
 
