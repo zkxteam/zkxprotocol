@@ -865,15 +865,9 @@ class OrderExecutor:
         self.ttl = 60
 
     def set_market_price(self, market_id: int, price: float, current_timestamp: int):
-        last_timestamp = 0
-        try:
-            last_timestamp = self.market_prices[market_id]["timestamp"]
-        except:
-            last_timestamp = 0
+        current_price = self.get_market_price(market_id, current_timestamp)
 
-        if last_timestamp + self.ttl < current_timestamp:
-            print("new market price set", last_timestamp,
-                  current_timestamp, price)
+        if current_price == 0:
             self.market_prices.update({
                 market_id: {
                     "price": price,
@@ -1167,6 +1161,9 @@ class OrderExecutor:
         # Store the quantity executed so far
         running_weighted_sum = 0
 
+        self.set_market_price(
+            market_id=market_id, price=oracle_price, current_timestamp=timestamp)
+
         (maker_execution_sizes) = self.__adjust_quantity_locked(
             request_list=request_list, users_list=user_list, quantity_locked=quantity_locked)
         print("adjusted size", maker_execution_sizes[-1:])
@@ -1262,8 +1259,6 @@ class OrderExecutor:
                                        margin_amount=margin_amount, borrowed_amount=borrowed_amount, market_id=market_id, timestamp=timestamp, pnl=pnl, margin_update=margin_update)
             print("\n\n")
 
-        self.set_market_price(
-            market_id=market_id, price=oracle_price, current_timestamp=timestamp)
         self.batch_id_status[batch_id] = 1
         return
 
