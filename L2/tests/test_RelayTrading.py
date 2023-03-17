@@ -7,7 +7,7 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61, from64x61, assert_revert, PRIME, PRIME_HALF
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61, from64x61, assert_revert, PRIME, PRIME_HALF, assert_event_with_custom_keys_emitted
 from utils_trading import User, order_direction, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
@@ -454,27 +454,13 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     # execute order
     (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
 
-    # assert_event_emitted(
-    #     info,
-    #     from_address=trading.contract_address,
-    #     name="trade_execution",
-    #     data=[
-    #         to64x61(quantity_locked_1),
-    #         to64x61(200),
-    #         order_direction["short"]
-    #     ]
-    # )
-
-    # assert_event_emitted(
-    #     info,
-    #     from_address=trading.contract_address,
-    #     name="trade_execution",
-    #     data=[
-    #         to64x61(quantity_locked_1),
-    #         to64x61(200),
-    #         1
-    #     ]
-    # )
+    assert_event_with_custom_keys_emitted(
+        tx_exec_info = info,
+        from_address = trading.contract_address,
+        keys = [str_to_felt('trade_execution'), market_id_1],
+        data = [to64x61(quantity_locked_1), to64x61(200), order_direction["short"]],
+        order=6
+    )
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1411,16 +1397,13 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
-    # assert_event_emitted(
-    #     info,
-    #     from_address=trading.contract_address,
-    #     name="trade_execution",
-    #     data=[
-    #         to64x61(quantity_locked_1),
-    #         to64x61(1000),
-    #         1
-    #     ]
-    # )
+    assert_event_with_custom_keys_emitted(
+        tx_exec_info = info,
+        from_address = trading.contract_address,
+        keys = [str_to_felt('trade_execution'), market_id_1],
+        data = [to64x61(quantity_locked_1), to64x61(1000), order_direction["short"]],
+        order=5
+    )
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -1600,16 +1583,13 @@ async def test_closing_partial_orders(trading_test_initializer):
     # execute order
     (_, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
 
-    # assert_event_emitted(
-    #     info,
-    #     from_address=trading.contract_address,
-    #     name="trade_execution",
-    #     data=[
-    #         to64x61(quantity_locked_2),
-    #         to64x61(1000),
-    #         1
-    #     ]
-    # )
+    assert_event_with_custom_keys_emitted(
+        tx_exec_info = info,
+        from_address = trading.contract_address,
+        keys = [str_to_felt('trade_execution'), market_id_1],
+        data = [to64x61(quantity_locked_2), to64x61(1000), order_direction["long"]],
+        order=3
+    )
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
