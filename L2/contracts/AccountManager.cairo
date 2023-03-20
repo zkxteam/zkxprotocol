@@ -518,6 +518,11 @@ func get_account_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
     let (positions_array: PositionDetailsWithMarket*) = alloc();
 
+    // Get position to be liquidated or deleveraged
+    let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
+        collateral_id=collateral_id_
+    );
+
     // Recursively call the next market_id
     let (
         positions_array_len: felt, positions_array: PositionDetailsWithMarket*
@@ -527,6 +532,7 @@ func get_account_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         markets_iterator_=0,
         markets_array_len_=current_markets_array_len,
         current_collateral_id_=collateral_id_,
+        liq_position_=liq_position,
     );
 
     let (
@@ -2068,6 +2074,7 @@ func populate_array_collaterals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
 // @param markets_iterator_ - Current length of traversed markets array
 // @param markets_array_len_ - Length of the markets array
 // @param current_collateral_id_ - Current collateral_id
+// @param liq_position_ - Position to be liquidated or deleveraged
 // @returns positions_array_len - Length of the positions array
 // @returns positions_array - Array with the positions
 func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
@@ -2076,6 +2083,7 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     markets_iterator_: felt,
     markets_array_len_: felt,
     current_collateral_id_: felt,
+    liq_position_: LiquidatablePosition,
 ) -> (positions_array_len: felt, positions_array: PositionDetailsWithMarket*) {
     alloc_locals;
 
@@ -2121,6 +2129,45 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     local is_long;
     local is_short;
+    local deleveragable_or_liquidatable_long;
+    local amount_to_be_sold_long;
+    local deleveragable_or_liquidatable_short;
+    local amount_to_be_sold_short;
+
+    if (liq_position_.market_id == curr_market_id) {
+        if (liq_position_.direction == LONG) {
+            if (liq_position_.liquidatable == TRUE) {
+                assert deleveragable_or_liquidatable_long = 2;
+                assert amount_to_be_sold_long = liq_position_.amount_to_be_sold;
+            } else {
+                if (liq_position_.amount_to_be_sold != 0) {
+                    assert deleveragable_or_liquidatable_long = 1;
+                    assert amount_to_be_sold_long = liq_position_.amount_to_be_sold;
+                } else {
+                    assert deleveragable_or_liquidatable_long = 0;
+                    assert amount_to_be_sold_long = 0;
+                }
+            }
+        } else {
+            if (liq_position_.liquidatable == TRUE) {
+                assert deleveragable_or_liquidatable_short = 2;
+                assert amount_to_be_sold_short = liq_position_.amount_to_be_sold;
+            } else {
+                if (liq_position_.amount_to_be_sold != 0) {
+                    assert deleveragable_or_liquidatable_short = 1;
+                    assert amount_to_be_sold_short = liq_position_.amount_to_be_sold;
+                } else {
+                    assert deleveragable_or_liquidatable_short = 0;
+                    assert amount_to_be_sold_short = 0;
+                }
+            }
+        }
+    } else {
+        assert deleveragable_or_liquidatable_long = 0;
+        assert amount_to_be_sold_long = 0;
+        assert deleveragable_or_liquidatable_short = 0;
+        assert amount_to_be_sold_short = 0;
+    }
 
     let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
     if (is_long_zero == TRUE) {
@@ -2152,6 +2199,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             market_price=market_price,
             maintenance_margin=maintanence_requirement,
             unrealized_pnl=pnl,
+            deleveragable_or_liquidatable=deleveragable_or_liquidatable_long,
+            amount_to_be_sold=amount_to_be_sold_long,
         );
         assert positions_array_[positions_array_len_] = curr_position;
         assert is_long = 1;
@@ -2193,6 +2242,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             market_price=market_price,
             maintenance_margin=maintanence_requirement,
             unrealized_pnl=pnl,
+            deleveragable_or_liquidatable=deleveragable_or_liquidatable_short,
+            amount_to_be_sold=amount_to_be_sold_short,
         );
         assert positions_array_[positions_array_len_ + is_long] = curr_position;
         assert is_short = 1;
@@ -2207,6 +2258,7 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         markets_iterator_=markets_iterator_ + 1,
         markets_array_len_=markets_array_len_,
         current_collateral_id_=current_collateral_id_,
+        liq_position_=liq_position_,
     );
 }
 
@@ -2395,6 +2447,11 @@ func populate_positions_collaterals_recurse{
         collateral_id=current_collateral_id
     );
 
+    // Get position to be liquidated or deleveraged
+    let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
+        collateral_id=current_collateral_id
+    );
+
     // Recursively call the next market_id
     let (
         positions_array_len: felt, positions_array: PositionDetailsWithMarket*
@@ -2404,6 +2461,7 @@ func populate_positions_collaterals_recurse{
         markets_iterator_=0,
         markets_array_len_=current_markets_array_len,
         current_collateral_id_=current_collateral_id,
+        liq_position_=liq_position,
     );
 
     return populate_positions_collaterals_recurse(
