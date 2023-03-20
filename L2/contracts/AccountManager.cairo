@@ -2121,6 +2121,49 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     local is_long;
     local is_short;
+    local deleveragable_or_liquidatable_long;
+    local amount_to_be_sold_long;
+    local deleveragable_or_liquidatable_short;
+    local amount_to_be_sold_short;
+
+    let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
+        collateral_id=market.asset_collateral
+    );
+
+    if (liq_position.market_id == curr_market_id) {
+        if (liq_position.direction == LONG) {
+            if (liq_position.liquidatable == TRUE) {
+                assert deleveragable_or_liquidatable_long = 2;
+                assert amount_to_be_sold_long = long_position.position_size;
+            } else {
+                if (liq_position.amount_to_be_sold != 0) {
+                    assert deleveragable_or_liquidatable_long = 1;
+                    assert amount_to_be_sold_long = liq_position.amount_to_be_sold;
+                } else {
+                    assert deleveragable_or_liquidatable_long = 0;
+                    assert amount_to_be_sold_long = 0;
+                }
+            }
+        } else {
+            if (liq_position.liquidatable == TRUE) {
+                assert deleveragable_or_liquidatable_short = 2;
+                assert amount_to_be_sold_short = short_position.position_size;
+            } else {
+                if (liq_position.amount_to_be_sold != 0) {
+                    assert deleveragable_or_liquidatable_short = 1;
+                    assert amount_to_be_sold_short = liq_position.amount_to_be_sold;
+                } else {
+                    assert deleveragable_or_liquidatable_short = 0;
+                    assert amount_to_be_sold_short = 0;
+                }
+            }
+        }
+    } else {
+        assert deleveragable_or_liquidatable_long = 0;
+        assert amount_to_be_sold_long = 0;
+        assert deleveragable_or_liquidatable_short = 0;
+        assert amount_to_be_sold_short = 0;
+    }
 
     let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
     if (is_long_zero == TRUE) {
@@ -2152,6 +2195,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             market_price=market_price,
             maintenance_margin=maintanence_requirement,
             unrealized_pnl=pnl,
+            deleveragable_or_liquidatable=deleveragable_or_liquidatable_long,
+            amount_to_be_sold=amount_to_be_sold_long,
         );
         assert positions_array_[positions_array_len_] = curr_position;
         assert is_long = 1;
@@ -2193,6 +2238,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
             market_price=market_price,
             maintenance_margin=maintanence_requirement,
             unrealized_pnl=pnl,
+            deleveragable_or_liquidatable=deleveragable_or_liquidatable_short,
+            amount_to_be_sold=amount_to_be_sold_short,
         );
         assert positions_array_[positions_array_len_ + is_long] = curr_position;
         assert is_short = 1;

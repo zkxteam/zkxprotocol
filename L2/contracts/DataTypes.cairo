@@ -127,6 +127,8 @@ struct PositionDetailsWithMarket {
     market_price: felt,
     maintenance_margin: felt,
     unrealized_pnl: felt,
+    deleveragable_or_liquidatable: felt,
+    amount_to_be_sold: felt,
 }
 
 // Struct to store the position that is to be Liquidated/Deleveraged
