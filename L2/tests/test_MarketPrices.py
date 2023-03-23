@@ -100,3 +100,21 @@ async def test_unauthorized_add_market_price_to_market_prices(adminAuth_factory)
     adminAuth, market_prices, admin1, admin2 = adminAuth_factory
 
     await assert_revert(admin2_signer.send_transaction(admin2, market_prices.contract_address, 'update_market_price', [BTC_USD_ID, 500]),reverted_with="MarketPrices: Unauthorized caller for updating market price")
+
+@pytest.mark.asyncio
+async def test_update_multiple_market_prices(adminAuth_factory):
+    adminAuth, market_prices, admin1, admin2 = adminAuth_factory
+
+    await admin1_signer.send_transaction(admin1, market_prices.contract_address, 'update_multiple_market_prices', [2, BTC_USD_ID, 1000, ETH_USD_ID, 100])
+
+    fetched_market_prices1 = await market_prices.get_market_price(BTC_USD_ID).call()
+    assert fetched_market_prices1.result.market_price == 1000
+
+    fetched_market_prices2 = await market_prices.get_market_price(ETH_USD_ID).call()
+    assert fetched_market_prices2.result.market_price == 100
+
+@pytest.mark.asyncio
+async def test_unauthorized_update_multiple_market_prices(adminAuth_factory):
+    adminAuth, market_prices, admin1, admin2 = adminAuth_factory
+
+    await assert_revert(admin2_signer.send_transaction(admin2, market_prices.contract_address, 'update_market_price', [2, BTC_USD_ID, 300, ETH_USD_ID, 100]))
