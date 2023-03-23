@@ -327,3 +327,8 @@ struct ABRDetails {
     abr_value: felt,
     abr_timestamp: felt,
 }
+
+struct MultipleMarketPrices {
+  market_id: felt,
+  price: felt,
+}

@@ -7,11 +7,12 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import AdminAuth_INDEX, ManageMarkets_ACTION, Market_INDEX, Trading_INDEX
-from contracts.DataTypes import Market, MarketPrice
+from contracts.DataTypes import Market, MarketPrice, MultipleMarketPrices
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
+from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
 // //////////
@@ -179,30 +180,16 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
 // @notice function to update multiple market prices
 // @notice This function is called by update_multiple_market_prices
-// @param market_ids_len - Length of market ids array
-// @param market_ids - Market ids array
 // @param market_prices_len - Length of market prices array
 // @param market_prices - Market prices array
 @external
 func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_ids_len: felt, market_ids: felt*, market_prices_len: felt, market_prices: felt*
+    market_prices_len: felt, market_prices: MultipleMarketPrices*
 ) {
-    let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
 
-    let (auth_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=AdminAuth_INDEX, version=version
-    );
-
-    // Auth Check
-    let (access) = IAdminAuth.get_admin_mapping(
-        contract_address=auth_address, address=caller, action=ManageMarkets_ACTION
-    );
-
-    with_attr error_message("MarketPrices: Unauthorized caller for updating market prices") {
-        assert access = 1;
-    }
+    verify_caller_authority(registry, version, ManageMarkets_ACTION);
 
     // Calculate the timestamp
     let (timestamp) = get_block_timestamp();
@@ -216,8 +203,6 @@ func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
         market_contract_address_=market_contract_address,
         timestamp_=timestamp,
         iterator_=0,
-        market_ids_len=market_ids_len,
-        market_ids=market_ids,
         market_prices_len=market_prices_len,
         market_prices=market_prices,
     );
@@ -231,36 +216,32 @@ func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 // @param market_contract_address_ - Address of the market contract address
 // @param timestamp_ - Current timestamp
 // @param iterator_ -  Current index of the market ids array
-// @param market_ids_len - Length of market ids array
-// @param market_ids - Market ids array
 // @param market_prices_len - Length of market prices array
 // @param market_prices - Market prices array
 func update_market_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_contract_address_: felt,
     timestamp_: felt,
     iterator_: felt,
-    market_ids_len: felt,
-    market_ids: felt*,
     market_prices_len: felt,
-    market_prices: felt*,
+    market_prices: MultipleMarketPrices*,
 ) {
     alloc_locals;
     // Termination conditon
-    if (iterator_ == market_ids_len) {
+    if (iterator_ == market_prices_len) {
         return ();
     }
 
     // Get Market from the corresponding Id
     let (market: Market) = IMarkets.get_market(
-        contract_address=market_contract_address_, market_id_=market_ids[iterator_]
+        contract_address=market_contract_address_, market_id_=market_prices[iterator_].market_id
     );
 
     with_attr error_message("MarketPrices: Price cannot be negative") {
-        assert_nn(market_prices[iterator_]);
+        assert_nn(market_prices[iterator_].price);
     }
 
     with_attr error_message("MarketPrices: Price must be in 64x61 respresentation") {
-        Math64x61_assert64x61(market_prices[iterator_]);
+        Math64x61_assert64x61(market_prices[iterator_].price);
     }
 
     with_attr error_message("MarketPrices: Market does not exist") {
@@ -272,18 +253,16 @@ func update_market_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
         asset_id=market.asset,
         collateral_id=market.asset_collateral,
         timestamp=timestamp_,
-        price=market_prices[iterator_],
+        price=market_prices[iterator_].price,
     );
 
-    market_prices.write(id=market_ids[iterator_], value=new_market_price);
+    market_prices.write(id=market_prices[iterator_].market_id, value=new_market_price);
 
     return update_market_prices_recurse(
         market_contract_address_,
         market_contract_address_=market_contract_address_,
         timestamp_=timestamp_,
         iterator_=iterator_ + 1,
-        market_ids_len=market_ids_len,
-        market_ids=market_ids,
         market_prices_len=market_prices_len,
         market_prices=market_prices,
     );
