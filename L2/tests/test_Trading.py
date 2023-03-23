@@ -370,14 +370,6 @@ async def trading_test_initializer(starknet_service: StarknetService):
     print("Market Prices:", hex(marketPrices.contract_address))
     print("Auth Registry", hex(registry.contract_address))
 
-    starknet_service.starknet.state.state.block_info = BlockInfo(
-        block_number=1,
-        block_timestamp=timestamp1,
-        gas_price=starknet_service.starknet.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.starknet.state.state.block_info.sequencer_address,
-        starknet_version=STARKNET_VERSION
-    )
-
     return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats
 
 
