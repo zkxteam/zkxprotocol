@@ -431,7 +431,6 @@ class User:
     def execute_order(self, order: Dict, size: float, price: float, margin_amount: float, borrowed_amount: float, market_id: int, timestamp: int, pnl: float, margin_update: float):
         position = self.get_position(
             market_id=order["market_id"], direction=order["direction"])
-        print("User position", position)
         order_portion_executed = self.get_portion_executed(
             order_id=order["order_id"])
         new_portion_executed = order_portion_executed + size
@@ -489,6 +488,8 @@ class User:
                 asset_id=market_to_collateral_mapping[market_id])
             self.set_locked_margin(new_locked_margin=current_locked_margin +
                                    margin_update, asset_id=market_to_collateral_mapping[market_id])
+            print("Lock margin update ", current_locked_margin, current_locked_margin +
+                  margin_update)
         else:
             new_leverage = 0
 
@@ -544,6 +545,8 @@ class User:
                         asset_id=market_to_collateral_mapping[market_id])
                     self.set_locked_margin(new_locked_margin=current_locked_margin -
                                            margin_update, asset_id=market_to_collateral_mapping[market_id])
+                    print("Lock margin update ", current_locked_margin, current_locked_margin +
+                          margin_update)
             else:
                 new_leverage = position["leverage"]
 
@@ -551,6 +554,9 @@ class User:
                     asset_id=market_to_collateral_mapping[market_id])
                 self.set_locked_margin(new_locked_margin=current_locked_margin -
                                        margin_update, asset_id=market_to_collateral_mapping[market_id])
+
+                print("Lock margin update ", current_locked_margin, current_locked_margin +
+                      margin_update)
 
             updated_position = {}
             if new_position_size == 0:
@@ -888,16 +894,13 @@ class OrderExecutor:
 
         self.set_fund_balance(fund, asset_id, new_balance)
 
-    def __process_open_orders(self, user: User, order: Dict, execution_price: float, order_size: float, side: int, timestamp: int) -> Tuple[float, float, float, float, float]:
+    def __process_open_orders(self, user: User, order: Dict, execution_price: float, order_size: float, side: int, timestamp: int) -> Tuple[float, float, float, float]:
         position = user.get_position(
             market_id=order["market_id"], direction=order["direction"])
 
         average_execution_price = 0
         margin_amount = position["margin_amount"]
         borrowed_amount = position["borrowed_amount"]
-
-        fee_rate = self.__get_fee(
-            user=user, side=side)
 
         # The position size is 0 or
         if position["position_size"] == 0:
@@ -928,26 +931,14 @@ class OrderExecutor:
         margin_amount += order_value_wo_leverage
         borrowed_amount += amount_to_be_borrowed
 
-        # Calculate the fee for the order
-        fees = fee_rate*leveraged_position_value
-        trading_fees = fees * -1
-
-        # Balance that the user must stake/pay
-        balance_to_be_deducted = order_value_wo_leverage + fees
-
         (_, _, available_margin, _, _, _, _, _) = user.get_margin_info(
             order_executor=self, timestamp=timestamp, asset_id=market_to_collateral_mapping[
                 order["market_id"]])
 
-        if available_margin < balance_to_be_deducted:
-            print("Low balance", balance_to_be_deducted, available_margin)
-            return (0, 0, 0, 0, 0)
+        # if available_margin < order_value_wo_leverage:
+        #     print("Low balance", order_value_wo_leverage, available_margin)
+        #     return (0, 0, 0, 0)
 
-        user.modify_balance(
-            mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=fees)
-
-        self.__modify_fund_balance(fund=fund_mapping["fee_balance"], mode=fund_mode["fund"],
-                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=fees)
         self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["fund"],
                                    asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_position_value)
 
@@ -955,7 +946,7 @@ class OrderExecutor:
             self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["defund"],
                                        asset_id=market_to_collateral_mapping[order["market_id"]], amount=amount_to_be_borrowed)
         print(margin_amount)
-        return (average_execution_price, margin_amount, borrowed_amount, trading_fees, order_value_wo_leverage)
+        return (average_execution_price, margin_amount, borrowed_amount, order_value_wo_leverage)
 
     def __get_quantity_to_execute(self, request: Dict, user: User, quantity_remaining: float, side: int) -> float:
         quantity_to_execute = 0
@@ -1239,9 +1230,9 @@ class OrderExecutor:
             margin_update = 0
 
             if request_list[i]["side"] == side["buy"]:
-                (avg_execution_price, margin_amount, borrowed_amount, trading_fees, margin_lock_update) = self.__process_open_orders(
+                (avg_execution_price, margin_amount, borrowed_amount, margin_lock_update) = self.__process_open_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, side=trade_side, timestamp=timestamp)
-                pnl = trading_fees
+                pnl = 0
                 margin_update = margin_lock_update
                 if avg_execution_price == 0:
                     print("Cannot execute batch; returning")
