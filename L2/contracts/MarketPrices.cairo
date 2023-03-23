@@ -176,3 +176,115 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     return ();
 }
+
+// @notice function to update multiple market prices
+// @notice This function is called by update_multiple_market_prices
+// @param market_ids_len - Length of market ids array
+// @param market_ids - Market ids array
+// @param market_prices_len - Length of market prices array
+// @param market_prices - Market prices array
+@external
+func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_ids_len: felt, market_ids: felt*, market_prices_len: felt, market_prices: felt*
+) {
+    let (caller) = get_caller_address();
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    let (auth_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=AdminAuth_INDEX, version=version
+    );
+
+    // Auth Check
+    let (access) = IAdminAuth.get_admin_mapping(
+        contract_address=auth_address, address=caller, action=ManageMarkets_ACTION
+    );
+
+    with_attr error_message("MarketPrices: Unauthorized caller for updating market prices") {
+        assert access = 1;
+    }
+
+    // Calculate the timestamp
+    let (timestamp) = get_block_timestamp();
+
+    // Get market contract address
+    let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    return update_market_prices_recurse(
+        market_contract_address_=market_contract_address,
+        timestamp_=timestamp,
+        iterator_=0,
+        market_ids_len=market_ids_len,
+        market_ids=market_ids,
+        market_prices_len=market_prices_len,
+        market_prices=market_prices,
+    );
+}
+
+// ///////////
+// Internal //
+// ///////////
+
+// @notice This function is called by update_multiple_market_prices
+// @param market_contract_address_ - Address of the market contract address
+// @param timestamp_ - Current timestamp
+// @param iterator_ -  Current index of the market ids array
+// @param market_ids_len - Length of market ids array
+// @param market_ids - Market ids array
+// @param market_prices_len - Length of market prices array
+// @param market_prices - Market prices array
+func update_market_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_contract_address_: felt,
+    timestamp_: felt,
+    iterator_: felt,
+    market_ids_len: felt,
+    market_ids: felt*,
+    market_prices_len: felt,
+    market_prices: felt*,
+) {
+    alloc_locals;
+    // Termination conditon
+    if (iterator_ == market_ids_len) {
+        return ();
+    }
+
+    // Get Market from the corresponding Id
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_contract_address_, market_id_=market_ids[iterator_]
+    );
+
+    with_attr error_message("MarketPrices: Price cannot be negative") {
+        assert_nn(market_prices[iterator_]);
+    }
+
+    with_attr error_message("MarketPrices: Price must be in 64x61 respresentation") {
+        Math64x61_assert64x61(market_prices[iterator_]);
+    }
+
+    with_attr error_message("MarketPrices: Market does not exist") {
+        assert_not_zero(market.asset);
+    }
+
+    // Create a struct object for the market prices
+    tempvar new_market_price: MarketPrice = MarketPrice(
+        asset_id=market.asset,
+        collateral_id=market.asset_collateral,
+        timestamp=timestamp_,
+        price=market_prices[iterator_],
+    );
+
+    market_prices.write(id=market_ids[iterator_], value=new_market_price);
+
+    return update_market_prices_recurse(
+        market_contract_address_,
+        market_contract_address_=market_contract_address_,
+        timestamp_=timestamp_,
+        iterator_=iterator_ + 1,
+        market_ids_len=market_ids_len,
+        market_ids=market_ids,
+        market_prices_len=market_prices_len,
+        market_prices=market_prices,
+    );
+}
