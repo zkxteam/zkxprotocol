@@ -687,7 +687,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // User must be able to pay the amount
     with_attr error_message("0501: {order_id} {user_available_balance}") {
         Math64x61_assert_le(
-            margin_order_value, user_available_balance, collateral_token_decimal_
+            0, user_available_balance, collateral_token_decimal_
         );
     }
 
