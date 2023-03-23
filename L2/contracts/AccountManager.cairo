@@ -1087,9 +1087,10 @@ func execute_order{
         assert data[6] = execution_price;
         assert data[7] = pnl;
         assert data[8] = side;
-        assert data[9] = is_final;
+        assert data[9] = 0;
+        assert data[10] = is_final;
 
-        emit_event(1, keys, 10, data);
+        emit_event(1, keys, 11, data);
 
         return (1,);
     }
@@ -1372,9 +1373,10 @@ func execute_order{
     assert data[6] = execution_price;
     assert data[7] = pnl;
     assert data[8] = side;
-    assert data[9] = is_final;
+    assert data[9] = 0;
+    assert data[10] = is_final;
 
-    emit_event(1, keys, 10, data);
+    emit_event(1, keys, 11, data);
 
     return (1,);
 }
