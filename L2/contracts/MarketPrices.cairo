@@ -7,11 +7,12 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_block_timestamp, get_caller_address
 
 from contracts.Constants import AdminAuth_INDEX, ManageMarkets_ACTION, Market_INDEX, Trading_INDEX
-from contracts.DataTypes import Market, MarketPrice
+from contracts.DataTypes import Market, MarketPrice, MultipleMarketPrices
 from contracts.interfaces.IAdminAuth import IAdminAuth
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.libraries.CommonLibrary import CommonLib
+from contracts.libraries.Utils import verify_caller_authority
 from contracts.Math_64x61 import Math64x61_assert64x61
 
 // //////////
@@ -175,4 +176,94 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     update_market_price_called.emit(market_id=market_id_, price=price_);
 
     return ();
+}
+
+// @notice function to update multiple market prices
+// @notice This function is called by update_multiple_market_prices
+// @param market_prices_list_len - Length of market prices array
+// @param market_prices_list - Market prices array
+@external
+func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_prices_list_len: felt, market_prices_list: MultipleMarketPrices*
+) {
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    verify_caller_authority(registry, version, ManageMarkets_ACTION);
+
+    // Calculate the timestamp
+    let (timestamp) = get_block_timestamp();
+
+    // Get market contract address
+    let (market_contract_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    return update_market_prices_recurse(
+        market_contract_address_=market_contract_address,
+        timestamp_=timestamp,
+        iterator_=0,
+        market_prices_list_len=market_prices_list_len,
+        market_prices_list=market_prices_list,
+    );
+}
+
+// ///////////
+// Internal //
+// ///////////
+
+// @notice This function is called by update_multiple_market_prices
+// @param market_contract_address_ - Address of the market contract address
+// @param timestamp_ - Current timestamp
+// @param iterator_ -  Current index of the market ids array
+// @param market_prices_list_len - Length of market prices array
+// @param market_prices_list - Market prices array
+func update_market_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    market_contract_address_: felt,
+    timestamp_: felt,
+    iterator_: felt,
+    market_prices_list_len: felt,
+    market_prices_list: MultipleMarketPrices*,
+) {
+    alloc_locals;
+    // Termination conditon
+    if (iterator_ == market_prices_list_len) {
+        return ();
+    }
+
+    // Get Market from the corresponding Id
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_contract_address_,
+        market_id_=market_prices_list[iterator_].market_id,
+    );
+
+    with_attr error_message("MarketPrices: Price cannot be negative") {
+        assert_nn(market_prices_list[iterator_].price);
+    }
+
+    with_attr error_message("MarketPrices: Price must be in 64x61 respresentation") {
+        Math64x61_assert64x61(market_prices_list[iterator_].price);
+    }
+
+    with_attr error_message("MarketPrices: Market does not exist") {
+        assert_not_zero(market.asset);
+    }
+
+    // Create a struct object for the market prices
+    tempvar new_market_price: MarketPrice = MarketPrice(
+        asset_id=market.asset,
+        collateral_id=market.asset_collateral,
+        timestamp=timestamp_,
+        price=market_prices_list[iterator_].price,
+    );
+
+    market_prices.write(id=market_prices_list[iterator_].market_id, value=new_market_price);
+
+    return update_market_prices_recurse(
+        market_contract_address_=market_contract_address_,
+        timestamp_=timestamp_,
+        iterator_=iterator_ + 1,
+        market_prices_list_len=market_prices_list_len,
+        market_prices_list=market_prices_list,
+    );
 }
