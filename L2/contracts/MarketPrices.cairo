@@ -180,11 +180,11 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
 // @notice function to update multiple market prices
 // @notice This function is called by update_multiple_market_prices
-// @param market_prices_len - Length of market prices array
-// @param market_prices - Market prices array
+// @param market_prices_list_len - Length of market prices array
+// @param market_prices_list - Market prices array
 @external
 func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    market_prices_len: felt, market_prices: MultipleMarketPrices*
+    market_prices_list_len: felt, market_prices_list: MultipleMarketPrices*
 ) {
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
@@ -203,8 +203,8 @@ func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
         market_contract_address_=market_contract_address,
         timestamp_=timestamp,
         iterator_=0,
-        market_prices_len=market_prices_len,
-        market_prices=market_prices,
+        market_prices_list_len=market_prices_list_len,
+        market_prices_list=market_prices_list,
     );
 }
 
@@ -216,32 +216,33 @@ func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 // @param market_contract_address_ - Address of the market contract address
 // @param timestamp_ - Current timestamp
 // @param iterator_ -  Current index of the market ids array
-// @param market_prices_len - Length of market prices array
-// @param market_prices - Market prices array
+// @param market_prices_list_len - Length of market prices array
+// @param market_prices_list - Market prices array
 func update_market_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_contract_address_: felt,
     timestamp_: felt,
     iterator_: felt,
-    market_prices_len: felt,
-    market_prices: MultipleMarketPrices*,
+    market_prices_list_len: felt,
+    market_prices_list: MultipleMarketPrices*,
 ) {
     alloc_locals;
     // Termination conditon
-    if (iterator_ == market_prices_len) {
+    if (iterator_ == market_prices_list_len) {
         return ();
     }
 
     // Get Market from the corresponding Id
     let (market: Market) = IMarkets.get_market(
-        contract_address=market_contract_address_, market_id_=market_prices[iterator_].market_id
+        contract_address=market_contract_address_,
+        market_id_=market_prices_list[iterator_].market_id,
     );
 
     with_attr error_message("MarketPrices: Price cannot be negative") {
-        assert_nn(market_prices[iterator_].price);
+        assert_nn(market_prices_list[iterator_].price);
     }
 
     with_attr error_message("MarketPrices: Price must be in 64x61 respresentation") {
-        Math64x61_assert64x61(market_prices[iterator_].price);
+        Math64x61_assert64x61(market_prices_list[iterator_].price);
     }
 
     with_attr error_message("MarketPrices: Market does not exist") {
@@ -253,17 +254,16 @@ func update_market_prices_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*
         asset_id=market.asset,
         collateral_id=market.asset_collateral,
         timestamp=timestamp_,
-        price=market_prices[iterator_].price,
+        price=market_prices_list[iterator_].price,
     );
 
-    market_prices.write(id=market_prices[iterator_].market_id, value=new_market_price);
+    market_prices.write(id=market_prices_list[iterator_].market_id, value=new_market_price);
 
     return update_market_prices_recurse(
-        market_contract_address_,
         market_contract_address_=market_contract_address_,
         timestamp_=timestamp_,
         iterator_=iterator_ + 1,
-        market_prices_len=market_prices_len,
-        market_prices=market_prices,
+        market_prices_list_len=market_prices_list_len,
+        market_prices_list=market_prices_list,
     );
 }
