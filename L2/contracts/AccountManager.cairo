@@ -10,11 +10,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
 
-from starkware.starknet.common.syscalls import (
-    emit_event,
-    get_block_timestamp,
-    get_caller_address,
-)
+from starkware.starknet.common.syscalls import emit_event, get_block_timestamp, get_caller_address
 
 from contracts.Constants import (
     ABR_PAYMENT_INDEX,
@@ -435,6 +431,9 @@ func get_margin_info{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     );
 }
 
+// @notice view function to get the amount that is executed for a given order id
+// @param order_id_ - ID of an order
+// @returns res - amount executed so far for that order
 @view
 func get_portion_executed{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_id_: felt
@@ -454,7 +453,28 @@ func get_position_data{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (res=res);
 }
 
-// @notice External function called by the ABR Contract to get the array of positions of the user filtered by timestamp
+// @notice View function to get the market arrays associated with the collateral
+// @param collateral_id_ - Collateral ID of the asset
+// @returns markets_array_len - Length of the markets_array
+// @returns markets_array - Array of markets IDs
+@view
+func get_collateral_to_markets_array{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(collateral_id_: felt) -> (markets_array_len: felt, markets_array: felt*) {
+    alloc_locals;
+
+    let (markets_array: felt*) = alloc();
+    let (markets_array_len) = collateral_to_market_array_len.read(collateral_id=collateral_id_);
+
+    return populate_collateral_to_market_array(
+        collateral_id_=collateral_id_,
+        markets_array_len_=markets_array_len,
+        markets_array_=markets_array,
+        markets_array_iterator_=0,
+    );
+}
+
+// @notice View function called by the ABR Contract to get the array of positions of the user filtered by timestamp
 // @param timestmap_filter_ - Timestamp by which to filter the array
 // @returns positions_array_len - Length of the array
 // @returns positions_array - Required array of net positions
@@ -2408,6 +2428,40 @@ func populate_simplified_positions_collaterals_recurse{
         collateral_array_iterator_=collateral_array_iterator_ + 1,
         collateral_array_len_=collateral_array_len_,
         timestamp_filter_=timestamp_filter_,
+    );
+}
+
+// @notice Internal function to get all the markets associated with a collateral ID
+// @param collateral_id_ - Collateral ID of the asset
+// @param markets_array_len_ - Length of the markets array
+// @param markets_array_ - Array of markets IDs
+// @param markets_array_iterator_ - Iterator to the markets array
+// @returns markets_array_len - Length of the populated markets array
+// @returns markets_array - Array of populated market IDs
+func populate_collateral_to_market_array{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    collateral_id_: felt,
+    markets_array_len_: felt,
+    markets_array_: felt*,
+    markets_array_iterator_: felt,
+) -> (markets_array_len: felt, markets_array: felt*) {
+    // If reached the end of the array, then return
+    if (markets_array_iterator_ == markets_array_len_) {
+        return (markets_array_len_, markets_array_);
+    }
+
+    let (market_id) = collateral_to_market_array.read(
+        collateral_id=collateral_id_, index=markets_array_iterator_
+    );
+
+    assert markets_array_[markets_array_iterator_] = market_id;
+
+    return populate_collateral_to_market_array(
+        collateral_id_=collateral_id_,
+        markets_array_len_=markets_array_len_,
+        markets_array_=markets_array_,
+        markets_array_iterator_=markets_array_iterator_ + 1,
     );
 }
 

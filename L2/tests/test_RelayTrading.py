@@ -8,7 +8,7 @@ from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61, from64x61, assert_revert, assert_event_with_custom_keys_emitted, PRIME, PRIME_HALF
-from utils_trading import User, order_direction, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, compare_margin_info
+from utils_trading import User, order_direction, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, compare_margin_info, compare_markets_array
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -17,6 +17,7 @@ from dummy_addresses import L1_dummy_address
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
+non_admin_signer = Signer(123456789987654330)
 alice_signer = Signer(123456789987654323)
 bob_signer = Signer(123456789987654324)
 charlie_signer = Signer(123456789987654325)
@@ -52,6 +53,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
     ])
     admin2 = await starknet_service.deploy(ContractType.Account, [
         admin2_signer.public_key
+    ])
+    non_admin = await starknet_service.deploy(ContractType.Account, [
+        non_admin_signer.public_key
     ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
@@ -408,12 +412,19 @@ async def trading_test_initializer(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
-    return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats
+    return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats, non_admin
+
+
+@pytest.mark.asyncio
+async def test_set_balance_by_non_admin(trading_test_initializer):
+    _, _, _, _, _, _, _, _, _, _, gary, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, non_admin = trading_test_initializer
+
+    await assert_revert(non_admin_signer.send_transaction(non_admin, gary.contract_address, "set_balance", [AssetID.USDC, to64x61(1000000)]), reverted_with="TestAccountManager: Unauthorized Call")
 
 
 @pytest.mark.asyncio
 async def test_for_risk_while_opening_order(trading_test_initializer):
-    starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, non_admin = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -464,8 +475,14 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margin info
     await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
     await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+
+    # compare markets array
+    await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
 
     starknet_service.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp1, gas_price=starknet_service.state.state.block_info.gas_price,
@@ -514,8 +531,14 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_2)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
+
+    # compare margin info
     await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+
+    # compare markets array
+    await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
 
     ###################
     ### Open orders ##
@@ -563,7 +586,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_balance_low_user_1(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -602,7 +625,7 @@ async def test_revert_balance_low_user_1(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_balance_low_user_2(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -641,7 +664,7 @@ async def test_revert_balance_low_user_2(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_leverage_more_than_allowed_user_1(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -680,7 +703,7 @@ async def test_revert_if_leverage_more_than_allowed_user_1(trading_test_initiali
 
 @pytest.mark.asyncio
 async def test_revert_if_leverage_more_than_allowed_user_2(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -719,7 +742,7 @@ async def test_revert_if_leverage_more_than_allowed_user_2(trading_test_initiali
 
 @pytest.mark.asyncio
 async def test_revert_if_leverage_below_1(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -758,7 +781,7 @@ async def test_revert_if_leverage_below_1(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_wrong_market_passed(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -797,7 +820,7 @@ async def test_revert_if_wrong_market_passed(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_quantity_low_user_1(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -835,7 +858,7 @@ async def test_revert_if_quantity_low_user_1(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_quantity_low_user_2(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -873,7 +896,7 @@ async def test_revert_if_quantity_low_user_2(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_invalid_slippage_1(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -913,7 +936,7 @@ async def test_revert_if_invalid_slippage_1(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_invalid_slippage_2(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -953,7 +976,7 @@ async def test_revert_if_invalid_slippage_2(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_limit_order_bad_short_limit_price(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -994,7 +1017,7 @@ async def test_revert_if_limit_order_bad_short_limit_price(trading_test_initiali
 
 @pytest.mark.asyncio
 async def test_revert_if_limit_order_bad_long_limit_price(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -1035,7 +1058,7 @@ async def test_revert_if_limit_order_bad_long_limit_price(trading_test_initializ
 
 @pytest.mark.asyncio
 async def test_revert_if_market_untradable(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -1075,7 +1098,7 @@ async def test_revert_if_market_untradable(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_unregistered_user(trading_test_initializer):
-    _, python_executor, admin1, _, alice, _, _, _, eduard, _, _, alice_test, _, _, eduard_test, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, _, _, _, eduard, _, _, alice_test, _, _, eduard_test, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1116,7 +1139,7 @@ async def test_revert_if_unregistered_user(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_taker_direction_wrong(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1155,7 +1178,7 @@ async def test_revert_if_taker_direction_wrong(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_maker_direction_wrong(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1199,7 +1222,7 @@ async def test_revert_if_maker_direction_wrong(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_invalid_batch_extra_taker_orders(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -1241,7 +1264,7 @@ async def test_revert_if_invalid_batch_extra_taker_orders(trading_test_initializ
 
 @pytest.mark.asyncio
 async def test_revert_if_taker_post_only_order(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1281,7 +1304,7 @@ async def test_revert_if_taker_post_only_order(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_taker_fk_partial_order(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1321,7 +1344,7 @@ async def test_revert_if_taker_fk_partial_order(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_revert_if_maker_order_is_market(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1360,7 +1383,7 @@ async def test_revert_if_maker_order_is_market(trading_test_initializer):
 
 @pytest.mark.asyncio
 async def test_opening_and_closing_full_orders(trading_test_initializer):
-    starknet_service, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    starknet_service, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
 
     starknet_service.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp1, gas_price=starknet_service.state.state.block_info.gas_price,
@@ -1421,6 +1444,10 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
     assert open_interest_response.result.res == to64x61(5)
 
@@ -1455,13 +1482,17 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
     assert open_interest_response.result.res == to64x61(2)
 
 
 @pytest.mark.asyncio
 async def test_opening_partial_orders(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1504,6 +1535,10 @@ async def test_opening_partial_orders(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
     ##########################
     ### Open orders Partial ##
     ##########################
@@ -1532,6 +1567,10 @@ async def test_opening_partial_orders(trading_test_initializer):
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
     assert pytest.approx(
         from64x61(open_interest_response.result.res), abs=1e-6) == 4
@@ -1539,7 +1578,7 @@ async def test_opening_partial_orders(trading_test_initializer):
 
 @ pytest.mark.asyncio
 async def test_closing_partial_orders(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
 
     ##############################
     ### Close orders partially ###
@@ -1582,8 +1621,11 @@ async def test_closing_partial_orders(trading_test_initializer):
 
     # compare margins
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
     assert pytest.approx(
@@ -1622,8 +1664,11 @@ async def test_closing_partial_orders(trading_test_initializer):
 
     # compare margins
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
     assert pytest.approx(
@@ -1632,7 +1677,7 @@ async def test_closing_partial_orders(trading_test_initializer):
 
 @ pytest.mark.asyncio
 async def test_opening_and_closing_full_orders_different_market(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1682,6 +1727,10 @@ async def test_opening_and_closing_full_orders_different_market(trading_test_ini
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
     open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
     assert from64x61(open_interest_response.result.res) == 4.5
 
@@ -1715,6 +1764,10 @@ async def test_opening_and_closing_full_orders_different_market(trading_test_ini
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
     open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
     assert pytest.approx(
         from64x61(open_interest_response.result.res), abs=1e-6) == 2.977
@@ -1722,7 +1775,7 @@ async def test_opening_and_closing_full_orders_different_market(trading_test_ini
 
 @ pytest.mark.asyncio
 async def test_placing_order_directly(trading_test_initializer):
-    _, _, admin1, _, alice, bob, _, dave, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = trading_test_initializer
+    _, _, admin1, _, alice, bob, _, dave, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1804,7 +1857,7 @@ async def test_placing_order_directly(trading_test_initializer):
 
 @ pytest.mark.asyncio
 async def test_closing_more_than_parent_size_should_pass(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1878,7 +1931,7 @@ async def test_closing_more_than_parent_size_should_pass(trading_test_initialize
 
 @ pytest.mark.asyncio
 async def test_invalid_liquidation(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -1957,7 +2010,7 @@ async def test_invalid_liquidation(trading_test_initializer):
 
 @ pytest.mark.asyncio
 async def test_invalid_deleverage(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -2033,10 +2086,14 @@ async def test_invalid_deleverage(trading_test_initializer):
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
 
 @ pytest.mark.asyncio
 async def test_opening_partial_orders_multiple(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -2080,6 +2137,10 @@ async def test_opening_partial_orders_multiple(trading_test_initializer):
     # compare margins
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
     ##########################
     ### Open orders Partial ##
@@ -2127,10 +2188,14 @@ async def test_opening_partial_orders_multiple(trading_test_initializer):
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
 
 @ pytest.mark.asyncio
 async def test_revert_if_parent_position_is_empty(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -2173,7 +2238,7 @@ async def test_revert_if_parent_position_is_empty(trading_test_initializer):
 
 @ pytest.mark.asyncio
 async def test_opening_and_closing_full_orders_new_collateral(trading_test_initializer):
-    starknet_service, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats = trading_test_initializer
+    starknet_service, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _, _ = trading_test_initializer
 
     ###################
     ### Open orders ##
@@ -2222,6 +2287,10 @@ async def test_opening_and_closing_full_orders_new_collateral(trading_test_initi
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
     alice_collaterals = await alice.return_array_collaterals().call()
     alice_collaterals_parsed = alice_collaterals.result.array_list
     assert alice_collaterals_parsed[0].assetID == AssetID.USDC
@@ -2243,7 +2312,7 @@ async def test_opening_and_closing_full_orders_new_collateral(trading_test_initi
 
 @pytest.mark.asyncio
 async def test_revert_if_market_order_slippage_error_lower_limit(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -2283,7 +2352,7 @@ async def test_revert_if_market_order_slippage_error_lower_limit(trading_test_in
 
 @pytest.mark.asyncio
 async def test_revert_if_market_order_slippage_error_upper_limit(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################
@@ -2325,7 +2394,7 @@ async def test_revert_if_market_order_slippage_error_upper_limit(trading_test_in
 
 @pytest.mark.asyncio
 async def test_execute_market_order_slippage_lower_limit(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, _, _, _, _, _, _ = trading_test_initializer
     ###################
     ### Open orders ##
     ###################

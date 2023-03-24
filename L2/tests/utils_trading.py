@@ -240,6 +240,12 @@ class User:
                 continue
         return positions
 
+    def get_collateral_to_markets_array(self, collateral_id: int) -> List[int]:
+        try:
+            return self.collateral_to_market_array[collateral_id]
+        except KeyError:
+            return []
+
     def get_positions_risk_management(self, collateral_id: int) -> List[Dict]:
         collaterals = self.collateral_array
         positions = []
@@ -1721,6 +1727,15 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
 ###################################
 #### Compare Python & Starknet ####
 ###################################
+
+async def compare_markets_array(user: StarknetContract, user_test: User, collatera_id: int):
+    python_markets_array = user_test.get_collateral_to_markets_array(
+        collatera_id)
+    starknet_markets_array_query = await user.get_collateral_to_markets_array(collatera_id).call()
+    starknet_markets_array = starknet_markets_array_query.result.markets_array
+
+    for element_1, element_2 in zip(starknet_markets_array, python_markets_array):
+        assert element_1 == element_2
 
 
 # Function to check if the debuggin values set in Liquidation contract are correct
