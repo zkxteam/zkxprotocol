@@ -12,9 +12,11 @@ USDC_ID = str_to_felt("fghj3am52qpzsib")
 USDT_ID = str_to_felt("65ksgn23nv")
 PRIME = 3618502788666131213697322783095070105623107215331596699973092056135872020481
 
+
 @pytest.fixture(scope='module')
 def event_loop():
     return asyncio.new_event_loop()
+
 
 @pytest.fixture(scope='module')
 async def adminAuth_factory(starknet_service: StarknetService):
@@ -26,7 +28,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     admin2 = await starknet_service.deploy(ContractType.Account, [
         signer2.public_key
     ])
-    
+
     # Deploy infrastructure
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
@@ -75,7 +77,8 @@ async def test_update_collateral_price_unauthorized_user(adminAuth_factory):
 async def test_update_negative_collateral_price(adminAuth_factory):
     adminAuth, collateral_prices, admin1, admin2 = adminAuth_factory
 
-    await assert_revert(signer1.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, -500%PRIME]), reverted_with="CollateralPrices: Price cannot be negative")
+    await assert_revert(signer1.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [USDC_ID, -500 % PRIME]), reverted_with="CollateralPrices: Price cannot be negative")
+
 
 @pytest.mark.asyncio
 async def test_update_collateral_price(adminAuth_factory):
@@ -85,8 +88,8 @@ async def test_update_collateral_price(adminAuth_factory):
 
     assert_event_emitted(
         tx_exec_info_1,
-        from_address = collateral_prices.contract_address,
-        name = 'update_collateral_price_called',
+        from_address=collateral_prices.contract_address,
+        name='update_collateral_price_called',
         data=[
             USDC_ID,
             500
@@ -97,8 +100,8 @@ async def test_update_collateral_price(adminAuth_factory):
 
     assert_event_emitted(
         tx_exec_info_2,
-        from_address = collateral_prices.contract_address,
-        name = 'update_collateral_price_called',
+        from_address=collateral_prices.contract_address,
+        name='update_collateral_price_called',
         data=[
             USDT_ID,
             1000
