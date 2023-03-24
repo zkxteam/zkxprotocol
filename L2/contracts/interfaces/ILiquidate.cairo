@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.DataTypes import PriceData, MultipleOrder, PositionDetailsForRiskManagement
+from contracts.DataTypes import MultipleOrder, PositionDetailsForRiskManagement
 
 @contract_interface
 namespace ILiquidate {

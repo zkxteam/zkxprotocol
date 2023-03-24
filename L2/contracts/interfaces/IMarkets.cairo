@@ -52,6 +52,7 @@ namespace IMarkets {
         market_id_: felt,
         tick_size_: felt,
         step_size_: felt,
+        ttl_: felt,
         minimum_order_size_: felt,
         minimum_leverage_: felt,
         maximum_leverage_: felt,

@@ -5,7 +5,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import deploy
 
 from contracts.Constants import MasterAdmin_ACTION
-from contracts.libraries.CommonLibrary import CommonLib, get_contract_version, get_registry_address
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
 // //////////

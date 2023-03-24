@@ -2,19 +2,19 @@
 
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.libraries.RelayLibrary import (
-    record_call_details,
-    get_inner_contract,
-    initialize,
-    get_current_version,
+    get_caller_hash_list,
     get_caller_hash_status,
     get_call_counter,
+    get_current_version,
+    get_inner_contract,
     get_registry_address_at_relay,
     get_self_index,
-    get_caller_hash_list,
-    set_current_version,
+    initialize,
     mark_caller_hash_paid,
+    record_call_details,
     reset_call_counter,
     set_self_index,
+    set_current_version
 )
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin

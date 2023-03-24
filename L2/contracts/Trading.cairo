@@ -5,7 +5,6 @@ from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
 from starkware.cairo.common.math import (
     abs_value,
-    assert_in_range,
     assert_le,
     assert_lt,
     assert_not_zero,
@@ -1297,8 +1296,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert data[0] = quantity_to_execute;
         assert data[1] = execution_price;
         assert data[2] = [request_list_].direction;
+        assert data[3] = [request_list_].side;
 
-        emit_event(2, keys, 3, data);
+        emit_event(2, keys, 4, data);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;

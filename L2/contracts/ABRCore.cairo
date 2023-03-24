@@ -5,7 +5,6 @@ from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_lt, assert_le
 from starkware.cairo.common.math_cmp import is_le
-from starkware.starknet.common.syscalls import get_block_timestamp
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.UserBatches import calculate_no_of_batches, get_batch
 from contracts.Constants import (
@@ -124,10 +123,9 @@ func bollinger_width() -> (value: felt) {
 // @param version_ Version of this contract
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    registry_address_: felt, version_: felt, abr_epoch_0_timestamp_:felt
+    registry_address_: felt, version_: felt, abr_epoch_0_timestamp_: felt
 ) {
     CommonLib.initialize(registry_address_, version_);
-    let (block_timestamp) = get_block_timestamp();
     // initialize epoch 0 with timestamp at deployment
     epoch_to_timestamp.write(epoch=0, value=abr_epoch_0_timestamp_);
     // 8 hours

@@ -66,11 +66,6 @@ func market_metadata_link_update(market_id: felt) {
 func max_ttl() -> (ttl: felt) {
 }
 
-// Version of Market contract to refresh in node
-@storage_var
-func version() -> (res: felt) {
-}
-
 // Length of the markets array
 @storage_var
 func markets_array_len() -> (len: felt) {
@@ -548,6 +543,7 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     market_id_: felt,
     tick_size_: felt,
     step_size_: felt,
+    ttl_: felt,
     minimum_order_size_: felt,
     minimum_leverage_: felt,
     maximum_leverage_: felt,
@@ -571,7 +567,7 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         asset_collateral=market.asset_collateral,
         is_tradable=market.is_tradable,
         is_archived=market.is_archived,
-        ttl=market.ttl,
+        ttl=ttl_,
         tick_size=tick_size_,
         step_size=step_size_,
         minimum_order_size=minimum_order_size_,
@@ -589,6 +585,13 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     // Validate and save updated market
     validate_market_trading_settings(updated_market);
     market_by_id.write(market_id_, updated_market);
+
+    // ttl check
+    with_attr error_message("Markets: ttl must be in range [1...max_ttl]") {
+        let (maximum_ttl) = max_ttl.read();
+        assert_le(1, market.ttl);
+        assert_le(market.ttl, maximum_ttl);
+    }
 
     // Emit event
     market_trade_settings_updated.emit(market_id=market_id_, market=market);
