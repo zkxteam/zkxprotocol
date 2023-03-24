@@ -5,17 +5,6 @@ from contracts.libraries.RelayLibrary import (
     record_call_details,
     get_inner_contract,
     initialize,
-    get_current_version,
-    get_caller_hash_status,
-    get_call_counter,
-    get_registry_address_at_relay,
-    get_self_index,
-    get_caller_hash_list,
-    set_current_version,
-    mark_caller_hash_paid,
-    reset_call_counter,
-    set_self_index,
-    verify_caller_authority,
 )
 
 from contracts.DataTypes import MultipleOrder

@@ -3,7 +3,7 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 from contracts.Constants import Trading_INDEX
-from contracts.libraries.FundLibrary import FundLib
+from contracts.libraries.FundLibrary import balance, FundLib
 from contracts.Math_64x61 import Math64x61_assert64x61
 
 // /////////

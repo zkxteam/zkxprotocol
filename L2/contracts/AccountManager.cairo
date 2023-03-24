@@ -14,7 +14,6 @@ from starkware.starknet.common.syscalls import (
     emit_event,
     get_block_timestamp,
     get_caller_address,
-    get_contract_address,
 )
 
 from contracts.Constants import (
@@ -210,7 +209,7 @@ func get_public_key{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 @view
 func is_valid_signature{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
-}(hash: felt, signature: felt*) -> () {
+}(hash: felt, signature_len: felt, signature: felt*) -> () {
     let (_public_key) = public_key.read();
 
     // This interface expects a signature pointer and length to make
@@ -1445,7 +1444,7 @@ func withdraw{
     // hash the parameters
     let (hash) = hash_withdrawal_request(&hash_withdrawal_request_);
     // check if Tx is signed by the user
-    is_valid_signature(hash, signature_);
+    is_valid_signature(hash, 2, signature_);
     let (arr_len) = withdrawal_history_array_len.read();
     let (result) = check_for_withdrawal_replay(request_id_, arr_len);
     with_attr error_message("AccountManager: Withdrawal replay detected") {

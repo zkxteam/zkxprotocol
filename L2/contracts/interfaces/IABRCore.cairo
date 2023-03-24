@@ -1,6 +1,6 @@
 %lang starknet
 
-from contracts.DataTypes import ABRDetails, Market
+from contracts.DataTypes import ABRDetails
 
 @contract_interface
 namespace IABRCore {

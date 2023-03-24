@@ -7,6 +7,9 @@ from starkware.cairo.common.math import assert_not_zero
 from contracts.DataTypes import DepositData
 from contracts.libraries.CommonLibrary import (
     CommonLib,
+    get_registry_address,
+    get_contract_version,
+    set_contract_version
 )
 
 // //////////
