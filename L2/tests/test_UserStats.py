@@ -331,13 +331,13 @@ async def test_record_trader_stats_with_two_open_orders(adminAuth_factory):
     market_id = market_id_1
 
     trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
-    assert from64x61(trader1_fee.result.fee_64x61) == 0
+    assert from64x61(trader1_fee.result.fee_64x61) == 0.9699999999999964
 
     trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
-    assert from64x61(trader2_fee.result.fee_64x61) == 0
+    assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
 
     total_fee = await user_stats.get_total_fee(season_id, market_id).call()
-    assert from64x61(total_fee.result.total_fee_64x61) == 0
+    assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
 
     trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
@@ -396,13 +396,13 @@ async def test_record_trader_stats_with_two_close_orders(adminAuth_factory):
 
     # Recorded fee is not changed as we placed close orders
     trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
-    assert from64x61(trader1_fee.result.fee_64x61) == 0
+    assert from64x61(trader1_fee.result.fee_64x61) == 0.9699999999999964
 
     trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
-    assert from64x61(trader2_fee.result.fee_64x61) == 0
+    assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
 
     total_fee = await user_stats.get_total_fee(season_id, market_id).call()
-    assert from64x61(total_fee.result.total_fee_64x61) == 0
+    assert from64x61(total_fee.result.total_fee_64x61) == 3.394999999999995
 
     trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["sell"])).call()
     assert trader1_order_volume.result.number_of_orders == 1
@@ -460,16 +460,16 @@ async def test_record_trader_stats_with_one_open_order_and_one_close_order(admin
     # Recorded fee is changed for Alice as it is a open order
     trader1_fee = await user_stats.get_trader_fee(season_id, market_id, alice.contract_address).call()
     print("alice fee",  from64x61(trader1_fee.result.fee_64x61))
-    assert from64x61(trader1_fee.result.fee_64x61) == 0
+    assert from64x61(trader1_fee.result.fee_64x61) == 2.424999999999996
 
     # Recorded fee is not changed for bob as it is a close order
     trader2_fee = await user_stats.get_trader_fee(season_id, market_id, bob.contract_address).call()
     print("bob fee",  from64x61(trader2_fee.result.fee_64x61))
-    assert from64x61(trader2_fee.result.fee_64x61) == 0
+    assert from64x61(trader2_fee.result.fee_64x61) == 2.424999999999999
 
     total_fee = await user_stats.get_total_fee(season_id, market_id).call()
     print("total fee", from64x61(total_fee.result.total_fee_64x61))
-    assert from64x61(total_fee.result.total_fee_64x61) == 0
+    assert from64x61(total_fee.result.total_fee_64x61) == 4.849999999999994
 
     trader1_order_volume = await user_stats.get_trader_order_volume(alice.contract_address, (season_id, market_id, side["buy"])).call()
     assert trader1_order_volume.result.number_of_orders == 2

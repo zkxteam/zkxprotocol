@@ -1019,6 +1019,7 @@ func execute_order{
     market_id: felt,
     collateral_id_: felt,
     pnl: felt,
+    opening_fee: felt,
     side: felt,
     margin_lock_update_amount: felt,
 ) -> (res: felt) {
@@ -1087,7 +1088,7 @@ func execute_order{
         assert data[6] = execution_price;
         assert data[7] = pnl;
         assert data[8] = side;
-        assert data[9] = 0;
+        assert data[9] = opening_fee;
         assert data[10] = is_final;
 
         emit_event(1, keys, 11, data);
@@ -1373,7 +1374,7 @@ func execute_order{
     assert data[6] = execution_price;
     assert data[7] = pnl;
     assert data[8] = side;
-    assert data[9] = 0;
+    assert data[9] = opening_fee;
     assert data[10] = is_final;
 
     emit_event(1, keys, 11, data);

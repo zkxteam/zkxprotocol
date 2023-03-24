@@ -19,6 +19,7 @@ from contracts.Constants import (
     BUY,
     CLOSE,
     DELEVERAGING_ORDER,
+    FeeBalance_INDEX,
     FoK,
     Holding_INDEX,
     InsuranceFund_INDEX,
@@ -34,6 +35,7 @@ from contracts.Constants import (
     OPEN,
     SELL,
     TAKER,
+    TradingFees_INDEX,
     TradingStats_INDEX,
 )
 from contracts.DataTypes import (
@@ -50,6 +52,7 @@ from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
+from contracts.interfaces.IFeeBalance import IFeeBalance
 from contracts.interfaces.IHolding import IHolding
 from contracts.interfaces.IInsuranceFund import IInsuranceFund
 from contracts.interfaces.ILiquidate import ILiquidate
@@ -57,6 +60,7 @@ from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.ITradingStats import ITradingStats
+from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import (
     Math64x61_add,
@@ -145,6 +149,8 @@ func execute_batch{
         account_registry_address: felt,
         asset_address: felt,
         holding_address: felt,
+        trading_fees_address: felt,
+        fees_balance_address: felt,
         liquidity_fund_address: felt,
         insurance_fund_address: felt,
         liquidate_address: felt,
@@ -202,6 +208,8 @@ func execute_batch{
         quantity_executed_=0,
         account_registry_address_=account_registry_address,
         holding_address_=holding_address,
+        trading_fees_address_=trading_fees_address,
+        fees_balance_address_=fees_balance_address,
         liquidate_address_=liquidate_address,
         liquidity_fund_address_=liquidity_fund_address,
         insurance_fund_address_=insurance_fund_address,
@@ -228,17 +236,11 @@ func execute_batch{
             contract_address=market_prices_address, id=market_id_, price=oracle_price_
         );
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-
-    tempvar syscall_ptr = syscall_ptr;
-    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    tempvar range_check_ptr = range_check_ptr;
 
     // Record TradingStats
     ITradingStats.record_trade_batch_stats(
@@ -323,13 +325,11 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         }
 
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         quantity_to_execute_final = quantity_to_execute;
 
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
 
@@ -516,6 +516,8 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @returns account_registry_address - Address of the Account Registry contract
 // @returns asset_address - Address of the Asset contract
 // @returns holding_address - Address of the Holding contract
+// @returns trading_fees_address - Address of the Trading contract
+// @returns fees_balance_address - Address of the Fee Balance contract
 // @returns liquidity_fund_address - Address of the Liquidity Fund contract
 // @returns insurance_fund_address - Address of the Insurance Fund contract
 // @returns liquidate_address - Address of the Liquidate contract
@@ -526,6 +528,8 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     account_registry_address: felt,
     asset_address: felt,
     holding_address: felt,
+    trading_fees_address: felt,
+    fees_balance_address: felt,
     liquidity_fund_address: felt,
     insurance_fund_address: felt,
     liquidate_address: felt,
@@ -550,6 +554,16 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
     // Get holding address
     let (holding_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Holding_INDEX, version=version
+    );
+
+    // Get Trading fees address
+    let (trading_fees_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=TradingFees_INDEX, version=version
+    );
+
+    // Get Fee balance address
+    let (fees_balance_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=FeeBalance_INDEX, version=version
     );
 
     // Get Liquidate address
@@ -586,6 +600,8 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         account_registry_address,
         asset_address,
         holding_address,
+        trading_fees_address,
+        fees_balance_address,
         liquidity_fund_address,
         insurance_fund_address,
         liquidate_address,
@@ -619,12 +635,15 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     liquidity_fund_address_: felt,
     liquidate_address_: felt,
     holding_address_: felt,
+    trading_fees_address_: felt,
+    fees_balance_address_: felt,
     trader_stats_list_: TraderStats*,
     side_: felt,
 ) -> (
     average_execution_price_open: felt,
     margin_amount_open: felt,
     borrowed_amount_open: felt,
+    trading_fee: felt,
     margin_lock_amount: felt,
 ) {
     alloc_locals;
@@ -633,7 +652,13 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     local borrowed_amount_open;
     local average_execution_price_open;
     local user_available_balance;
+    local trading_fee;
     local order_id;
+
+    // Get the fees from Trading Fee contract
+    let (fees_rate, base_fee_tier, discount_tier) = ITradingFees.get_discounted_fee_rate_for_user(
+        contract_address=trading_fees_address_, address_=order_.user_address, side_=side_
+    );
 
     // Get position details
     let (position_details: PositionDetails) = IAccountManager.get_position_data(
@@ -670,6 +695,10 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert margin_amount_open = margin_amount_open_felt;
     assert borrowed_amount_open = borrowed_amount_open_felt;
 
+    // Calculate the fees for the order
+    let (fees) = Math64x61_mul(fees_rate, leveraged_order_value);
+    let (trading_fee) = Math64x61_mul(fees, NEGATIVE_ONE);
+
     // Check if the position can be opened
     let (available_margin) = ILiquidate.check_for_risk(
         contract_address=liquidate_address_,
@@ -683,12 +712,33 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert user_available_balance = available_margin;
     assert order_id = order_.order_id;
 
-
     // User must be able to pay the amount
     with_attr error_message("0501: {order_id} {user_available_balance}") {
-        Math64x61_assert_le(
-            0, user_available_balance, collateral_token_decimal_
+        Math64x61_assert_le(fees, user_available_balance, collateral_token_decimal_);
+    }
+
+    if (is_le(fees, 0) == 0) {
+        // Deduct the fee from account contract
+        IAccountManager.transfer_from(
+            contract_address=order_.user_address,
+            asset_id_=collateral_id_,
+            market_id_=0,
+            amount_=fees,
+            invoked_for_='fee',
         );
+
+        // Update the fees to be paid by user in fee balance contract
+        IFeeBalance.update_fee_mapping(
+            contract_address=fees_balance_address_,
+            address=order_.user_address,
+            assetID_=collateral_id_,
+            fee_to_add=fees,
+        );
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar syscall_ptr = syscall_ptr;
+    } else {
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar syscall_ptr = syscall_ptr;
     }
 
     let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
@@ -696,7 +746,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     // Update Trader stats
     let element: TraderStats = TraderStats(
         trader_address=order_.user_address,
-        fee_64x61=0,
+        fee_64x61=fees,
         order_volume_64x61=order_volume_64x61,
         side=BUY,
         pnl_64x61=0,
@@ -715,11 +765,9 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
             position_id_=order_.order_id,
         );
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
 
@@ -729,7 +777,11 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     );
 
     return (
-        average_execution_price_open, margin_amount_open, borrowed_amount_open, margin_order_value
+        average_execution_price_open,
+        margin_amount_open,
+        borrowed_amount_open,
+        trading_fee,
+        margin_order_value,
     );
 }
 
@@ -830,7 +882,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         margin_amount_open_64x61 = 0;
 
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         // New borrowed amount of the position
@@ -845,7 +896,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         margin_amount_open_64x61 = margin_amount_to_be_reduced;
 
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
 
@@ -879,16 +929,13 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         );
 
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
 
     tempvar syscall_ptr = syscall_ptr;
-    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     tempvar range_check_ptr = range_check_ptr;
 
     // Check if the account value for the position is negative
@@ -931,7 +978,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     position_id_=order_.order_id,
                 );
                 tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             } else {
                 let (deduct_from_insurance) = Math64x61_sub(
@@ -944,7 +990,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                     position_id_=order_.order_id,
                 );
                 tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             }
             tempvar syscall_ptr = syscall_ptr;
@@ -1059,6 +1104,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param quantity_executed_ - Quantity of maker orders executed so far
 // @param account_registry_address_ - Address of the Account Registry contract
 // @param holding_address_ - Address of the Holding contract
+// @param trading_fees_address_ - Address of the Trading contract
+// @param fees_balance_address_ - Address of the Fee Balance contract
 // @param liquidate_address_ - Address of the Liquidate contract
 // @param liquidity_fund_address_ - Address of the Liquidity Fund contract
 // @param insurance_fund_address_ - Address of the Insurance Fund contract
@@ -1086,6 +1133,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     quantity_executed_: felt,
     account_registry_address_: felt,
     holding_address_: felt,
+    trading_fees_address_: felt,
+    fees_balance_address_: felt,
     liquidate_address_: felt,
     liquidity_fund_address_: felt,
     insurance_fund_address_: felt,
@@ -1112,6 +1161,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local current_quantity_executed;
     local current_order_side;
     local current_open_interest;
+    local opening_fee;
     local pnl;
 
     // Local variables to be passed as arguments in error_messages
@@ -1195,11 +1245,9 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             }
 
             tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
             tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
 
@@ -1307,6 +1355,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 market_id=market_id_,
                 collateral_id_=collateral_id_,
                 pnl=0,
+                opening_fee=0,
                 side=MAKER,
                 margin_lock_update_amount=0,
             );
@@ -1333,6 +1382,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 quantity_executed_=quantity_executed_,
                 account_registry_address_=account_registry_address_,
                 holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
                 liquidate_address_=liquidate_address_,
                 liquidity_fund_address_=liquidity_fund_address_,
                 insurance_fund_address_=insurance_fund_address_,
@@ -1379,6 +1430,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
             borrowed_amount_temp: felt,
+            trading_fee: felt,
             margin_lock_amount: felt,
         ) = process_open_orders(
             order_=[request_list_],
@@ -1390,13 +1442,16 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             liquidity_fund_address_=liquidity_fund_address_,
             liquidate_address_=liquidate_address_,
             holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
             trader_stats_list_=trader_stats_list_,
             side_=current_order_side,
         );
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
-        assert pnl = 0;
+        assert pnl = trading_fee;
+        assert opening_fee = trading_fee;
         assert current_open_interest = quantity_to_execute;
         assert margin_lock_update_amount = margin_lock_amount;
 
@@ -1426,6 +1481,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
         assert pnl = realized_pnl;
+        assert opening_fee = 0;
         assert current_open_interest = 0 - quantity_to_execute;
         assert margin_lock_update_amount = margin_unlock_amount;
 
@@ -1467,6 +1523,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         market_id=market_id_,
         collateral_id_=collateral_id_,
         pnl=pnl,
+        opening_fee=opening_fee,
         side=current_order_side,
         margin_lock_update_amount=margin_lock_update_amount,
     );
@@ -1484,6 +1541,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         quantity_executed_=current_quantity_executed,
         account_registry_address_=account_registry_address_,
         holding_address_=holding_address_,
+        trading_fees_address_=trading_fees_address_,
+        fees_balance_address_=fees_balance_address_,
         liquidate_address_=liquidate_address_,
         liquidity_fund_address_=liquidity_fund_address_,
         insurance_fund_address_=insurance_fund_address_,
