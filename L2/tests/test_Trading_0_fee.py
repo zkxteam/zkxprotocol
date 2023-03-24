@@ -7,8 +7,11 @@ from starkware.starkware_utils.error_handling import StarkException
 from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, str_to_felt, to64x61, from64x61, assert_revert, assert_event_with_custom_keys_emitted, PRIME, PRIME_HALF
-from utils_trading import User, order_direction, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, compare_margin_info
+from starkware.starknet.business_logic.execution.objects import OrderedEvent
+from starkware.starknet.public.abi import get_selector_from_name
+
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, assert_event_with_custom_keys_emitted, PRIME, PRIME_HALF
+from utils_trading import User, order_direction, order_side, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, compare_margin_info, check_batch_status
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -46,6 +49,7 @@ def event_loop():
 
 @pytest.fixture(scope='module')
 async def trading_test_initializer(starknet_service: StarknetService):
+
     # Deploy infrastructure (Part 1)
     admin1 = await starknet_service.deploy(ContractType.Account, [
         admin1_signer.public_key
@@ -59,7 +63,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
     fees = await starknet_service.deploy(ContractType.TradingFees, [registry.contract_address, 1])
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
 
-    python_executor = OrderExecutor()
+    python_executor = OrderExecutor(maker_fees=0, taker_fees=0)
     # Deploy user accounts
     account_factory = AccountFactory(
         starknet_service,
@@ -68,25 +72,29 @@ async def trading_test_initializer(starknet_service: StarknetService):
         1
     )
     alice = await account_factory.deploy_ZKX_account(alice_signer.public_key)
+    print("alice", hex(alice.contract_address))
     alice_test = User(123456789987654323, alice.contract_address)
-    print(alice.contract_address)
 
     bob = await account_factory.deploy_ZKX_account(bob_signer.public_key)
+    print("bob", hex(bob.contract_address))
     bob_test = User(123456789987654324, bob.contract_address)
-    print(bob.contract_address)
 
     charlie = await account_factory.deploy_ZKX_account(charlie_signer.public_key)
+    print("charlie", hex(charlie.contract_address))
     charlie_test = User(123456789987654325, charlie.contract_address)
 
     dave = await account_factory.deploy_account(dave_signer.public_key)
+    print("dave", hex(dave.contract_address))
 
     eduard = await account_factory.deploy_ZKX_account(eduard_signer.public_key)
     eduard_test = User(123456789987654327, eduard.contract_address)
 
     felix = await account_factory.deploy_ZKX_account(felix_signer.public_key)
+    print("felix", hex(felix.contract_address))
     felix_test = User(123456789987654328, felix.contract_address)
 
     gary = await account_factory.deploy_ZKX_account(gary_signer.public_key)
+    print("gary", hex(gary.contract_address))
     gary_test = User(123456789987654329, gary.contract_address)
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
@@ -109,10 +117,6 @@ async def trading_test_initializer(starknet_service: StarknetService):
     feeDiscount = await starknet_service.deploy(ContractType.FeeDiscount, [registry.contract_address, 1])
     marketPrices = await starknet_service.deploy(ContractType.MarketPrices, [registry.contract_address, 1])
     liquidate = await starknet_service.deploy(ContractType.Liquidate, [registry.contract_address, 1])
-    collateral_prices = await starknet_service.deploy(
-        ContractType.CollateralPrices,
-        [registry.contract_address, 1]
-    )
     hightide = await starknet_service.deploy(ContractType.HighTide, [registry.contract_address, 1])
     trading_stats = await starknet_service.deploy(ContractType.TradingStats, [registry.contract_address, 1])
     user_stats = await starknet_service.deploy(ContractType.UserStats, [registry.contract_address, 1])
@@ -149,72 +153,18 @@ async def trading_test_initializer(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.LiquidityFund, 1, liquidity.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.InsuranceFund, 1, insurance.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Liquidate, 1, liquidate.contract_address])
-    await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.CollateralPrices, 1, collateral_prices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.AccountRegistry, 1, account_registry.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.MarketPrices, 1, marketPrices.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Hightide, 1, hightide.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.TradingStats, 1, trading_stats.contract_address])
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.UserStats, 1, user_stats.contract_address])
 
-    # Deploy relay contracts with appropriate indexes
-    relay_trading = await starknet_service.deploy(ContractType.RelayTrading, [
-        registry.contract_address,
-        1,
-        ContractIndex.Trading
-    ])
-    relay_asset = await starknet_service.deploy(ContractType.RelayAsset, [
-        registry.contract_address,
-        1,
-        ContractIndex.Asset
-    ])
-    relay_market = await starknet_service.deploy(ContractType.RelayMarkets, [
-        registry.contract_address,
-        1,
-        ContractIndex.Market
-    ])
-    relay_holding = await starknet_service.deploy(ContractType.RelayHolding, [
-        registry.contract_address,
-        1,
-        ContractIndex.Holding
-    ])
-    relay_fees = await starknet_service.deploy(ContractType.RelayTradingFees, [
-        registry.contract_address,
-        1,
-        ContractIndex.TradingFees
-    ])
-    relay_feeBalance = await starknet_service.deploy(ContractType.RelayFeeBalance, [
-        registry.contract_address,
-        1,
-        ContractIndex.FeeBalance
-    ])
-    relay_ABRCore = await starknet_service.deploy(ContractType.RelayFeeBalance, [
-        registry.contract_address,
-        1,
-        ContractIndex.ABRCore
-    ])
-
-    # Give permissions to relay contracts
-    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_asset.contract_address, ManagerAction.ManageAssets, True])
-    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_market.contract_address, ManagerAction.ManageMarkets, True])
-    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_fees.contract_address, ManagerAction.ManageFeeDetails, True])
-    await admin1_signer.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [relay_holding.contract_address, ManagerAction.ManageFunds, True])
-
     # Add base fee and discount in Trading Fee contract
-    base_fee_maker1 = to64x61(0.0002)
-    base_fee_taker1 = to64x61(0.0005)
-    await admin1_signer.send_transaction(admin1, relay_fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1])
-    base_fee_maker2 = to64x61(0.00015)
-    base_fee_taker2 = to64x61(0.0004)
-    await admin1_signer.send_transaction(admin1, relay_fees.contract_address, 'update_base_fees', [2, 1000, base_fee_maker2, base_fee_taker2])
-    base_fee_maker3 = to64x61(0.0001)
-    base_fee_taker3 = to64x61(0.00035)
-    await admin1_signer.send_transaction(admin1, relay_fees.contract_address, 'update_base_fees', [3, 5000, base_fee_maker3, base_fee_taker3])
-    discount1 = to64x61(0.03)
-    await admin1_signer.send_transaction(admin1, relay_fees.contract_address, 'update_discount', [1, 0, discount1])
-    discount2 = to64x61(0.05)
-    await admin1_signer.send_transaction(admin1, relay_fees.contract_address, 'update_discount', [2, 1000, discount2])
-    discount3 = to64x61(0.1)
-    await admin1_signer.send_transaction(admin1, relay_fees.contract_address, 'update_discount', [3, 5000, discount3])
+    base_fee_maker1 = 0
+    base_fee_taker1 = 0
+    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_base_fees', [1, 0, base_fee_maker1, base_fee_taker1])
+    discount1 = 0
+    await admin1_signer.send_transaction(admin1, fees.contract_address, 'update_discount', [1, 0, discount1])
 
     # Add assets
     BTC_properties = build_asset_properties(
@@ -225,7 +175,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_collateral=False,
         token_decimal=8
     )
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', BTC_properties)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', BTC_properties)
 
     ETH_properties = build_asset_properties(
         id=AssetID.ETH,
@@ -235,7 +185,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_collateral=False,
         token_decimal=18
     )
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', ETH_properties)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', ETH_properties)
 
     USDC_properties = build_asset_properties(
         id=AssetID.USDC,
@@ -245,7 +195,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_collateral=True,
         token_decimal=6
     )
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', USDC_properties)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
 
     UST_properties = build_asset_properties(
         id=AssetID.UST,
@@ -255,7 +205,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_collateral=True,
         token_decimal=6
     )
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', UST_properties)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', UST_properties)
 
     DOGE_properties = build_asset_properties(
         id=AssetID.DOGE,
@@ -265,7 +215,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_collateral=False,
         token_decimal=8
     )
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', DOGE_properties)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', DOGE_properties)
 
     TESLA_properties = build_asset_properties(
         id=AssetID.TSLA,
@@ -275,7 +225,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_collateral=False,
         token_decimal=8
     )
-    await admin1_signer.send_transaction(admin1, relay_asset.contract_address, 'add_asset', TESLA_properties)
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', TESLA_properties)
 
     # Add markets
     BTC_USD_properties = MarketProperties(
@@ -298,7 +248,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         baseline_position_size=1000,
         maximum_position_size=10000
     )
-    await admin1_signer.send_transaction(admin1, relay_market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
 
     BTC_UST_properties = MarketProperties(
         id=BTC_UST_ID,
@@ -320,7 +270,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         baseline_position_size=1000,
         maximum_position_size=10000
     )
-    await admin1_signer.send_transaction(admin1, relay_market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
 
     ETH_USD_properties = MarketProperties(
         id=ETH_USD_ID,
@@ -342,7 +292,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         baseline_position_size=1000,
         maximum_position_size=10000
     )
-    await admin1_signer.send_transaction(admin1, relay_market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
 
     TSLA_USD_properties = MarketProperties(
         id=TSLA_USD_ID,
@@ -357,14 +307,14 @@ async def trading_test_initializer(starknet_service: StarknetService):
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(5),
         currently_allowed_leverage=to64x61(3),
-        maintenance_margin_fraction=1,
+        maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
         incremental_position_size=100,
         baseline_position_size=1000,
         maximum_position_size=10000
     )
-    await admin1_signer.send_transaction(admin1, relay_market.contract_address, 'add_market', TSLA_USD_properties.to_params_list())
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', TSLA_USD_properties.to_params_list())
 
     UST_USDC_properties = MarketProperties(
         id=UST_USDC_ID,
@@ -386,19 +336,15 @@ async def trading_test_initializer(starknet_service: StarknetService):
         baseline_position_size=1000,
         maximum_position_size=10000
     )
-    await admin1_signer.send_transaction(admin1, relay_market.contract_address, 'add_market', UST_USDC_properties.to_params_list())
-
-    # Update collateral prices
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.USDC, to64x61(1)])
-    await admin1_signer.send_transaction(admin1, collateral_prices.contract_address, 'update_collateral_price', [AssetID.UST, to64x61(1)])
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', UST_USDC_properties.to_params_list())
 
     # Fund the Holding contract
     python_executor.set_fund_balance(
         fund=fund_mapping["holding_fund"], asset_id=AssetID.USDC, new_balance=1000000)
     python_executor.set_fund_balance(
         fund=fund_mapping["holding_fund"], asset_id=AssetID.UST, new_balance=1000000)
-    await admin1_signer.send_transaction(admin1, relay_holding.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
-    await admin1_signer.send_transaction(admin1, relay_holding.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
+    await admin1_signer.send_transaction(admin1, holding.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
 
     # Fund the Liquidity fund contract
     python_executor.set_fund_balance(
@@ -407,6 +353,12 @@ async def trading_test_initializer(starknet_service: StarknetService):
         fund=fund_mapping["liquidity_fund"], asset_id=AssetID.UST, new_balance=1000000)
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.USDC, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, liquidity.contract_address, 'fund', [AssetID.UST, to64x61(1000000)])
+
+    print("Trading contract:", hex(trading.contract_address))
+    print("liquidate contract:", hex(liquidate.contract_address))
+    print("Market:", hex(market.contract_address))
+    print("Market Prices:", hex(marketPrices.contract_address))
+    print("Auth Registry", hex(registry.contract_address))
 
     return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats
 
@@ -457,7 +409,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
         keys=[str_to_felt('trade_execution'), market_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
             200), order_direction["short"]],
-        order=6
+        order=4
     )
 
     # check balances
@@ -1409,7 +1361,7 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
         keys=[str_to_felt('trade_execution'), market_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
             1000), order_direction["short"]],
-        order=5
+        order=3
     )
 
     # check balances

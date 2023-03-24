@@ -419,7 +419,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
         keys=[str_to_felt('trade_execution'), market_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
             200), order_direction["short"]],
-        order=4
+        order=6
     )
 
     # check balances
@@ -1371,7 +1371,7 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
         keys=[str_to_felt('trade_execution'), market_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
             1000), order_direction["short"]],
-        order=3
+        order=5
     )
 
     # check balances
@@ -1748,6 +1748,8 @@ async def test_placing_order_directly(trading_test_initializer):
         # collateral_id
         AssetID.USDC,
         # pnl
+        0,
+        # opening_fee
         0,
         # side,
         1,
