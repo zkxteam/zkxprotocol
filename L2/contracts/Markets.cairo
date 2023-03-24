@@ -66,11 +66,6 @@ func market_metadata_link_update(market_id: felt) {
 func max_ttl() -> (ttl: felt) {
 }
 
-// Version of Market contract to refresh in node
-@storage_var
-func version() -> (res: felt) {
-}
-
 // Length of the markets array
 @storage_var
 func markets_array_len() -> (len: felt) {

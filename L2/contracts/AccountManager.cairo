@@ -54,7 +54,6 @@ from contracts.DataTypes import (
 from contracts.interfaces.IAccountLiquidator import IAccountLiquidator
 from contracts.interfaces.IAsset import IAsset
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.interfaces.ILiquidate import ILiquidate
 from contracts.interfaces.IMarkets import IMarkets
 from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IWithdrawalFeeBalance import IWithdrawalFeeBalance
@@ -211,7 +210,7 @@ func get_public_key{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 @view
 func is_valid_signature{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
-}(hash: felt, signature_len: felt, signature: felt*) -> () {
+}(hash: felt, signature: felt*) -> () {
     let (_public_key) = public_key.read();
 
     // This interface expects a signature pointer and length to make
@@ -622,7 +621,6 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
 
     let (registry) = CommonLib.get_registry_address();
     let (version) = CommonLib.get_contract_version();
-    let (user_l2_address) = get_contract_address();
 
     let (asset_address) = IAuthorizedRegistry.get_contract_address(
         contract_address=registry, index=Asset_INDEX, version=version
@@ -636,10 +634,6 @@ func get_safe_amount_to_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
         return (0, 0);
     }
 
-    // Get Liquidate contract address
-    let (liquidate_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Liquidate_INDEX, version=version
-    );
     let (
         liq_result: felt,
         total_account_value: felt,
@@ -1451,7 +1445,7 @@ func withdraw{
     // hash the parameters
     let (hash) = hash_withdrawal_request(&hash_withdrawal_request_);
     // check if Tx is signed by the user
-    is_valid_signature(hash, 2, signature_);
+    is_valid_signature(hash, signature_);
     let (arr_len) = withdrawal_history_array_len.read();
     let (result) = check_for_withdrawal_replay(request_id_, arr_len);
     with_attr error_message("AccountManager: Withdrawal replay detected") {

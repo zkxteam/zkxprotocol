@@ -9,13 +9,7 @@ from starkware.starknet.common.syscalls import deploy
 from contracts.Constants import AccountRegistry_INDEX, MasterAdmin_ACTION
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAuthorizedRegistry import IAuthorizedRegistry
-from contracts.libraries.CommonLibrary import (
-    CommonLib,
-    get_contract_version,
-    get_registry_address,
-    set_contract_version,
-    set_registry_address,
-)
+from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 
 // /////////
