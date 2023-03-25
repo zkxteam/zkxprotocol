@@ -467,7 +467,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
         from_address=trading.contract_address,
         keys=[str_to_felt('trade_execution'), market_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
-            200), order_direction["short"]],
+            200), order_direction["short"], side["buy"]],
         order=6
     )
 
@@ -1431,7 +1431,7 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
         from_address=trading.contract_address,
         keys=[str_to_felt('trade_execution'), market_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
-            1000), order_direction["short"]],
+            1000), order_direction["short"], side["buy"]],
         order=5
     )
 
@@ -1653,7 +1653,7 @@ async def test_closing_partial_orders(trading_test_initializer):
         from_address=trading.contract_address,
         keys=[str_to_felt('trade_execution'), market_id_1],
         data=[to64x61(quantity_locked_2), to64x61(
-            1000), order_direction["long"]],
+            1000), order_direction["long"], side["buy"]],
         order=3
     )
 
