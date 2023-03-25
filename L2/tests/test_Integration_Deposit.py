@@ -21,6 +21,7 @@ eth_test_utils = EthTestUtils()
 # Generates unique asset params (id and name) to avoid conflicts
 
 DUMMY_WITHDRAWAL_REQUEST_ADDRESS=12345
+collateral_id=7788
 
 def generate_asset_info():
     global counter
@@ -111,7 +112,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
                                                   [class_hash])
 
     tx_exec_info = await signer1.send_transaction(admin1,
-                                                  account_deployer.contract_address, 'deploy_account', [pubkey, int(eth_test_utils.accounts[0].address,16)])
+                                                  account_deployer.contract_address, 'deploy_account', [pubkey, int(eth_test_utils.accounts[0].address,16), collateral_id])
 
     deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, int(eth_test_utils.accounts[0].address,16)).call()
     deployed_address=deployed_address.result.address

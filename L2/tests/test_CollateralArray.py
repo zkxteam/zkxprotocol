@@ -66,6 +66,6 @@ async def test_should_set_collaterals(adminAuth_factory):
 
     alice_list = await alice.return_array_collaterals().call()
     assert from64x61(
-        alice_list.result.array_list[0].balance) == from64x61(alice_balance_usdc)
+        alice_list.result.array_list[1].balance) == from64x61(alice_balance_usdc)
     assert from64x61(
-        alice_list.result.array_list[1].balance) == from64x61(alice_balance_ust)
+        alice_list.result.array_list[2].balance) == from64x61(alice_balance_ust)

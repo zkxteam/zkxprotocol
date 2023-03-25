@@ -100,6 +100,10 @@ func deploy_account{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         assert_not_zero(hash);
     }
 
+    with_attr error_message("AccountDeployer: callateral id cannot be 0") {
+        assert_not_zero(collateral_id);
+    }
+
     let (stored_deployed_address) = pubkey_L1_to_address.read(public_key, L1_address);
 
     // check we havent already deployed this combination of public key and L1 address
