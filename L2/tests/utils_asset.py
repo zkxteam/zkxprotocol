@@ -18,6 +18,7 @@ class AssetID:
     ADA = str_to_felt("32f0406jz7qj22")
     LUNA = str_to_felt("32f0406jz7qj23")
     UST = str_to_felt("yjk45lvmasopq")
+    DEFAULT = 7788
 
 
 DEFAULT_ASSET_ICON_LINK = DEFAULT_LINK_1

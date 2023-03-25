@@ -126,6 +126,7 @@ class AccountFactory:
         self.L1_user_address = L1_user_address
         self.registry_address = registry_address
         self.version = version
+        self.collateral_id = 7788
 
     async def deploy_account(self, public_key) -> StarknetContract:
         return await self.starknet_service.deploy(ContractType.Account, [
@@ -137,5 +138,6 @@ class AccountFactory:
             public_key,
             self.L1_user_address,
             self.registry_address,
-            self.version
+            self.version,
+            self.collateral_id
         ])
