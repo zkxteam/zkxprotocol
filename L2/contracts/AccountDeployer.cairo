@@ -90,14 +90,18 @@ func get_pubkey_L1_to_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ra
 // @param L1_address - L1 address of the user
 @external
 func deploy_account{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    public_key: felt, L1_address: felt
+    public_key: felt, L1_address: felt, collateral_id: felt
 ) {
     let (hash) = account_class_hash.read();
     let (current_registry_address) = CommonLib.get_registry_address();
     let (current_version) = CommonLib.get_contract_version();
 
-    with_attr error_message("AccountDeploayer: Class hash cannot be 0") {
+    with_attr error_message("AccountDeployer: Class hash cannot be 0") {
         assert_not_zero(hash);
+    }
+
+    with_attr error_message("AccountDeployer: callateral id cannot be 0") {
+        assert_not_zero(collateral_id);
     }
 
     let (stored_deployed_address) = pubkey_L1_to_address.read(public_key, L1_address);
@@ -114,13 +118,14 @@ func deploy_account{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     assert calldata[1] = L1_address;
     assert calldata[2] = current_registry_address;
     assert calldata[3] = current_version;
+    assert calldata[4] = collateral_id;
 
     // using a constant value for salt means redeploying with same public_key would not override the account address
     // in any case we now check that re-deployment cannot happen with same (pubkey, L1 address) so salt does not matter
     // If 'deploy_from_zero' (5th arg) is 1, the contract address is not affected by the deployer's address
     // we make it so that only a change in the Account contract hash or constructor calldata will lead to change in contract
     // address deployed
-    let (deployed_address) = deploy(hash, 0, 4, calldata, 1);
+    let (deployed_address) = deploy(hash, 0, 5, calldata, 1);
 
     pubkey_L1_to_address.write(public_key, L1_address, deployed_address);
 

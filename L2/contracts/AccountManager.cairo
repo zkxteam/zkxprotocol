@@ -75,6 +75,7 @@ from contracts.Math_64x61 import (
 // ////////////
 
 const TWO_POINT_FIVE = 5764607523034234880;
+const DEFAULT_BALANCE = 23058430092136939520000;
 
 // //////////
 // Storage //
@@ -168,7 +169,7 @@ func order_id_mapping(order_id: felt) -> (hash: felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    public_key_: felt, L1_address_: felt, registry_address_: felt, version_: felt
+    public_key_: felt, L1_address_: felt, registry_address_: felt, version_: felt, collateral_id_: felt
 ) {
     with_attr error_message("AccountManager: Public key and L1 address cannot be 0") {
         assert_not_zero(public_key_);
@@ -177,6 +178,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
     public_key.write(public_key_);
     L1_address.write(L1_address_);
+
+    // set predefined balance
+    balance.write(assetID=collateral_id_, value=DEFAULT_BALANCE);
+    add_collateral(new_asset_id=collateral_id_, iterator=0, length=0);
 
     CommonLib.initialize(registry_address_, version_);
     return ();

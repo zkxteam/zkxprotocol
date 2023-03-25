@@ -2255,13 +2255,15 @@ async def test_opening_and_closing_full_orders_new_collateral(trading_test_initi
 
     alice_collaterals = await alice.return_array_collaterals().call()
     alice_collaterals_parsed = alice_collaterals.result.array_list
-    assert alice_collaterals_parsed[0].assetID == AssetID.USDC
-    assert alice_collaterals_parsed[1].assetID == AssetID.UST
+    assert alice_collaterals_parsed[0].assetID == AssetID.DEFAULT
+    assert alice_collaterals_parsed[1].assetID == AssetID.USDC
+    assert alice_collaterals_parsed[2].assetID == AssetID.UST
 
     bob_collaterals = await bob.return_array_collaterals().call()
     bob_collaterals_parsed = bob_collaterals.result.array_list
-    assert bob_collaterals_parsed[0].assetID == AssetID.USDC
-    assert bob_collaterals_parsed[1].assetID == AssetID.UST
+    assert bob_collaterals_parsed[0].assetID == AssetID.DEFAULT
+    assert bob_collaterals_parsed[1].assetID == AssetID.USDC
+    assert bob_collaterals_parsed[2].assetID == AssetID.UST
 
     alice_positions = await alice.get_positions().call()
     alice_positions_parsed = alice_positions.result.positions_array

@@ -113,13 +113,13 @@ class User:
         self.user_address = user_address
         self.orders = {}
         self.orders_decimal = {}
-        self.balance = {}
+        self.balance = {7788: 23058430092136939520000}
         self.locked_margin = {}
         self.portion_executed = {}
         self.positions = {}
         self.collateral_to_market_array = {}
         self.market_array = []
-        self.collateral_array = []
+        self.collateral_array = [7788]
         self.deleveragable_or_liquidatable_position = {}
         self.liquidator_private_key = liquidator_private_key
 
