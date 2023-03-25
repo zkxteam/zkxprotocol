@@ -70,6 +70,7 @@ namespace IAccountManager {
         request: OrderRequest,
         signature: Signature,
         size: felt,
+        average_execution_price: felt,
         execution_price: felt,
         margin_amount: felt,
         borrowed_amount: felt,

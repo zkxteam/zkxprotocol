@@ -1012,6 +1012,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @param request - Details of the order to be executed
 // @param signature - Details of the signature
 // @param size - Size of the Order to be executed
+// @param average_execution_price - Average Execution Price of the position
 // @param execution_price - Price at which the order should be executed
 // @param margin_amount - New margin amount of the position
 // @param borrowed_amount - New borrowed amount of the position
@@ -1026,6 +1027,7 @@ func execute_order{
     request: OrderRequest,
     signature: Signature,
     size: felt,
+    average_execution_price: felt,
     execution_price: felt,
     margin_amount: felt,
     borrowed_amount: felt,
@@ -1126,7 +1128,7 @@ func execute_order{
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
 
     let (local current_timestamp) = get_block_timestamp();
-    let (execution_price_rounded) = Math64x61_round(execution_price, collateral_decimals);
+    let (average_execution_price_rounded) = Math64x61_round(average_execution_price, collateral_decimals);
 
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position
@@ -1183,7 +1185,7 @@ func execute_order{
 
         // Create a new struct with the updated details
         let updated_position = PositionDetails(
-            avg_execution_price=execution_price_rounded,
+            avg_execution_price=average_execution_price_rounded,
             position_size=new_position_size,
             margin_amount=margin_amount_rounded,
             borrowed_amount=borrowed_amount_rounded,
@@ -1349,7 +1351,7 @@ func execute_order{
 
             // Create a new struct with the updated details
             let updated_position = PositionDetails(
-                avg_execution_price=execution_price_rounded,
+                avg_execution_price=average_execution_price_rounded,
                 position_size=new_position_size,
                 margin_amount=margin_amount_rounded,
                 borrowed_amount=borrowed_amount_rounded,
