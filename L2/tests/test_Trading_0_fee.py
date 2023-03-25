@@ -1705,6 +1705,8 @@ async def test_placing_order_directly(trading_test_initializer):
         556715728833533465056602594347606394,
         # direction
         2,
+        # average execution price
+        300220759799622926336,
         # price
         300220759799622926336,
         # quantity
