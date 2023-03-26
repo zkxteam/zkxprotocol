@@ -14,6 +14,7 @@ admin2_signer = Signer(123456789987654322)
 
 BTC_USD_ID = str_to_felt("gecn2j0cm45sz")
 ETH_USD_ID = str_to_felt("k84azmn47vsj8az")
+TSLA_USD_ID = str_to_felt("2jfk20ckwlmzaksc")
 
 
 @pytest.fixture(scope='module')
@@ -76,9 +77,20 @@ async def adminAuth_factory(starknet_service: StarknetService):
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
 
+    TESLA_properties = build_asset_properties(
+        id=AssetID.TSLA,
+        asset_version=0,
+        short_name=str_to_felt("TESLA"),
+        is_tradable=1,
+        is_collateral=0,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', TESLA_properties)
+
     # Add markets
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, AssetID.BTC, AssetID.USDC, 1, 0, 10, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, AssetID.ETH, AssetID.USDC, 1, 0, 10, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [TSLA_USD_ID, AssetID.TSLA, AssetID.USDC, 1, 0, 10, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), 1, 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
 
     return adminAuth, market_prices, admin1, admin2
 
@@ -112,6 +124,31 @@ async def test_update_multiple_market_prices(adminAuth_factory):
 
     fetched_market_prices2 = await market_prices.get_market_price(ETH_USD_ID).call()
     assert fetched_market_prices2.result.market_price == 100
+
+    prices = await market_prices.get_all_market_prices().call()
+    assert prices.result.market_prices_list[0].price==100
+    assert prices.result.market_prices_list[1].price==1000
+
+@pytest.mark.asyncio
+async def test_get_multiple_market_prices(adminAuth_factory):
+    adminAuth, market_prices, admin1, admin2 = adminAuth_factory
+
+    await admin1_signer.send_transaction(admin1, market_prices.contract_address, 'update_multiple_market_prices', [2, BTC_USD_ID, 1000, ETH_USD_ID, 0])
+
+    prices = await market_prices.get_all_market_prices().call()
+    assert prices.result.market_prices_list[0].price==1000
+
+    await admin1_signer.send_transaction(admin1, market_prices.contract_address, 'update_multiple_market_prices', [1, TSLA_USD_ID, 10])
+
+    prices = await market_prices.get_all_market_prices().call()
+    assert prices.result.market_prices_list[0].price==10
+    assert prices.result.market_prices_list[1].price==1000
+
+    await admin1_signer.send_transaction(admin1, market_prices.contract_address, 'update_multiple_market_prices', [1, ETH_USD_ID, 500])
+    prices = await market_prices.get_all_market_prices().call()
+    assert prices.result.market_prices_list[0].price==10
+    assert prices.result.market_prices_list[1].price==500
+    assert prices.result.market_prices_list[2].price==1000
 
 @pytest.mark.asyncio
 async def test_unauthorized_update_multiple_market_prices(adminAuth_factory):
