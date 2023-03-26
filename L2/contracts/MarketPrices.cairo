@@ -1,5 +1,6 @@
 %lang starknet
 
+from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_nn, assert_not_zero
@@ -91,6 +92,41 @@ func get_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     }
 }
 
+// @notice function to get market prices of all markets
+// @return market_prices_list_len - length of market prices list
+// @return market_prices_list - market prices list
+@view
+func get_all_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (
+    market_prices_list_len: felt, market_prices_list: MultipleMarketPrices*
+) {
+    alloc_locals;
+
+    // Get registry and version
+    let (registry) = CommonLib.get_registry_address();
+    let (version) = CommonLib.get_contract_version();
+
+    // Get Market address
+    let (markets_address) = IAuthorizedRegistry.get_contract_address(
+        contract_address=registry, index=Market_INDEX, version=version
+    );
+
+    // Get all the markets in the system
+    let (markets_list_len: felt, markets_list: Market*) = IMarkets.get_all_markets(
+        contract_address=markets_address
+    );
+
+    let (market_prices_list: MultipleMarketPrices*) = alloc();
+
+    let market_prices_list_len: felt = populate_market_prices_recurse(
+        iterator=0,
+        markets_list_len=markets_list_len,
+        markets_list=markets_list,
+        market_prices_list=market_prices_list,
+    );
+
+    return (market_prices_list_len, market_prices_list);
+}
+
 // ////////////
 // External //
 // ////////////
@@ -179,7 +215,6 @@ func update_market_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 }
 
 // @notice function to update multiple market prices
-// @notice This function is called by update_multiple_market_prices
 // @param market_prices_list_len - Length of market prices array
 // @param market_prices_list - Market prices array
 @external
@@ -211,6 +246,48 @@ func update_multiple_market_prices{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
 // ///////////
 // Internal //
 // ///////////
+
+// @notice function called by get_all_market_prices
+// @param iterator - current index of market_prices_list
+// @param markets_list_len - length of markets list
+// @param markets_list - markets list
+// @param market_prices_list - market prices list which gets populated
+// @return market_prices_list_len - length of market prices list
+func populate_market_prices_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
+    iterator: felt,
+    markets_list_len: felt,
+    markets_list: Market*,
+    market_prices_list: MultipleMarketPrices*,
+) -> (market_prices_list_len: felt) {
+    if (markets_list_len == 0) {
+        return (iterator,);
+    }
+
+    let market_id = markets_list[markets_list_len - 1].id;
+    let price: felt = get_market_price(market_id);
+
+    // Add market id and price to the list if price is non zero
+    if (price != 0) {
+        let market_prices_element: MultipleMarketPrices = MultipleMarketPrices(
+            market_id=market_id, price=price
+        );
+        assert market_prices_list[iterator] = market_prices_element;
+        return populate_market_prices_recurse(
+            iterator=iterator + 1,
+            markets_list_len=markets_list_len - 1,
+            markets_list=markets_list,
+            market_prices_list=market_prices_list,
+        );
+    }
+    return populate_market_prices_recurse(
+        iterator=iterator,
+        markets_list_len=markets_list_len - 1,
+        markets_list=markets_list,
+        market_prices_list=market_prices_list,
+    );
+}
 
 // @notice This function is called by update_multiple_market_prices
 // @param market_contract_address_ - Address of the market contract address
