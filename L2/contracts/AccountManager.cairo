@@ -34,6 +34,7 @@ from contracts.Constants import (
 from contracts.DataTypes import (
     Asset,
     CollateralBalance,
+    ExecutionDetails,
     LiquidatablePosition,
     Market,
     OrderRequest,
@@ -169,7 +170,11 @@ func order_id_mapping(order_id: felt) -> (hash: felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    public_key_: felt, L1_address_: felt, registry_address_: felt, version_: felt, collateral_id_: felt
+    public_key_: felt,
+    L1_address_: felt,
+    registry_address_: felt,
+    version_: felt,
+    collateral_id_: felt,
 ) {
     with_attr error_message("AccountManager: Public key and L1 address cannot be 0") {
         assert_not_zero(public_key_);
@@ -1025,31 +1030,402 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @param collateral_id_ - Collateral id of the position
 // @param pnl_ - New pnl of the position
 // @return 1, if executed correctly
-@external
+// @external
+// func execute_order{
+//     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
+// }(
+//     request: OrderRequest,
+//     signature: Signature,
+//     size: felt,
+//     average_execution_price: felt,
+//     execution_price: felt,
+//     margin_amount: felt,
+//     borrowed_amount: felt,
+//     market_id: felt,
+//     collateral_id_: felt,
+//     pnl: felt,
+//     opening_fee: felt,
+//     side: felt,
+//     margin_lock_update_amount: felt,
+// ) -> (res: felt) {
+//     alloc_locals;
+
+// local order_id;
+//     local is_final;
+//     assert order_id = request.order_id;
+
+// let (__fp__, _) = get_fp_and_pc();
+
+// // Make sure that the caller is the authorized Trading Contract
+//     let (caller) = get_caller_address();
+//     let (registry) = CommonLib.get_registry_address();
+//     let (version) = CommonLib.get_contract_version();
+
+// let (trading_address) = IAuthorizedRegistry.get_contract_address(
+//         contract_address=registry, index=Trading_INDEX, version=version
+//     );
+
+// with_attr error_message("0002: {order_id} {market_id}") {
+//         assert caller = trading_address;
+//     }
+
+// // hash the parameters
+//     let (hash) = hash_order(&request);
+
+// // Check for hash collision
+//     order_hash_check(request.order_id, hash);
+
+// // check if signed by the user/liquidator
+//     is_valid_signature_order(hash, signature, request.liquidator_address);
+
+// // Get the portion executed details if already exists
+//     let (order_portion_executed) = portion_executed.read(order_id=request.order_id);
+//     let (new_position_executed) = Math64x61_add(order_portion_executed, size);
+
+// // Get asset and collateral number of decimals
+//     let (market_address) = IAuthorizedRegistry.get_contract_address(
+//         contract_address=registry, index=Market_INDEX, version=version
+//     );
+//     let (market: Market) = IMarkets.get_market(
+//         contract_address=market_address, market_id_=market_id
+//     );
+//     let (asset_address) = IAuthorizedRegistry.get_contract_address(
+//         contract_address=registry, index=Asset_INDEX, version=version
+//     );
+//     let (asset_details) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
+//     let asset_decimals = asset_details.token_decimal;
+//     let (collateral_details) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
+//     let collateral_decimals = collateral_details.token_decimal;
+
+// let (is_final) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
+
+// if (size == 0) {
+//         // Emit event for the order
+//         let (keys: felt*) = alloc();
+//         assert keys[0] = 'trade';
+//         let (data: felt*) = alloc();
+//         assert data[0] = order_id;
+//         assert data[1] = market_id;
+//         assert data[2] = request.direction;
+//         assert data[3] = size;
+//         assert data[4] = request.order_type;
+//         assert data[5] = request.side;
+//         assert data[6] = execution_price;
+//         assert data[7] = pnl;
+//         assert data[8] = side;
+//         assert data[9] = opening_fee;
+//         assert data[10] = is_final;
+
+// emit_event(1, keys, 11, data);
+
+// return (1,);
+//     }
+
+// // Get the details of the position
+//     let (position_details: PositionDetails) = position_mapping.read(
+//         market_id=market_id, direction=request.direction
+//     );
+
+// if (request.time_in_force == IoC) {
+//         // Update the portion executed to request.quantity if it's an IoC order
+//         portion_executed.write(order_id=request.order_id, value=request.quantity);
+//         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//     } else {
+//         // Update the portion executed
+//         portion_executed.write(order_id=request.order_id, value=new_position_executed);
+//         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//     }
+//     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+
+// let (local current_timestamp) = get_block_timestamp();
+//     let (average_execution_price_rounded) = Math64x61_round(average_execution_price, collateral_decimals);
+
+// // closeOrder == 1 -> Open a new position
+//     // closeOrder == 2 -> Close a position
+//     if (request.side == BUY) {
+//         local created_timestamp;
+
+// let (is_zero_current_position) = Math64x61_is_equal(
+//             position_details.position_size, 0, asset_decimals
+//         );
+//         if (is_zero_current_position == TRUE) {
+//             let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
+//             let (opposite_position: PositionDetails) = position_mapping.read(
+//                 market_id=market_id, direction=opposite_direction
+//             );
+//             let (is_zero_opposite_position) = Math64x61_is_equal(
+//                 opposite_position.position_size, 0, asset_decimals
+//             );
+
+// if (is_zero_opposite_position == TRUE) {
+//                 add_to_market_array(market_id_=market_id, collateral_id_=collateral_id_);
+
+// tempvar syscall_ptr = syscall_ptr;
+//                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//                 tempvar range_check_ptr = range_check_ptr;
+//             } else {
+//                 tempvar syscall_ptr = syscall_ptr;
+//                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//                 tempvar range_check_ptr = range_check_ptr;
+//             }
+
+// created_timestamp = current_timestamp;
+//         } else {
+//             created_timestamp = position_details.created_timestamp;
+
+// tempvar syscall_ptr = syscall_ptr;
+//             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//             tempvar range_check_ptr = range_check_ptr;
+//         }
+
+// // New position size
+//         let (new_position_size) = Math64x61_add(position_details.position_size, size);
+
+// tempvar syscall_ptr = syscall_ptr;
+//         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//         tempvar range_check_ptr = range_check_ptr;
+
+// // New leverage
+//         let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
+//         let (new_leverage) = Math64x61_div(total_value, margin_amount);
+//         let (new_leverage_rounded) = Math64x61_round(new_leverage, 5);
+//         let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
+//         let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
+//         let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
+
+// // Create a new struct with the updated details
+//         let updated_position = PositionDetails(
+//             avg_execution_price=average_execution_price_rounded,
+//             position_size=new_position_size,
+//             margin_amount=margin_amount_rounded,
+//             borrowed_amount=borrowed_amount_rounded,
+//             leverage=new_leverage_rounded,
+//             created_timestamp=created_timestamp,
+//             modified_timestamp=current_timestamp,
+//             realized_pnl=current_pnl,
+//         );
+
+// // Write to the mapping
+//         position_mapping.write(
+//             market_id=market_id, direction=request.direction, value=updated_position
+//         );
+
+// let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+//         let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_update_amount);
+//         // Add to previous locked amount
+//         margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
+
+// tempvar syscall_ptr = syscall_ptr;
+//         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//         tempvar range_check_ptr = range_check_ptr;
+//         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
+//     } else {
+//         // Calculate the new leverage if it's a deleveraging order
+//         local new_leverage;
+
+// let (new_position_size) = Math64x61_sub(position_details.position_size, size);
+
+// // Check if it's liq/delveraging order
+//         let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
+
+// if (is_liq == TRUE) {
+//             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
+//             let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
+//                 collateral_id=collateral_id_
+//             );
+
+// with_attr error_message("0004: {order_id} {market_id}") {
+//                 assert liq_position.market_id = market_id;
+//                 assert liq_position.direction = request.direction;
+//             }
+
+// with_attr error_message("0005: {order_id} {size}") {
+//                 Math64x61_assert_le(size, liq_position.amount_to_be_sold, asset_decimals);
+//             }
+
+// let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
+
+// local updated_liquidatable_position: LiquidatablePosition;
+//             let (is_equal_zero) = Math64x61_is_equal(updated_amount, 0, 6);  // Double check precision
+//             if (is_equal_zero == TRUE) {
+//                 assert updated_liquidatable_position = LiquidatablePosition(
+//                     market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
+//                 );
+//             } else {
+//                 assert updated_liquidatable_position = LiquidatablePosition(
+//                     market_id=liq_position.market_id,
+//                     direction=liq_position.direction,
+//                     amount_to_be_sold=updated_amount,
+//                     liquidatable=liq_position.liquidatable,
+//                 );
+//             }
+
+// // Update the Liquidatable position
+//             deleveragable_or_liquidatable_position.write(
+//                 collateral_id=collateral_id_, value=updated_liquidatable_position
+//             );
+
+// // If it's a deleveraging order, calculate the new leverage
+//             if (request.order_type == DELEVERAGING_ORDER) {
+//                 with_attr error_message("0007: {order_id} {size}") {
+//                     assert liq_position.liquidatable = FALSE;
+//                 }
+//                 let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
+//                 let (leverage_) = Math64x61_div(total_value, margin_amount);
+//                 let (leverage_rounded) = Math64x61_round(leverage_, 5);
+//                 assert new_leverage = leverage_rounded;
+
+// tempvar syscall_ptr = syscall_ptr;
+//                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//                 tempvar range_check_ptr = range_check_ptr;
+//             } else {
+//                 with_attr error_message("0006: {order_id} {size}") {
+//                     assert liq_position.liquidatable = TRUE;
+//                 }
+
+// assert new_leverage = position_details.leverage;
+
+// let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+//                 let (new_margin_locked) = Math64x61_sub(
+//                     current_margin_locked, margin_lock_update_amount
+//                 );
+//                 // Subtract from previous locked amount
+//                 margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
+
+// tempvar syscall_ptr = syscall_ptr;
+//                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//                 tempvar range_check_ptr = range_check_ptr;
+//             }
+//         } else {
+//             assert new_leverage = position_details.leverage;
+
+// let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+//             let (new_margin_locked) = Math64x61_sub(
+//                 current_margin_locked, margin_lock_update_amount
+//             );
+//             // Subtract from previous locked amount
+//             margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
+
+// tempvar syscall_ptr = syscall_ptr;
+//             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//             tempvar range_check_ptr = range_check_ptr;
+//         }
+//         tempvar syscall_ptr = syscall_ptr;
+//         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//         tempvar range_check_ptr = range_check_ptr;
+
+// let (is_zero_current_position) = Math64x61_is_equal(new_position_size, 0, asset_decimals);
+//         if (is_zero_current_position == TRUE) {
+//             let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
+//             let (opposite_position: PositionDetails) = position_mapping.read(
+//                 market_id=market_id, direction=opposite_direction
+//             );
+//             let (is_zero_opposite_position) = Math64x61_is_equal(
+//                 opposite_position.position_size, 0, asset_decimals
+//             );
+
+// if (is_zero_opposite_position == 1) {
+//                 remove_from_market_array(market_id_=market_id, collateral_id_=collateral_id_);
+//                 tempvar syscall_ptr = syscall_ptr;
+//                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//                 tempvar range_check_ptr = range_check_ptr;
+//             } else {
+//                 tempvar syscall_ptr = syscall_ptr;
+//                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//                 tempvar range_check_ptr = range_check_ptr;
+//             }
+
+// // Write to the mapping
+//             position_mapping.write(
+//                 market_id=market_id,
+//                 direction=request.direction,
+//                 value=PositionDetails(
+//                     avg_execution_price=0,
+//                     position_size=0,
+//                     margin_amount=0,
+//                     borrowed_amount=0,
+//                     leverage=0,
+//                     created_timestamp=0,
+//                     modified_timestamp=0,
+//                     realized_pnl=0,
+//                 ),
+//             );
+
+// tempvar syscall_ptr = syscall_ptr;
+//             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//             tempvar range_check_ptr = range_check_ptr;
+//         } else {
+//             let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
+//             let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
+//             let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
+
+// // Create a new struct with the updated details
+//             let updated_position = PositionDetails(
+//                 avg_execution_price=average_execution_price_rounded,
+//                 position_size=new_position_size,
+//                 margin_amount=margin_amount_rounded,
+//                 borrowed_amount=borrowed_amount_rounded,
+//                 leverage=new_leverage,
+//                 created_timestamp=position_details.created_timestamp,
+//                 modified_timestamp=current_timestamp,
+//                 realized_pnl=current_pnl,
+//             );
+
+// position_mapping.write(
+//                 market_id=market_id, direction=request.direction, value=updated_position
+//             );
+
+// tempvar syscall_ptr = syscall_ptr;
+//             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//             tempvar range_check_ptr = range_check_ptr;
+//         }
+
+// tempvar syscall_ptr = syscall_ptr;
+//         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+//         tempvar range_check_ptr = range_check_ptr;
+//         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
+//     }
+
+// // Emit event for the order
+//     let (keys: felt*) = alloc();
+//     assert keys[0] = 'trade';
+//     let (data: felt*) = alloc();
+//     assert data[0] = order_id;
+//     assert data[1] = market_id;
+//     assert data[2] = request.direction;
+//     assert data[3] = size;
+//     assert data[4] = request.order_type;
+//     assert data[5] = request.side;
+//     assert data[6] = execution_price;
+//     assert data[7] = pnl;
+//     assert data[8] = side;
+//     assert data[9] = opening_fee;
+//     assert data[10] = is_final;
+
+// emit_event(1, keys, 11, data);
+
+// return (1,);
+// }
+
 func execute_order{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
-    request: OrderRequest,
-    signature: Signature,
-    size: felt,
-    average_execution_price: felt,
-    execution_price: felt,
-    margin_amount: felt,
-    borrowed_amount: felt,
-    market_id: felt,
-    collateral_id_: felt,
-    pnl: felt,
-    opening_fee: felt,
-    side: felt,
-    margin_lock_update_amount: felt,
-) -> (res: felt) {
+    execution_details_: ExecutionDetails,
+    updated_position_: PositionDetails,
+    updated_liquidatable_position_: LiquidatablePosition,
+    updated_margin_locked_: felt,
+    updated_portion_executed_: felt,
+    market_array_update_: felt,
+    is_liquidation_: felt,
+) {
     alloc_locals;
 
     local order_id;
-    local is_final;
-    assert order_id = request.order_id;
+    local market_id;
 
-    let (__fp__, _) = get_fp_and_pc();
+    // For the error message
+    assert order_id = execution_details_.order_id;
+    assert market_id = execution_details_.market_id;
 
     // Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address();
@@ -1064,342 +1440,82 @@ func execute_order{
         assert caller = trading_address;
     }
 
-    // hash the parameters
-    let (hash) = hash_order(&request);
-
-    // Check for hash collision
-    order_hash_check(request.order_id, hash);
-
-    // check if signed by the user/liquidator
-    is_valid_signature_order(hash, signature, request.liquidator_address);
-
-    // Get the portion executed details if already exists
-    let (order_portion_executed) = portion_executed.read(order_id=request.order_id);
-    let (new_position_executed) = Math64x61_add(order_portion_executed, size);
-
-    // Get asset and collateral number of decimals
-    let (market_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Market_INDEX, version=version
+    // Update the position mapping
+    position_mapping.write(
+        market_id=execution_details_.market_id,
+        direction=execution_details_.direction,
+        value=updated_position_,
     );
-    let (market: Market) = IMarkets.get_market(
-        contract_address=market_address, market_id_=market_id
-    );
-    let (asset_address) = IAuthorizedRegistry.get_contract_address(
-        contract_address=registry, index=Asset_INDEX, version=version
-    );
-    let (asset_details) = IAsset.get_asset(contract_address=asset_address, id=market.asset);
-    let asset_decimals = asset_details.token_decimal;
-    let (collateral_details) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
-    let collateral_decimals = collateral_details.token_decimal;
 
-    let (is_final) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
+    // Update the margin locked
+    margin_locked.write(asset_id=execution_details_.collateral_id, value=updated_margin_locked_);
 
-    if (size == 0) {
-        // Emit event for the order
-        let (keys: felt*) = alloc();
-        assert keys[0] = 'trade';
-        let (data: felt*) = alloc();
-        assert data[0] = order_id;
-        assert data[1] = market_id;
-        assert data[2] = request.direction;
-        assert data[3] = size;
-        assert data[4] = request.order_type;
-        assert data[5] = request.side;
-        assert data[6] = execution_price;
-        assert data[7] = pnl;
-        assert data[8] = side;
-        assert data[9] = opening_fee;
-        assert data[10] = is_final;
+    // Update the portion executed for the order
+    portion_executed.write(order_id=execution_details_.order_id, value=updated_portion_executed_);
 
-        emit_event(1, keys, 11, data);
+    // Update the market array if required
+    if (market_array_update_ == 1) {
+        add_to_market_array(
+            market_id_=execution_details_.market_id, collateral_id_=execution_details_.collateral_id
+        );
 
-        return (1,);
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        if (market_array_update_ == 2) {
+            remove_from_market_array(
+                market_id_=execution_details_.market_id,
+                collateral_id_=execution_details_.collateral_id,
+            );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
-    // Get the details of the position
-    let (position_details: PositionDetails) = position_mapping.read(
-        market_id=market_id, direction=request.direction
-    );
-
-    if (request.time_in_force == IoC) {
-        // Update the portion executed to request.quantity if it's an IoC order
-        portion_executed.write(order_id=request.order_id, value=request.quantity);
+    // Update the deleveragable_or_liquidatable_position if required
+    if (is_liquidation_ == 1) {
+        deleveragable_or_liquidatable_position.write(
+            collateral_id=execution_details_.collateral_id, value=updated_liquidatable_position_
+        );
+        tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
-        // Update the portion executed
-        portion_executed.write(order_id=request.order_id, value=new_position_executed);
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    }
-    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-
-    let (local current_timestamp) = get_block_timestamp();
-    let (average_execution_price_rounded) = Math64x61_round(average_execution_price, collateral_decimals);
-
-    // closeOrder == 1 -> Open a new position
-    // closeOrder == 2 -> Close a position
-    if (request.side == BUY) {
-        local created_timestamp;
-
-        let (is_zero_current_position) = Math64x61_is_equal(
-            position_details.position_size, 0, asset_decimals
-        );
-        if (is_zero_current_position == TRUE) {
-            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
-            let (opposite_position: PositionDetails) = position_mapping.read(
-                market_id=market_id, direction=opposite_direction
-            );
-            let (is_zero_opposite_position) = Math64x61_is_equal(
-                opposite_position.position_size, 0, asset_decimals
-            );
-
-            if (is_zero_opposite_position == TRUE) {
-                add_to_market_array(market_id_=market_id, collateral_id_=collateral_id_);
-
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-            } else {
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-            }
-
-            created_timestamp = current_timestamp;
-        } else {
-            created_timestamp = position_details.created_timestamp;
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
-
-        // New position size
-        let (new_position_size) = Math64x61_add(position_details.position_size, size);
-
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
-
-        // New leverage
-        let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
-        let (new_leverage) = Math64x61_div(total_value, margin_amount);
-        let (new_leverage_rounded) = Math64x61_round(new_leverage, 5);
-        let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
-        let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
-        let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
-
-        // Create a new struct with the updated details
-        let updated_position = PositionDetails(
-            avg_execution_price=average_execution_price_rounded,
-            position_size=new_position_size,
-            margin_amount=margin_amount_rounded,
-            borrowed_amount=borrowed_amount_rounded,
-            leverage=new_leverage_rounded,
-            created_timestamp=created_timestamp,
-            modified_timestamp=current_timestamp,
-            realized_pnl=current_pnl,
-        );
-
-        // Write to the mapping
-        position_mapping.write(
-            market_id=market_id, direction=request.direction, value=updated_position
-        );
-
-        let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
-        let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_update_amount);
-        // Add to previous locked amount
-        margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
-
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-        tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
-    } else {
-        // Calculate the new leverage if it's a deleveraging order
-        local new_leverage;
-
-        let (new_position_size) = Math64x61_sub(position_details.position_size, size);
-
-        // Check if it's liq/delveraging order
-        let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
-
-        if (is_liq == TRUE) {
-            // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
-            let liq_position: LiquidatablePosition = deleveragable_or_liquidatable_position.read(
-                collateral_id=collateral_id_
-            );
-
-            with_attr error_message("0004: {order_id} {market_id}") {
-                assert liq_position.market_id = market_id;
-                assert liq_position.direction = request.direction;
-            }
-
-            with_attr error_message("0005: {order_id} {size}") {
-                Math64x61_assert_le(size, liq_position.amount_to_be_sold, asset_decimals);
-            }
-
-            let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
-
-            local updated_liquidatable_position: LiquidatablePosition;
-            let (is_equal_zero) = Math64x61_is_equal(updated_amount, 0, 6);  // Double check precision
-            if (is_equal_zero == TRUE) {
-                assert updated_liquidatable_position = LiquidatablePosition(
-                    market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
-                );
-            } else {
-                assert updated_liquidatable_position = LiquidatablePosition(
-                    market_id=liq_position.market_id,
-                    direction=liq_position.direction,
-                    amount_to_be_sold=updated_amount,
-                    liquidatable=liq_position.liquidatable,
-                );
-            }
-
-            // Update the Liquidatable position
-            deleveragable_or_liquidatable_position.write(
-                collateral_id=collateral_id_, value=updated_liquidatable_position
-            );
-
-            // If it's a deleveraging order, calculate the new leverage
-            if (request.order_type == DELEVERAGING_ORDER) {
-                with_attr error_message("0007: {order_id} {size}") {
-                    assert liq_position.liquidatable = FALSE;
-                }
-                let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
-                let (leverage_) = Math64x61_div(total_value, margin_amount);
-                let (leverage_rounded) = Math64x61_round(leverage_, 5);
-                assert new_leverage = leverage_rounded;
-
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-            } else {
-                with_attr error_message("0006: {order_id} {size}") {
-                    assert liq_position.liquidatable = TRUE;
-                }
-
-                assert new_leverage = position_details.leverage;
-
-                let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
-                let (new_margin_locked) = Math64x61_sub(
-                    current_margin_locked, margin_lock_update_amount
-                );
-                // Subtract from previous locked amount
-                margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
-
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-            }
-        } else {
-            assert new_leverage = position_details.leverage;
-
-            let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
-            let (new_margin_locked) = Math64x61_sub(
-                current_margin_locked, margin_lock_update_amount
-            );
-            // Subtract from previous locked amount
-            margin_locked.write(asset_id=collateral_id_, value=new_margin_locked);
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-
-        let (is_zero_current_position) = Math64x61_is_equal(new_position_size, 0, asset_decimals);
-        if (is_zero_current_position == TRUE) {
-            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
-            let (opposite_position: PositionDetails) = position_mapping.read(
-                market_id=market_id, direction=opposite_direction
-            );
-            let (is_zero_opposite_position) = Math64x61_is_equal(
-                opposite_position.position_size, 0, asset_decimals
-            );
-
-            if (is_zero_opposite_position == 1) {
-                remove_from_market_array(market_id_=market_id, collateral_id_=collateral_id_);
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-            } else {
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-            }
-
-            // Write to the mapping
-            position_mapping.write(
-                market_id=market_id,
-                direction=request.direction,
-                value=PositionDetails(
-                    avg_execution_price=0,
-                    position_size=0,
-                    margin_amount=0,
-                    borrowed_amount=0,
-                    leverage=0,
-                    created_timestamp=0,
-                    modified_timestamp=0,
-                    realized_pnl=0,
-                ),
-            );
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
-            let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
-            let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
-
-            // Create a new struct with the updated details
-            let updated_position = PositionDetails(
-                avg_execution_price=average_execution_price_rounded,
-                position_size=new_position_size,
-                margin_amount=margin_amount_rounded,
-                borrowed_amount=borrowed_amount_rounded,
-                leverage=new_leverage,
-                created_timestamp=position_details.created_timestamp,
-                modified_timestamp=current_timestamp,
-                realized_pnl=current_pnl,
-            );
-
-            position_mapping.write(
-                market_id=market_id, direction=request.direction, value=updated_position
-            );
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
-
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-        tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     }
 
     // Emit event for the order
     let (keys: felt*) = alloc();
     assert keys[0] = 'trade';
     let (data: felt*) = alloc();
-    assert data[0] = order_id;
-    assert data[1] = market_id;
-    assert data[2] = request.direction;
-    assert data[3] = size;
-    assert data[4] = request.order_type;
-    assert data[5] = request.side;
-    assert data[6] = execution_price;
-    assert data[7] = pnl;
-    assert data[8] = side;
-    assert data[9] = opening_fee;
-    assert data[10] = is_final;
+    assert data[0] = execution_details_.order_id;
+    assert data[1] = execution_details_.market_id;
+    assert data[2] = execution_details_.direction;
+    assert data[3] = execution_details_.size;
+    assert data[4] = execution_details_.order_type;
+    assert data[5] = execution_details_.order_side;
+    assert data[6] = execution_details_.execution_price;
+    assert data[7] = execution_details_.pnl;
+    assert data[8] = execution_details_.side;
+    assert data[9] = execution_details_.opening_fee;
+    assert data[10] = execution_details_.is_final;
 
     emit_event(1, keys, 11, data);
 
-    return (1,);
+    return ();
 }
 
 // @notice function to update l1 fee and node operators l1 wallet address
@@ -1862,7 +1978,8 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     if (is_le_least_short * is_le_least_long == 1) {
         assert new_least_collateral_ratio = least_collateral_ratio;
         assert new_least_collateral_ratio_position = least_collateral_ratio_position;
-        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price;
+        // assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price
+        // ;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
