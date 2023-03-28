@@ -3,12 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import (
-    abs_value,
-    assert_le,
-    assert_lt,
-    assert_not_zero,
-)
+from starkware.cairo.common.math import abs_value, assert_le, assert_lt, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import emit_event
 
@@ -405,6 +400,10 @@ func adjust_quantity_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         quantity_remaining_=quantity_locked_,
     );
 
+    with_attr error_message("0523: {quantity_locked_}") {
+        assert_not_zero(taker_quantity_to_execute);
+    }
+
     // Adjust the quantity to execute on the maker side and fill the execution_sizes_ array
     let (maker_quantity_to_execute) = get_maker_sizes(
         asset_token_decimal_=asset_token_decimal_,
@@ -415,6 +414,10 @@ func adjust_quantity_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
         quantity_executed_=0,
         iterator_=0,
     );
+
+    with_attr error_message("0524: {quantity_locked_}") {
+        assert_not_zero(maker_quantity_to_execute);
+    }
 
     // Store the new adjusted execution size of taker order
     assert execution_sizes_[last_index] = maker_quantity_to_execute;
