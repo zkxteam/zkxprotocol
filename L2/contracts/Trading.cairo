@@ -3,12 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
-from starkware.cairo.common.math import (
-    abs_value,
-    assert_le,
-    assert_lt,
-    assert_not_zero,
-)
+from starkware.cairo.common.math import abs_value, assert_le, assert_lt, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import emit_event
 
@@ -185,18 +180,21 @@ func execute_batch{
         assert_not_zero(quantity_locked_);
     }
 
+    // Get the index of the Taker order
+    let last_index = request_list_len_ - 1;
+
     let (execution_sizes: felt*) = alloc();
 
-    adjust_quantity_locked(
+    let (initial_taker_locked: felt) = find_initial_taker_locked(
         asset_token_decimal_=asset.token_decimal,
-        request_list_len_=request_list_len,
-        request_list_=request_list,
+        request_=request_list[last_index],
         quantity_locked_=quantity_locked_,
         execution_sizes_=execution_sizes,
     );
 
     // Recursively loop through the orders in the batch
     let (taker_execution_price: felt, open_interest: felt) = check_and_execute(
+        initial_taker_locked_=initial_taker_locked,
         market_id_=market_id_,
         collateral_id_=collateral_id,
         asset_token_decimal_=asset.token_decimal,
@@ -272,16 +270,15 @@ func execute_batch{
 // @param execution_sizes_ - Array of the calculated execution sizes
 // @returns quantity_to_execute_final - Calculated quantity to execute
 func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_token_decimal_: felt, request_: MultipleOrder, quantity_remaining_: felt
+    order_portion_executed_: felt,
+    position_details_: PositionDetails,
+    asset_token_decimal_: felt,
+    request_: MultipleOrder,
+    quantity_remaining_: felt,
 ) -> (quantity_to_execute_final: felt) {
     alloc_locals;
     local quantity_to_execute;
     local quantity_to_execute_final;
-
-    // Get the portion executed of the order
-    let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
-        contract_address=request_.user_address, order_id_=request_.order_id
-    );
 
     // Get min of remaining quantity and the order quantity
     let (executable_quantity: felt) = Math64x61_sub(request_.quantity, order_portion_executed);
@@ -302,23 +299,12 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // If it's a sell order, calculate the amount that can be executed
     if (request_.side == SELL) {
-        // Get position details
-        let (position_details: PositionDetails) = IAccountManager.get_position_data(
-            contract_address=request_.user_address,
-            market_id_=request_.market_id,
-            direction_=request_.direction,
-        );
-        // Give an error if the position to be closed is of size 0
-        with_attr error_message("0517: {order_id} 0") {
-            assert_not_zero(position_details.position_size);
-        }
-
         let (cmp_res) = Math64x61_is_le(
-            quantity_to_execute, position_details.position_size, asset_token_decimal_
+            quantity_to_execute, position_details_.position_size, asset_token_decimal_
         );
 
         if (cmp_res == FALSE) {
-            quantity_to_execute_final = position_details.position_size;
+            quantity_to_execute_final = position_details_.position_size;
         } else {
             quantity_to_execute_final = quantity_to_execute;
         }
@@ -388,38 +374,34 @@ func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @param request_list_ - Request list of orders
 // @param quantity_locked_ - Original quantity lokcked of the batch
 // @param execution_sizes_ - Array of the calculated execution sizes
-func adjust_quantity_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_token_decimal_: felt,
-    request_list_len_: felt,
-    request_list_: MultipleOrder*,
+    request_: MultipleOrder,
     quantity_locked_: felt,
     execution_sizes_: felt*,
 ) -> () {
-    // Get the index of the Taker order
-    let last_index = request_list_len_ - 1;
+    // Get the portion executed of the order
+    let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
+        contract_address=request_.user_address, order_id_=request_
+    );
+
+    // Get position details
+    let (position_details: PositionDetails) = IAccountManager.get_position_data(
+        contract_address=request_.user_address,
+        market_id_=request_.market_id,
+        direction_=request_.direction,
+    );
 
     // Adjust the quantity to execute on the taker side
     let (taker_quantity_to_execute) = get_quantity_to_execute(
+        order_portion_executed_=order_portion_executed,
+        position_details_=position_details,
         asset_token_decimal_=asset_token_decimal_,
-        request_=request_list_[last_index],
+        request_=request_,
         quantity_remaining_=quantity_locked_,
     );
 
-    // Adjust the quantity to execute on the maker side and fill the execution_sizes_ array
-    let (maker_quantity_to_execute) = get_maker_sizes(
-        asset_token_decimal_=asset_token_decimal_,
-        request_list_len_=request_list_len_,
-        request_list_=request_list_,
-        execution_sizes_=execution_sizes_,
-        taker_locked_quantity_=taker_quantity_to_execute,
-        quantity_executed_=0,
-        iterator_=0,
-    );
-
-    // Store the new adjusted execution size of taker order
-    assert execution_sizes_[last_index] = maker_quantity_to_execute;
-
-    return ();
+    return (taker_quantity_to_execute);
 }
 
 // @notice Internal function to check to check the slippage of a market order
@@ -1122,6 +1104,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @return trader_stats_list_len - length of the trader fee list so far
 // @return open_interest - open interest corresponding to the trade batch
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    initial_taker_locked_: felt,
     market_id_: felt,
     collateral_id_: felt,
     asset_token_decimal_: felt,
@@ -1160,8 +1143,15 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local current_quantity_executed;
     local current_order_side;
     local current_open_interest;
+    local new_portion_executed;
     local opening_fee;
+    local updated_position_details: PositionDetails;
     local pnl;
+
+    // Local variable for setting the error
+    local error_message;
+    local error_param_1;
+    local error_param_2;
 
     // Local variables to be passed as arguments in error_messages
     local order_id;
@@ -1191,13 +1181,23 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         contract_address=account_registry_address_, address_=user_address
     );
 
-    with_attr error_message("0510: {order_id} {user_address}") {
-        assert_not_zero(is_registered);
+    // User is not registered
+    if (is_registered == 0) {
+        assert error_message = '0510';
+        assert error_param_1 = order_id;
+        assert error_param_2 = user_address;
+        jmp error_handling;
     }
 
-    // Size Check
-    with_attr error_message("0505: {order_id} {quantity_order}") {
-        Math64x61_assert_le(min_quantity_, [request_list_].quantity, asset_token_decimal_);
+    // Quantity is less than the one set for the market
+    let (size_check) = Math64x61_is_le(
+        min_quantity_, [request_list_].quantity, asset_token_decimal_
+    );
+    if (size_check == 0) {
+        assert error_message = '0505';
+        assert error_param_1 = order_id;
+        assert error_param_2 = quantity_order;
+        jmp error_handling;
     }
 
     // Market Check
@@ -1215,8 +1215,23 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert_le([request_list_].leverage, max_leverage_);
     }
 
+    // Get the portion executed of the order
+    let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
+        contract_address=request_.user_address, order_id_=request_.order_id
+    );
+
+    // Get position details
+    let (position_details: PositionDetails) = IAccountManager.get_position_data(
+        contract_address=request_.user_address,
+        market_id_=request_.market_id,
+        direction_=request_.direction,
+    );
+
     // Taker Order
     if (request_list_len_ == 1) {
+        // Set the quantity to execute as the total quantity executed by the Maker so far
+        let (quantity_to_execute) = quantity_executed_;
+
         // Direction Check
         validate_taker(
             order_id,
@@ -1232,7 +1247,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         }
 
         local taker_quantity;
-        assert taker_quantity = [execution_sizes_];
+        assert taker_quantity = quantity_executed_;
         // Check for F&K type of orders; they must only be filled completely or rejected
         if ([request_list_].time_in_force == FoK) {
             let (diff_check) = Math64x61_sub([request_list_].quantity, taker_quantity);
@@ -1305,6 +1320,19 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
     } else {
         // Maker Order
+
+        // Find quantity left to be executed
+        let (quantity_remaining) = Math64x61_sub(taker_locked_quantity_, quantity_executed_);
+
+        // Find quantity that needs to be executed for the current order
+        let (quantity_to_execute) = get_quantity_to_execute(
+            order_portion_executed_=order_portion_executed,
+            position_details_=position_details,
+            asset_token_decimal_=asset_token_decimal_,
+            request_=[request_list_],
+            quantity_remaining_=quantity_remaining,
+        );
+
         // Check the direction of the maker
         validate_maker(
             order_id,
@@ -1318,7 +1346,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             assert [request_list_].order_type = LIMIT_ORDER;
         }
 
-        assert quantity_to_execute = [execution_sizes_];
+        assert quantity_to_execute = quantity_to_execute;
 
         // Send to AccountManager to emit an event in case the execution_price is 0
         if (quantity_to_execute == 0) {
@@ -1425,6 +1453,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar range_check_ptr = range_check_ptr;
     }
 
+    let (local current_timestamp) = get_block_timestamp();
+
     // If the order is to be opened
     if ([request_list_].side == BUY) {
         let (
@@ -1448,9 +1478,44 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             trader_stats_list_=trader_stats_list_,
             side_=current_order_side,
         );
-        assert margin_amount = margin_amount_temp;
-        assert borrowed_amount = borrowed_amount_temp;
-        assert average_execution_price = average_execution_price_temp;
+
+        local created_timestamp;
+
+        let (average_execution_price_rounded) = Math64x61_round(average_execution_price, collateral_decimals);
+
+        let (is_zero_current_position) = Math64x61_is_equal(
+            position_details.position_size, 0, asset_decimals
+        );
+
+        if (is_zero_current_position == TRUE) {
+            created_timestamp = current_timestamp;
+        } else {
+            created_timestamp = position_details.created_timestamp;
+        }
+
+        // New position size
+        let (new_position_size) = Math64x61_add(position_details.position_size, quantity_to_execute);
+
+        // New leverage
+        let (total_value) = Math64x61_add(margin_amount_temp, borrowed_amount_temp);
+        let (new_leverage) = Math64x61_div(total_value, margin_amount_temp);
+        let (new_leverage_rounded) = Math64x61_round(new_leverage, 5);
+        let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, trading_fee);
+        let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
+        let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
+
+        // Create a new struct with the updated details
+        assert updated_position_details = PositionDetails(
+            avg_execution_price=average_execution_price_rounded,
+            position_size=new_position_size,
+            margin_amount=margin_amount_rounded,
+            borrowed_amount=borrowed_amount_rounded,
+            leverage=new_leverage_rounded,
+            created_timestamp=created_timestamp,
+            modified_timestamp=current_timestamp,
+            realized_pnl=current_pnl,
+        );
+
         assert pnl = trading_fee;
         assert opening_fee = trading_fee;
         assert current_open_interest = quantity_to_execute;
@@ -1478,6 +1543,164 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             holding_address_=holding_address_,
             trader_stats_list_=trader_stats_list_,
         );
+
+        // Calculate the new leverage if it's a deleveraging order
+        local new_leverage;
+
+        let (new_position_size) = Math64x61_sub(position_details.position_size, size);
+
+        // Check if it's liq/delveraging order
+        let is_liq = is_le(LIQUIDATION_ORDER, request.order_type);
+
+        if (is_liq == TRUE) {
+            // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
+            let liq_position: LiquidatablePosition = get_deleveragable_or_liquidatable_position.read(
+                contract_address=user_address, collateral_id=collateral_id_
+            );
+
+            with_attr error_message("0004: {order_id} {market_id}") {
+                assert liq_position.market_id = market_id;
+                assert liq_position.direction = request.direction;
+            }
+
+            with_attr error_message("0005: {order_id} {size}") {
+                Math64x61_assert_le(size, liq_position.amount_to_be_sold, asset_decimals);
+            }
+
+            let (updated_amount) = Math64x61_sub(liq_position.amount_to_be_sold, size);
+
+            local updated_liquidatable_position: LiquidatablePosition;
+            let (is_equal_zero) = Math64x61_is_equal(updated_amount, 0, 6);  // Double check precision
+            if (is_equal_zero == TRUE) {
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
+                );
+            } else {
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=liq_position.market_id,
+                    direction=liq_position.direction,
+                    amount_to_be_sold=updated_amount,
+                    liquidatable=liq_position.liquidatable,
+                );
+            }
+
+            // // Update the Liquidatable position
+            // deleveragable_or_liquidatable_position.write(
+            //     collateral_id=collateral_id_, value=updated_liquidatable_position
+            // );
+
+            // If it's a deleveraging order, calculate the new leverage
+            if (request.order_type == DELEVERAGING_ORDER) {
+                with_attr error_message("0007: {order_id} {size}") {
+                    assert liq_position.liquidatable = FALSE;
+                }
+                let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
+                let (leverage_) = Math64x61_div(total_value, margin_amount);
+                let (leverage_rounded) = Math64x61_round(leverage_, 5);
+                assert new_leverage = leverage_rounded;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                with_attr error_message("0006: {order_id} {size}") {
+                    assert liq_position.liquidatable = TRUE;
+                }
+
+                assert new_leverage = position_details.leverage;
+
+                let (current_margin_locked) = margin_locked.read(asset_id=collateral_id_);
+                let (new_margin_locked) = Math64x61_sub(
+                    current_margin_locked, margin_lock_update_amount
+                );
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            }
+        } else {
+            assert new_leverage = position_details.leverage;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+
+        let (is_zero_current_position) = Math64x61_is_equal(new_position_size, 0, asset_decimals);
+        if (is_zero_current_position == TRUE) {
+            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
+            let (opposite_position: PositionDetails) = position_mapping.read(
+                market_id=market_id, direction=opposite_direction
+            );
+            let (is_zero_opposite_position) = Math64x61_is_equal(
+                opposite_position.position_size, 0, asset_decimals
+            );
+
+            if (is_zero_opposite_position == 1) {
+                remove_from_market_array(market_id_=market_id, collateral_id_=collateral_id_);
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            }
+
+            // Write to the mapping
+            position_mapping.write(
+                market_id=market_id,
+                direction=request.direction,
+                value=PositionDetails(
+                    avg_execution_price=0,
+                    position_size=0,
+                    margin_amount=0,
+                    borrowed_amount=0,
+                    leverage=0,
+                    created_timestamp=0,
+                    modified_timestamp=0,
+                    realized_pnl=0,
+                ),
+            );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
+            let (margin_amount_rounded) = Math64x61_round(margin_amount, collateral_decimals);
+            let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount, collateral_decimals);
+
+            // Create a new struct with the updated details
+            let updated_position = PositionDetails(
+                avg_execution_price=average_execution_price_rounded,
+                position_size=new_position_size,
+                margin_amount=margin_amount_rounded,
+                borrowed_amount=borrowed_amount_rounded,
+                leverage=new_leverage,
+                created_timestamp=position_details.created_timestamp,
+                modified_timestamp=current_timestamp,
+                realized_pnl=current_pnl,
+            );
+
+            position_mapping.write(
+                market_id=market_id, direction=request.direction, value=updated_position
+            );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
+
+        
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
         assert average_execution_price = average_execution_price_temp;
@@ -1489,6 +1712,30 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+    }
+
+    // Code brought in from AccountManager
+    // hash the parameters
+    let (hash) = hash_order(&request);
+
+    // Check for hash collision
+    order_hash_check(request.order_id, hash);
+
+    let (new_position_executed) = Math64x61_add(order_portion_executed, size);
+
+    // check if signed by the user/liquidator
+    is_valid_signature_order(hash, signature, request.liquidator_address);
+
+    let (is_final) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
+
+    if (request.time_in_force == IoC) {
+        // Update the portion executed to request.quantity if it's an IoC order
+        new_portion_executed = request.quantity
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    } else {
+        // Update the portion executed
+        new_portion_executed = new_position_executed
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     }
 
     // Create a temporary order object
@@ -1559,6 +1806,35 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         oracle_price_=oracle_price_,
         execution_sizes_=execution_sizes_ + 1,
     );
+
+    error_handling:
+        eturn check_and_execute(
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            asset_token_decimal_=asset_token_decimal_,
+            collateral_token_decimal_=collateral_token_decimal_,
+            orders_len_=orders_len_,
+            request_list_len_=request_list_len_ - 1,
+            request_list_=request_list_ + MultipleOrder.SIZE,
+            quantity_executed_=current_quantity_executed,
+            account_registry_address_=account_registry_address_,
+            holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
+            liquidate_address_=liquidate_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            max_leverage_=max_leverage_,
+            min_quantity_=min_quantity_,
+            maker1_direction_=maker1_direction_,
+            maker1_side_=maker1_side_,
+            trader_stats_list_=trader_stats_list_ + TraderStats.SIZE,
+            total_order_volume_=new_total_order_volume,
+            taker_execution_price=execution_price,
+            open_interest_=new_open_interest,
+            oracle_price_=oracle_price_,
+            execution_sizes_=execut
+
 }
 
 // @notice Internal function to validate maker orders

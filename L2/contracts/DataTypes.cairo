@@ -329,6 +329,6 @@ struct ABRDetails {
 }
 
 struct MultipleMarketPrices {
-  market_id: felt,
-  price: felt,
+    market_id: felt,
+    price: felt,
 }
