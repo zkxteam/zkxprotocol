@@ -334,9 +334,7 @@ struct MultipleMarketPrices {
 }
 
 struct ExecutionDetails {
-    collateral_id: felt,
     order_id: felt,
-    market_id: felt,
     direction: felt,
     size: felt,
     order_type: felt,

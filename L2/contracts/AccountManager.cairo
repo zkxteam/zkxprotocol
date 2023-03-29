@@ -1410,8 +1410,10 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 func execute_order{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
+    market_id_: felt,
+    collateral_id_: felt,
     execution_details_: ExecutionDetails,
-    updated_position_: PositionDetails,
+    updated_position_details_: PositionDetails,
     updated_liquidatable_position_: LiquidatablePosition,
     updated_margin_locked_: felt,
     updated_portion_executed_: felt,
@@ -1425,7 +1427,7 @@ func execute_order{
 
     // For the error message
     assert order_id = execution_details_.order_id;
-    assert market_id = execution_details_.market_id;
+    assert market_id = market_id_;
 
     // Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address();
@@ -1442,32 +1444,27 @@ func execute_order{
 
     // Update the position mapping
     position_mapping.write(
-        market_id=execution_details_.market_id,
+        market_id=market_id_,
         direction=execution_details_.direction,
-        value=updated_position_,
+        value=updated_position_details_,
     );
 
     // Update the margin locked
-    margin_locked.write(asset_id=execution_details_.collateral_id, value=updated_margin_locked_);
+    margin_locked.write(asset_id=collateral_id_, value=updated_margin_locked_);
 
     // Update the portion executed for the order
     portion_executed.write(order_id=execution_details_.order_id, value=updated_portion_executed_);
 
     // Update the market array if required
     if (market_array_update_ == 1) {
-        add_to_market_array(
-            market_id_=execution_details_.market_id, collateral_id_=execution_details_.collateral_id
-        );
+        add_to_market_array(market_id_=market_id_, collateral_id_=collateral_id_);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         if (market_array_update_ == 2) {
-            remove_from_market_array(
-                market_id_=execution_details_.market_id,
-                collateral_id_=execution_details_.collateral_id,
-            );
+            remove_from_market_array(market_id_=market_id_, collateral_id_=collateral_id_);
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1482,7 +1479,7 @@ func execute_order{
     // Update the deleveragable_or_liquidatable_position if required
     if (is_liquidation_ == 1) {
         deleveragable_or_liquidatable_position.write(
-            collateral_id=execution_details_.collateral_id, value=updated_liquidatable_position_
+            collateral_id=collateral_id_, value=updated_liquidatable_position_
         );
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1498,7 +1495,7 @@ func execute_order{
     assert keys[0] = 'trade';
     let (data: felt*) = alloc();
     assert data[0] = execution_details_.order_id;
-    assert data[1] = execution_details_.market_id;
+    assert data[1] = market_id_;
     assert data[2] = execution_details_.direction;
     assert data[3] = execution_details_.size;
     assert data[4] = execution_details_.order_type;
@@ -2651,26 +2648,6 @@ func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res
         let pedersen_ptr = hash_ptr;
         return (res=res);
     }
-}
-
-// @notice Internal function to check for hash collisions
-// @param order_id - Order ID of the request
-// @param order_hash - Hash of the corresponding order
-func order_hash_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_id: felt, order_hash: felt
-) {
-    // Get the hash of the order associated with the order_id
-    let (existing_hash) = order_id_mapping.read(order_id=order_id);
-    // If the hash isn't stored in the contract yet
-    if (existing_hash == 0) {
-        order_id_mapping.write(order_id=order_id, value=order_hash);
-        return ();
-    }
-
-    with_attr error_message("AccountManager: Hash mismatch") {
-        assert existing_hash = order_hash;
-    }
-    return ();
 }
 
 // @notice Internal function to hash the withdrawal request parameters

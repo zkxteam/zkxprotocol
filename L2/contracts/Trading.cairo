@@ -34,6 +34,7 @@ from contracts.Constants import (
 )
 from contracts.DataTypes import (
     Asset,
+    ExecutionDetails,
     Market,
     MultipleOrder,
     OrderRequest,
@@ -84,6 +85,11 @@ const TWO = 4611686018427387904;
 // Stores if a batch id is executed
 @storage_var
 func batch_id_status(batch_id: felt) -> (res: felt) {
+}
+
+// Stores the order_id to hash mapping
+@storage_var
+func order_id_mapping(order_id: felt) -> (hash: felt) {
 }
 
 // //////////////
@@ -417,13 +423,9 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     direction_: felt,
     side_: felt,
     collateral_token_decimal_: felt,
-) {
+) -> (is_error: felt) {
     // To remove
     alloc_locals;
-    with_attr error_message("0521: {order_id_} {slippage_}") {
-        assert_lt(0, slippage_);
-        assert_le(slippage_, FIFTEEN_PERCENTAGE);
-    }
 
     let (percentage) = Math64x61_div(slippage_, HUNDRED);
     let (threshold) = Math64x61_mul(percentage, oracle_price_);
@@ -432,16 +434,22 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     let (upper_limit: felt) = Math64x61_add(oracle_price_, threshold);
 
     if (direction_ == side_) {
-        with_attr error_message("0506: {order_id_} {execution_price_}") {
-            Math64x61_assert_le(execution_price_, upper_limit, collateral_token_decimal_);
+        let (slippage_check) = Math64x61_is_le(
+            execution_price_, upper_limit, collateral_token_decimal_
+        );
+        if (slippage_check == FALSE) {
+            return (TRUE);
         }
     } else {
-        with_attr error_message("0506: {order_id_} {execution_price_}") {
-            Math64x61_assert_le(lower_limit, execution_price_, collateral_token_decimal_);
+        let (slippage_check) = Math64x61_is_le(
+            lower_limit_, execution_price_, collateral_token_decimal_
+        );
+        if (slippage_check == FALSE) {
+            return (TRUE);
         }
     }
 
-    return ();
+    return (FALSE);
 }
 
 // @notice Internal function to check if the execution_price of a limit order is valid (TAKER)
@@ -457,20 +465,28 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     direction_: felt,
     side_: felt,
     collateral_token_decimal_: felt,
-) {
+) -> (is_error: felt, error_message: felt) {
     alloc_locals;
 
     if (direction_ == LONG) {
         // if it's a long order
         if (side_ == BUY) {
-            // if it's a buy order
-            with_attr error_message("0508: {order_id_} {execution_price_}") {
-                Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
+            let (limit_price_check) = Math64x61_is_le(
+                execution_price_, price_, collateral_token_decimal_
+            );
+
+            if (limit_price_check == FALSE) {
+                // if it's a buy order
+                return (TRUE, '0508');
             }
         } else {
             // if it's a sell order
-            with_attr error_message("0507: {order_id_} {execution_price_}") {
-                Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
+            let (limit_price_check) = Math64x61_is_le(
+                price_, execution_price_, collateral_token_decimal_
+            );
+
+            if (limit_price_check == FALSE) {
+                return (TRUE, '0507');
             }
         }
         tempvar range_check_ptr = range_check_ptr;
@@ -478,19 +494,27 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // if it's a short order
         if (side_ == BUY) {
             // if it's a buy order
-            with_attr error_message("0507: {order_id_} {execution_price_}") {
-                Math64x61_assert_le(price_, execution_price_, collateral_token_decimal_);
+            let (limit_price_check) = Math64x61_is_le(
+                price_, execution_price_, collateral_token_decimal_
+            );
+
+            if (limit_price_check == FALSE) {
+                return (TRUE, '0507');
             }
         } else {
             // if it's a sell order
-            with_attr error_message("0508: {order_id_} {execution_price_}") {
-                Math64x61_assert_le(execution_price_, price_, collateral_token_decimal_);
+            let (limit_price_check) = Math64x61_is_le(
+                price_, execution_price_, collateral_token_decimal_
+            );
+
+            if (limit_price_check == FALSE) {
+                return (TRUE, '0507');
             }
         }
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    return ();
+    return (0, 0);
 }
 
 // @notice Internal function to retrieve contract addresses from the Auth Registry
@@ -621,6 +645,8 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     trader_stats_list_: TraderStats*,
     side_: felt,
 ) -> (
+    is_error: felt,
+    user_available_balance: felt,
     average_execution_price_open: felt,
     margin_amount_open: felt,
     borrowed_amount_open: felt,
@@ -693,9 +719,12 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert user_available_balance = available_margin;
     assert order_id = order_.order_id;
 
-    // User must be able to pay the amount
-    with_attr error_message("0501: {order_id} {user_available_balance}") {
-        Math64x61_assert_le(fees, user_available_balance, collateral_token_decimal_);
+    let (user_balance_check) = Math64x61_is_le(
+        fees, user_available_balance, collateral_token_decimal_
+    );
+
+    if (user_balance_check == FALSE) {
+        return (FALSE, user_available_balance, 0, 0, 0, 0);
     }
 
     if (is_le(fees, 0) == 0) {
@@ -758,6 +787,8 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     );
 
     return (
+        FALSE,
+        user_available_balance,
         average_execution_price_open,
         margin_amount_open,
         borrowed_amount_open,
@@ -1103,7 +1134,9 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @return res - returns the net sum of the orders do far
 // @return trader_stats_list_len - length of the trader fee list so far
 // @return open_interest - open interest corresponding to the trade batch
-func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+func preprocess_order_execution_recurse{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(
     initial_taker_locked_: felt,
     market_id_: felt,
     collateral_id_: felt,
@@ -1146,6 +1179,8 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local updated_portion_executed;
     local opening_fee;
     local updated_position_details: PositionDetails;
+    local execution_details: ExecutionDetails;
+    local is_final;
     local pnl;
 
     // Local variable for setting the error
@@ -1176,43 +1211,57 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     assert quantity_order = [request_list_].quantity;
     assert user_address = [request_list_].user_address;
 
+    // Error Handling: User is not registered
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
     let (is_registered) = IAccountRegistry.is_registered_user(
         contract_address=account_registry_address_, address_=user_address
     );
-
-    // User is not registered
-    if (is_registered == 0) {
+    if (is_registered == FALSE) {
         assert error_message = '0510';
         assert error_param_1 = order_id;
         assert error_param_2 = user_address;
         jmp error_handling;
     }
 
-    // Quantity is less than the one set for the market
+    // Error Handling: Quantity is less than the one set for the market
     let (size_check) = Math64x61_is_le(
         min_quantity_, [request_list_].quantity, asset_token_decimal_
     );
-    if (size_check == 0) {
+    if (size_check == FALSE) {
         assert error_message = '0505';
         assert error_param_1 = order_id;
         assert error_param_2 = quantity_order;
         jmp error_handling;
     }
 
-    // Market Check
-    with_attr error_message("0504: {order_id} {market_id_order}") {
-        assert [request_list_].market_id = market_id_;
+    // Error Handling: Wrong market passed for the order
+    if ([request_list_].market_id != market_id) {
+        assert error_message = '0504';
+        assert error_param_1 = order_id;
+        assert error_param_2 = market_id_order;
+        jmp error_handling;
     }
 
-    // Leverage check minimum
-    with_attr error_message("0503: {order_id} {leverage}") {
-        assert_le(LEVERAGE_ONE, [request_list_].leverage);
+    // Error Handling: Invalid leverage; leverage < minimum
+    let (leverage_min_check) = Math64x61_is_le(
+        LEVERAGE_ONE, [request_list_].leverage, asset_token_decimal_
+    );
+    if (leverage_min_check == FALSE) {
+        assert error_message = '0503';
+        assert error_param_1 = order_id;
+        assert error_param_2 = leverage;
+        jmp error_handling;
     }
 
-    // Leverage check maximum
-    with_attr error_message("0502: {order_id} {leverage}") {
-        assert_le([request_list_].leverage, max_leverage_);
+    // Invalid leverage; leverage > maximum
+    let (leverage_max_check) = Math64x61_is_le(
+        [request_list_].leverage, max_leverage_, asset_token_decimal_
+    );
+    if (leverage_min_check == FALSE) {
+        assert error_message = '0502';
+        assert error_param_1 = order_id;
+        assert error_param_2 = leverage;
+        jmp error_handling;
     }
 
     // Get the portion executed of the order
@@ -1238,7 +1287,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let (quantity_to_execute) = quantity_executed_;
 
         // Direction Check
-        validate_taker(
+        let (is_error) = validate_taker(
             order_id,
             maker1_direction_,
             maker1_side_,
@@ -1246,9 +1295,19 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             [request_list_].side,
         );
 
-        // Check for post-only flag; they must always be a maker
-        with_attr error_message("0515: {order_id} {current_index}") {
-            assert [request_list_].post_only = FALSE;
+        if (is_error == TRUE) {
+            assert error_message = '0513';
+            assert error_param_1 = order_id;
+            assert error_param_2 = [request_list_].direction;
+            jmp error_handling;
+        }
+
+        // Error Handling: A Taker order cannot be a post only order
+        if ([request_list_].post_only == TRUE) {
+            assert error_message = '0515';
+            assert error_param_1 = order_id;
+            assert error_param_2 = current_index;
+            jmp error_handling;
         }
 
         local taker_quantity;
@@ -1257,10 +1316,20 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         if ([request_list_].time_in_force == FoK) {
             let (diff_check) = Math64x61_sub([request_list_].quantity, taker_quantity);
 
-            with_attr error_message("0516: {order_id} {taker_quantity}") {
-                let (is_zero) = Math64x61_is_equal(diff_check, 0, asset_token_decimal_);
-                assert is_zero = TRUE;
-                assert [request_list_].order_type = LIMIT_ORDER;
+            // Error Handling: A Taker order cannot be a post only order
+            if (diff_check == FALSE) {
+                assert error_message = '0516';
+                assert error_param_1 = order_id;
+                assert error_param_2 = taker_quantity;
+                jmp error_handling;
+            }
+
+            // Error Handling: A Taker order cannot be a post only order
+            if ([request_list_].order_type != LIMIT_ORDER) {
+                assert error_message = '0550';
+                assert error_param_1 = order_id;
+                assert error_param_2 = MARKET_ORDER;
+                jmp error_handling;
             }
 
             tempvar syscall_ptr = syscall_ptr;
@@ -1276,9 +1345,27 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
         // Price check
         if ([request_list_].order_type == MARKET_ORDER) {
-            check_within_slippage(
+            local slippage;
+            assert slippage = [request_list_].slippage;
+            // Error Handling: Slippage of a market order cannot be 0
+            if (slippage != 0) {
+                assert error_message = '0521';
+                assert error_param_1 = order_id;
+                assert error_param_2 = slippage;
+                jmp error_handling;
+            }
+
+            // Error Handling: A Taker order cannot be a post only order
+            if (is_le(slippage, FIFTEEN_PERCENTAGE) == 1) {
+                assert error_message = '0521';
+                assert error_param_1 = order_id;
+                assert error_param_2 = slippage;
+                jmp error_handling;
+            }
+
+            let (is_error: felt) = check_within_slippage(
                 order_id_=order_id,
-                slippage_=[request_list_].slippage,
+                slippage_=slippage,
                 oracle_price_=oracle_price_,
                 execution_price_=execution_price,
                 direction_=[request_list_].direction,
@@ -1286,7 +1373,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 collateral_token_decimal_=collateral_token_decimal_,
             );
         } else {
-            check_limit_price(
+            let (is_error: felt, error_message: felt) = check_limit_price(
                 order_id_=order_id,
                 price_=[request_list_].price,
                 execution_price_=new_execution_price,
@@ -1294,6 +1381,13 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 side_=[request_list_].side,
                 collateral_token_decimal_=collateral_token_decimal_,
             );
+
+            if (is_error == TRUE) {
+                assert error_message = error_message;
+                assert error_param_1 = order_id;
+                assert error_param_2 = execution_price;
+                jmp error_handling;
+            }
         }
 
         // Reset the variable
@@ -1339,7 +1433,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         );
 
         // Check the direction of the maker
-        validate_maker(
+        let (is_error) = validate_maker(
             order_id,
             maker1_direction_,
             maker1_side_,
@@ -1347,10 +1441,20 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             [request_list_].side,
         );
 
-        with_attr error_message("0518: {order_id} {current_index}") {
-            assert [request_list_].order_type = LIMIT_ORDER;
+        if (is_error == TRUE) {
+            assert error_message = '0512';
+            assert error_param_1 = order_id;
+            assert error_param_2 = [request_list_].direction;
+            jmp error_handling;
         }
 
+        // Error Handling: A Taker order cannot be a post only order
+        if ([request_list_].order_type != LIMIT_ORDER) {
+            assert error_message = '0518';
+            assert error_param_1 = order_id;
+            assert error_param_2 = current_index;
+            jmp error_handling;
+        }
         assert quantity_to_execute = quantity_to_execute;
 
         // Send to AccountManager to emit an event in case the execution_price is 0
@@ -1463,9 +1567,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     local market_array_update;
     local updated_margin_locked;
     local updated_liquidatable_position;
+    local updated_portion_executed;
+    local is_liquidation;
+
     // If the order is to be opened
     if ([request_list_].side == BUY) {
         let (
+            is_error: felt,
+            user_available_balance: felt,
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
             borrowed_amount_temp: felt,
@@ -1486,6 +1595,13 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             trader_stats_list_=trader_stats_list_,
             side_=current_order_side,
         );
+
+        if (is_balance_error == TRUE) {
+            assert error_message = '0501';
+            assert error_param_1 = order_id;
+            assert error_param_2 = user_available_balance;
+            jmp error_handling;
+        }
 
         // Local variable to store the timestamp at which the position was opened
         local created_timestamp;
@@ -1546,19 +1662,46 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             modified_timestamp=current_timestamp,
             realized_pnl=new_pnl_rounded,
         );
-
         let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_update_amount);
         assert updated_margin_locked = new_margin_locked;
+
+        let (new_portion_executed) = Math64x61_add(portion_executed, quantity_to_execute);
+
+        let (is_final) = Math64x61_is_equal(
+            new_position_executed, request.quantity, asset_decimals
+        );
+
+        assert execution_details = ExecutionDetails(
+            collateral_id=collateral_id_,
+            order_id=order_id,
+            market_id=market_id_,
+            direction=[request_list_].direction,
+            size=quantity_to_execute,
+            order_type=[request_list_].order_type,
+            order_side=[request_list_].side,
+            execution_price=execution_price,
+            pnl=pnl,
+            side=current_order_side,
+            opening_fee=trading_fee,
+            is_final=is_final,
+        );
+
+        assert updated_liquidatable_position = LiquidatablePosition(
+            market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
+        );
 
         assert pnl = trading_fee;
         assert opening_fee = trading_fee;
         assert current_open_interest = quantity_to_execute;
         assert margin_lock_update_amount = margin_lock_amount;
+        assert updated_portion_executed = new_portion_executed;
+        assert is_liquidation = FALSE;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
+        // Close order
         let (
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
@@ -1592,15 +1735,31 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 contract_address=user_address, collateral_id_=collateral_id_
             );
 
-            with_attr error_message("0004: {order_id} {market_id_order}") {
-                assert liq_position.market_id = market_id_;
-                assert liq_position.direction = [request_list_].direction;
+            // Error Handling: Wrong market for liquidation
+            if (liq_position.market_id != market_id_) {
+                assert error_message = '0531';
+                assert error_param_1 = order_id;
+                assert error_param_2 = market_id_;
+                jmp error_handling;
             }
 
-            with_attr error_message("0005: {order_id} {quantity_to_execute}") {
-                Math64x61_assert_le(
-                    quantity_to_execute, liq_position.amount_to_be_sold, asset_decimals
-                );
+            // Error Handling: Wrong direction for liquidation
+            if (liq_position.direction != [request_list_].direction) {
+                assert error_message = '0532';
+                assert error_param_1 = order_id;
+                assert error_param_2 = [request_list_].direction;
+                jmp error_handling;
+            }
+
+            // Error Handling: Size larger than marked one
+            let (liquidatable_size_check) = Math64x61_is_le(
+                quantity_to_execute, liq_position.amount_to_be_sold, asset_decimals
+            );
+            if (liquidatable_size_check == FALSE) {
+                assert error_message = '0533';
+                assert error_param_1 = order_id;
+                assert error_param_2 = quantity_to_execute;
+                jmp error_handling;
             }
 
             let (updated_amount) = Math64x61_sub(
@@ -1624,9 +1783,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
             // If it's a deleveraging order, calculate the new leverage
             if ([request_list_].order_type == DELEVERAGING_ORDER) {
-                with_attr error_message("0007: {order_id} {size}") {
-                    assert liq_position.liquidatable = FALSE;
+                // Error Handling: Position not marked as 'deleveragable'
+                if (liq_position.liquidatable == TRUE) {
+                    assert error_message = '0534';
+                    assert error_param_1 = order_id;
+                    assert error_param_2 = size;
+                    jmp error_handling;
                 }
+
                 let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
                 let (leverage_) = Math64x61_div(total_value, margin_amount);
                 let (leverage_rounded) = Math64x61_round(leverage_, 5);
@@ -1637,9 +1801,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             } else {
-                with_attr error_message("0006: {order_id} {size}") {
-                    assert liq_position.liquidatable = TRUE;
+                // Error Handling: Position not marked as 'liquidatable'
+                if (liq_position.liquidatable == FALSE) {
+                    assert error_message = '0535';
+                    assert error_param_1 = order_id;
+                    assert error_param_2 = size;
+                    jmp error_handling;
                 }
+
                 let (new_margin_locked) = Math64x61_sub(
                     current_margin_locked, margin_lock_update_amount
                 );
@@ -1706,7 +1875,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             );
 
             // Create a new struct with the updated details
-            assert updated_position = PositionDetails(
+            assert updated_position_details = PositionDetails(
                 avg_execution_price=average_execution_price_rounded,
                 position_size=new_position_size,
                 margin_amount=margin_amount_rounded,
@@ -1722,10 +1891,31 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             tempvar range_check_ptr = range_check_ptr;
         }
 
+        let () = Math64x61_add(portion_executed, quantity_to_execute);
+
+        assert execution_details = ExecutionDetails(
+            order_id=order_id,
+            direction=[request_list_].direction,
+            size=quantity_to_execute,
+            order_type=[request_list_].order_type,
+            order_side=[request_list_].side,
+            execution_price=execution_price,
+            pnl=pnl,
+            side=current_order_side,
+            opening_fee=0,
+            is_final=is_final,
+        );
+
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
+
+        assert pnl = trading_fee;
+        assert opening_fee = trading_fee;
+        assert current_open_interest = quantity_to_execute;
+        assert margin_lock_update_amount = margin_lock_amount;
+        assert current_portion_executed = new_portion_executed;
 
         assert margin_amount = margin_amount_temp;
         assert borrowed_amount = borrowed_amount_temp;
@@ -1734,6 +1924,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert opening_fee = 0;
         assert current_open_interest = 0 - quantity_to_execute;
         assert margin_lock_update_amount = margin_unlock_amount;
+        assert is_liquidation = is_liq;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -1745,14 +1936,27 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (hash) = hash_order(&request);
 
     // Check for hash collision
-    order_hash_check(request.order_id, hash);
+    let (hash_error) = order_hash_check(order_id_=request.order_id, order_hash=hash);
 
-    let (new_position_executed) = Math64x61_add(order_portion_executed, size);
+    if (hash_error == TRUE) {
+        assert error_message = '0536';
+        assert error_param_1 = order_id;
+        assert error_param_2 = hash;
+        jmp error_handling;
+    }
+
+    // Create a signature object
+    let user_signature: Signature = Signature(
+        r_value=[request_list_].sig_r, s_value=[request_list_].sig_s
+    );
 
     // check if signed by the user/liquidator
-    is_valid_signature_order(hash, signature, request.liquidator_address);
-
-    let (is_final) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
+    is_valid_signature_order(
+        hash=hash,
+        signature=user_signature,
+        liquidator_address_=request.liquidator_address,
+        user_public_key_=user_public_key,
+    );
 
     if (request.time_in_force == IoC) {
         // Update the portion executed to request.quantity if it's an IoC order
@@ -1760,47 +1964,22 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     } else {
         // Update the portion executed
-        updated_portion_executed = new_position_executed;
+        updated_portion_executed = current_portion_executed;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     }
-
-    // Create a temporary order object
-    let temp_order_request: OrderRequest = OrderRequest(
-        order_id=[request_list_].order_id,
-        market_id=[request_list_].market_id,
-        direction=[request_list_].direction,
-        price=[request_list_].price,
-        quantity=[request_list_].quantity,
-        leverage=[request_list_].leverage,
-        slippage=[request_list_].slippage,
-        order_type=[request_list_].order_type,
-        time_in_force=[request_list_].time_in_force,
-        post_only=[request_list_].post_only,
-        side=[request_list_].side,
-        liquidator_address=[request_list_].liquidator_address,
-    );
-
-    // Create a temporary signature object
-    let temp_signature: Signature = Signature(
-        r_value=[request_list_].sig_r, s_value=[request_list_].sig_s
-    );
 
     // Call the account contract to initialize the order
     IAccountManager.execute_order(
         contract_address=user_address,
-        request=temp_order_request,
-        signature=temp_signature,
-        size=quantity_to_execute,
-        average_execution_price=average_execution_price,
-        execution_price=execution_price,
-        margin_amount=margin_amount,
-        borrowed_amount=borrowed_amount,
-        market_id=market_id_,
+        market_id_=market_id_,
         collateral_id_=collateral_id_,
-        pnl=pnl,
-        opening_fee=opening_fee,
-        side=current_order_side,
-        margin_lock_update_amount=margin_lock_update_amount,
+        execution_details_=execution_details,
+        updated_position_details_=updated_position_details,
+        updated_liquidatable_position_=updated_liquidatable_position,
+        updated_margin_locked_=updated_margin_locked,
+        updated_portion_executed_=updated_portion_executed,
+        market_array_update_=market_array_update,
+        is_liquidation_=is_liquidation,
     );
 
     let (new_open_interest) = Math64x61_add(open_interest_, current_open_interest);
@@ -1832,6 +2011,44 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         oracle_price_=oracle_price_,
         execution_sizes_=execution_sizes_ + 1,
     );
+
+    error_handling:
+    // Emit the event
+    let (keys: felt*) = alloc();
+    assert keys[0] = 'order_rejected';
+    let (data: felt*) = alloc();
+    assert data[0] = error_message;
+    assert data[1] = error_param_1;
+    assert data[2] = error_param_2;
+
+    emit_event(1, keys, 3, data);
+
+    return check_and_execute(
+        market_id_=market_id_,
+        collateral_id_=collateral_id_,
+        asset_token_decimal_=asset_token_decimal_,
+        collateral_token_decimal_=collateral_token_decimal_,
+        orders_len_=orders_len_,
+        request_list_len_=request_list_len_ - 1,
+        request_list_=request_list_ + MultipleOrder.SIZE,
+        quantity_executed_=quantity_executed_,
+        account_registry_address_=account_registry_address_,
+        holding_address_=holding_address_,
+        trading_fees_address_=trading_fees_address_,
+        fees_balance_address_=fees_balance_address_,
+        liquidate_address_=liquidate_address_,
+        liquidity_fund_address_=liquidity_fund_address_,
+        insurance_fund_address_=insurance_fund_address_,
+        max_leverage_=max_leverage_,
+        min_quantity_=min_quantity_,
+        maker1_direction_=maker1_direction_,
+        maker1_side_=maker1_side_,
+        trader_stats_list_=trader_stats_list_,
+        total_order_volume_=total_order_volume_,
+        taker_execution_price=taker_execution_price,
+        open_interest_=open_interest_,
+        oracle_price_=oracle_price_,
+    );
 }
 
 // @notice Internal function to validate maker orders
@@ -1846,26 +2063,23 @@ func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     maker1_side_: felt,
     current_direction_: felt,
     current_side_: felt,
-) {
+) -> (is_error: felt) {
     alloc_locals;
     let (local opposite_direction) = get_opposite(maker1_direction_);
     let (local opposite_side) = get_opposite(maker1_side_);
     if (current_direction_ == maker1_direction_) {
         if (current_side_ == maker1_side_) {
-            return ();
+            return (FALSE);
         }
     }
 
     if (current_direction_ == opposite_direction) {
         if (current_side_ == opposite_side) {
-            return ();
+            return (FALSE);
         }
     }
 
-    with_attr error_message("0512: {order_id_} {current_direction_}") {
-        assert 0 = 1;
-    }
-    return ();
+    return (TRUE);
 }
 
 // @notice Internal function to validate taker orders
@@ -1880,26 +2094,23 @@ func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     maker1_side_: felt,
     current_direction_: felt,
     current_side_: felt,
-) {
+) -> (is_error: felt) {
     alloc_locals;
     let (local opposite_direction) = get_opposite(maker1_direction_);
     let (local opposite_side) = get_opposite(maker1_side_);
     if (current_direction_ == maker1_direction_) {
         if (current_side_ == opposite_side) {
-            return ();
+            return (FALSE);
         }
     }
 
     if (current_direction_ == opposite_direction) {
         if (current_side_ == maker1_side_) {
-            return ();
+            return (FALSE);
         }
     }
 
-    with_attr error_message("0511: {order_id_} {current_direction_}") {
-        assert 0 = 1;
-    }
-    return ();
+    return (TRUE);
 }
 
 // @notice Internal function to get oppsite side or direction of the order
@@ -1913,4 +2124,58 @@ func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     } else {
         return (res=OPEN);
     }
+}
+
+// @notice Internal function to check for hash collisions
+// @param order_id - Order ID of the request
+// @param order_hash - Hash of the corresponding order
+func order_hash_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    order_id: felt, order_hash: felt
+) -> (is_error: felt) {
+    // Get the hash of the order associated with the order_id
+    let (existing_hash) = order_id_mapping.read(order_id=order_id);
+    // If the hash isn't stored in the contract yet
+    if (existing_hash == 0) {
+        order_id_mapping.write(order_id=order_id, value=order_hash);
+        return (FALSE);
+    }
+
+    return (TRUE);
+}
+
+// @notice view function which checks the signature passed is valid
+// @param hash - Hash of the order to check against
+// @param signature - Signature passed to the contract to check against
+// @param liquidator_address_ - Address of the liquidator
+// @return reverts, if there is an error
+@view
+func is_valid_signature_order{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
+}(hash: felt, signature: Signature, liquidator_address_: felt, user_public_key_: felt) -> () {
+    alloc_locals;
+
+    let sig_r = signature.r_value;
+    let sig_s = signature.s_value;
+    local pub_key;
+
+    if (liquidator_address_ != 0) {
+        // Verify whether call came from node operator
+        let (_public_key) = IAccountLiquidator.getPublicKey(contract_address=liquidator_address_);
+        pub_key = _public_key;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
+    } else {
+        pub_key = user_public_key_;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
+    }
+
+    verify_ecdsa_signature(message=hash, public_key=pub_key, signature_r=sig_r, signature_s=sig_s);
+    return ();
 }
