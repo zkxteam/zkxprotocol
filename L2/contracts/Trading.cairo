@@ -1090,7 +1090,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @return trader_stats_list_len - length of the trader fee list so far
 // @return open_interest - open interest corresponding to the trade batch
 func process_and_execute_orders_recurse{
-    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
     original_quantity_locked_: felt,
     taker_locked_quantity_: felt,
@@ -1176,6 +1176,10 @@ func process_and_execute_orders_recurse{
         assert error_param_1 = order_id;
         assert error_param_2 = user_address;
         jmp error_handling;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Error Handling: Quantity is less than the one set for the market
@@ -1187,6 +1191,10 @@ func process_and_execute_orders_recurse{
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = quantity_order;
         jmp error_handling;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Error Handling: Wrong market passed for the order
@@ -1195,6 +1203,10 @@ func process_and_execute_orders_recurse{
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = market_id_order;
         jmp error_handling;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Error Handling: Invalid leverage; leverage < minimum
@@ -1206,6 +1218,10 @@ func process_and_execute_orders_recurse{
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = leverage;
         jmp error_handling;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Invalid leverage; leverage > maximum
@@ -1217,6 +1233,10 @@ func process_and_execute_orders_recurse{
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = leverage;
         jmp error_handling;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
 
     // Get the portion executed of the order
@@ -1238,6 +1258,60 @@ func process_and_execute_orders_recurse{
 
     let (user_public_key, _) = IAccountManager.get_public_key(
         contract_address=[request_list_].user_address
+    );
+
+    local market_array_update;
+    local updated_margin_locked;
+    local updated_liquidatable_position: LiquidatablePosition;
+    local updated_portion_executed;
+    local current_portion_executed;
+    local is_liquidation;
+
+    // Create a temporary order object
+    let temp_order_request: OrderRequest = OrderRequest(
+        order_id=[request_list_].order_id,
+        market_id=[request_list_].market_id,
+        direction=[request_list_].direction,
+        price=[request_list_].price,
+        quantity=[request_list_].quantity,
+        leverage=[request_list_].leverage,
+        slippage=[request_list_].slippage,
+        order_type=[request_list_].order_type,
+        time_in_force=[request_list_].time_in_force,
+        post_only=[request_list_].post_only,
+        side=[request_list_].side,
+        liquidator_address=[request_list_].liquidator_address,
+    );
+
+    // Code brought in from AccountManager
+    // hash the parameters
+    let (hash) = hash_order(temp_order_request);
+
+    // Check for hash collision
+    let (hash_error) = order_hash_check(order_id_=[request_list_].order_id, order_hash_=hash);
+
+    if (hash_error == TRUE) {
+        assert error_message = '0536';
+        assert error_param_1 = [request_list_].order_id;
+        assert error_param_2 = hash;
+        jmp error_handling;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
+
+    // Create a signature object
+    let user_signature: Signature = Signature(
+        r_value=[request_list_].sig_r, s_value=[request_list_].sig_s
+    );
+
+    // check if signed by the user/liquidator
+    is_valid_signature_order(
+        hash=hash,
+        signature=user_signature,
+        liquidator_address_=[request_list_].liquidator_address,
+        user_public_key_=user_public_key,
     );
 
     // Taker Order
@@ -1263,6 +1337,10 @@ func process_and_execute_orders_recurse{
             assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = [request_list_].direction;
             jmp error_handling;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
 
         // Error Handling: A Taker order cannot be a post only order
@@ -1271,6 +1349,10 @@ func process_and_execute_orders_recurse{
             assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = current_index;
             jmp error_handling;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
 
         local taker_quantity;
@@ -1285,6 +1367,10 @@ func process_and_execute_orders_recurse{
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = taker_quantity;
                 jmp error_handling;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
             }
 
             // Error Handling: A Taker order cannot be a post only order
@@ -1293,6 +1379,10 @@ func process_and_execute_orders_recurse{
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = MARKET_ORDER;
                 jmp error_handling;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
             }
 
             tempvar syscall_ptr = syscall_ptr;
@@ -1316,6 +1406,10 @@ func process_and_execute_orders_recurse{
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = slippage;
                 jmp error_handling;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
             }
 
             // Error Handling: A Taker order cannot be a post only order
@@ -1324,6 +1418,10 @@ func process_and_execute_orders_recurse{
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = slippage;
                 jmp error_handling;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
             }
 
             let (is_error: felt) = check_within_slippage(
@@ -1353,6 +1451,10 @@ func process_and_execute_orders_recurse{
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = execution_price;
                 jmp error_handling;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
             }
 
             tempvar syscall_ptr = syscall_ptr;
@@ -1416,6 +1518,10 @@ func process_and_execute_orders_recurse{
             assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = [request_list_].direction;
             jmp error_handling;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
 
         // Error Handling: A Taker order cannot be a post only order
@@ -1424,31 +1530,51 @@ func process_and_execute_orders_recurse{
             assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = current_index;
             jmp error_handling;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
         assert quantity_to_execute = quantity_to_execute;
 
         // Send to AccountManager to emit an event in case the execution_price is 0
         if (quantity_to_execute == 0) {
-            // Create a temporary order object
-            let temp_order_request: OrderRequest = OrderRequest(
-                order_id=[request_list_].order_id,
-                market_id=[request_list_].market_id,
-                direction=[request_list_].direction,
-                price=[request_list_].price,
-                quantity=[request_list_].quantity,
-                leverage=[request_list_].leverage,
-                slippage=[request_list_].slippage,
-                order_type=[request_list_].order_type,
-                time_in_force=[request_list_].time_in_force,
-                post_only=[request_list_].post_only,
-                side=[request_list_].side,
-                liquidator_address=[request_list_].liquidator_address,
+            assert updated_liquidatable_position = LiquidatablePosition(
+                market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
             );
 
-            // Create a temporary signature object
-            let temp_signature: Signature = Signature(
-                r_value=[request_list_].sig_r, s_value=[request_list_].sig_s
+            assert updated_position_details = PositionDetails(
+                avg_execution_price=0,
+                position_size=0,
+                margin_amount=0,
+                borrowed_amount=0,
+                leverage=0,
+                created_timestamp=0,
+                modified_timestamp=0,
+                realized_pnl=0,
             );
+
+            assert execution_details = ExecutionDetails(
+                order_id=order_id,
+                direction=[request_list_].direction,
+                size=0,
+                order_type=[request_list_].order_type,
+                order_side=[request_list_].side,
+                execution_price=[request_list_].price,
+                pnl=0,
+                side=MAKER,
+                opening_fee=0,
+                is_final=is_final,
+            );
+
+            let (is_final) = Math64x61_is_equal(
+                order_portion_executed, [request_list_].quantity, asset_token_decimal_
+            );
+
+            assert updated_margin_locked = current_margin_locked;
+            assert updated_portion_executed = order_portion_executed;
+            assert market_array_update = 0;
+            assert is_liquidation = 0;
 
             // Call the account contract to initialize the order
             IAccountManager.execute_order(
@@ -1463,17 +1589,6 @@ func process_and_execute_orders_recurse{
                 market_array_update_=market_array_update,
                 is_liquidation_=is_liquidation,
             );
-
-            let element: TraderStats = TraderStats(
-                trader_address=user_address,
-                fee_64x61=0,
-                order_volume_64x61=0,
-                side=MAKER,
-                pnl_64x61=0,
-                margin_amount_64x61=0,
-            );
-
-            assert [trader_stats_list_] = element;
 
             return process_and_execute_orders_recurse(
                 original_quantity_locked_=original_quantity_locked_,
@@ -1503,6 +1618,10 @@ func process_and_execute_orders_recurse{
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
             );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
 
         // Add the executed quantity to the running sum of quantity executed
@@ -1530,13 +1649,6 @@ func process_and_execute_orders_recurse{
     }
 
     let (local current_timestamp) = get_block_timestamp();
-
-    local market_array_update;
-    local updated_margin_locked;
-    local updated_liquidatable_position;
-    local updated_portion_executed;
-    local current_portion_executed;
-    local is_liquidation;
 
     // If the order is to be opened
     if ([request_list_].side == BUY) {
@@ -1646,9 +1758,7 @@ func process_and_execute_orders_recurse{
         );
 
         assert execution_details = ExecutionDetails(
-            collateral_id=collateral_id_,
             order_id=order_id,
-            market_id=market_id_,
             direction=[request_list_].direction,
             size=quantity_to_execute,
             order_type=[request_list_].order_type,
@@ -1914,33 +2024,6 @@ func process_and_execute_orders_recurse{
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    // Code brought in from AccountManager
-    // hash the parameters
-    let (hash) = hash_order(&[request_list_]);
-
-    // Check for hash collision
-    let (hash_error) = order_hash_check(order_id_=[request_list_].order_id, order_hash=hash);
-
-    if (hash_error == TRUE) {
-        assert error_message = '0536';
-        assert error_param_1 = [request_list_].order_id;
-        assert error_param_2 = hash;
-        jmp error_handling;
-    }
-
-    // Create a signature object
-    let user_signature: Signature = Signature(
-        r_value=[request_list_].sig_r, s_value=[request_list_].sig_s
-    );
-
-    // check if signed by the user/liquidator
-    is_valid_signature_order(
-        hash=hash,
-        signature=user_signature,
-        liquidator_address_=[request_list_].liquidator_address,
-        user_public_key_=user_public_key,
-    );
-
     if ([request_list_].time_in_force == IoC) {
         // Update the portion executed to request.quantity if it's an IoC order
         updated_portion_executed = [request_list_].quantity;
@@ -2116,13 +2199,13 @@ func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // @param order_id - Order ID of the request
 // @param order_hash - Hash of the corresponding order
 func order_hash_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_id: felt, order_hash: felt
+    order_id_: felt, order_hash_: felt
 ) -> (is_error: felt) {
     // Get the hash of the order associated with the order_id
-    let (existing_hash) = order_id_mapping.read(order_id=order_id);
+    let (existing_hash) = order_id_mapping.read(order_id=order_id_);
     // If the hash isn't stored in the contract yet
     if (existing_hash == 0) {
-        order_id_mapping.write(order_id=order_id, value=order_hash);
+        order_id_mapping.write(order_id=order_id_, value=order_hash_);
         return (FALSE);
     }
 
@@ -2169,7 +2252,7 @@ func is_valid_signature_order{
 // @notice Internal function to hash the order parameters
 // @param orderRequest - Struct of order request to hash
 // @param res - Hash of the details
-func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res: felt) {
+func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest) -> (res: felt) {
     let hash_ptr = pedersen_ptr;
     with hash_ptr {
         let (hash_state_ptr) = hash_init();
