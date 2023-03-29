@@ -3,9 +3,11 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin, SignatureBuiltin
+from starkware.cairo.common.hash_state import hash_finalize, hash_init, hash_update
 from starkware.cairo.common.math import abs_value, assert_le, assert_lt, assert_not_zero
 from starkware.cairo.common.math_cmp import is_le
-from starkware.starknet.common.syscalls import emit_event
+from starkware.cairo.common.signature import verify_ecdsa_signature
+from starkware.starknet.common.syscalls import emit_event, get_block_timestamp
 
 from contracts.Constants import (
     AccountRegistry_INDEX,
@@ -35,6 +37,7 @@ from contracts.Constants import (
 from contracts.DataTypes import (
     Asset,
     ExecutionDetails,
+    LiquidatablePosition,
     Market,
     MultipleOrder,
     OrderRequest,
@@ -43,6 +46,8 @@ from contracts.DataTypes import (
     Signature,
     TraderStats,
 )
+
+from contracts.interfaces.IAccountLiquidator import IAccountLiquidator
 from contracts.interfaces.IAccountManager import IAccountManager
 from contracts.interfaces.IAccountRegistry import IAccountRegistry
 from contracts.interfaces.IAsset import IAsset
@@ -66,6 +71,7 @@ from contracts.Math_64x61 import (
     Math64x61_mul,
     Math64x61_ONE,
     Math64x61_sub,
+    Math64x61_round,
 )
 
 // ////////////
@@ -187,20 +193,23 @@ func execute_batch{
     }
 
     // Get the index of the Taker order
-    let last_index = request_list_len_ - 1;
-
-    let (execution_sizes: felt*) = alloc();
+    let last_index = request_list_len - 1;
 
     let (initial_taker_locked: felt) = find_initial_taker_locked(
         asset_token_decimal_=asset.token_decimal,
         request_=request_list[last_index],
         quantity_locked_=quantity_locked_,
-        execution_sizes_=execution_sizes,
     );
 
+    let (is_zero_quantity) = Math64x61_is_equal(initial_taker_locked, 0, 6);
+    with_attr error_message("0523: {quantity_locked_} {0}") {
+        assert is_zero_quantity = 0;
+    }
+
     // Recursively loop through the orders in the batch
-    let (taker_execution_price: felt, open_interest: felt) = check_and_execute(
-        initial_taker_locked_=initial_taker_locked,
+    let (taker_execution_price: felt, open_interest: felt) = process_and_execute_orders_recurse(
+        original_quantity_locked_=initial_taker_locked,
+        taker_locked_quantity_=initial_taker_locked,
         market_id_=market_id_,
         collateral_id_=collateral_id,
         asset_token_decimal_=asset.token_decimal,
@@ -225,7 +234,6 @@ func execute_batch{
         taker_execution_price=0,
         open_interest_=0,
         oracle_price_=oracle_price_,
-        execution_sizes_=execution_sizes,
     );
 
     // Get Market price for the corresponding market Id
@@ -245,19 +253,19 @@ func execute_batch{
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    // Record TradingStats
-    ITradingStats.record_trade_batch_stats(
-        contract_address=trading_stats_address,
-        market_id_=market_id_,
-        execution_price_64x61_=taker_execution_price,
-        request_list_len=request_list_len,
-        request_list=request_list,
-        trader_stats_list_len=request_list_len,
-        trader_stats_list=trader_stats_list,
-        executed_sizes_list_len=request_list_len,
-        executed_sizes_list=execution_sizes,
-        open_interest_=open_interest,
-    );
+    // // Record TradingStats
+    // ITradingStats.record_trade_batch_stats(
+    //     contract_address=trading_stats_address,
+    //     market_id_=market_id_,
+    //     execution_price_64x61_=taker_execution_price,
+    //     request_list_len=request_list_len,
+    //     request_list=request_list,
+    //     trader_stats_list_len=request_list_len,
+    //     trader_stats_list=trader_stats_list,
+    //     executed_sizes_list_len=request_list_len,
+    //     executed_sizes_list=execution_sizes,
+    //     open_interest_=open_interest,
+    // );
 
     // Change the status of the batch to TRUE
     batch_id_status.write(batch_id=batch_id_, value=TRUE);
@@ -273,7 +281,6 @@ func execute_batch{
 // @param asset_token_decimal_ - Number of decimals for the asset
 // @param request_ - An order request
 // @param quantity_remainging - Max quantity that can be executed for that order
-// @param execution_sizes_ - Array of the calculated execution sizes
 // @returns quantity_to_execute_final - Calculated quantity to execute
 func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_portion_executed_: felt,
@@ -287,7 +294,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     local quantity_to_execute_final;
 
     // Get min of remaining quantity and the order quantity
-    let (executable_quantity: felt) = Math64x61_sub(request_.quantity, order_portion_executed);
+    let (executable_quantity: felt) = Math64x61_sub(request_.quantity, order_portion_executed_);
     let (cmp_res) = Math64x61_is_le(quantity_remaining_, executable_quantity, asset_token_decimal_);
 
     // If yes, make the quantity_to_execute to be quantity_remaining
@@ -327,68 +334,17 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     return (quantity_to_execute_final,);
 }
 
-// @notice Internal function to recurse through maker orders and
-// calculate the size that must be executed for each
-// @param asset_token_decimal_ - Number of decimals for the asset
-// @param request_list_len_ - Length of the requests list
-// @param request_list_ - Request list of orders
-// @param execution_sizes_ - Array of the calculated execution sizes
-// @param taker_locked_quantity_ - Adjsut taker execution Size
-// @param quantity_executed_ - Quantity that has been locked so far on maker side
-// @param iterator_ - Iterator for the execution_sizes_ array
-func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_token_decimal_: felt,
-    request_list_len_: felt,
-    request_list_: MultipleOrder*,
-    execution_sizes_: felt*,
-    taker_locked_quantity_: felt,
-    quantity_executed_: felt,
-    iterator_: felt,
-) -> (maker_quantity_to_execute: felt) {
-    // Reached the end of maker orders
-    if (request_list_len_ == 1) {
-        return (quantity_executed_,);
-    }
-    // Find quantity left to be executed
-    let (quantity_remaining) = Math64x61_sub(taker_locked_quantity_, quantity_executed_);
-    // Find quantity that needs to be executed for the current order
-    let (quantity_to_execute) = get_quantity_to_execute(
-        asset_token_decimal_=asset_token_decimal_,
-        request_=[request_list_],
-        quantity_remaining_=quantity_remaining,
-    );
-
-    // Store it in the array
-    assert execution_sizes_[iterator_] = quantity_to_execute;
-
-    // New quantity executed
-    let (quantity_executed_new) = Math64x61_add(quantity_to_execute, quantity_executed_);
-    return get_maker_sizes(
-        asset_token_decimal_=asset_token_decimal_,
-        request_list_len_=request_list_len_ - 1,
-        request_list_=request_list_ + MultipleOrder.SIZE,
-        execution_sizes_=execution_sizes_,
-        taker_locked_quantity_=taker_locked_quantity_,
-        quantity_executed_=quantity_executed_new,
-        iterator_=iterator_ + 1,
-    );
-}
-
 // @notice Internal function to adjust and calculate the quantity locked and execution sizes
 // @param asset_token_decimal_ - Number of decimals for the asset
 // @param request_list_len_ - Length of the requests list
 // @param request_list_ - Request list of orders
 // @param quantity_locked_ - Original quantity lokcked of the batch
-// @param execution_sizes_ - Array of the calculated execution sizes
 func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_token_decimal_: felt,
-    request_: MultipleOrder,
-    quantity_locked_: felt,
-    execution_sizes_: felt*,
-) -> () {
+    asset_token_decimal_: felt, request_: MultipleOrder, quantity_locked_: felt
+) -> (taker_quantity_to_execute: felt) {
     // Get the portion executed of the order
     let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
-        contract_address=request_.user_address, order_id_=request_
+        contract_address=request_.user_address, order_id_=request_.order_id
     );
 
     // Get position details
@@ -407,7 +363,7 @@ func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         quantity_remaining_=quantity_locked_,
     );
 
-    return (taker_quantity_to_execute);
+    return (taker_quantity_to_execute,);
 }
 
 // @notice Internal function to check to check the slippage of a market order
@@ -438,18 +394,18 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
             execution_price_, upper_limit, collateral_token_decimal_
         );
         if (slippage_check == FALSE) {
-            return (TRUE);
+            return (TRUE,);
         }
     } else {
         let (slippage_check) = Math64x61_is_le(
-            lower_limit_, execution_price_, collateral_token_decimal_
+            lower_limit, execution_price_, collateral_token_decimal_
         );
         if (slippage_check == FALSE) {
-            return (TRUE);
+            return (TRUE,);
         }
     }
 
-    return (FALSE);
+    return (FALSE,);
 }
 
 // @notice Internal function to check if the execution_price of a limit order is valid (TAKER)
@@ -724,7 +680,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     );
 
     if (user_balance_check == FALSE) {
-        return (FALSE, user_available_balance, 0, 0, 0, 0);
+        return (FALSE, user_available_balance, 0, 0, 0, 0, 0);
     }
 
     if (is_le(fees, 0) == 0) {
@@ -1130,14 +1086,14 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param taker_execution_price - The price to be stored for the market price in execute_batch
 // @param open_interest_ - Open interest corresponding to the current order
 // @param oracle_price_ - Oracle price from the ZKXNode network
-// @param execution_sizes_ - Execution sizes array
 // @return res - returns the net sum of the orders do far
 // @return trader_stats_list_len - length of the trader fee list so far
 // @return open_interest - open interest corresponding to the trade batch
-func preprocess_order_execution_recurse{
+func process_and_execute_orders_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(
-    initial_taker_locked_: felt,
+    original_quantity_locked_: felt,
+    taker_locked_quantity_: felt,
     market_id_: felt,
     collateral_id_: felt,
     asset_token_decimal_: felt,
@@ -1162,7 +1118,6 @@ func preprocess_order_execution_recurse{
     taker_execution_price: felt,
     open_interest_: felt,
     oracle_price_: felt,
-    execution_sizes_: felt*,
 ) -> (taker_execution_price: felt, open_interest: felt) {
     alloc_locals;
 
@@ -1229,15 +1184,15 @@ func preprocess_order_execution_recurse{
     );
     if (size_check == FALSE) {
         assert error_message = '0505';
-        assert error_param_1 = order_id;
+        assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = quantity_order;
         jmp error_handling;
     }
 
     // Error Handling: Wrong market passed for the order
-    if ([request_list_].market_id != market_id) {
+    if ([request_list_].market_id != market_id_) {
         assert error_message = '0504';
-        assert error_param_1 = order_id;
+        assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = market_id_order;
         jmp error_handling;
     }
@@ -1248,7 +1203,7 @@ func preprocess_order_execution_recurse{
     );
     if (leverage_min_check == FALSE) {
         assert error_message = '0503';
-        assert error_param_1 = order_id;
+        assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = leverage;
         jmp error_handling;
     }
@@ -1259,32 +1214,40 @@ func preprocess_order_execution_recurse{
     );
     if (leverage_min_check == FALSE) {
         assert error_message = '0502';
-        assert error_param_1 = order_id;
+        assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = leverage;
         jmp error_handling;
     }
 
     // Get the portion executed of the order
     let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
-        contract_address=request_.user_address, order_id_=request_.order_id
+        contract_address=[request_list_].user_address, order_id_=[request_list_].order_id
     );
 
     // Get position details
     let (position_details: PositionDetails) = IAccountManager.get_position_data(
-        contract_address=request_.user_address,
-        market_id_=request_.market_id,
-        direction_=request_.direction,
+        contract_address=[request_list_].user_address,
+        market_id_=[request_list_].market_id,
+        direction_=[request_list_].direction,
     );
 
     // Get the locked margin details from the AccountManager
-    let (locked_margin) = get_locked_margin.get_locked_margin(
-        contract_address=request_.user_address, assetID_=collateral_id_
+    let (current_margin_locked) = IAccountManager.get_locked_margin(
+        contract_address=[request_list_].user_address, assetID_=collateral_id_
+    );
+
+    let (user_public_key, _) = IAccountManager.get_public_key(
+        contract_address=[request_list_].user_address
     );
 
     // Taker Order
     if (request_list_len_ == 1) {
         // Set the quantity to execute as the total quantity executed by the Maker so far
-        let (quantity_to_execute) = quantity_executed_;
+        assert quantity_to_execute = quantity_executed_;
+        let (is_zero_quantity) = Math64x61_is_equal(quantity_to_execute, 0, 6);
+        with_attr error_message("0524: {original_quantity_locked} {0}") {
+            assert is_zero_quantity = 0;
+        }
 
         // Direction Check
         let (is_error) = validate_taker(
@@ -1297,7 +1260,7 @@ func preprocess_order_execution_recurse{
 
         if (is_error == TRUE) {
             assert error_message = '0513';
-            assert error_param_1 = order_id;
+            assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = [request_list_].direction;
             jmp error_handling;
         }
@@ -1305,7 +1268,7 @@ func preprocess_order_execution_recurse{
         // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].post_only == TRUE) {
             assert error_message = '0515';
-            assert error_param_1 = order_id;
+            assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = current_index;
             jmp error_handling;
         }
@@ -1319,7 +1282,7 @@ func preprocess_order_execution_recurse{
             // Error Handling: A Taker order cannot be a post only order
             if (diff_check == FALSE) {
                 assert error_message = '0516';
-                assert error_param_1 = order_id;
+                assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = taker_quantity;
                 jmp error_handling;
             }
@@ -1327,7 +1290,7 @@ func preprocess_order_execution_recurse{
             // Error Handling: A Taker order cannot be a post only order
             if ([request_list_].order_type != LIMIT_ORDER) {
                 assert error_message = '0550';
-                assert error_param_1 = order_id;
+                assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = MARKET_ORDER;
                 jmp error_handling;
             }
@@ -1350,7 +1313,7 @@ func preprocess_order_execution_recurse{
             // Error Handling: Slippage of a market order cannot be 0
             if (slippage != 0) {
                 assert error_message = '0521';
-                assert error_param_1 = order_id;
+                assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = slippage;
                 jmp error_handling;
             }
@@ -1358,7 +1321,7 @@ func preprocess_order_execution_recurse{
             // Error Handling: A Taker order cannot be a post only order
             if (is_le(slippage, FIFTEEN_PERCENTAGE) == 1) {
                 assert error_message = '0521';
-                assert error_param_1 = order_id;
+                assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = slippage;
                 jmp error_handling;
             }
@@ -1372,6 +1335,9 @@ func preprocess_order_execution_recurse{
                 side_=[request_list_].side,
                 collateral_token_decimal_=collateral_token_decimal_,
             );
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         } else {
             let (is_error: felt, error_message: felt) = check_limit_price(
                 order_id_=order_id,
@@ -1384,10 +1350,14 @@ func preprocess_order_execution_recurse{
 
             if (is_error == TRUE) {
                 assert error_message = error_message;
-                assert error_param_1 = order_id;
+                assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = execution_price;
                 jmp error_handling;
             }
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
 
         // Reset the variable
@@ -1443,7 +1413,7 @@ func preprocess_order_execution_recurse{
 
         if (is_error == TRUE) {
             assert error_message = '0512';
-            assert error_param_1 = order_id;
+            assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = [request_list_].direction;
             jmp error_handling;
         }
@@ -1451,7 +1421,7 @@ func preprocess_order_execution_recurse{
         // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].order_type != LIMIT_ORDER) {
             assert error_message = '0518';
-            assert error_param_1 = order_id;
+            assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = current_index;
             jmp error_handling;
         }
@@ -1483,19 +1453,15 @@ func preprocess_order_execution_recurse{
             // Call the account contract to initialize the order
             IAccountManager.execute_order(
                 contract_address=user_address,
-                request=temp_order_request,
-                signature=temp_signature,
-                size=0,
-                average_execution_price=0,
-                execution_price=[request_list_].price,
-                margin_amount=0,
-                borrowed_amount=0,
-                market_id=market_id_,
+                market_id_=market_id_,
                 collateral_id_=collateral_id_,
-                pnl=0,
-                opening_fee=0,
-                side=MAKER,
-                margin_lock_update_amount=0,
+                execution_details_=execution_details,
+                updated_position_details_=updated_position_details,
+                updated_liquidatable_position_=updated_liquidatable_position,
+                updated_margin_locked_=updated_margin_locked,
+                updated_portion_executed_=updated_portion_executed,
+                market_array_update_=market_array_update,
+                is_liquidation_=is_liquidation,
             );
 
             let element: TraderStats = TraderStats(
@@ -1509,7 +1475,9 @@ func preprocess_order_execution_recurse{
 
             assert [trader_stats_list_] = element;
 
-            return check_and_execute(
+            return process_and_execute_orders_recurse(
+                original_quantity_locked_=original_quantity_locked_,
+                taker_locked_quantity_=taker_locked_quantity_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
                 asset_token_decimal_=asset_token_decimal_,
@@ -1534,13 +1502,12 @@ func preprocess_order_execution_recurse{
                 taker_execution_price=0,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                execution_sizes_=execution_sizes_ + 1,
             );
         }
 
         // Add the executed quantity to the running sum of quantity executed
         let (current_quantity_executed_felt: felt) = Math64x61_add(
-            quantity_executed_, [execution_sizes_]
+            quantity_executed_, quantity_to_execute
         );
         // Write to local variable
         assert current_quantity_executed = current_quantity_executed_felt;
@@ -1549,7 +1516,7 @@ func preprocess_order_execution_recurse{
         assert execution_price = [request_list_].price;
 
         // Add to the weighted sum of the execution prices
-        let (new_order_volume) = Math64x61_mul([request_list_].price, [execution_sizes_]);
+        let (new_order_volume) = Math64x61_mul([request_list_].price, quantity_to_execute);
         let (new_total_order_volume_) = Math64x61_add(new_order_volume, total_order_volume_);
         // Write to local variable
         assert new_total_order_volume = new_total_order_volume_;
@@ -1568,6 +1535,7 @@ func preprocess_order_execution_recurse{
     local updated_margin_locked;
     local updated_liquidatable_position;
     local updated_portion_executed;
+    local current_portion_executed;
     local is_liquidation;
 
     // If the order is to be opened
@@ -1598,7 +1566,7 @@ func preprocess_order_execution_recurse{
 
         if (is_balance_error == TRUE) {
             assert error_message = '0501';
-            assert error_param_1 = order_id;
+            assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = user_available_balance;
             jmp error_handling;
         }
@@ -1608,23 +1576,25 @@ func preprocess_order_execution_recurse{
 
         // Round off the average execution price of the position
         let (average_execution_price_rounded) = Math64x61_round(
-            average_execution_price, collateral_decimals
+            average_execution_price, collateral_token_decimal_
         );
 
         // Check if the current position size is 0
         let (is_zero_current_position) = Math64x61_is_equal(
-            position_details.position_size, 0, asset_decimals
+            position_details.position_size, 0, asset_token_decimal_
         );
 
         // If the current_position's size is 0
         if (is_zero_current_position == TRUE) {
             // Get the opposite position and check if the size of it is 0 as well
-            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
-            let (opposite_position: PositionDetails) = get_position_data.read(
-                contract_address=user_address, market_id_=market_id, direction_=opposite_direction
+            let (opposite_direction: felt) = get_opposite(
+                side_or_direction_=[request_list_].direction
+            );
+            let (opposite_position: PositionDetails) = IAccountManager.get_position_data(
+                contract_address=user_address, market_id_=market_id_, direction_=opposite_direction
             );
             let (is_zero_opposite_position) = Math64x61_is_equal(
-                opposite_position.position_size, 0, asset_decimals
+                opposite_position.position_size, 0, asset_token_decimal_
             );
 
             // If the size is 0, we mark market_array_update needing add_to_market_array
@@ -1645,11 +1615,15 @@ func preprocess_order_execution_recurse{
         );
         let (total_value) = Math64x61_add(margin_amount_temp, borrowed_amount_temp);
         let (new_leverage) = Math64x61_div(total_value, margin_amount_temp);
-        let (new_leverage_rounded) = Math64x61_round(new_leverage, 5);
+        let (new_leverage_rounded) = Math64x61_round(new_leverage, 6);
         let (new_pnl) = Math64x61_add(position_details.realized_pnl, trading_fee);
-        let (new_pnl_rounded) = Math64x61_round(new_pnl, collateral_decimals);
-        let (margin_amount_rounded) = Math64x61_round(margin_amount_temp, collateral_decimals);
-        let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount_temp, collateral_decimals);
+        let (new_pnl_rounded) = Math64x61_round(new_pnl, collateral_token_decimal_);
+        let (margin_amount_rounded) = Math64x61_round(
+            margin_amount_temp, collateral_token_decimal_
+        );
+        let (borrowed_amount_rounded) = Math64x61_round(
+            borrowed_amount_temp, collateral_token_decimal_
+        );
 
         // Create a new struct with the updated details
         assert updated_position_details = PositionDetails(
@@ -1665,10 +1639,10 @@ func preprocess_order_execution_recurse{
         let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_update_amount);
         assert updated_margin_locked = new_margin_locked;
 
-        let (new_portion_executed) = Math64x61_add(portion_executed, quantity_to_execute);
+        let (new_portion_executed) = Math64x61_add(order_portion_executed, quantity_to_execute);
 
         let (is_final) = Math64x61_is_equal(
-            new_position_executed, request.quantity, asset_decimals
+            order_portion_executed, [request_list_].quantity, asset_token_decimal_
         );
 
         assert execution_details = ExecutionDetails(
@@ -1694,7 +1668,7 @@ func preprocess_order_execution_recurse{
         assert opening_fee = trading_fee;
         assert current_open_interest = quantity_to_execute;
         assert margin_lock_update_amount = margin_lock_amount;
-        assert updated_portion_executed = new_portion_executed;
+        assert current_portion_executed = new_portion_executed;
         assert is_liquidation = FALSE;
 
         tempvar syscall_ptr = syscall_ptr;
@@ -1724,21 +1698,22 @@ func preprocess_order_execution_recurse{
         // Calculate the new leverage if it's a deleveraging order
         local new_leverage;
 
-        let (new_position_size) = Math64x61_sub(position_details.position_size, size);
+        let (new_position_size) = Math64x61_sub(
+            position_details.position_size, quantity_to_execute
+        );
 
         // Check if it's liq/delveraging order
         let is_liq = is_le(LIQUIDATION_ORDER, [request_list_].order_type);
 
         if (is_liq == TRUE) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
-            let liq_position: LiquidatablePosition = get_deleveragable_or_liquidatable_position(
-                contract_address=user_address, collateral_id_=collateral_id_
-            );
+            let liq_position: LiquidatablePosition = IAccountManager.get_deleveragable_or_liquidatable_position(
+                contract_address=user_address, collateral_id_=collateral_id_);
 
             // Error Handling: Wrong market for liquidation
             if (liq_position.market_id != market_id_) {
                 assert error_message = '0531';
-                assert error_param_1 = order_id;
+                assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = market_id_;
                 jmp error_handling;
             }
@@ -1746,18 +1721,18 @@ func preprocess_order_execution_recurse{
             // Error Handling: Wrong direction for liquidation
             if (liq_position.direction != [request_list_].direction) {
                 assert error_message = '0532';
-                assert error_param_1 = order_id;
+                assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = [request_list_].direction;
                 jmp error_handling;
             }
 
             // Error Handling: Size larger than marked one
             let (liquidatable_size_check) = Math64x61_is_le(
-                quantity_to_execute, liq_position.amount_to_be_sold, asset_decimals
+                quantity_to_execute, liq_position.amount_to_be_sold, asset_token_decimal_
             );
             if (liquidatable_size_check == FALSE) {
                 assert error_message = '0533';
-                assert error_param_1 = order_id;
+                assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = quantity_to_execute;
                 jmp error_handling;
             }
@@ -1786,14 +1761,14 @@ func preprocess_order_execution_recurse{
                 // Error Handling: Position not marked as 'deleveragable'
                 if (liq_position.liquidatable == TRUE) {
                     assert error_message = '0534';
-                    assert error_param_1 = order_id;
-                    assert error_param_2 = size;
+                    assert error_param_1 = [request_list_].order_id;
+                    assert error_param_2 = quantity_to_execute;
                     jmp error_handling;
                 }
 
                 let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
                 let (leverage_) = Math64x61_div(total_value, margin_amount);
-                let (leverage_rounded) = Math64x61_round(leverage_, 5);
+                let (leverage_rounded) = Math64x61_round(leverage_, 6);
                 assert new_leverage = leverage_rounded;
                 assert updated_margin_locked = current_margin_locked;
 
@@ -1804,8 +1779,8 @@ func preprocess_order_execution_recurse{
                 // Error Handling: Position not marked as 'liquidatable'
                 if (liq_position.liquidatable == FALSE) {
                     assert error_message = '0535';
-                    assert error_param_1 = order_id;
-                    assert error_param_2 = size;
+                    assert error_param_1 = [request_list_].order_id;
+                    assert error_param_2 = quantity_to_execute;
                     jmp error_handling;
                 }
 
@@ -1831,14 +1806,20 @@ func preprocess_order_execution_recurse{
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
 
-        let (is_zero_current_position) = Math64x61_is_equal(new_position_size, 0, asset_decimals);
+        let (is_zero_current_position) = Math64x61_is_equal(
+            new_position_size, 0, asset_token_decimal_
+        );
         if (is_zero_current_position == TRUE) {
-            let (opposite_direction: felt) = get_opposite(side_or_direction_=request.direction);
-            let (opposite_position: PositionDetails) = position_mapping.read(
-                market_id=market_id, direction=opposite_direction
+            let (opposite_direction: felt) = get_opposite(
+                side_or_direction_=[request_list_].direction
+            );
+            let (opposite_position: PositionDetails) = IAccountManager.get_position_data(
+                contract_address=[request_list_].user_address,
+                market_id=market_id_,
+                direction=opposite_direction,
             );
             let (is_zero_opposite_position) = Math64x61_is_equal(
-                opposite_position.position_size, 0, asset_decimals
+                opposite_position.position_size, 0, asset_token_decimal_
             );
 
             if (is_zero_opposite_position == 1) {
@@ -1869,9 +1850,11 @@ func preprocess_order_execution_recurse{
             tempvar range_check_ptr = range_check_ptr;
         } else {
             let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, pnl);
-            let (margin_amount_rounded) = Math64x61_round(margin_amount_temp, collateral_decimals);
+            let (margin_amount_rounded) = Math64x61_round(
+                margin_amount_temp, collateral_token_decimal_
+            );
             let (borrowed_amount_rounded) = Math64x61_round(
-                borrowed_amount_temp, collateral_decimals
+                borrowed_amount_temp, collateral_token_decimal_
             );
 
             // Create a new struct with the updated details
@@ -1891,7 +1874,7 @@ func preprocess_order_execution_recurse{
             tempvar range_check_ptr = range_check_ptr;
         }
 
-        let () = Math64x61_add(portion_executed, quantity_to_execute);
+        let (new_portion_executed) = Math64x61_add(order_portion_executed, quantity_to_execute);
 
         assert execution_details = ExecutionDetails(
             order_id=order_id,
@@ -1933,14 +1916,14 @@ func preprocess_order_execution_recurse{
 
     // Code brought in from AccountManager
     // hash the parameters
-    let (hash) = hash_order(&request);
+    let (hash) = hash_order(&[request_list_]);
 
     // Check for hash collision
-    let (hash_error) = order_hash_check(order_id_=request.order_id, order_hash=hash);
+    let (hash_error) = order_hash_check(order_id_=[request_list_].order_id, order_hash=hash);
 
     if (hash_error == TRUE) {
         assert error_message = '0536';
-        assert error_param_1 = order_id;
+        assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = hash;
         jmp error_handling;
     }
@@ -1954,13 +1937,13 @@ func preprocess_order_execution_recurse{
     is_valid_signature_order(
         hash=hash,
         signature=user_signature,
-        liquidator_address_=request.liquidator_address,
+        liquidator_address_=[request_list_].liquidator_address,
         user_public_key_=user_public_key,
     );
 
-    if (request.time_in_force == IoC) {
+    if ([request_list_].time_in_force == IoC) {
         // Update the portion executed to request.quantity if it's an IoC order
-        updated_portion_executed = request.quantity;
+        updated_portion_executed = [request_list_].quantity;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     } else {
         // Update the portion executed
@@ -1984,7 +1967,9 @@ func preprocess_order_execution_recurse{
 
     let (new_open_interest) = Math64x61_add(open_interest_, current_open_interest);
 
-    return check_and_execute(
+    return process_and_execute_orders_recurse(
+        original_quantity_locked_=original_quantity_locked_,
+        taker_locked_quantity_=taker_locked_quantity_,
         market_id_=market_id_,
         collateral_id_=collateral_id_,
         asset_token_decimal_=asset_token_decimal_,
@@ -2009,7 +1994,6 @@ func preprocess_order_execution_recurse{
         taker_execution_price=execution_price,
         open_interest_=new_open_interest,
         oracle_price_=oracle_price_,
-        execution_sizes_=execution_sizes_ + 1,
     );
 
     error_handling:
@@ -2023,7 +2007,9 @@ func preprocess_order_execution_recurse{
 
     emit_event(1, keys, 3, data);
 
-    return check_and_execute(
+    return process_and_execute_orders_recurse(
+        original_quantity_locked_=original_quantity_locked_,
+        taker_locked_quantity_=taker_locked_quantity_,
         market_id_=market_id_,
         collateral_id_=collateral_id_,
         asset_token_decimal_=asset_token_decimal_,
@@ -2178,4 +2164,18 @@ func is_valid_signature_order{
 
     verify_ecdsa_signature(message=hash, public_key=pub_key, signature_r=sig_r, signature_s=sig_s);
     return ();
+}
+
+// @notice Internal function to hash the order parameters
+// @param orderRequest - Struct of order request to hash
+// @param res - Hash of the details
+func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res: felt) {
+    let hash_ptr = pedersen_ptr;
+    with hash_ptr {
+        let (hash_state_ptr) = hash_init();
+        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 11);
+        let (res) = hash_finalize(hash_state_ptr);
+        let pedersen_ptr = hash_ptr;
+        return (res=res);
+    }
 }
