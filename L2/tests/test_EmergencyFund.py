@@ -94,7 +94,7 @@ async def test_fund_holding_unauthorized(emergencyFund_factory):
 async def test_defund_holding_more_than_balance(emergencyFund_factory):
     emergencyFund, holding, admin1, admin2, insurance, liquidity = emergencyFund_factory
 
-    await assert_revert(signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 10]), reverted_with=f"0703: 1414745153 7")
+    await assert_revert(signer1.send_transaction(admin1, emergencyFund.contract_address, 'defund_holding', [str_to_felt("TSLA"), 10]), reverted_with=f"703: 1414745153 7")
 
 @pytest.mark.asyncio
 async def test_fund_holding_more_than_balance(emergencyFund_factory):
