@@ -511,20 +511,6 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
     # compare margin info
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_2)
 
-    ###################################################
-    ######## Alice's liquidation result USDC 6 ########
-    ###################################################
-    # will return (1, (0,0,0,0,0,0)) as a position has already been set as liquidatable
-    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=alice, user_test=alice_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_2)
-    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-    await compare_liquidatable_position(user=alice, user_test=alice_test, collateral_id=collateral_id_1)
-
-    is_liquidatable = await alice.get_deleveragable_or_liquidatable_position(AssetID.USDC).call()
-    print("alice liq position", is_liquidatable.result.position)
-
-    # compare margin info
-    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_2)
-
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
@@ -1364,13 +1350,3 @@ async def test_shouldnt_liquidate_multiple_leverage_1(adminAuth_factory):
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
 
     await compare_margin_info(user=daniel, user_test=daniel_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_9)
-
-    ###################################################
-    ####### Eduard's liquidation result USDC ##########
-    ###################################################
-    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=eduard, user_test=eduard_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_8)
-
-    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
-    await compare_liquidatable_position(user=eduard, user_test=eduard_test, collateral_id=collateral_id_1)
-
-    await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_9)

@@ -2156,6 +2156,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     if (liq_position_.market_id == curr_market_id) {
         if (liq_position_.direction == LONG) {
+            assert deleveragable_or_liquidatable_short = 0;
+            assert amount_to_be_sold_short = 0;
             if (liq_position_.liquidatable == TRUE) {
                 assert deleveragable_or_liquidatable_long = 2;
                 assert amount_to_be_sold_long = liq_position_.amount_to_be_sold;
@@ -2169,6 +2171,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
                 }
             }
         } else {
+            assert deleveragable_or_liquidatable_long = 0;
+            assert amount_to_be_sold_long = 0;
             if (liq_position_.liquidatable == TRUE) {
                 assert deleveragable_or_liquidatable_short = 2;
                 assert amount_to_be_sold_short = liq_position_.amount_to_be_sold;

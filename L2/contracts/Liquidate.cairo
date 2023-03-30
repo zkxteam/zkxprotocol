@@ -128,7 +128,9 @@ func mark_under_collateralized_position{
     );
 
     if (liquidatable_position.amount_to_be_sold != 0) {
-        return (TRUE, PositionDetailsForRiskManagement(0, 0, 0, 0, 0, 0, 0), 0, 0);
+        with_attr error_message("1102: {account_address_} {collateral_id_}") {
+            assert 0 = 1;
+        }
     }
 
     let (
