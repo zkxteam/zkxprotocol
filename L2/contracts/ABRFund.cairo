@@ -3,7 +3,7 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_block_timestamp
 
-from contracts.Constants import ABR_PAYMENT_INDEX
+from contracts.Constants import ABR_FUNDS_INDEX, ABR_PAYMENT_INDEX
 from contracts.libraries.FundLibrary import balance, FundLib
 
 // /////////
@@ -56,7 +56,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, amount_: felt
 ) {
-    FundLib.fund_abr_or_emergency(market_id_, amount_);
+    FundLib.fund_abr_or_emergency(market_id_, amount_, ABR_FUNDS_INDEX);
     fund_ABR_called.emit(market_id=market_id_, amount=amount_);
 
     return ();
@@ -69,7 +69,7 @@ func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 func defund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market_id_: felt, amount_: felt
 ) {
-    FundLib.defund_abr_or_emergency(market_id_, amount_);
+    FundLib.defund_abr_or_emergency(market_id_, amount_, ABR_FUNDS_INDEX);
     defund_ABR_called.emit(market_id=market_id_, amount=amount_);
 
     return ();

@@ -4,6 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math import assert_le, assert_lt
 
 from contracts.Constants import (
+    EmergencyFund_INDEX,
     Holding_INDEX,
     InsuranceFund_INDEX,
     LiquidityFund_INDEX,
@@ -87,7 +88,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
-    FundLib.fund_abr_or_emergency(asset_id_, amount_);
+    FundLib.fund_abr_or_emergency(asset_id_, amount_, EmergencyFund_INDEX);
     fund_Emergency_called.emit(asset_id=asset_id_, amount=amount_);
 
     return ();
@@ -100,7 +101,7 @@ func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 func defund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
-    FundLib.defund_abr_or_emergency(asset_id_, amount_);
+    FundLib.defund_abr_or_emergency(asset_id_, amount_, EmergencyFund_INDEX);
     defund_Emergency_called.emit(asset_id=asset_id_, amount=amount_);
 
     return ();
