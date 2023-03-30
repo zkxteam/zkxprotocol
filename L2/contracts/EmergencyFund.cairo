@@ -114,6 +114,7 @@ func defund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 func fund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
+    alloc_locals;
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
 
@@ -121,7 +122,7 @@ func fund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("EmergencyFund: Amount must be > 0") {
+    with_attr error_message("0801: {asset_id_} {amount_}") {
         assert_lt(0, amount_);
     }
 
@@ -130,8 +131,8 @@ func fund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         contract_address=registry, index=Holding_INDEX, version=version
     );
 
-    let current_amount: felt = FundLib.balance(asset_id_);
-    with_attr error_message("EmergencyFund: Insufficient balance") {
+    let (local current_amount: felt) = FundLib.balance(asset_id_);
+    with_attr error_message("0802: {asset_id_} {current_amount}") {
         assert_le(amount_, current_amount);
     }
     let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -151,6 +152,7 @@ func fund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 func fund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
+    alloc_locals;
     // Verify auth
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
@@ -159,7 +161,7 @@ func fund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("EmergencyFund: Amount must > 0") {
+    with_attr error_message("0803: {asset_id_} {amount_}") {
         assert_lt(0, amount_);
     }
 
@@ -168,8 +170,8 @@ func fund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         contract_address=registry, index=LiquidityFund_INDEX, version=version
     );
 
-    let current_amount: felt = FundLib.balance(asset_id_);
-    with_attr error_message("EmergencyFund: Insufficient funds") {
+    let (local current_amount: felt) = FundLib.balance(asset_id_);
+    with_attr error_message("0804: {asset_id_} {current_amount}") {
         assert_le(amount_, current_amount);
     }
     let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -189,6 +191,7 @@ func fund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 func fund_insurance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
+    alloc_locals;
     // Verify auth
     let (registry) = FundLib.get_registry_address();
     let (version) = FundLib.get_contract_version();
@@ -197,7 +200,7 @@ func fund_insurance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("EmergencyFund: Amount must be > 0") {
+    with_attr error_message("0805: {asset_id_} {amount_}") {
         assert_lt(0, amount_);
     }
 
@@ -206,8 +209,8 @@ func fund_insurance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         contract_address=registry, index=InsuranceFund_INDEX, version=version
     );
 
-    let current_amount: felt = FundLib.balance(asset_id_);
-    with_attr error_message("EmergencyFund: Insufficient funds") {
+    let (local current_amount: felt) = FundLib.balance(asset_id_);
+    with_attr error_message("0806: {asset_id_} {current_amount}") {
         assert_le(amount_, current_amount);
     }
     let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -235,7 +238,7 @@ func defund_holding{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("EmergencyFund: Amount must be > 0") {
+    with_attr error_message("0807: {asset_id_} {amount_}") {
         assert_lt(0, amount_);
     }
 
@@ -269,7 +272,7 @@ func defund_liquidity{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("EmergencyFund: Amount must be > 0") {
+    with_attr error_message("0808: {asset_id_} {amount_}") {
         assert_lt(0, amount_);
     }
 
@@ -303,7 +306,7 @@ func defund_insurance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
         verify_caller_authority(registry, version, ManageFunds_ACTION);
     }
 
-    with_attr error_message("EmergencyFund: Amount must > 0") {
+    with_attr error_message("0809: {asset_id_} {amount_}") {
         assert_lt(0, amount_);
     }
 

@@ -84,5 +84,5 @@ async def test_defund_more_than_available(holding_factory):
 
     await assert_revert(signer1.send_transaction(
         admin1, insurance.contract_address, 'defund', [str_to_felt("USDC"), 200]),
-        reverted_with="FundLib: Insufficient balance"    
+        reverted_with=f"1003: 1431520323 0"    
     )

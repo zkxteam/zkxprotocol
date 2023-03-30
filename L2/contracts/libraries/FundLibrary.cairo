@@ -135,6 +135,7 @@ namespace FundLib {
     func defund_contract{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         asset_id_: felt, amount_: felt, index_: felt
     ) {
+        alloc_locals;
         // Auth Check
         let (caller) = get_caller_address();
         let (registry) = FundLib_registry_address.read();
@@ -151,7 +152,7 @@ namespace FundLib {
             assert_lt(0, amount_);
         }
 
-        let current_amount: felt = FundLib_balance_by_id.read(id=asset_id_);
+        let (local current_amount: felt) = FundLib_balance_by_id.read(id=asset_id_);
         with_attr error_message("{index_}03: {asset_id_} {current_amount}") {
             assert_le(amount_, current_amount);
         }
@@ -212,6 +213,7 @@ namespace FundLib {
     func withdraw_from_contract{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         id_: felt, amount_: felt, index_: felt
     ) {
+        alloc_locals;
         // Auth Check
         let (caller) = get_caller_address();
         let (registry) = FundLib_registry_address.read();
@@ -228,7 +230,7 @@ namespace FundLib {
             assert_lt(0, amount_);
         }
 
-        let current_amount: felt = FundLib_balance_by_id.read(id=id_);
+        let (local current_amount: felt) = FundLib_balance_by_id.read(id=id_);
         with_attr error_message("{index_}06: {id_} {current_amount}") {
             assert_le(amount_, current_amount);
         }
@@ -271,6 +273,7 @@ namespace FundLib {
     func defund_abr_or_emergency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         id_: felt, amount_: felt, index_: felt
     ) {
+        alloc_locals;
         with_attr error_message("FundLib: Unauthorized call to manage funds") {
             let (registry) = FundLib_registry_address.read();
             let (version) = FundLib_contract_version.read();
@@ -281,7 +284,7 @@ namespace FundLib {
             assert_lt(0, amount_);
         }
 
-        let current_amount: felt = FundLib_balance_by_id.read(id=id_);
+        let (local current_amount: felt) = FundLib_balance_by_id.read(id=id_);
         with_attr error_message("{index_}09: {id_} {current_amount}") {
             assert_le(amount_, current_amount);
         }
