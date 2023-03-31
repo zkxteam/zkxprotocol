@@ -1258,21 +1258,21 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert execution_price = new_execution_price;
 
         // Price check
-        if ([request_list_].order_type == MARKET_ORDER) {
-            check_within_slippage(
+        if ([request_list_].order_type == LIMIT_ORDER) {
+            check_limit_price(
                 order_id_=order_id,
-                slippage_=[request_list_].slippage,
-                oracle_price_=oracle_price_,
-                execution_price_=execution_price,
+                price_=[request_list_].price,
+                execution_price_=new_execution_price,
                 direction_=[request_list_].direction,
                 side_=[request_list_].side,
                 collateral_token_decimal_=collateral_token_decimal_,
             );
         } else {
-            check_limit_price(
+            check_within_slippage(
                 order_id_=order_id,
-                price_=[request_list_].price,
-                execution_price_=new_execution_price,
+                slippage_=[request_list_].slippage,
+                oracle_price_=oracle_price_,
+                execution_price_=execution_price,
                 direction_=[request_list_].direction,
                 side_=[request_list_].side,
                 collateral_token_decimal_=collateral_token_decimal_,
