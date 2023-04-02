@@ -75,7 +75,6 @@ class ContractType(Enum):
     TestMath64x61 = "tests/testable/TestMath64x61.cairo"
 
 
-
 class OptimizedStarknetState(StarknetState):
 
     def copy(self) -> "OptimizedStarknetState":

@@ -5,7 +5,7 @@ import string
 import calculate_abr
 from math import isclose
 from utils_asset import AssetID
-from utils import Signer, str_to_felt, assert_revert, hash_order, from64x61, to64x61
+from utils import Signer, str_to_felt, assert_revert, hash_order, from64x61, to64x61, PRIME
 from typing import List, Dict, Tuple
 from calculate_abr import calculate_abr
 from starkware.starknet.testing.contract import StarknetContract
@@ -1004,8 +1004,8 @@ class OrderExecutor:
     def __adjust_quantity_locked(self, request_list: List[Dict], users_list: List[User], quantity_locked: float) -> Tuple[List[float]]:
         taker_quantity_to_execute = self.__get_quantity_to_execute(
             request=request_list[-1:][0], user=users_list[-1:][0], quantity_remaining=quantity_locked, side=order_side["taker"])
-        print("taker_quantity_to_execute",
-              taker_quantity_to_execute, quantity_locked)
+        print("\n\ntaker_quantity_to_execute",
+              taker_quantity_to_execute, quantity_locked, "\n")
         maker_execution_sizes = []
         quantity_executed = 0
         for i in range(len(request_list) - 1):
@@ -1015,6 +1015,7 @@ class OrderExecutor:
 
             quantity_executed += quantity_to_execute
         maker_execution_sizes.append(quantity_executed)
+        print("\n\n MAker execution sizes", maker_execution_sizes)
 
         return (maker_execution_sizes)
 
@@ -1719,8 +1720,8 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
             actual_error_message = error_message
         execution_info = await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
     else:
-        execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
         executor.execute_batch(*execute_batch_params_python)
+        execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
     return (batch_id, complete_orders_python, execution_info)
 
 
@@ -2214,3 +2215,5 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 #     1000,
 #     100
 # )
+
+print(340282366920938463463374607431768211456 < PRIME/2)

@@ -16,8 +16,9 @@ signer1 = Signer(123456789987654321)
 signer2 = Signer(123456789987654322)
 signer3 = Signer(12345)
 signer4 = Signer(56789)
-class_hash=0
-collateral_id=7788
+class_hash = 0
+collateral_id = 7788
+
 
 @pytest.fixture(scope='module')
 def event_loop():
@@ -35,14 +36,25 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     # a contract definition has to be declared before we can use class hash
     # can declare directly using state for tests
-    contract_class = starknet_service.contracts_holder.get_contract_class(ContractType.AccountManager)
+    contract_class = starknet_service.contracts_holder.get_contract_class(
+        ContractType.AccountManager)
     global class_hash
-    #class_hash = await signer1.send_declare_transaction(admin1, contract_class, starknet_service.starknet.state)
+    # class_hash = await signer1.send_declare_transaction(admin1, contract_class, starknet_service.starknet.state)
     class_hash, _ = await starknet_service.starknet.state.declare(contract_class)
     direct_class_hash = compute_class_hash(contract_class)
-    class_hash = int.from_bytes(class_hash,'big')
+    class_hash = int.from_bytes(class_hash, 'big')
     assert direct_class_hash == class_hash
-    
+
+    contract_class = starknet_service.contracts_holder.get_contract_class(
+        ContractType.Account)
+    global new_ch
+    # class_hash = await signer1.send_declare_transaction(admin1, contract_class, starknet_service.starknet.state)
+    new_ch, _ = await starknet_service.starknet.state.declare(contract_class)
+    direct_class_hash = compute_class_hash(contract_class)
+    new_ch = int.from_bytes(new_ch, 'big')
+    print("Account class hash is", new_ch)
+    # assert direct_class_hash == class_hash
+
     # Deploy contracts
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [
         admin1.contract_address,
@@ -53,16 +65,17 @@ async def adminAuth_factory(starknet_service: StarknetService):
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
     account_deployer = await starknet_service.deploy(ContractType.AccountDeployer, [registry.contract_address, 1])
 
-    #await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
+    # await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 2, 1])
     await signer1.send_transaction(admin1, adminAuth.contract_address, 'update_admin_mapping', [admin1.contract_address, 3, 1])
-    await signer1.send_transaction(admin1, 
-    registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
+    await signer1.send_transaction(admin1,
+                                   registry.contract_address, 'update_contract_registry', [14, 1, account_registry.contract_address])
 
     await signer1.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [12, 1, L1_ZKX_dummy_address])
-    await signer1.send_transaction(admin1, 
-    registry.contract_address, 'update_contract_registry', [20, 1, account_deployer.contract_address])
+    await signer1.send_transaction(admin1,
+                                   registry.contract_address, 'update_contract_registry', [20, 1, account_deployer.contract_address])
 
     return adminAuth, registry, account_registry, admin1, admin2, user4, account_deployer
+
 
 @pytest.mark.asyncio
 async def test_deploy_account_contract_with_zero_hash(adminAuth_factory):
@@ -72,6 +85,7 @@ async def test_deploy_account_contract_with_zero_hash(adminAuth_factory):
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
     await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456, collateral_id]), reverted_with="AccountDeployer: Class hash cannot be 0")
 
+
 @pytest.mark.asyncio
 async def test_deploy_account_contract(adminAuth_factory):
     adminAuth, auth_registry, account_registry, admin1, admin2, user4, account_deployer = adminAuth_factory
@@ -80,58 +94,59 @@ async def test_deploy_account_contract(adminAuth_factory):
     # this call should revert since class_hash is not yet set and deploy cannot happen with class_hash as 0
     await assert_revert(signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456, collateral_id]), reverted_with="AccountDeployer: Class hash cannot be 0")
 
-    #print(pubkey)
-    tx_exec_info=await signer1.send_transaction(admin1, 
-                                   account_deployer.contract_address,
-                                   'set_account_class_hash',
-                                   [class_hash])
-   
+    # print(pubkey)
+    tx_exec_info = await signer1.send_transaction(admin1,
+                                                  account_deployer.contract_address,
+                                                  'set_account_class_hash',
+                                                  [class_hash])
+
     assert_event_emitted(
         tx_exec_info,
-        from_address = account_deployer.contract_address,
-        name = 'class_hash_changed',
-        data = [
+        from_address=account_deployer.contract_address,
+        name='class_hash_changed',
+        data=[
             class_hash
         ]
     )
-    tx_exec_info=await signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456, collateral_id])
+    tx_exec_info = await signer1.send_transaction(admin1, account_deployer.contract_address, 'deploy_account', [pubkey, 123456, collateral_id])
 
     # get address of deployed contract
     deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, 123456).call()
-    #print(deployed_address.result)
-   
-    deployed_address=deployed_address.result.address
+    # print(deployed_address.result)
+
+    deployed_address = deployed_address.result.address
 
     assert_event_emitted(
         tx_exec_info,
-        from_address = account_deployer.contract_address,
-        name = 'account_deployed',
-        data =[
+        from_address=account_deployer.contract_address,
+        name='account_deployed',
+        data=[
             pubkey,
             123456,
             deployed_address
         ]
     )
-    
+
     result = await account_registry.is_registered_user(deployed_address).call()
 
     # check whether newly deployed contract address is present in the account registry
     assert result.result.present == 1
 
-    abi = get_contract_class(source="tests/testable/TestAccountManager.cairo").abi
+    abi = get_contract_class(
+        source="tests/testable/TestAccountManager.cairo").abi
 
     new_account_contract = StarknetContract(state=account_registry.state,
-                                            abi=abi, 
+                                            abi=abi,
                                             contract_address=deployed_address,
                                             deploy_call_info=None)
-    
+
     balance = await new_account_contract.get_balance(collateral_id).call()
     assert balance.result.res == 23058430092136939520000
 
     # check that the account manager contract is deployed with the public key used in the deploy call
     result = await new_account_contract.get_public_key().call()
 
-    #print(result)
+    # print(result)
 
     assert result.result.pub_key == pubkey
 
@@ -143,9 +158,10 @@ async def test_deploy_account_contract(adminAuth_factory):
 
     array_length = await account_registry.get_registry_len().call()
     fetched_account_registry = await account_registry.get_account_registry(0, array_length.result.len).call()
-    
+
     assert fetched_account_registry.result.account_registry[0] == deployed_address
-   
+
+
 @pytest.mark.asyncio
 async def test_unauthorized_changes_to_config(adminAuth_factory):
     adminAuth, auth_registry, account_registry, admin1, admin2, user4, account_deployer = adminAuth_factory
@@ -155,7 +171,7 @@ async def test_unauthorized_changes_to_config(adminAuth_factory):
 
     await assert_revert(signer4.send_transaction(
         user4, account_deployer.contract_address, 'set_contract_version', [123456]), reverted_with="Caller Check: Unauthorized caller")
-    
+
     result = await account_deployer.get_account_class_hash().call()
     assert result.result.class_hash == class_hash
 
@@ -164,21 +180,22 @@ async def test_unauthorized_changes_to_config(adminAuth_factory):
     assert result.result.registry_address == auth_registry.contract_address
 
 
-
 @pytest.mark.asyncio
 async def test_check_unknown_pubkey_L1_address(adminAuth_factory):
     adminAuth, auth_registry, account_registry, admin1, admin2, user4, account_deployer = adminAuth_factory
 
     pubkey = signer3.public_key
-    deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, 456).call() #456 is not a known L1 address
-    #print(deployed_address.result)
-    deployed_address=deployed_address.result.address
+    # 456 is not a known L1 address
+    deployed_address = await account_deployer.get_pubkey_L1_to_address(pubkey, 456).call()
+    # print(deployed_address.result)
+    deployed_address = deployed_address.result.address
 
     assert deployed_address == 0
 
-    deployed_address = await account_deployer.get_pubkey_L1_to_address(123, 123456).call() #123 is not a known pubkey
-   
-    deployed_address=deployed_address.result.address
+    # 123 is not a known pubkey
+    deployed_address = await account_deployer.get_pubkey_L1_to_address(123, 123456).call()
+
+    deployed_address = deployed_address.result.address
 
     assert deployed_address == 0
 
