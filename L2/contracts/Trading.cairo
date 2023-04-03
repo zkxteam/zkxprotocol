@@ -775,7 +775,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // Deposit the funds taken from the user and liquidity fund
     IHolding.deposit(
-        contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_order_value
+        contract_address=holding_address_, asset_id_=collateral_id_, amount_=leveraged_order_value
     );
 
     return (
@@ -917,9 +917,19 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     assert [trader_stats_list_] = element;
 
     // Deduct funds from holding contract
-    IHolding.withdraw(
-        contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_amount_out
-    );
+    if (is_le(0, leveraged_amount_out) == TRUE) {
+        IHolding.withdraw(
+            contract_address=holding_address_,
+            asset_id_=collateral_id_,
+            amount_=leveraged_amount_out,
+        );
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
 
     // If the position is leveraged, deposit the borrowed funds to Liquidity Fund
     if (current_position.leverage != LEVERAGE_ONE) {
@@ -944,6 +954,25 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (is_underwater) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
 
     if (is_underwater == TRUE) {
+        if (is_le(0, leveraged_amount_out) == FALSE) {
+            let holding_deficit = abs_value(leveraged_amount_out);
+            IInsuranceFund.withdraw(
+                contract_address=insurance_fund_address_,
+                asset_id_=collateral_id_,
+                amount=holding_deficit,
+                position_id_=order_.order_id,
+            );
+            IHolding.deposit(
+                contract_address=holding_address_, asset_id_=collateral_id_, amount_=holding_deficit
+            );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+
         // If yes, deduct the difference from user's balance; balance can go negative
         // Absolute value of the acc value
         let amount_to_transfer_from = abs_value(margin_plus_pnl);

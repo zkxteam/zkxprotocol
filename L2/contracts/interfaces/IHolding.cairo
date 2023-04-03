@@ -15,9 +15,9 @@ namespace IHolding {
     func defund(asset_id_: felt, amount: felt) {
     }
 
-    func deposit(asset_id_: felt, amount: felt) {
+    func deposit(asset_id_: felt, amount_: felt) {
     }
 
-    func withdraw(asset_id_: felt, amount: felt) {
+    func withdraw(asset_id_: felt, amount_: felt) {
     }
 }

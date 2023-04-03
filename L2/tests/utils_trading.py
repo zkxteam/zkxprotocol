@@ -1069,8 +1069,10 @@ class OrderExecutor:
             margin_amount_close = margin_amount - margin_amount_to_be_reduced
             margin_unlock_amount = margin_amount_to_be_reduced
 
-        self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["defund"],
-                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
+        if leveraged_amount_out >= 0:
+            print("==> The leveraged_amount_out is: ", leveraged_amount_out)
+            self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["defund"],
+                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=leveraged_amount_out)
 
         if position["leverage"] > 1:
             print("deposited {} in liquidity fund",
@@ -1079,6 +1081,14 @@ class OrderExecutor:
                                        asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
 
         if net_account_value <= 0:
+            if leveraged_amount_out < 0:
+                holding_deficit = abs(leveraged_amount_out)
+                print("==> The Holding contract deficit is: ", holding_deficit)
+                self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
+                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=holding_deficit)
+                self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["fund"],
+                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=holding_deficit)
+
             print("Deficit", net_account_value)
             deficit = abs(net_account_value)
 
