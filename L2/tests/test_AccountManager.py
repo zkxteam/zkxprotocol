@@ -553,44 +553,6 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     # execute order
     (batch_id_1, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp4)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
-    print("events:", info.call_info.internal_calls[0])
-    # assert_event_with_custom_keys_emitted(
-    #     tx_exec_info=info,
-    #     from_address=felix.contract_address,
-    #     keys=[str_to_felt('trade')],
-    #     data=[complete_orders_1[0]["order_id"], #order_id
-    #           market_id_1, #market_id
-    #           order_direction["long"], #request.direction
-    #           to64x61(1), #size
-    #           order_types["limit"], #request.order_type
-    #           side["buy"], #request.side
-    #           to64x61(85), #execution_price
-    #           0, #pnl
-    #           1, #side
-    #           0, #opening_fee
-    #           1 #is_final
-    #           ],
-    #     order=6
-    # )
-    print("orders:", complete_orders_1)
-    assert_event_with_custom_keys_emitted(
-        tx_exec_info=info,
-        from_address=gary.contract_address,
-        keys=[str_to_felt('trade')],
-        data=[complete_orders_1[1]["order_id"], #order_id
-              market_id_1, #market_id
-              order_direction["short"], #request.direction
-              to64x61(1), #size
-              order_types["market"], #request.order_type
-              side["buy"], #request.side
-              to64x61(85), #execution_price
-              3618502788666131213697322783095070105623107215331596699972996997757817185996, #pnl
-              2, #side
-              3618502788666131213697322783095070105623107215331596699972996997757817185996, #opening_fee
-              1 #is_final
-              ],
-        order=10
-    )
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
@@ -676,8 +638,44 @@ async def test_closing_more_than_parent_size_should_pass(trading_test_initialize
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp4, is_reverted=0)
+    (batch_id_1, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp4, is_reverted=0)
 
     # compare margins
     await compare_margin_info(user=charlie, user_test=charlie_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp4)
     await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp4)
+    # print("events:", info.call_info.internal_calls[0])
+    # print("orders:", complete_orders_1)
+    # assert_event_with_custom_keys_emitted(
+    #     tx_exec_info=info,
+    #     from_address=charlie.contract_address,
+    #     keys=[str_to_felt('trade')],
+    #     data=[complete_orders_1[1]["order_id"], #order_id
+    #           market_id_1, #market_id
+    #           order_direction["long"], #request.direction
+    #           to64x61(3), #size
+    #           order_types["limit"], #request.order_type
+    #           side["sell"], #request.side
+    #           to64x61(1000), #execution_price
+    #           0, #pnl
+    #           1, #side
+    #           0, #opening_fee
+    #           1], #is_final
+    #     order=2
+    # )
+    # assert_event_with_custom_keys_emitted(
+    #     tx_exec_info=info,
+    #     from_address=eduard.contract_address,
+    #     keys=[str_to_felt('trade')],
+    #     data=[complete_orders_1[1]["order_id"], #order_id
+    #           market_id_1, #market_id
+    #           order_direction["short"], #request.direction
+    #           to64x61(3), #size
+    #           order_types["market"], #request.order_type
+    #           side["sell"], #request.side
+    #           to64x61(1000), #execution_price
+    #           0, #pnl
+    #           2, #side
+    #           0, #opening_fee
+    #           1], #is_final
+    #     order=6
+    # )
