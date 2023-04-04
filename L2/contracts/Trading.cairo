@@ -315,10 +315,6 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             market_id_=request_.market_id,
             direction_=request_.direction,
         );
-        // // Give an error if the position to be closed is of size 0
-        // with_attr error_message("0517: {order_id} 0") {
-        //     assert_not_zero(position_details.position_size);
-        // }
 
         let (remaining_position_size) = Math64x61_sub(
             position_details.position_size, current_batch_locked_size
