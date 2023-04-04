@@ -169,7 +169,11 @@ func order_id_mapping(order_id: felt) -> (hash: felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    public_key_: felt, L1_address_: felt, registry_address_: felt, version_: felt, collateral_id_: felt
+    public_key_: felt,
+    L1_address_: felt,
+    registry_address_: felt,
+    version_: felt,
+    collateral_id_: felt,
 ) {
     with_attr error_message("AccountManager: Public key and L1 address cannot be 0") {
         assert_not_zero(public_key_);
@@ -1092,7 +1096,24 @@ func execute_order{
     let (collateral_details) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
     let collateral_decimals = collateral_details.token_decimal;
 
-    let (is_final) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
+    // Get the details of the position
+    let (position_details: PositionDetails) = position_mapping.read(
+        market_id=market_id, direction=request.direction
+    );
+
+    local is_final;
+    if (request.side == BUY) {
+        let (result) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
+        assert is_final = result;
+    } else {
+        let (current_available_position) = Math64x61_min(
+            position_details.position_size, request.quantity
+        );
+        let (result) = Math64x61_is_equal(
+            new_position_executed, current_available_position, asset_decimals
+        );
+        assert is_final = result;
+    }
 
     if (size == 0) {
         // Emit event for the order
@@ -1116,11 +1137,6 @@ func execute_order{
         return (1,);
     }
 
-    // Get the details of the position
-    let (position_details: PositionDetails) = position_mapping.read(
-        market_id=market_id, direction=request.direction
-    );
-
     if (request.time_in_force == IoC) {
         // Update the portion executed to request.quantity if it's an IoC order
         portion_executed.write(order_id=request.order_id, value=request.quantity);
@@ -1133,10 +1149,10 @@ func execute_order{
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
 
     let (local current_timestamp) = get_block_timestamp();
-    let (average_execution_price_rounded) = Math64x61_round(average_execution_price, collateral_decimals);
+    let (average_execution_price_rounded) = Math64x61_round(
+        average_execution_price, collateral_decimals
+    );
 
-    // closeOrder == 1 -> Open a new position
-    // closeOrder == 2 -> Close a position
     if (request.side == BUY) {
         local created_timestamp;
 
