@@ -10,7 +10,12 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
 
-from starkware.starknet.common.syscalls import emit_event, get_block_timestamp, get_caller_address
+from starkware.starknet.common.syscalls import (
+    emit_event,
+    get_block_timestamp,
+    get_caller_address,
+    get_block_number,
+)
 
 from contracts.Constants import (
     ABR_PAYMENT_INDEX,
@@ -89,6 +94,11 @@ func public_key() -> (res: felt) {
 // Stores balance of an asset
 @storage_var
 func balance(assetID: felt) -> (res: felt) {
+}
+
+// Stores block number at which account got deployed
+@storage_var
+func account_deployed_block_number() -> (block_number: felt) {
 }
 
 // Stores the locked amount of margin for a collateral
@@ -187,6 +197,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     balance.write(assetID=collateral_id_, value=DEFAULT_BALANCE);
     add_collateral(new_asset_id=collateral_id_, iterator=0, length=0);
 
+    // Get current block number
+    let (current_block_number) = get_block_number();
+    account_deployed_block_number.write(current_block_number);
+
     CommonLib.initialize(registry_address_, version_);
     return ();
 }
@@ -205,6 +219,16 @@ func get_public_key{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (pub_key) = public_key.read();
     let (registry) = CommonLib.get_registry_address();
     return (pub_key=pub_key, auth_reg_addr=registry);
+}
+
+// @notice view function to get block number at which account got deployed
+// @return block_number - block number at which account got deployed
+@view
+func get_account_deployed_block_number{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}() -> (block_number: felt) {
+    let (block_number) = account_deployed_block_number.read();
+    return (block_number=block_number);
 }
 
 // @notice view function to check if the transaction signature is valid
