@@ -9,6 +9,7 @@ from contracts.AccountManager import (
     is_valid_signature_order,
     get_balance,
     get_locked_margin,
+    get_unused_balance,
     get_position_data,
     get_L1_address,
     get_deleveragable_or_liquidatable_position,
@@ -51,7 +52,6 @@ from contracts.Constants import MasterAdmin_ACTION
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-
 
 // ///////////
 // External //

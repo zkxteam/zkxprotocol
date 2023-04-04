@@ -11,7 +11,7 @@ from starkware.starknet.business_logic.execution.objects import OrderedEvent
 from starkware.starknet.public.abi import get_selector_from_name
 
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, assert_event_with_custom_keys_emitted, PRIME, PRIME_HALF
-from utils_trading import User, order_direction, order_side, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, compare_margin_info, check_batch_status
+from utils_trading import User, order_direction, order_side, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, compare_margin_info, check_batch_status, compare_markets_array
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -2328,7 +2328,7 @@ async def test_execute_market_order_slippage_lower_limit(trading_test_initialize
 
 @pytest.mark.asyncio
 async def test_short_actual_execution_price_doubled(trading_test_initializer):
-    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, gary, alice_test, bob_test, charlie_test, _, _, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, gary, alice_test, bob_test, charlie_test, _, _, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, _ = trading_test_initializer
 
     ###################
     ### Open orders ##

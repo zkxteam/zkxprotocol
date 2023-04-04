@@ -169,7 +169,11 @@ func order_id_mapping(order_id: felt) -> (hash: felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    public_key_: felt, L1_address_: felt, registry_address_: felt, version_: felt, collateral_id_: felt
+    public_key_: felt,
+    L1_address_: felt,
+    registry_address_: felt,
+    version_: felt,
+    collateral_id_: felt,
 ) {
     with_attr error_message("AccountManager: Public key and L1 address cannot be 0") {
         assert_not_zero(public_key_);
@@ -284,6 +288,21 @@ func get_locked_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) -> (res: felt) {
     let (res) = margin_locked.read(asset_id=assetID_);
     return (res=res);
+}
+
+
+// @notice view function to get the unused balance of an asset; balance - locked_balance
+// @param assetID_ - ID of an asset
+// @return res - unused balance of an asset
+@view
+func get_unused_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    assetID_: felt
+) -> (res: felt) {
+    let (total_balance) = balance.read(assetID=assetID_);
+    let (locked_balance) = margin_locked.read(asset_id=assetID_);
+
+    let (usused_balance) = Math64x61_sub(total_balance, locked_balance);
+    return (res=usused_balance);
 }
 
 // @notice view function to get the available margin of an asset
@@ -1133,7 +1152,9 @@ func execute_order{
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
 
     let (local current_timestamp) = get_block_timestamp();
-    let (average_execution_price_rounded) = Math64x61_round(average_execution_price, collateral_decimals);
+    let (average_execution_price_rounded) = Math64x61_round(
+        average_execution_price, collateral_decimals
+    );
 
     // closeOrder == 1 -> Open a new position
     // closeOrder == 2 -> Close a position

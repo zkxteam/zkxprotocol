@@ -387,13 +387,20 @@ class User:
         try:
             return self.balance[asset_id]
         except KeyError:
-            print("key error here")
+            print("key error while getting user balance")
             return 0
 
     def get_locked_margin(self, asset_id: int = AssetID.USDC) -> float:
         try:
             return self.locked_margin[asset_id]
         except KeyError:
+            return 0
+
+    def get_unused_balance(self, asset_id: int = AssetID.USDC) -> float:
+        try:
+            return self.balance[asset_id] - self.locked_margin[asset_id]
+        except KeyError:
+            print("key error while getting unused balance")
             return 0
 
     def get_deleveragable_or_liquidatable_position(self, collateral_id: int) -> Dict:
@@ -1080,39 +1087,44 @@ class OrderExecutor:
             self.__modify_fund_balance(fund=fund_mapping["liquidity_fund"], mode=fund_mode["fund"],
                                        asset_id=market_to_collateral_mapping[order["market_id"]], amount=borrowed_amount_to_be_returned)
 
+        # If the the user's margin is fully exhausted
         if net_account_value <= 0:
-            if leveraged_amount_out < 0:
-                holding_deficit = abs(leveraged_amount_out)
-                print("==> The Holding contract deficit is: ", holding_deficit)
-                self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=holding_deficit)
-                self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["fund"],
-                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=holding_deficit)
-
-            print("Deficit", net_account_value)
+            # Find the absolute value of the margin_plu_pnl
             deficit = abs(net_account_value)
+            # Get unused balance of the user
+            user_unused_balance = user.get_unused_balance(
+                asset_id=market_to_collateral_mapping[order["market_id"]])
 
-            # Get position details of the user
-            (_, _, available_margin, _, _, _, _, _) = user.get_margin_info(
-                order_executor=self, timestamp=timestamp, asset_id=market_to_collateral_mapping[
-                    order["market_id"]]
-            )
-            print("available margin is ", available_margin)
+            print("unused balance is ", user_unused_balance)
 
-            if deficit > available_margin:
-                if available_margin < 0:
+            # If the deficit is larger than user's unused balance
+            if deficit > user_unused_balance:
+                if user_unused_balance < 0:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
                                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit)
                     print("reaches available_margin < 0")
                 else:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                                               asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - available_margin)
+                                               asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit - user_unused_balance)
                     print("reaches available_margin > 0")
             else:
                 print("defict <= available margin")
+
+            if leveraged_amount_out < 0:
+                holding_deficit = abs(leveraged_amount_out)
+                print("==> The Holding contract deficit is: ", holding_deficit)
+                self.__modify_fund_balance(fund=fund_mapping["holding_fund"], mode=fund_mode["fund"],
+                                           asset_id=market_to_collateral_mapping[order["market_id"]], amount=holding_deficit)
+
             user.modify_balance(
                 mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=deficit+margin_unlock_amount)
-            realized_pnl = deficit*-1
+
+            realized_pnl = (deficit+margin_unlock_amount)*-1
+
+            print("Deficit", net_account_value)
+            deficit = abs(net_account_value)
+
+            print("unused balance is ", user_unused_balance)
         else:
             if order["order_type"] <= 3:
                 if pnl > 0:
