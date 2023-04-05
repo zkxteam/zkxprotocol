@@ -1133,8 +1133,8 @@ func execute_order{
         let (current_available_position) = Math64x61_min(
             position_details.position_size, request.quantity
         );
-        let (result) = Math64x61_is_equal(
-            new_position_executed, current_available_position, asset_decimals
+        let (result) = Math64x61_is_le(
+            current_available_position, new_position_executed, asset_decimals
         );
         assert is_final = result;
     }
