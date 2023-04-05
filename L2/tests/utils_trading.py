@@ -1055,9 +1055,6 @@ class OrderExecutor:
         # Calculate the profit and loss for the user
         pnl = order_size * diff
         realized_pnl = 0
-        # Value of the position after factoring in the pnl
-        net_account_value = margin_amount + pnl
-
         # Value of asset at current price w leverage
         leveraged_amount_out = order_size * actual_execution_price
 
@@ -1067,6 +1064,9 @@ class OrderExecutor:
         borrowed_amount_to_be_returned = borrowed_amount*percent_of_position
         margin_amount_to_be_reduced = margin_amount*percent_of_position
         margin_unlock_amount = 0
+
+        # Value of the position after factoring in the pnl
+        net_account_value = margin_amount_to_be_reduced + pnl
 
         if order["order_type"] == order_types["deleverage"]:
             borrowed_amount_close = borrowed_amount - leveraged_amount_out

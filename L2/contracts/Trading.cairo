@@ -859,11 +859,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         assert actual_execution_price = actual_exexution_price_felt;
     }
 
-    // Calculate pnl and net account value
-    let (pnl) = Math64x61_mul(order_size_, diff);
-    let (margin_plus_pnl_felt) = Math64x61_add(margin_amount, pnl);
-    assert margin_plus_pnl = margin_plus_pnl_felt;
-
     // Total value of the asset at current price
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
 
@@ -872,6 +867,12 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, ratio_of_position);
     let (local margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
     local margin_amount_open_64x61;
+
+    // Calculate pnl and net account value
+    let (pnl) = Math64x61_mul(order_size_, diff);
+    let (margin_plus_pnl_felt) = Math64x61_add(margin_amount_to_be_reduced, pnl);
+    assert margin_plus_pnl = margin_plus_pnl_felt;
+
 
     // Calculate new values for margin and borrowed amounts
     if (order_.order_type == DELEVERAGING_ORDER) {
