@@ -974,7 +974,7 @@ class OrderExecutor:
         print(margin_amount)
         return (average_execution_price, margin_amount, borrowed_amount, trading_fees, order_value_wo_leverage)
 
-    def __get_quantity_to_execute(self, request: Dict, user: User, quantity_remaining: float, side: int) -> float:
+    def __get_quantity_to_execute(self, request: Dict, user: User, quantity_remaining: float, side: int, position_locked: List[Dict]) -> float:
         quantity_to_execute = 0
         quantity_to_execute_final = 0
 
@@ -989,28 +989,37 @@ class OrderExecutor:
             quantity_to_execute = executable_quantity
 
         if request['side'] == 2:
+            try:
+                current_batch_locked_size = position_locked[user.user_address][request["direction"]]
+            except KeyError:
+                current_batch_locked_size = 0
             position = user.get_position(
                 market_id=request["market_id"], direction=request["direction"])
+            
+            remaining_position_size = position["position_size"] - current_batch_locked_size
 
-            if quantity_to_execute <= position["position_size"]:
+            if quantity_to_execute <= remaining_position_size:
                 quantity_to_execute_final = quantity_to_execute
             else:
-                quantity_to_execute_final = position["position_size"]
+                quantity_to_execute_final = remaining_position_size
+
+            current_batch_locked_size_new = current_batch_locked_size + quantity_to_execute_final
+            position_locked.update({user.user_address: {request["direction"]: current_batch_locked_size_new}})
         else:
             quantity_to_execute_final = quantity_to_execute
 
         return quantity_to_execute_final
 
-    def __adjust_quantity_locked(self, request_list: List[Dict], users_list: List[User], quantity_locked: float) -> Tuple[List[float]]:
+    def __adjust_quantity_locked(self, request_list: List[Dict], users_list: List[User], quantity_locked: float, position_locked: List[Dict]) -> Tuple[List[float]]:
         taker_quantity_to_execute = self.__get_quantity_to_execute(
-            request=request_list[-1:][0], user=users_list[-1:][0], quantity_remaining=quantity_locked, side=order_side["taker"])
+            request=request_list[-1:][0], user=users_list[-1:][0], quantity_remaining=quantity_locked, side=order_side["taker"], position_locked=position_locked)
         print("taker_quantity_to_execute",
               taker_quantity_to_execute, quantity_locked)
         maker_execution_sizes = []
         quantity_executed = 0
         for i in range(len(request_list) - 1):
             quantity_to_execute = self.__get_quantity_to_execute(
-                request=request_list[i], user=users_list[i], quantity_remaining=taker_quantity_to_execute - quantity_executed, side=order_side["maker"])
+                request=request_list[i], user=users_list[i], quantity_remaining=taker_quantity_to_execute - quantity_executed, side=order_side["maker"], position_locked=position_locked)
             maker_execution_sizes.append(quantity_to_execute)
 
             quantity_executed += quantity_to_execute
@@ -1176,13 +1185,14 @@ class OrderExecutor:
 
     def execute_batch(self, batch_id: int, request_list: List[Dict], user_list: List, quantity_locked: float = 1, market_id: int = BTC_USD_ID, oracle_price: float = 1000, timestamp: int = 0):
         # Store the quantity executed so far
+        position_size_locked_per_user = {}
         running_weighted_sum = 0
 
         self.set_market_price(
             market_id=market_id, price=oracle_price, current_timestamp=timestamp)
 
         (maker_execution_sizes) = self.__adjust_quantity_locked(
-            request_list=request_list, users_list=user_list, quantity_locked=quantity_locked)
+            request_list=request_list, users_list=user_list, quantity_locked=quantity_locked, position_locked=position_size_locked_per_user)
         print("adjusted size", maker_execution_sizes[-1:])
         print("maker_execution_sizes", maker_execution_sizes)
 

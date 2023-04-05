@@ -86,6 +86,13 @@ const TWO = 4611686018427387904;
 func batch_id_status(batch_id: felt) -> (res: felt) {
 }
 
+// Stores size locked for a user if order is SELL
+@storage_var
+func position_size_locked_per_user(
+    batch_id: felt, user_address: felt, market_id: felt, direction: felt
+) -> (res: felt) {
+}
+
 // //////////////
 // Constructor //
 // //////////////
@@ -183,6 +190,7 @@ func execute_batch{
     let (execution_sizes: felt*) = alloc();
 
     adjust_quantity_locked(
+        batch_id_=batch_id_,
         asset_token_decimal_=asset.token_decimal,
         request_list_len_=request_list_len,
         request_list_=request_list,
@@ -267,7 +275,7 @@ func execute_batch{
 // @param execution_sizes_ - Array of the calculated execution sizes
 // @returns quantity_to_execute_final - Calculated quantity to execute
 func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_token_decimal_: felt, request_: MultipleOrder, quantity_remaining_: felt
+    batch_id_: felt, asset_token_decimal_: felt, request_: MultipleOrder, quantity_remaining_: felt
 ) -> (quantity_to_execute_final: felt) {
     alloc_locals;
     local quantity_to_execute;
@@ -297,33 +305,51 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // If it's a sell order, calculate the amount that can be executed
     if (request_.side == SELL) {
+        // Get the order size already locked for the current batch
+        let (current_batch_locked_size) = position_size_locked_per_user.read(
+            batch_id_, request_.user_address, request_.market_id, request_.direction
+        );
         // Get position details
         let (position_details: PositionDetails) = IAccountManager.get_position_data(
             contract_address=request_.user_address,
             market_id_=request_.market_id,
             direction_=request_.direction,
         );
-        // Give an error if the position to be closed is of size 0
-        with_attr error_message("0517: {order_id} 0") {
-            assert_not_zero(position_details.position_size);
-        }
+
+        let (remaining_position_size) = Math64x61_sub(
+            position_details.position_size, current_batch_locked_size
+        );
 
         let (cmp_res) = Math64x61_is_le(
-            quantity_to_execute, position_details.position_size, asset_token_decimal_
+            quantity_to_execute, remaining_position_size, asset_token_decimal_
         );
 
         if (cmp_res == FALSE) {
-            quantity_to_execute_final = position_details.position_size;
+            quantity_to_execute_final = remaining_position_size;
         } else {
             quantity_to_execute_final = quantity_to_execute;
         }
 
+        // Update position size locked for the user in current batch
+        let (current_batch_locked_size_new) = Math64x61_add(
+            current_batch_locked_size, quantity_to_execute_final
+        );
+        position_size_locked_per_user.write(
+            batch_id_,
+            request_.user_address,
+            request_.market_id,
+            request_.direction,
+            current_batch_locked_size_new,
+        );
+
         tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         quantity_to_execute_final = quantity_to_execute;
 
         tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
 
@@ -340,6 +366,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // @param quantity_executed_ - Quantity that has been locked so far on maker side
 // @param iterator_ - Iterator for the execution_sizes_ array
 func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    batch_id_: felt,
     asset_token_decimal_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
@@ -356,6 +383,7 @@ func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (quantity_remaining) = Math64x61_sub(taker_locked_quantity_, quantity_executed_);
     // Find quantity that needs to be executed for the current order
     let (quantity_to_execute) = get_quantity_to_execute(
+        batch_id_=batch_id_,
         asset_token_decimal_=asset_token_decimal_,
         request_=[request_list_],
         quantity_remaining_=quantity_remaining,
@@ -367,6 +395,7 @@ func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     // New quantity executed
     let (quantity_executed_new) = Math64x61_add(quantity_to_execute, quantity_executed_);
     return get_maker_sizes(
+        batch_id_=batch_id_,
         asset_token_decimal_=asset_token_decimal_,
         request_list_len_=request_list_len_ - 1,
         request_list_=request_list_ + MultipleOrder.SIZE,
@@ -384,6 +413,7 @@ func get_maker_sizes{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @param quantity_locked_ - Original quantity lokcked of the batch
 // @param execution_sizes_ - Array of the calculated execution sizes
 func adjust_quantity_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    batch_id_: felt,
     asset_token_decimal_: felt,
     request_list_len_: felt,
     request_list_: MultipleOrder*,
@@ -395,6 +425,7 @@ func adjust_quantity_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     // Adjust the quantity to execute on the taker side
     let (taker_quantity_to_execute) = get_quantity_to_execute(
+        batch_id_=batch_id_,
         asset_token_decimal_=asset_token_decimal_,
         request_=request_list_[last_index],
         quantity_remaining_=quantity_locked_,
@@ -406,6 +437,7 @@ func adjust_quantity_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
     // Adjust the quantity to execute on the maker side and fill the execution_sizes_ array
     let (maker_quantity_to_execute) = get_maker_sizes(
+        batch_id_=batch_id_,
         asset_token_decimal_=asset_token_decimal_,
         request_list_len_=request_list_len_,
         request_list_=request_list_,
