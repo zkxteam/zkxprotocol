@@ -10,7 +10,12 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
 
-from starkware.starknet.common.syscalls import emit_event, get_block_timestamp, get_caller_address
+from starkware.starknet.common.syscalls import (
+    emit_event,
+    get_block_timestamp,
+    get_caller_address,
+    get_block_number,
+)
 
 from contracts.Constants import (
     ABR_PAYMENT_INDEX,
@@ -91,6 +96,11 @@ func public_key() -> (res: felt) {
 func balance(assetID: felt) -> (res: felt) {
 }
 
+// Stores block number at which account got deployed
+@storage_var
+func account_deployed_block_number() -> (block_number: felt) {
+}
+
 // Stores the locked amount of margin for a collateral
 @storage_var
 func margin_locked(asset_id: felt) -> (res: felt) {
@@ -169,7 +179,11 @@ func order_id_mapping(order_id: felt) -> (hash: felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    public_key_: felt, L1_address_: felt, registry_address_: felt, version_: felt, collateral_id_: felt
+    public_key_: felt,
+    L1_address_: felt,
+    registry_address_: felt,
+    version_: felt,
+    collateral_id_: felt,
 ) {
     with_attr error_message("AccountManager: Public key and L1 address cannot be 0") {
         assert_not_zero(public_key_);
@@ -182,6 +196,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     // set predefined balance
     balance.write(assetID=collateral_id_, value=DEFAULT_BALANCE);
     add_collateral(new_asset_id=collateral_id_, iterator=0, length=0);
+
+    // Get current block number
+    let (current_block_number) = get_block_number();
+    account_deployed_block_number.write(current_block_number);
 
     CommonLib.initialize(registry_address_, version_);
     return ();
@@ -201,6 +219,16 @@ func get_public_key{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (pub_key) = public_key.read();
     let (registry) = CommonLib.get_registry_address();
     return (pub_key=pub_key, auth_reg_addr=registry);
+}
+
+// @notice view function to get block number at which account got deployed
+// @return block_number - block number at which account got deployed
+@view
+func get_account_deployed_block_number{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}() -> (block_number: felt) {
+    let (block_number) = account_deployed_block_number.read();
+    return (block_number=block_number);
 }
 
 // @notice view function to check if the transaction signature is valid
@@ -1092,7 +1120,24 @@ func execute_order{
     let (collateral_details) = IAsset.get_asset(contract_address=asset_address, id=collateral_id_);
     let collateral_decimals = collateral_details.token_decimal;
 
-    let (is_final) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
+    // Get the details of the position
+    let (position_details: PositionDetails) = position_mapping.read(
+        market_id=market_id, direction=request.direction
+    );
+
+    local is_final;
+    if (request.side == BUY) {
+        let (result) = Math64x61_is_equal(new_position_executed, request.quantity, asset_decimals);
+        assert is_final = result;
+    } else {
+        let (current_available_position) = Math64x61_min(
+            position_details.position_size, request.quantity
+        );
+        let (result) = Math64x61_is_le(
+            current_available_position, new_position_executed, asset_decimals
+        );
+        assert is_final = result;
+    }
 
     if (size == 0) {
         // Emit event for the order
@@ -1116,11 +1161,6 @@ func execute_order{
         return (1,);
     }
 
-    // Get the details of the position
-    let (position_details: PositionDetails) = position_mapping.read(
-        market_id=market_id, direction=request.direction
-    );
-
     if (request.time_in_force == IoC) {
         // Update the portion executed to request.quantity if it's an IoC order
         portion_executed.write(order_id=request.order_id, value=request.quantity);
@@ -1133,10 +1173,10 @@ func execute_order{
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
 
     let (local current_timestamp) = get_block_timestamp();
-    let (average_execution_price_rounded) = Math64x61_round(average_execution_price, collateral_decimals);
+    let (average_execution_price_rounded) = Math64x61_round(
+        average_execution_price, collateral_decimals
+    );
 
-    // closeOrder == 1 -> Open a new position
-    // closeOrder == 2 -> Close a position
     if (request.side == BUY) {
         local created_timestamp;
 

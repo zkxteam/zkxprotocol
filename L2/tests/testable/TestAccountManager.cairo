@@ -5,6 +5,7 @@
 from contracts.AccountManager import (
     constructor,
     get_public_key,
+    get_account_deployed_block_number,
     is_valid_signature,
     is_valid_signature_order,
     get_balance,
