@@ -21,6 +21,9 @@ namespace IAccountManager {
     func get_balance(assetID_: felt) -> (res: felt) {
     }
 
+    func get_unused_balance(assetID_: felt) -> (res: felt) {
+    }
+
     func get_positions() -> (
         positions_array_len: felt, positions_array: PositionDetailsWithMarket*
     ) {

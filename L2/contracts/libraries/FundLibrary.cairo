@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero, assert_nn
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AdminAuth_INDEX, EmergencyFund_INDEX, ManageFunds_ACTION
@@ -195,7 +195,7 @@ namespace FundLib {
         }
 
         with_attr error_message("{index_}04: {id_} {amount_}") {
-            assert_lt(0, amount_);
+            assert_nn(amount_);
         }
 
         let current_amount: felt = FundLib_balance_by_id.read(id=id_);
@@ -227,12 +227,12 @@ namespace FundLib {
         }
 
         with_attr error_message("{index_}05: {id_} {amount_}") {
-            assert_lt(0, amount_);
+            assert_nn(amount_);
         }
 
         let (local current_amount: felt) = FundLib_balance_by_id.read(id=id_);
         with_attr error_message("{index_}06: {id_} {current_amount}") {
-            assert_le(amount_, current_amount);
+            assert_nn(current_amount);
         }
         let updated_amount: felt = Math64x61_sub(current_amount, amount_);
 

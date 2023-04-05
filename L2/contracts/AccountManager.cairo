@@ -314,6 +314,21 @@ func get_locked_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     return (res=res);
 }
 
+
+// @notice view function to get the unused balance of an asset; balance - locked_balance
+// @param assetID_ - ID of an asset
+// @return res - unused balance of an asset
+@view
+func get_unused_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    assetID_: felt
+) -> (res: felt) {
+    let (total_balance) = balance.read(assetID=assetID_);
+    let (locked_balance) = margin_locked.read(asset_id=assetID_);
+
+    let (usused_balance) = Math64x61_sub(total_balance, locked_balance);
+    return (res=usused_balance);
+}
+
 // @notice view function to get the available margin of an asset
 // @param asset_id_ - ID of collateral asset
 // @param new_position_maintanence_requirement_ - maintenance requirement of new position, if any
