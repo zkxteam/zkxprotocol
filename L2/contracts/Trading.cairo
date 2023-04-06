@@ -1175,11 +1175,12 @@ func process_and_execute_orders_recurse{
         assert error_message = '0510';
         assert error_param_1 = order_id;
         assert error_param_2 = user_address;
-        jmp error_handling;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+
+        jmp error_handling;
     }
 
     // Error Handling: Quantity is less than the one set for the market
@@ -1190,11 +1191,12 @@ func process_and_execute_orders_recurse{
         assert error_message = '0505';
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = quantity_order;
-        jmp error_handling;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+
+        jmp error_handling;
     }
 
     // Error Handling: Wrong market passed for the order
@@ -1202,11 +1204,12 @@ func process_and_execute_orders_recurse{
         assert error_message = '0504';
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = market_id_order;
-        jmp error_handling;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+
+        jmp error_handling;
     }
 
     // Error Handling: Invalid leverage; leverage < minimum
@@ -1217,11 +1220,12 @@ func process_and_execute_orders_recurse{
         assert error_message = '0503';
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = leverage;
-        jmp error_handling;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+
+        jmp error_handling;
     }
 
     // Invalid leverage; leverage > maximum
@@ -1232,11 +1236,12 @@ func process_and_execute_orders_recurse{
         assert error_message = '0502';
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = leverage;
-        jmp error_handling;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+
+        jmp error_handling;
     }
 
     // Get the portion executed of the order
@@ -1294,11 +1299,12 @@ func process_and_execute_orders_recurse{
         assert error_message = '0536';
         assert error_param_1 = [request_list_].order_id;
         assert error_param_2 = hash;
-        jmp error_handling;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+
+        jmp error_handling;
     }
 
     // Create a signature object
@@ -1336,11 +1342,12 @@ func process_and_execute_orders_recurse{
             assert error_message = '0513';
             assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = [request_list_].direction;
-            jmp error_handling;
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
+
+            jmp error_handling;
         }
 
         // Error Handling: A Taker order cannot be a post only order
@@ -1348,11 +1355,12 @@ func process_and_execute_orders_recurse{
             assert error_message = '0515';
             assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = current_index;
-            jmp error_handling;
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
+
+            jmp error_handling;
         }
 
         local taker_quantity;
@@ -1366,11 +1374,12 @@ func process_and_execute_orders_recurse{
                 assert error_message = '0516';
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = taker_quantity;
-                jmp error_handling;
 
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
+
+                jmp error_handling;
             }
 
             // Error Handling: A Taker order cannot be a post only order
@@ -1378,11 +1387,12 @@ func process_and_execute_orders_recurse{
                 assert error_message = '0550';
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = MARKET_ORDER;
-                jmp error_handling;
 
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
+
+                jmp error_handling;
             }
 
             tempvar syscall_ptr = syscall_ptr;
@@ -1405,11 +1415,12 @@ func process_and_execute_orders_recurse{
                 assert error_message = '0521';
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = slippage;
-                jmp error_handling;
 
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
+
+                jmp error_handling;
             }
 
             // Error Handling: A Taker order cannot be a post only order
@@ -1417,11 +1428,12 @@ func process_and_execute_orders_recurse{
                 assert error_message = '0521';
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = slippage;
-                jmp error_handling;
 
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
+
+                jmp error_handling;
             }
 
             let (is_error: felt) = check_within_slippage(
@@ -1450,11 +1462,12 @@ func process_and_execute_orders_recurse{
                 assert error_message = error_message;
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = execution_price;
-                jmp error_handling;
 
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
+
+                jmp error_handling;
             }
 
             tempvar syscall_ptr = syscall_ptr;
@@ -1517,11 +1530,12 @@ func process_and_execute_orders_recurse{
             assert error_message = '0512';
             assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = [request_list_].direction;
-            jmp error_handling;
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
+
+            jmp error_handling;
         }
 
         // Error Handling: A Taker order cannot be a post only order
@@ -1529,13 +1543,18 @@ func process_and_execute_orders_recurse{
             assert error_message = '0518';
             assert error_param_1 = [request_list_].order_id;
             assert error_param_2 = current_index;
-            jmp error_handling;
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
+
+            jmp error_handling;
         }
         assert quantity_to_execute = quantity_to_execute;
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
 
         // Send to AccountManager to emit an event in case the execution_price is 0
         if (quantity_to_execute == 0) {
