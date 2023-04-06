@@ -1815,6 +1815,7 @@ func process_and_execute_orders_recurse{
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+        tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     } else {
         // Close order
         let (
@@ -2079,6 +2080,7 @@ func process_and_execute_orders_recurse{
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
+        tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     }
 
     if ([request_list_].time_in_force == IoC) {
