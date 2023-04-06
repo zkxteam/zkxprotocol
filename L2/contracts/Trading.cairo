@@ -19,6 +19,7 @@ from contracts.Constants import (
     FoK,
     Holding_INDEX,
     InsuranceFund_INDEX,
+    IoC,
     LIMIT_ORDER,
     Liquidate_INDEX,
     LIQUIDATION_ORDER,
@@ -1271,6 +1272,7 @@ func process_and_execute_orders_recurse{
     local updated_portion_executed;
     local current_portion_executed;
     local is_liquidation;
+    local average_execution_price_rounded;
 
     // Create a temporary order object
     let temp_order_request: OrderRequest = OrderRequest(
@@ -1449,7 +1451,7 @@ func process_and_execute_orders_recurse{
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         } else {
-            let (is_error: felt, error_message: felt) = check_limit_price(
+            let (is_error_1: felt, error_message_1: felt) = check_limit_price(
                 order_id_=order_id,
                 price_=[request_list_].price,
                 execution_price_=new_execution_price,
@@ -1458,8 +1460,8 @@ func process_and_execute_orders_recurse{
                 collateral_token_decimal_=collateral_token_decimal_,
             );
 
-            if (is_error == TRUE) {
-                assert error_message = error_message;
+            if (is_error_1 == TRUE) {
+                assert error_message = error_message_1;
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = execution_price;
 
@@ -1509,7 +1511,7 @@ func process_and_execute_orders_recurse{
         let (quantity_remaining) = Math64x61_sub(taker_locked_quantity_, quantity_executed_);
 
         // Find quantity that needs to be executed for the current order
-        let (quantity_to_execute) = get_quantity_to_execute(
+        let (quantity_to_execute_remaining) = get_quantity_to_execute(
             order_portion_executed_=order_portion_executed,
             position_details_=position_details,
             asset_token_decimal_=asset_token_decimal_,
@@ -1550,7 +1552,7 @@ func process_and_execute_orders_recurse{
 
             jmp error_handling;
         }
-        assert quantity_to_execute = quantity_to_execute;
+        assert quantity_to_execute = quantity_to_execute_remaining;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
@@ -1638,9 +1640,9 @@ func process_and_execute_orders_recurse{
                 oracle_price_=oracle_price_,
             );
 
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
+            // tempvar syscall_ptr = syscall_ptr;
+            // tempvar pedersen_ptr = pedersen_ptr;
+            // tempvar range_check_ptr = range_check_ptr;
         }
 
         // Add the executed quantity to the running sum of quantity executed
@@ -1695,20 +1697,22 @@ func process_and_execute_orders_recurse{
             side_=current_order_side,
         );
 
-        if (is_balance_error == TRUE) {
-            assert error_message = '0501';
-            assert error_param_1 = [request_list_].order_id;
-            assert error_param_2 = user_available_balance;
-            jmp error_handling;
-        }
+        // if (is_balance_error == TRUE) {
+        //     assert error_message = '0501';
+        //     assert error_param_1 = [request_list_].order_id;
+        //     assert error_param_2 = user_available_balance;
+        //     jmp error_handling;
+        // }
 
         // Local variable to store the timestamp at which the position was opened
         local created_timestamp;
 
         // Round off the average execution price of the position
-        let (average_execution_price_rounded) = Math64x61_round(
+        let (average_execution_price_rounded_felt) = Math64x61_round(
             average_execution_price, collateral_token_decimal_
         );
+
+        assert average_execution_price_rounded = average_execution_price_rounded_felt;
 
         // Check if the current position size is 0
         let (is_zero_current_position) = Math64x61_is_equal(
@@ -1736,8 +1740,16 @@ func process_and_execute_orders_recurse{
             }
 
             created_timestamp = current_timestamp;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         } else {
             created_timestamp = position_details.created_timestamp;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
         }
 
         // Calculate the updated position data
@@ -1834,6 +1846,10 @@ func process_and_execute_orders_recurse{
         // Check if it's liq/delveraging order
         let is_liq = is_le(LIQUIDATION_ORDER, [request_list_].order_type);
 
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+
         if (is_liq == TRUE) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
             let liq_position: LiquidatablePosition = IAccountManager.get_deleveragable_or_liquidatable_position(
@@ -1844,6 +1860,11 @@ func process_and_execute_orders_recurse{
                 assert error_message = '0531';
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = market_id_;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+
                 jmp error_handling;
             }
 
@@ -1852,6 +1873,11 @@ func process_and_execute_orders_recurse{
                 assert error_message = '0532';
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = [request_list_].direction;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+
                 jmp error_handling;
             }
 
@@ -1863,6 +1889,11 @@ func process_and_execute_orders_recurse{
                 assert error_message = '0533';
                 assert error_param_1 = [request_list_].order_id;
                 assert error_param_2 = quantity_to_execute;
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+
                 jmp error_handling;
             }
 
@@ -1892,6 +1923,10 @@ func process_and_execute_orders_recurse{
                     assert error_message = '0534';
                     assert error_param_1 = [request_list_].order_id;
                     assert error_param_2 = quantity_to_execute;
+
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar pedersen_ptr = pedersen_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
                     jmp error_handling;
                 }
 
@@ -1910,6 +1945,11 @@ func process_and_execute_orders_recurse{
                     assert error_message = '0535';
                     assert error_param_1 = [request_list_].order_id;
                     assert error_param_2 = quantity_to_execute;
+
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar pedersen_ptr = pedersen_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
+
                     jmp error_handling;
                 }
 
@@ -1944,8 +1984,8 @@ func process_and_execute_orders_recurse{
             );
             let (opposite_position: PositionDetails) = IAccountManager.get_position_data(
                 contract_address=[request_list_].user_address,
-                market_id=market_id_,
-                direction=opposite_direction,
+                market_id_=market_id_,
+                direction_=opposite_direction,
             );
             let (is_zero_opposite_position) = Math64x61_is_equal(
                 opposite_position.position_size, 0, asset_token_decimal_
@@ -2023,10 +2063,8 @@ func process_and_execute_orders_recurse{
         tempvar range_check_ptr = range_check_ptr;
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
 
-        assert pnl = trading_fee;
-        assert opening_fee = trading_fee;
         assert current_open_interest = quantity_to_execute;
-        assert margin_lock_update_amount = margin_lock_amount;
+        assert margin_lock_update_amount = margin_unlock_amount;
         assert current_portion_executed = new_portion_executed;
 
         assert margin_amount = margin_amount_temp;
