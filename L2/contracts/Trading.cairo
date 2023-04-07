@@ -1387,9 +1387,10 @@ func process_and_execute_orders_recurse{
     local current_portion_executed;
     local is_liquidation;
     local average_execution_price_rounded;
+    local temp_order_request: OrderRequest;
 
     // Create a temporary order object
-    let temp_order_request: OrderRequest = OrderRequest(
+    assert temp_order_request = OrderRequest(
         order_id=[request_list_].order_id,
         market_id=[request_list_].market_id,
         direction=[request_list_].direction,
@@ -1406,7 +1407,7 @@ func process_and_execute_orders_recurse{
 
     // Code brought in from AccountManager
     // hash the parameters
-    let (hash) = hash_order(temp_order_request);
+    let (hash) = hash_order(&temp_order_request);
 
     // Check for hash collision
     let (hash_error) = order_hash_check(order_id_=[request_list_].order_id, order_hash_=hash);
@@ -2081,6 +2082,9 @@ func process_and_execute_orders_recurse{
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
 
         // Calculate the updated position data
         let (new_position_size) = Math64x61_add(
@@ -2595,17 +2599,17 @@ func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (local opposite_side) = get_opposite(maker1_side_);
     if (current_direction_ == maker1_direction_) {
         if (current_side_ == maker1_side_) {
-            return (FALSE);
+            return (FALSE,);
         }
     }
 
     if (current_direction_ == opposite_direction) {
         if (current_side_ == opposite_side) {
-            return (FALSE);
+            return (FALSE,);
         }
     }
 
-    return (TRUE);
+    return (TRUE,);
 }
 
 // @notice Internal function to validate taker orders
@@ -2626,17 +2630,17 @@ func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (local opposite_side) = get_opposite(maker1_side_);
     if (current_direction_ == maker1_direction_) {
         if (current_side_ == opposite_side) {
-            return (FALSE);
+            return (FALSE,);
         }
     }
 
     if (current_direction_ == opposite_direction) {
         if (current_side_ == maker1_side_) {
-            return (FALSE);
+            return (FALSE,);
         }
     }
 
-    return (TRUE);
+    return (TRUE,);
 }
 
 // @notice Internal function to get oppsite side or direction of the order
@@ -2663,10 +2667,10 @@ func order_hash_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     // If the hash isn't stored in the contract yet
     if (existing_hash == 0) {
         order_id_mapping.write(order_id=order_id_, value=order_hash_);
-        return (FALSE);
+        return (FALSE,);
     }
 
-    return (TRUE);
+    return (TRUE,);
 }
 
 // @notice view function which checks the signature passed is valid
@@ -2709,7 +2713,7 @@ func is_valid_signature_order{
 // @notice Internal function to hash the order parameters
 // @param orderRequest - Struct of order request to hash
 // @param res - Hash of the details
-func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest) -> (res: felt) {
+func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res: felt) {
     let hash_ptr = pedersen_ptr;
     with hash_ptr {
         let (hash_state_ptr) = hash_init();
