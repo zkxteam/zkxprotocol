@@ -99,6 +99,15 @@ func batch_id_status(batch_id: felt) -> (res: felt) {
 func order_id_mapping(order_id: felt) -> (hash: felt) {
 }
 
+// /////////
+// Events //
+// /////////
+
+// Event emitted whenever fund() is called
+@event
+func order_rejected(code: felt, param_1: felt, param_2: felt) {
+}
+
 // //////////////
 // Constructor //
 // //////////////
@@ -1173,15 +1182,36 @@ func process_and_execute_orders_recurse{
         contract_address=account_registry_address_, address_=user_address
     );
     if (is_registered == FALSE) {
-        assert error_message = '0510';
-        assert error_param_1 = order_id;
-        assert error_param_2 = user_address;
+        order_rejected.emit(code='0510', param_1=order_id, param_2=user_address);
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-
-        jmp error_handling;
+        return process_and_execute_orders_recurse(
+            original_quantity_locked_=original_quantity_locked_,
+            taker_locked_quantity_=taker_locked_quantity_,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            asset_token_decimal_=asset_token_decimal_,
+            collateral_token_decimal_=collateral_token_decimal_,
+            orders_len_=orders_len_,
+            request_list_len_=request_list_len_ - 1,
+            request_list_=request_list_ + MultipleOrder.SIZE,
+            quantity_executed_=quantity_executed_,
+            account_registry_address_=account_registry_address_,
+            holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
+            liquidate_address_=liquidate_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            max_leverage_=max_leverage_,
+            min_quantity_=min_quantity_,
+            maker1_direction_=maker1_direction_,
+            maker1_side_=maker1_side_,
+            trader_stats_list_=trader_stats_list_,
+            total_order_volume_=total_order_volume_,
+            taker_execution_price=taker_execution_price,
+            open_interest_=open_interest_,
+            oracle_price_=oracle_price_,
+        );
     }
 
     // Error Handling: Quantity is less than the one set for the market
@@ -1189,28 +1219,70 @@ func process_and_execute_orders_recurse{
         min_quantity_, [request_list_].quantity, asset_token_decimal_
     );
     if (size_check == FALSE) {
-        assert error_message = '0505';
-        assert error_param_1 = [request_list_].order_id;
-        assert error_param_2 = quantity_order;
+        order_rejected.emit(code='0505', param_1=order_id, param_2=quantity_order);
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-
-        jmp error_handling;
+        return process_and_execute_orders_recurse(
+            original_quantity_locked_=original_quantity_locked_,
+            taker_locked_quantity_=taker_locked_quantity_,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            asset_token_decimal_=asset_token_decimal_,
+            collateral_token_decimal_=collateral_token_decimal_,
+            orders_len_=orders_len_,
+            request_list_len_=request_list_len_ - 1,
+            request_list_=request_list_ + MultipleOrder.SIZE,
+            quantity_executed_=quantity_executed_,
+            account_registry_address_=account_registry_address_,
+            holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
+            liquidate_address_=liquidate_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            max_leverage_=max_leverage_,
+            min_quantity_=min_quantity_,
+            maker1_direction_=maker1_direction_,
+            maker1_side_=maker1_side_,
+            trader_stats_list_=trader_stats_list_,
+            total_order_volume_=total_order_volume_,
+            taker_execution_price=taker_execution_price,
+            open_interest_=open_interest_,
+            oracle_price_=oracle_price_,
+        );
     }
 
     // Error Handling: Wrong market passed for the order
     if ([request_list_].market_id != market_id_) {
-        assert error_message = '0504';
-        assert error_param_1 = [request_list_].order_id;
-        assert error_param_2 = market_id_order;
+        order_rejected.emit(code='0504', param_1=order_id, param_2=market_id_order);
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-
-        jmp error_handling;
+        return process_and_execute_orders_recurse(
+            original_quantity_locked_=original_quantity_locked_,
+            taker_locked_quantity_=taker_locked_quantity_,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            asset_token_decimal_=asset_token_decimal_,
+            collateral_token_decimal_=collateral_token_decimal_,
+            orders_len_=orders_len_,
+            request_list_len_=request_list_len_ - 1,
+            request_list_=request_list_ + MultipleOrder.SIZE,
+            quantity_executed_=quantity_executed_,
+            account_registry_address_=account_registry_address_,
+            holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
+            liquidate_address_=liquidate_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            max_leverage_=max_leverage_,
+            min_quantity_=min_quantity_,
+            maker1_direction_=maker1_direction_,
+            maker1_side_=maker1_side_,
+            trader_stats_list_=trader_stats_list_,
+            total_order_volume_=total_order_volume_,
+            taker_execution_price=taker_execution_price,
+            open_interest_=open_interest_,
+            oracle_price_=oracle_price_,
+        );
     }
 
     // Error Handling: Invalid leverage; leverage < minimum
@@ -1218,15 +1290,36 @@ func process_and_execute_orders_recurse{
         LEVERAGE_ONE, [request_list_].leverage, asset_token_decimal_
     );
     if (leverage_min_check == FALSE) {
-        assert error_message = '0503';
-        assert error_param_1 = [request_list_].order_id;
-        assert error_param_2 = leverage;
+        order_rejected.emit(code='0503', param_1=order_id, param_2=leverage);
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-
-        jmp error_handling;
+        return process_and_execute_orders_recurse(
+            original_quantity_locked_=original_quantity_locked_,
+            taker_locked_quantity_=taker_locked_quantity_,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            asset_token_decimal_=asset_token_decimal_,
+            collateral_token_decimal_=collateral_token_decimal_,
+            orders_len_=orders_len_,
+            request_list_len_=request_list_len_ - 1,
+            request_list_=request_list_ + MultipleOrder.SIZE,
+            quantity_executed_=quantity_executed_,
+            account_registry_address_=account_registry_address_,
+            holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
+            liquidate_address_=liquidate_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            max_leverage_=max_leverage_,
+            min_quantity_=min_quantity_,
+            maker1_direction_=maker1_direction_,
+            maker1_side_=maker1_side_,
+            trader_stats_list_=trader_stats_list_,
+            total_order_volume_=total_order_volume_,
+            taker_execution_price=taker_execution_price,
+            open_interest_=open_interest_,
+            oracle_price_=oracle_price_,
+        );
     }
 
     // Invalid leverage; leverage > maximum
@@ -1234,15 +1327,36 @@ func process_and_execute_orders_recurse{
         [request_list_].leverage, max_leverage_, asset_token_decimal_
     );
     if (leverage_min_check == FALSE) {
-        assert error_message = '0502';
-        assert error_param_1 = [request_list_].order_id;
-        assert error_param_2 = leverage;
+        order_rejected.emit(code='0502', param_1=order_id, param_2=leverage);
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-
-        jmp error_handling;
+        return process_and_execute_orders_recurse(
+            original_quantity_locked_=original_quantity_locked_,
+            taker_locked_quantity_=taker_locked_quantity_,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            asset_token_decimal_=asset_token_decimal_,
+            collateral_token_decimal_=collateral_token_decimal_,
+            orders_len_=orders_len_,
+            request_list_len_=request_list_len_ - 1,
+            request_list_=request_list_ + MultipleOrder.SIZE,
+            quantity_executed_=quantity_executed_,
+            account_registry_address_=account_registry_address_,
+            holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
+            liquidate_address_=liquidate_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            max_leverage_=max_leverage_,
+            min_quantity_=min_quantity_,
+            maker1_direction_=maker1_direction_,
+            maker1_side_=maker1_side_,
+            trader_stats_list_=trader_stats_list_,
+            total_order_volume_=total_order_volume_,
+            taker_execution_price=taker_execution_price,
+            open_interest_=open_interest_,
+            oracle_price_=oracle_price_,
+        );
     }
 
     // Get the portion executed of the order
@@ -1298,15 +1412,36 @@ func process_and_execute_orders_recurse{
     let (hash_error) = order_hash_check(order_id_=[request_list_].order_id, order_hash_=hash);
 
     if (hash_error == TRUE) {
-        assert error_message = '0536';
-        assert error_param_1 = [request_list_].order_id;
-        assert error_param_2 = hash;
+        order_rejected.emit(code='0536', param_1=order_id, param_2=hash);
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-
-        jmp error_handling;
+        return process_and_execute_orders_recurse(
+            original_quantity_locked_=original_quantity_locked_,
+            taker_locked_quantity_=taker_locked_quantity_,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            asset_token_decimal_=asset_token_decimal_,
+            collateral_token_decimal_=collateral_token_decimal_,
+            orders_len_=orders_len_,
+            request_list_len_=request_list_len_ - 1,
+            request_list_=request_list_ + MultipleOrder.SIZE,
+            quantity_executed_=quantity_executed_,
+            account_registry_address_=account_registry_address_,
+            holding_address_=holding_address_,
+            trading_fees_address_=trading_fees_address_,
+            fees_balance_address_=fees_balance_address_,
+            liquidate_address_=liquidate_address_,
+            liquidity_fund_address_=liquidity_fund_address_,
+            insurance_fund_address_=insurance_fund_address_,
+            max_leverage_=max_leverage_,
+            min_quantity_=min_quantity_,
+            maker1_direction_=maker1_direction_,
+            maker1_side_=maker1_side_,
+            trader_stats_list_=trader_stats_list_,
+            total_order_volume_=total_order_volume_,
+            taker_execution_price=taker_execution_price,
+            open_interest_=open_interest_,
+            oracle_price_=oracle_price_,
+        );
     }
 
     // Create a signature object
@@ -1341,28 +1476,70 @@ func process_and_execute_orders_recurse{
         );
 
         if (is_error == TRUE) {
-            assert error_message = '0513';
-            assert error_param_1 = [request_list_].order_id;
-            assert error_param_2 = [request_list_].direction;
+            order_rejected.emit(code='0513', param_1=order_id, param_2=[request_list_].direction);
 
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-
-            jmp error_handling;
+            return process_and_execute_orders_recurse(
+                original_quantity_locked_=original_quantity_locked_,
+                taker_locked_quantity_=taker_locked_quantity_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                asset_token_decimal_=asset_token_decimal_,
+                collateral_token_decimal_=collateral_token_decimal_,
+                orders_len_=orders_len_,
+                request_list_len_=request_list_len_ - 1,
+                request_list_=request_list_ + MultipleOrder.SIZE,
+                quantity_executed_=quantity_executed_,
+                account_registry_address_=account_registry_address_,
+                holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
+                liquidate_address_=liquidate_address_,
+                liquidity_fund_address_=liquidity_fund_address_,
+                insurance_fund_address_=insurance_fund_address_,
+                max_leverage_=max_leverage_,
+                min_quantity_=min_quantity_,
+                maker1_direction_=maker1_direction_,
+                maker1_side_=maker1_side_,
+                trader_stats_list_=trader_stats_list_,
+                total_order_volume_=total_order_volume_,
+                taker_execution_price=taker_execution_price,
+                open_interest_=open_interest_,
+                oracle_price_=oracle_price_,
+            );
         }
 
         // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].post_only == TRUE) {
-            assert error_message = '0515';
-            assert error_param_1 = [request_list_].order_id;
-            assert error_param_2 = current_index;
+            order_rejected.emit(code='0515', param_1=order_id, param_2=current_index);
 
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-
-            jmp error_handling;
+            return process_and_execute_orders_recurse(
+                original_quantity_locked_=original_quantity_locked_,
+                taker_locked_quantity_=taker_locked_quantity_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                asset_token_decimal_=asset_token_decimal_,
+                collateral_token_decimal_=collateral_token_decimal_,
+                orders_len_=orders_len_,
+                request_list_len_=request_list_len_ - 1,
+                request_list_=request_list_ + MultipleOrder.SIZE,
+                quantity_executed_=quantity_executed_,
+                account_registry_address_=account_registry_address_,
+                holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
+                liquidate_address_=liquidate_address_,
+                liquidity_fund_address_=liquidity_fund_address_,
+                insurance_fund_address_=insurance_fund_address_,
+                max_leverage_=max_leverage_,
+                min_quantity_=min_quantity_,
+                maker1_direction_=maker1_direction_,
+                maker1_side_=maker1_side_,
+                trader_stats_list_=trader_stats_list_,
+                total_order_volume_=total_order_volume_,
+                taker_execution_price=taker_execution_price,
+                open_interest_=open_interest_,
+                oracle_price_=oracle_price_,
+            );
         }
 
         local taker_quantity;
@@ -1373,28 +1550,74 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: A Taker order cannot be a post only order
             if (diff_check == FALSE) {
-                assert error_message = '0516';
-                assert error_param_1 = [request_list_].order_id;
-                assert error_param_2 = taker_quantity;
+                order_rejected.emit(
+                    code='0516', param_1=[request_list_].order_id, param_2=taker_quantity
+                );
 
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-
-                jmp error_handling;
+                return process_and_execute_orders_recurse(
+                    original_quantity_locked_=original_quantity_locked_,
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    trader_stats_list_=trader_stats_list_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price=taker_execution_price,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
             }
 
             // Error Handling: A Taker order cannot be a post only order
             if ([request_list_].order_type != LIMIT_ORDER) {
-                assert error_message = '0550';
-                assert error_param_1 = [request_list_].order_id;
-                assert error_param_2 = MARKET_ORDER;
+                order_rejected.emit(
+                    code='0550', param_1=[request_list_].order_id, param_2=MARKET_ORDER
+                );
 
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-
-                jmp error_handling;
+                return process_and_execute_orders_recurse(
+                    original_quantity_locked_=original_quantity_locked_,
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    trader_stats_list_=trader_stats_list_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price=taker_execution_price,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
             }
 
             tempvar syscall_ptr = syscall_ptr;
@@ -1414,28 +1637,70 @@ func process_and_execute_orders_recurse{
             assert slippage = [request_list_].slippage;
             // Error Handling: Slippage of a market order cannot be 0
             if (slippage != 0) {
-                assert error_message = '0521';
-                assert error_param_1 = [request_list_].order_id;
-                assert error_param_2 = slippage;
+                order_rejected.emit(code='0521', param_1=order_id, param_2=slippage);
 
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-
-                jmp error_handling;
+                return process_and_execute_orders_recurse(
+                    original_quantity_locked_=original_quantity_locked_,
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    trader_stats_list_=trader_stats_list_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price=taker_execution_price,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
             }
 
             // Error Handling: A Taker order cannot be a post only order
             if (is_le(slippage, FIFTEEN_PERCENTAGE) == 1) {
-                assert error_message = '0521';
-                assert error_param_1 = [request_list_].order_id;
-                assert error_param_2 = slippage;
+                order_rejected.emit(code='0521', param_1=order_id, param_2=slippage);
 
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-
-                jmp error_handling;
+                return process_and_execute_orders_recurse(
+                    original_quantity_locked_=original_quantity_locked_,
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    trader_stats_list_=trader_stats_list_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price=taker_execution_price,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
             }
 
             let (is_error: felt) = check_within_slippage(
@@ -1461,15 +1726,38 @@ func process_and_execute_orders_recurse{
             );
 
             if (is_error_1 == TRUE) {
-                assert error_message = error_message_1;
-                assert error_param_1 = [request_list_].order_id;
-                assert error_param_2 = execution_price;
+                order_rejected.emit(
+                    code=error_message_1, param_1=order_id, param_2=execution_price
+                );
 
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-
-                jmp error_handling;
+                return process_and_execute_orders_recurse(
+                    original_quantity_locked_=original_quantity_locked_,
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    trader_stats_list_=trader_stats_list_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price=taker_execution_price,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
             }
 
             tempvar syscall_ptr = syscall_ptr;
@@ -1529,28 +1817,70 @@ func process_and_execute_orders_recurse{
         );
 
         if (is_error == TRUE) {
-            assert error_message = '0512';
-            assert error_param_1 = [request_list_].order_id;
-            assert error_param_2 = [request_list_].direction;
+            order_rejected.emit(code='0512', param_1=order_id, param_2=[request_list_].direction);
 
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-
-            jmp error_handling;
+            return process_and_execute_orders_recurse(
+                original_quantity_locked_=original_quantity_locked_,
+                taker_locked_quantity_=taker_locked_quantity_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                asset_token_decimal_=asset_token_decimal_,
+                collateral_token_decimal_=collateral_token_decimal_,
+                orders_len_=orders_len_,
+                request_list_len_=request_list_len_ - 1,
+                request_list_=request_list_ + MultipleOrder.SIZE,
+                quantity_executed_=quantity_executed_,
+                account_registry_address_=account_registry_address_,
+                holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
+                liquidate_address_=liquidate_address_,
+                liquidity_fund_address_=liquidity_fund_address_,
+                insurance_fund_address_=insurance_fund_address_,
+                max_leverage_=max_leverage_,
+                min_quantity_=min_quantity_,
+                maker1_direction_=maker1_direction_,
+                maker1_side_=maker1_side_,
+                trader_stats_list_=trader_stats_list_,
+                total_order_volume_=total_order_volume_,
+                taker_execution_price=taker_execution_price,
+                open_interest_=open_interest_,
+                oracle_price_=oracle_price_,
+            );
         }
 
         // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].order_type != LIMIT_ORDER) {
-            assert error_message = '0518';
-            assert error_param_1 = [request_list_].order_id;
-            assert error_param_2 = current_index;
+            order_rejected.emit(code='0518', param_1=order_id, param_2=current_index);
 
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-
-            jmp error_handling;
+            return process_and_execute_orders_recurse(
+                original_quantity_locked_=original_quantity_locked_,
+                taker_locked_quantity_=taker_locked_quantity_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                asset_token_decimal_=asset_token_decimal_,
+                collateral_token_decimal_=collateral_token_decimal_,
+                orders_len_=orders_len_,
+                request_list_len_=request_list_len_ - 1,
+                request_list_=request_list_ + MultipleOrder.SIZE,
+                quantity_executed_=quantity_executed_,
+                account_registry_address_=account_registry_address_,
+                holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
+                liquidate_address_=liquidate_address_,
+                liquidity_fund_address_=liquidity_fund_address_,
+                insurance_fund_address_=insurance_fund_address_,
+                max_leverage_=max_leverage_,
+                min_quantity_=min_quantity_,
+                maker1_direction_=maker1_direction_,
+                maker1_side_=maker1_side_,
+                trader_stats_list_=trader_stats_list_,
+                total_order_volume_=total_order_volume_,
+                taker_execution_price=taker_execution_price,
+                open_interest_=open_interest_,
+                oracle_price_=oracle_price_,
+            );
         }
         assert quantity_to_execute = quantity_to_execute_remaining;
 
@@ -1858,28 +2188,72 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: Wrong market for liquidation
             if (liq_position.market_id != market_id_) {
-                assert error_message = '0531';
-                assert error_param_1 = [request_list_].order_id;
-                assert error_param_2 = market_id_;
+                order_rejected.emit(code='0531', param_1=order_id, param_2=market_id_);
 
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-
-                jmp error_handling;
+                return process_and_execute_orders_recurse(
+                    original_quantity_locked_=original_quantity_locked_,
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    trader_stats_list_=trader_stats_list_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price=taker_execution_price,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
             }
 
             // Error Handling: Wrong direction for liquidation
             if (liq_position.direction != [request_list_].direction) {
-                assert error_message = '0532';
-                assert error_param_1 = [request_list_].order_id;
-                assert error_param_2 = [request_list_].direction;
+                order_rejected.emit(
+                    code='0532', param_1=order_id, param_2=[request_list_].direction
+                );
 
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-
-                jmp error_handling;
+                return process_and_execute_orders_recurse(
+                    original_quantity_locked_=original_quantity_locked_,
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    trader_stats_list_=trader_stats_list_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price=taker_execution_price,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
             }
 
             // Error Handling: Size larger than marked one
@@ -1887,15 +2261,36 @@ func process_and_execute_orders_recurse{
                 quantity_to_execute, liq_position.amount_to_be_sold, asset_token_decimal_
             );
             if (liquidatable_size_check == FALSE) {
-                assert error_message = '0533';
-                assert error_param_1 = [request_list_].order_id;
-                assert error_param_2 = quantity_to_execute;
+                order_rejected.emit(code='0533', param_1=order_id, param_2=quantity_to_execute);
 
-                tempvar syscall_ptr = syscall_ptr;
-                tempvar pedersen_ptr = pedersen_ptr;
-                tempvar range_check_ptr = range_check_ptr;
-
-                jmp error_handling;
+                return process_and_execute_orders_recurse(
+                    original_quantity_locked_=original_quantity_locked_,
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    trader_stats_list_=trader_stats_list_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price=taker_execution_price,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
             }
 
             let (updated_amount) = Math64x61_sub(
@@ -1921,14 +2316,36 @@ func process_and_execute_orders_recurse{
             if ([request_list_].order_type == DELEVERAGING_ORDER) {
                 // Error Handling: Position not marked as 'deleveragable'
                 if (liq_position.liquidatable == TRUE) {
-                    assert error_message = '0534';
-                    assert error_param_1 = [request_list_].order_id;
-                    assert error_param_2 = quantity_to_execute;
+                    order_rejected.emit(code='0534', param_1=order_id, param_2=quantity_to_execute);
 
-                    tempvar syscall_ptr = syscall_ptr;
-                    tempvar pedersen_ptr = pedersen_ptr;
-                    tempvar range_check_ptr = range_check_ptr;
-                    jmp error_handling;
+                    return process_and_execute_orders_recurse(
+                        original_quantity_locked_=original_quantity_locked_,
+                        taker_locked_quantity_=taker_locked_quantity_,
+                        market_id_=market_id_,
+                        collateral_id_=collateral_id_,
+                        asset_token_decimal_=asset_token_decimal_,
+                        collateral_token_decimal_=collateral_token_decimal_,
+                        orders_len_=orders_len_,
+                        request_list_len_=request_list_len_ - 1,
+                        request_list_=request_list_ + MultipleOrder.SIZE,
+                        quantity_executed_=quantity_executed_,
+                        account_registry_address_=account_registry_address_,
+                        holding_address_=holding_address_,
+                        trading_fees_address_=trading_fees_address_,
+                        fees_balance_address_=fees_balance_address_,
+                        liquidate_address_=liquidate_address_,
+                        liquidity_fund_address_=liquidity_fund_address_,
+                        insurance_fund_address_=insurance_fund_address_,
+                        max_leverage_=max_leverage_,
+                        min_quantity_=min_quantity_,
+                        maker1_direction_=maker1_direction_,
+                        maker1_side_=maker1_side_,
+                        trader_stats_list_=trader_stats_list_,
+                        total_order_volume_=total_order_volume_,
+                        taker_execution_price=taker_execution_price,
+                        open_interest_=open_interest_,
+                        oracle_price_=oracle_price_,
+                    );
                 }
 
                 let (total_value) = Math64x61_add(margin_amount, borrowed_amount);
@@ -1943,15 +2360,36 @@ func process_and_execute_orders_recurse{
             } else {
                 // Error Handling: Position not marked as 'liquidatable'
                 if (liq_position.liquidatable == FALSE) {
-                    assert error_message = '0535';
-                    assert error_param_1 = [request_list_].order_id;
-                    assert error_param_2 = quantity_to_execute;
+                    order_rejected.emit(code='0535', param_1=order_id, param_2=quantity_to_execute);
 
-                    tempvar syscall_ptr = syscall_ptr;
-                    tempvar pedersen_ptr = pedersen_ptr;
-                    tempvar range_check_ptr = range_check_ptr;
-
-                    jmp error_handling;
+                    return process_and_execute_orders_recurse(
+                        original_quantity_locked_=original_quantity_locked_,
+                        taker_locked_quantity_=taker_locked_quantity_,
+                        market_id_=market_id_,
+                        collateral_id_=collateral_id_,
+                        asset_token_decimal_=asset_token_decimal_,
+                        collateral_token_decimal_=collateral_token_decimal_,
+                        orders_len_=orders_len_,
+                        request_list_len_=request_list_len_ - 1,
+                        request_list_=request_list_ + MultipleOrder.SIZE,
+                        quantity_executed_=quantity_executed_,
+                        account_registry_address_=account_registry_address_,
+                        holding_address_=holding_address_,
+                        trading_fees_address_=trading_fees_address_,
+                        fees_balance_address_=fees_balance_address_,
+                        liquidate_address_=liquidate_address_,
+                        liquidity_fund_address_=liquidity_fund_address_,
+                        insurance_fund_address_=insurance_fund_address_,
+                        max_leverage_=max_leverage_,
+                        min_quantity_=min_quantity_,
+                        maker1_direction_=maker1_direction_,
+                        maker1_side_=maker1_side_,
+                        trader_stats_list_=trader_stats_list_,
+                        total_order_volume_=total_order_volume_,
+                        taker_execution_price=taker_execution_price,
+                        open_interest_=open_interest_,
+                        oracle_price_=oracle_price_,
+                    );
                 }
 
                 let (new_margin_locked) = Math64x61_sub(
@@ -2135,46 +2573,6 @@ func process_and_execute_orders_recurse{
         total_order_volume_=new_total_order_volume,
         taker_execution_price=execution_price,
         open_interest_=new_open_interest,
-        oracle_price_=oracle_price_,
-    );
-
-    error_handling:
-    // Emit the event
-    let (keys: felt*) = alloc();
-    assert keys[0] = 'order_rejected';
-    let (data: felt*) = alloc();
-    assert data[0] = error_message;
-    assert data[1] = error_param_1;
-    assert data[2] = error_param_2;
-
-    emit_event(1, keys, 3, data);
-
-    return process_and_execute_orders_recurse(
-        original_quantity_locked_=original_quantity_locked_,
-        taker_locked_quantity_=taker_locked_quantity_,
-        market_id_=market_id_,
-        collateral_id_=collateral_id_,
-        asset_token_decimal_=asset_token_decimal_,
-        collateral_token_decimal_=collateral_token_decimal_,
-        orders_len_=orders_len_,
-        request_list_len_=request_list_len_ - 1,
-        request_list_=request_list_ + MultipleOrder.SIZE,
-        quantity_executed_=quantity_executed_,
-        account_registry_address_=account_registry_address_,
-        holding_address_=holding_address_,
-        trading_fees_address_=trading_fees_address_,
-        fees_balance_address_=fees_balance_address_,
-        liquidate_address_=liquidate_address_,
-        liquidity_fund_address_=liquidity_fund_address_,
-        insurance_fund_address_=insurance_fund_address_,
-        max_leverage_=max_leverage_,
-        min_quantity_=min_quantity_,
-        maker1_direction_=maker1_direction_,
-        maker1_side_=maker1_side_,
-        trader_stats_list_=trader_stats_list_,
-        total_order_volume_=total_order_volume_,
-        taker_execution_price=taker_execution_price,
-        open_interest_=open_interest_,
         oracle_price_=oracle_price_,
     );
 }
