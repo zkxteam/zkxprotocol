@@ -1057,6 +1057,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 }
 
 // @notice Function called by Trading Contract
+// @param batch_id - ID of the batch
 // @param request - Details of the order to be executed
 // @param signature - Details of the signature
 // @param size - Size of the Order to be executed
@@ -1072,6 +1073,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 func execute_order{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
+    batch_id: felt,
     request: OrderRequest,
     signature: Signature,
     size: felt,
@@ -1158,6 +1160,7 @@ func execute_order{
         // Emit event for the order
         let (keys: felt*) = alloc();
         assert keys[0] = 'trade';
+        assert keys[1] = batch_id;
         let (data: felt*) = alloc();
         assert data[0] = order_id;
         assert data[1] = market_id;
