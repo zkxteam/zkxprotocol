@@ -145,6 +145,11 @@ func execute_batch{
 ) -> () {
     alloc_locals;
 
+    let (status: felt) = batch_id_status.read(batch_id=batch_id_);
+    with_attr error_message("0525: {batch_id_}") {
+        assert status = FALSE;
+    }
+
     // Get all the addresses from the auth registry
     let (
         account_registry_address: felt,
