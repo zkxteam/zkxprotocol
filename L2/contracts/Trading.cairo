@@ -212,7 +212,7 @@ func execute_batch{
     );
 
     let (is_zero_quantity) = Math64x61_is_equal(initial_taker_locked, 0, 6);
-    with_attr error_message("0523: {quantity_locked_} {0}") {
+    with_attr error_message("0523: {quantity_locked_} 0") {
         assert is_zero_quantity = 0;
     }
 
@@ -1387,27 +1387,27 @@ func process_and_execute_orders_recurse{
     local current_portion_executed;
     local is_liquidation;
     local average_execution_price_rounded;
-    local temp_order_request: OrderRequest;
+    local temp_order_request: felt*;
 
     // Create a temporary order object
-    assert temp_order_request = OrderRequest(
-        order_id=[request_list_].order_id,
-        market_id=[request_list_].market_id,
-        direction=[request_list_].direction,
-        price=[request_list_].price,
-        quantity=[request_list_].quantity,
-        leverage=[request_list_].leverage,
-        slippage=[request_list_].slippage,
-        order_type=[request_list_].order_type,
-        time_in_force=[request_list_].time_in_force,
-        post_only=[request_list_].post_only,
-        side=[request_list_].side,
-        liquidator_address=[request_list_].liquidator_address,
+    tempvar temp_order_request: felt* = new (
+        [request_list_].order_id,
+        [request_list_].market_id,
+        [request_list_].direction,
+        [request_list_].price,
+        [request_list_].quantity,
+        [request_list_].leverage,
+        [request_list_].slippage,
+        [request_list_].order_type,
+        [request_list_].time_in_force,
+        [request_list_].post_only,
+        [request_list_].side,
+        [request_list_].liquidator_address,
     );
 
     // Code brought in from AccountManager
     // hash the parameters
-    let (hash) = hash_order(&temp_order_request);
+    let (hash) = hash_order(temp_order_request);
 
     // Check for hash collision
     let (hash_error) = order_hash_check(order_id_=[request_list_].order_id, order_hash_=hash);
@@ -1463,7 +1463,7 @@ func process_and_execute_orders_recurse{
         // Set the quantity to execute as the total quantity executed by the Maker so far
         assert quantity_to_execute = quantity_executed_;
         let (is_zero_quantity) = Math64x61_is_equal(quantity_to_execute, 0, 6);
-        with_attr error_message("0524: {original_quantity_locked} {0}") {
+        with_attr error_message("0524: {original_quantity_locked_} 0") {
             assert is_zero_quantity = 0;
         }
 
@@ -2713,8 +2713,9 @@ func is_valid_signature_order{
 // @notice Internal function to hash the order parameters
 // @param orderRequest - Struct of order request to hash
 // @param res - Hash of the details
-func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res: felt) {
+func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: felt*) -> (res: felt) {
     let hash_ptr = pedersen_ptr;
+    // let orderRequestPointer: OrderRequest* = &orderRequest;
     with hash_ptr {
         let (hash_state_ptr) = hash_init();
         let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 11);
