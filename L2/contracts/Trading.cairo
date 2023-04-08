@@ -1365,7 +1365,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         assert data[2] = [request_list_].direction;
         assert data[3] = [request_list_].side;
 
-        emit_event(2, keys, 4, data);
+        emit_event(3, keys, 4, data);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;

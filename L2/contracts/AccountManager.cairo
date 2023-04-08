@@ -1174,7 +1174,7 @@ func execute_order{
         assert data[9] = opening_fee;
         assert data[10] = is_final;
 
-        emit_event(1, keys, 11, data);
+        emit_event(2, keys, 11, data);
 
         return (1,);
     }

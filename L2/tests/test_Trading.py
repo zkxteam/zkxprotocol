@@ -1762,6 +1762,8 @@ async def test_placing_order_directly(trading_test_initializer):
 
     # Create orders
     params = [
+        # batch id
+        1, 
         # order_id
         36913743897347031862778619449,
         # market_id
