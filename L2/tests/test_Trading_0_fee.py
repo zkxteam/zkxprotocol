@@ -406,7 +406,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     assert_event_with_custom_keys_emitted(
         tx_exec_info=info,
         from_address=trading.contract_address,
-        keys=[str_to_felt('trade_execution'), market_id_1],
+        keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
             200), order_direction["short"], side["buy"]],
         order=4
@@ -1358,7 +1358,7 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     assert_event_with_custom_keys_emitted(
         tx_exec_info=info,
         from_address=trading.contract_address,
-        keys=[str_to_felt('trade_execution'), market_id_1],
+        keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
             1000), order_direction["short"], side["buy"]],
         order=3
@@ -1557,11 +1557,11 @@ async def test_closing_partial_orders(trading_test_initializer):
     }]
 
     # execute order
-    (_, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     assert_event_with_custom_keys_emitted(
         tx_exec_info=info,
         from_address=trading.contract_address,
-        keys=[str_to_felt('trade_execution'), market_id_1],
+        keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
         data=[to64x61(quantity_locked_2), to64x61(
             1000), order_direction["long"], side["buy"]],
         order=3
@@ -1699,6 +1699,8 @@ async def test_placing_order_directly(trading_test_initializer):
 
     # Create orders
     params = [
+        # batch id
+        1, 
         # order_id
         36913743897347031862778619449,
         # market_id

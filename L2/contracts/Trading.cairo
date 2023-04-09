@@ -145,6 +145,11 @@ func execute_batch{
 ) -> () {
     alloc_locals;
 
+    let (status: felt) = batch_id_status.read(batch_id=batch_id_);
+    with_attr error_message("0525: {batch_id_}") {
+        assert status = FALSE;
+    }
+
     // Get all the addresses from the auth registry
     let (
         account_registry_address: felt,
@@ -200,6 +205,7 @@ func execute_batch{
 
     // Recursively loop through the orders in the batch
     let (taker_execution_price: felt, open_interest: felt) = check_and_execute(
+        batch_id_=batch_id_,
         market_id_=market_id_,
         collateral_id_=collateral_id,
         asset_token_decimal_=asset.token_decimal,
@@ -1151,6 +1157,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 }
 
 // @notice Internal function called by execute_batch
+// @param batch_id_ - ID of the batch
 // @param market_id_ - Market ID of the batch
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
 // @param asset_token_decimal_ - No.of token decimals of an asset
@@ -1180,6 +1187,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @return trader_stats_list_len - length of the trader fee list so far
 // @return open_interest - open interest corresponding to the trade batch
 func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    batch_id_: felt,
     market_id_: felt,
     collateral_id_: felt,
     asset_token_decimal_: felt,
@@ -1350,13 +1358,14 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         let (keys: felt*) = alloc();
         assert keys[0] = 'trade_execution';
         assert keys[1] = market_id_;
+        assert keys[2] = batch_id_;
         let (data: felt*) = alloc();
         assert data[0] = quantity_to_execute;
         assert data[1] = execution_price;
         assert data[2] = [request_list_].direction;
         assert data[3] = [request_list_].side;
 
-        emit_event(2, keys, 4, data);
+        emit_event(3, keys, 4, data);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
@@ -1404,6 +1413,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             // Call the account contract to initialize the order
             IAccountManager.execute_order(
                 contract_address=user_address,
+                batch_id=batch_id_,
                 request=temp_order_request,
                 signature=temp_signature,
                 size=0,
@@ -1431,6 +1441,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             assert [trader_stats_list_] = element;
 
             return check_and_execute(
+                batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
                 asset_token_decimal_=asset_token_decimal_,
@@ -1573,6 +1584,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     // Call the account contract to initialize the order
     IAccountManager.execute_order(
         contract_address=user_address,
+        batch_id=batch_id_,
         request=temp_order_request,
         signature=temp_signature,
         size=quantity_to_execute,
@@ -1591,6 +1603,7 @@ func check_and_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (new_open_interest) = Math64x61_add(open_interest_, current_open_interest);
 
     return check_and_execute(
+        batch_id_=batch_id_,
         market_id_=market_id_,
         collateral_id_=collateral_id_,
         asset_token_decimal_=asset_token_decimal_,

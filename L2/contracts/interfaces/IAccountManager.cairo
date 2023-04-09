@@ -70,6 +70,7 @@ namespace IAccountManager {
     // External functions
 
     func execute_order(
+        batch_id: felt,
         request: OrderRequest,
         signature: Signature,
         size: felt,
