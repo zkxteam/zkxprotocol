@@ -239,7 +239,7 @@ func execute_batch{
         maker1_direction_=[request_list].direction,
         maker1_side_=[request_list].side,
         total_order_volume_=0,
-        taker_execution_price=0,
+        taker_execution_price_=0,
         open_interest_=0,
         oracle_price_=oracle_price_,
     );
@@ -431,21 +431,21 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     if (direction_ == LONG) {
         // if it's a long order
         if (side_ == BUY) {
-            let (limit_price_check) = Math64x61_is_le(
+            let (limit_price_check_1) = Math64x61_is_le(
                 execution_price_, price_, collateral_token_decimal_
             );
 
-            if (limit_price_check == FALSE) {
+            if (limit_price_check_1 == FALSE) {
                 // if it's a buy order
                 return (TRUE, '0508');
             }
         } else {
             // if it's a sell order
-            let (limit_price_check) = Math64x61_is_le(
+            let (limit_price_check_2) = Math64x61_is_le(
                 price_, execution_price_, collateral_token_decimal_
             );
 
-            if (limit_price_check == FALSE) {
+            if (limit_price_check_2 == FALSE) {
                 return (TRUE, '0507');
             }
         }
@@ -454,20 +454,20 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
         // if it's a short order
         if (side_ == BUY) {
             // if it's a buy order
-            let (limit_price_check) = Math64x61_is_le(
+            let (limit_price_check_3) = Math64x61_is_le(
                 price_, execution_price_, collateral_token_decimal_
             );
 
-            if (limit_price_check == FALSE) {
+            if (limit_price_check_3 == FALSE) {
                 return (TRUE, '0507');
             }
         } else {
             // if it's a sell order
-            let (limit_price_check) = Math64x61_is_le(
-                price_, execution_price_, collateral_token_decimal_
+            let (limit_price_check_4) = Math64x61_is_le(
+                execution_price_, price_, collateral_token_decimal_
             );
 
-            if (limit_price_check == FALSE) {
+            if (limit_price_check_4 == FALSE) {
                 return (TRUE, '0507');
             }
         }
@@ -1087,7 +1087,7 @@ func process_and_execute_orders_recurse{
     maker1_direction_: felt,
     maker1_side_: felt,
     total_order_volume_: felt,
-    taker_execution_price: felt,
+    taker_execution_price_: felt,
     open_interest_: felt,
     oracle_price_: felt,
 ) -> (taker_execution_price: felt, open_interest: felt) {
@@ -1108,7 +1108,6 @@ func process_and_execute_orders_recurse{
     local market_array_update;
     local updated_margin_locked;
     local updated_liquidatable_position: LiquidatablePosition;
-    local current_portion_executed;
     local is_liquidation;
 
     // Error messages require local variables to be passed in params
@@ -1118,7 +1117,7 @@ func process_and_execute_orders_recurse{
     // Check if the list is empty, if yes return 1
     if (request_list_len_ == 0) {
         let (actual_open_interest) = Math64x61_div(open_interest_, TWO);
-        return (taker_execution_price, actual_open_interest);
+        return (taker_execution_price_, actual_open_interest);
     }
 
     // Error Handling: User is not registered
@@ -1153,7 +1152,7 @@ func process_and_execute_orders_recurse{
             maker1_direction_=maker1_direction_,
             maker1_side_=maker1_side_,
             total_order_volume_=total_order_volume_,
-            taker_execution_price=taker_execution_price,
+            taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
         );
@@ -1190,7 +1189,7 @@ func process_and_execute_orders_recurse{
             maker1_direction_=maker1_direction_,
             maker1_side_=maker1_side_,
             total_order_volume_=total_order_volume_,
-            taker_execution_price=taker_execution_price,
+            taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
         );
@@ -1224,7 +1223,7 @@ func process_and_execute_orders_recurse{
             maker1_direction_=maker1_direction_,
             maker1_side_=maker1_side_,
             total_order_volume_=total_order_volume_,
-            taker_execution_price=taker_execution_price,
+            taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
         );
@@ -1261,7 +1260,7 @@ func process_and_execute_orders_recurse{
             maker1_direction_=maker1_direction_,
             maker1_side_=maker1_side_,
             total_order_volume_=total_order_volume_,
-            taker_execution_price=taker_execution_price,
+            taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
         );
@@ -1298,7 +1297,7 @@ func process_and_execute_orders_recurse{
             maker1_direction_=maker1_direction_,
             maker1_side_=maker1_side_,
             total_order_volume_=total_order_volume_,
-            taker_execution_price=taker_execution_price,
+            taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
         );
@@ -1378,7 +1377,7 @@ func process_and_execute_orders_recurse{
             maker1_direction_=maker1_direction_,
             maker1_side_=maker1_side_,
             total_order_volume_=total_order_volume_,
-            taker_execution_price=taker_execution_price,
+            taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
         );
@@ -1402,8 +1401,38 @@ func process_and_execute_orders_recurse{
         // Set the quantity to execute as the total quantity executed by the Maker so far
         assert quantity_to_execute = quantity_executed_;
         let (is_zero_quantity) = Math64x61_is_equal(quantity_to_execute, 0, 6);
-        with_attr error_message("0524: {taker_locked_quantity_} 0") {
-            assert is_zero_quantity = 0;
+
+        if (is_zero_quantity == TRUE) {
+            return process_and_execute_orders_recurse(
+                taker_locked_quantity_=taker_locked_quantity_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                asset_token_decimal_=asset_token_decimal_,
+                collateral_token_decimal_=collateral_token_decimal_,
+                orders_len_=orders_len_,
+                request_list_len_=request_list_len_ - 1,
+                request_list_=request_list_ + MultipleOrder.SIZE,
+                quantity_executed_=quantity_executed_,
+                account_registry_address_=account_registry_address_,
+                holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
+                liquidate_address_=liquidate_address_,
+                liquidity_fund_address_=liquidity_fund_address_,
+                insurance_fund_address_=insurance_fund_address_,
+                max_leverage_=max_leverage_,
+                min_quantity_=min_quantity_,
+                maker1_direction_=maker1_direction_,
+                maker1_side_=maker1_side_,
+                total_order_volume_=total_order_volume_,
+                taker_execution_price_=taker_execution_price_,
+                open_interest_=open_interest_,
+                oracle_price_=oracle_price_,
+            );
+        }
+
+        with_attr error_message("0524: {taker_locked_quantity_} {quantity_to_execute}") {
+            assert is_zero_quantity = FALSE;
         }
 
         // Direction Check
@@ -1438,7 +1467,7 @@ func process_and_execute_orders_recurse{
                 maker1_direction_=maker1_direction_,
                 maker1_side_=maker1_side_,
                 total_order_volume_=total_order_volume_,
-                taker_execution_price=taker_execution_price,
+                taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
             );
@@ -1472,7 +1501,7 @@ func process_and_execute_orders_recurse{
                 maker1_direction_=maker1_direction_,
                 maker1_side_=maker1_side_,
                 total_order_volume_=total_order_volume_,
-                taker_execution_price=taker_execution_price,
+                taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
             );
@@ -1512,7 +1541,7 @@ func process_and_execute_orders_recurse{
                     maker1_direction_=maker1_direction_,
                     maker1_side_=maker1_side_,
                     total_order_volume_=total_order_volume_,
-                    taker_execution_price=taker_execution_price,
+                    taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
                 );
@@ -1546,7 +1575,7 @@ func process_and_execute_orders_recurse{
                     maker1_direction_=maker1_direction_,
                     maker1_side_=maker1_side_,
                     total_order_volume_=total_order_volume_,
-                    taker_execution_price=taker_execution_price,
+                    taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
                 );
@@ -1568,7 +1597,7 @@ func process_and_execute_orders_recurse{
             local slippage;
             assert slippage = [request_list_].slippage;
             // Error Handling: Slippage of a market order cannot be 0
-            if (slippage != 0) {
+            if (slippage == 0) {
                 order_rejected.emit(
                     code='0521', param_1=[request_list_].order_id, param_2=slippage
                 );
@@ -1595,14 +1624,14 @@ func process_and_execute_orders_recurse{
                     maker1_direction_=maker1_direction_,
                     maker1_side_=maker1_side_,
                     total_order_volume_=total_order_volume_,
-                    taker_execution_price=taker_execution_price,
+                    taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
                 );
             }
 
             // Error Handling: A Taker order cannot be a post only order
-            if (is_le(slippage, FIFTEEN_PERCENTAGE) == 1) {
+            if (is_le(slippage, FIFTEEN_PERCENTAGE) == FALSE) {
                 order_rejected.emit(
                     code='0521', param_1=[request_list_].order_id, param_2=slippage
                 );
@@ -1629,7 +1658,7 @@ func process_and_execute_orders_recurse{
                     maker1_direction_=maker1_direction_,
                     maker1_side_=maker1_side_,
                     total_order_volume_=total_order_volume_,
-                    taker_execution_price=taker_execution_price,
+                    taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
                 );
@@ -1643,6 +1672,39 @@ func process_and_execute_orders_recurse{
                 side_=[request_list_].side,
                 collateral_token_decimal_=collateral_token_decimal_,
             );
+
+            if (is_error == TRUE) {
+                order_rejected.emit(
+                    code='0506', param_1=[request_list_].order_id, param_2=execution_price
+                );
+
+                return process_and_execute_orders_recurse(
+                    taker_locked_quantity_=taker_locked_quantity_,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    asset_token_decimal_=asset_token_decimal_,
+                    collateral_token_decimal_=collateral_token_decimal_,
+                    orders_len_=orders_len_,
+                    request_list_len_=request_list_len_ - 1,
+                    request_list_=request_list_ + MultipleOrder.SIZE,
+                    quantity_executed_=quantity_executed_,
+                    account_registry_address_=account_registry_address_,
+                    holding_address_=holding_address_,
+                    trading_fees_address_=trading_fees_address_,
+                    fees_balance_address_=fees_balance_address_,
+                    liquidate_address_=liquidate_address_,
+                    liquidity_fund_address_=liquidity_fund_address_,
+                    insurance_fund_address_=insurance_fund_address_,
+                    max_leverage_=max_leverage_,
+                    min_quantity_=min_quantity_,
+                    maker1_direction_=maker1_direction_,
+                    maker1_side_=maker1_side_,
+                    total_order_volume_=total_order_volume_,
+                    taker_execution_price_=taker_execution_price_,
+                    open_interest_=open_interest_,
+                    oracle_price_=oracle_price_,
+                );
+            }
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1682,7 +1744,7 @@ func process_and_execute_orders_recurse{
                     maker1_direction_=maker1_direction_,
                     maker1_side_=maker1_side_,
                     total_order_volume_=total_order_volume_,
-                    taker_execution_price=taker_execution_price,
+                    taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
                 );
@@ -1767,7 +1829,7 @@ func process_and_execute_orders_recurse{
                 maker1_direction_=maker1_direction_,
                 maker1_side_=maker1_side_,
                 total_order_volume_=total_order_volume_,
-                taker_execution_price=taker_execution_price,
+                taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
             );
@@ -1801,7 +1863,7 @@ func process_and_execute_orders_recurse{
                 maker1_direction_=maker1_direction_,
                 maker1_side_=maker1_side_,
                 total_order_volume_=total_order_volume_,
-                taker_execution_price=taker_execution_price,
+                taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
             );
@@ -1840,7 +1902,7 @@ func process_and_execute_orders_recurse{
                 maker1_direction_=maker1_direction_,
                 maker1_side_=maker1_side_,
                 total_order_volume_=total_order_volume_,
-                taker_execution_price=taker_execution_price,
+                taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
             );
@@ -1924,7 +1986,7 @@ func process_and_execute_orders_recurse{
                 maker1_direction_=maker1_direction_,
                 maker1_side_=maker1_side_,
                 total_order_volume_=total_order_volume_,
-                taker_execution_price=taker_execution_price,
+                taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
             );
@@ -1972,6 +2034,7 @@ func process_and_execute_orders_recurse{
             tempvar range_check_ptr = range_check_ptr;
         } else {
             created_timestamp = position_details.created_timestamp;
+            assert market_array_update = 0;
 
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr = pedersen_ptr;
@@ -2008,8 +2071,6 @@ func process_and_execute_orders_recurse{
             realized_pnl=new_pnl,
         );
 
-        let (new_portion_executed) = Math64x61_add(order_portion_executed, quantity_to_execute);
-
         assert updated_liquidatable_position = LiquidatablePosition(
             market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
         );
@@ -2017,7 +2078,6 @@ func process_and_execute_orders_recurse{
         assert pnl = trading_fee;
         assert opening_fee = trading_fee;
         assert current_open_interest = quantity_to_execute;
-        assert current_portion_executed = new_portion_executed;
         assert is_liquidation = FALSE;
 
         let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_amount);
@@ -2074,11 +2134,6 @@ func process_and_execute_orders_recurse{
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
 
-        // Round off the average execution price of the position
-        let (average_execution_price_rounded) = Math64x61_round(
-            average_execution_price_temp, collateral_token_decimal_
-        );
-
         if (is_liq == TRUE) {
             // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
             let liq_position: LiquidatablePosition = IAccountManager.get_deleveragable_or_liquidatable_position(
@@ -2112,7 +2167,7 @@ func process_and_execute_orders_recurse{
                     maker1_direction_=maker1_direction_,
                     maker1_side_=maker1_side_,
                     total_order_volume_=total_order_volume_,
-                    taker_execution_price=taker_execution_price,
+                    taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
                 );
@@ -2146,7 +2201,7 @@ func process_and_execute_orders_recurse{
                     maker1_direction_=maker1_direction_,
                     maker1_side_=maker1_side_,
                     total_order_volume_=total_order_volume_,
-                    taker_execution_price=taker_execution_price,
+                    taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
                 );
@@ -2183,7 +2238,7 @@ func process_and_execute_orders_recurse{
                     maker1_direction_=maker1_direction_,
                     maker1_side_=maker1_side_,
                     total_order_volume_=total_order_volume_,
-                    taker_execution_price=taker_execution_price,
+                    taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
                 );
@@ -2237,7 +2292,7 @@ func process_and_execute_orders_recurse{
                         maker1_direction_=maker1_direction_,
                         maker1_side_=maker1_side_,
                         total_order_volume_=total_order_volume_,
-                        taker_execution_price=taker_execution_price,
+                        taker_execution_price_=taker_execution_price_,
                         open_interest_=open_interest_,
                         oracle_price_=oracle_price_,
                     );
@@ -2281,7 +2336,7 @@ func process_and_execute_orders_recurse{
                         maker1_direction_=maker1_direction_,
                         maker1_side_=maker1_side_,
                         total_order_volume_=total_order_volume_,
-                        taker_execution_price=taker_execution_price,
+                        taker_execution_price_=taker_execution_price_,
                         open_interest_=open_interest_,
                         oracle_price_=oracle_price_,
                     );
@@ -2301,6 +2356,13 @@ func process_and_execute_orders_recurse{
         } else {
             assert new_leverage = position_details.leverage;
 
+            let (new_margin_locked) = Math64x61_sub(current_margin_locked, margin_unlock_amount);
+
+            assert updated_margin_locked = new_margin_locked;
+
+            assert updated_liquidatable_position = LiquidatablePosition(
+                market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
+            );
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -2309,9 +2371,11 @@ func process_and_execute_orders_recurse{
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
 
+        // Check if the new position size is 0
         let (is_zero_current_position) = Math64x61_is_equal(
             new_position_size, 0, asset_token_decimal_
         );
+        // If yes, fetch the opposite position
         if (is_zero_current_position == TRUE) {
             let (opposite_direction: felt) = get_opposite(
                 side_or_direction_=[request_list_].direction
@@ -2321,15 +2385,19 @@ func process_and_execute_orders_recurse{
                 market_id_=market_id_,
                 direction_=opposite_direction,
             );
+
+            // Check if the opposite position's size is 0
             let (is_zero_opposite_position) = Math64x61_is_equal(
                 opposite_position.position_size, 0, asset_token_decimal_
             );
 
-            if (is_zero_opposite_position == 1) {
+            // If yes, we need to remove this market from the array
+            if (is_zero_opposite_position == TRUE) {
                 assert market_array_update = 2;
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
                 tempvar range_check_ptr = range_check_ptr;
+                // If not, we do nothing
             } else {
                 assert market_array_update = 0;
                 tempvar syscall_ptr = syscall_ptr;
@@ -2361,6 +2429,11 @@ func process_and_execute_orders_recurse{
                 borrowed_amount_temp, collateral_token_decimal_
             );
 
+            // Round off the average execution price of the position
+            let (average_execution_price_rounded) = Math64x61_round(
+                average_execution_price_temp, collateral_token_decimal_
+            );
+
             // Create a new struct with the updated details
             assert updated_position_details = PositionDetails(
                 avg_execution_price=average_execution_price_rounded,
@@ -2373,17 +2446,16 @@ func process_and_execute_orders_recurse{
                 realized_pnl=current_pnl,
             );
 
+            assert market_array_update = 0;
+
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
 
-        let (new_portion_executed) = Math64x61_add(order_portion_executed, quantity_to_execute);
-
         assert pnl = realized_pnl;
         assert opening_fee = 0;
         assert current_open_interest = 0 - quantity_to_execute;
-        assert current_portion_executed = new_portion_executed;
         assert is_liquidation = is_liq;
 
         assert execution_details = ExecutionDetails(
@@ -2393,7 +2465,7 @@ func process_and_execute_orders_recurse{
             order_type=[request_list_].order_type,
             order_side=[request_list_].side,
             execution_price=execution_price,
-            pnl=pnl,
+            pnl=realized_pnl,
             side=current_order_side,
             opening_fee=0,
             is_final=is_final,
@@ -2405,13 +2477,15 @@ func process_and_execute_orders_recurse{
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     }
 
+    let (new_portion_executed) = Math64x61_add(order_portion_executed, quantity_to_execute);
+
     if ([request_list_].time_in_force == IoC) {
         // Update the portion executed to request.quantity if it's an IoC order
-        updated_portion_executed = [request_list_].quantity;
+        assert updated_portion_executed = [request_list_].quantity;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     } else {
         // Update the portion executed
-        updated_portion_executed = current_portion_executed;
+        assert updated_portion_executed = new_portion_executed;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     }
 
@@ -2453,7 +2527,7 @@ func process_and_execute_orders_recurse{
         maker1_direction_=maker1_direction_,
         maker1_side_=maker1_side_,
         total_order_volume_=new_total_order_volume,
-        taker_execution_price=execution_price,
+        taker_execution_price_=execution_price,
         open_interest_=new_open_interest,
         oracle_price_=oracle_price_,
     );
@@ -2536,9 +2610,13 @@ func order_hash_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     if (existing_hash == 0) {
         order_id_mapping.write(order_id=order_id_, value=order_hash_);
         return (FALSE,);
+    } else {
+        if (existing_hash == order_hash_) {
+            return (FALSE,);
+        } else {
+            return (TRUE,);
+        }
     }
-
-    return (TRUE,);
 }
 
 // @notice view function which checks the signature passed is valid
