@@ -1166,10 +1166,10 @@ class OrderExecutor:
                         pnl_abs = abs(pnl)
                         if user_balance <= pnl_abs:
                             self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount-user_balance)      
+                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=pnl_abs-user_balance)      
                         else:
                             self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
-                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance-margin_unlock_amount)      
+                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance-pnl_abs)      
                 user.modify_balance(
                     mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount)
                 realized_pnl = margin_unlock_amount*-1

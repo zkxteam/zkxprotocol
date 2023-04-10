@@ -1177,9 +1177,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                         );
                         // if user balance can't cover loss, deduct deficit from insurance
                         if (is_balance_less_than_loss == TRUE) {
-                            let (deduct_from_insurance) = Math64x61_sub(
-                                margin_amount_to_be_reduced, user_balance
-                            );
+                            let (deduct_from_insurance) = Math64x61_sub(pnl_abs, user_balance);
                             IInsuranceFund.withdraw(
                                 contract_address=insurance_fund_address_,
                                 asset_id_=collateral_id_,
@@ -1190,9 +1188,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                             tempvar range_check_ptr = range_check_ptr;
                             // if user balance can cover loss, deposit remaining to insurance
                         } else {
-                            let (deposit_to_insurance) = Math64x61_sub(
-                                user_balance, margin_amount_to_be_reduced
-                            );
+                            let (deposit_to_insurance) = Math64x61_sub(user_balance, pnl_abs);
                             IInsuranceFund.deposit(
                                 contract_address=insurance_fund_address_,
                                 asset_id_=collateral_id_,
