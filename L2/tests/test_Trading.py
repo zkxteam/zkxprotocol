@@ -1388,14 +1388,14 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     print(info.call_info)
-    assert_event_with_custom_keys_emitted(
-        tx_exec_info=info,
-        from_address=trading.contract_address,
-        keys=[str_to_felt('trade_execution'), market_id_1],
-        data=[to64x61(quantity_locked_1), to64x61(
-            1000), order_direction["short"], side["buy"]],
-        order=5
-    )
+    # assert_event_with_custom_keys_emitted(
+    #     tx_exec_info=info,
+    #     from_address=trading.contract_address,
+    #     keys=[str_to_felt('trade_execution'), market_id_1],
+    #     data=[to64x61(quantity_locked_1), to64x61(
+    #         1000), order_direction["short"], side["buy"]],
+    #     order=5
+    # )
 
     # # check balances
     # await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)

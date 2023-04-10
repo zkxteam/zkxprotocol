@@ -1407,6 +1407,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 // return (1,);
 // }
 
+@external
 func execute_order{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
@@ -2629,20 +2630,6 @@ func populate_positions_collaterals_recurse{
     );
 }
 
-// @notice Internal function to hash the order parameters
-// @param orderRequest - Struct of order request to hash
-// @param res - Hash of the details
-func hash_order{pedersen_ptr: HashBuiltin*}(orderRequest: OrderRequest*) -> (res: felt) {
-    let hash_ptr = pedersen_ptr;
-    with hash_ptr {
-        let (hash_state_ptr) = hash_init();
-        let (hash_state_ptr) = hash_update(hash_state_ptr, orderRequest, 11);
-        let (res) = hash_finalize(hash_state_ptr);
-        let pedersen_ptr = hash_ptr;
-        return (res=res);
-    }
-}
-
 // @notice Internal function to hash the withdrawal request parameters
 // @param withdrawal_request_ - Struct of withdrawal Request to hash
 // @param res - Hash of the details
@@ -2768,17 +2755,4 @@ func check_for_withdrawal_replay{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*,
     }
 
     return check_for_withdrawal_replay(request_id_, arr_len_ - 1);
-}
-
-// @notice Internal function to get oppsite side or direction of the order
-// @param side_or_direction_ - Argument represents either side or direction
-// @return res - Returns either opposite side or opposite direction of the order
-func get_opposite{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    side_or_direction_: felt
-) -> (res: felt) {
-    if (side_or_direction_ == LONG) {
-        return (res=SHORT);
-    } else {
-        return (res=LONG);
-    }
 }

@@ -35,7 +35,6 @@ from contracts.AccountManager import (
     populate_array_collaterals,
     populate_positions,
     populate_simplified_positions,
-    hash_order,
     hash_withdrawal_request,
     add_to_market_array,
     remove_from_market_array,
