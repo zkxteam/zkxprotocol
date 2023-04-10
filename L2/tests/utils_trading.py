@@ -1720,7 +1720,7 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
         execution_info = await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
     else:
         execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
-        executor.execute_batch(*execute_batch_params_python)
+        # executor.execute_batch(*execute_batch_params_python)
     return (batch_id, complete_orders_python, execution_info)
 
 

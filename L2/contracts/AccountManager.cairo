@@ -1422,13 +1422,6 @@ func execute_order{
 ) {
     alloc_locals;
 
-    local order_id;
-    local market_id;
-
-    // For the error message
-    assert order_id = execution_details_.order_id;
-    assert market_id = market_id_;
-
     // Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
@@ -1438,7 +1431,7 @@ func execute_order{
         contract_address=registry, index=Trading_INDEX, version=version
     );
 
-    with_attr error_message("0002: {order_id} {market_id}") {
+    with_attr error_message("0002: {execution_details_.order_id} {market_id_}") {
         assert caller = trading_address;
     }
 

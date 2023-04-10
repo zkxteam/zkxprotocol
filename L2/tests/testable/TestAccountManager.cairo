@@ -31,7 +31,6 @@ from contracts.AccountManager import (
     update_withdrawal_history,
     withdraw,
     liquidate_position,
-    order_hash_check,
     populate_withdrawals_array,
     populate_array_collaterals,
     populate_positions,
@@ -51,7 +50,6 @@ from contracts.Constants import MasterAdmin_ACTION
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.Utils import verify_caller_authority
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-
 
 // ///////////
 // External //
