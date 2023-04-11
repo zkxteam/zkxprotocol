@@ -1459,6 +1459,8 @@ func execute_order{
     updated_portion_executed_: felt,
     market_array_update_: felt,
     is_liquidation_: felt,
+    error_message_: felt,
+    error_param_1_: felt,
 ) {
     alloc_locals;
 
@@ -1475,30 +1477,48 @@ func execute_order{
         assert caller = trading_address;
     }
 
-    // Update the position mapping
-    position_mapping.write(
-        market_id=market_id_,
-        direction=execution_details_.direction,
-        value=updated_position_details_,
-    );
+    if (error_message_ == 0) {
+        // Update the position mapping
+        position_mapping.write(
+            market_id=market_id_,
+            direction=execution_details_.direction,
+            value=updated_position_details_,
+        );
 
-    // Update the margin locked
-    margin_locked.write(asset_id=collateral_id_, value=updated_margin_locked_);
+        // Update the margin locked
+        margin_locked.write(asset_id=collateral_id_, value=updated_margin_locked_);
 
-    // Update the portion executed for the order
-    portion_executed.write(order_id=execution_details_.order_id, value=updated_portion_executed_);
+        // Update the portion executed for the order
+        portion_executed.write(
+            order_id=execution_details_.order_id, value=updated_portion_executed_
+        );
 
-    // Update the market array if required
-    if (market_array_update_ == 1) {
-        add_to_market_array(market_id_=market_id_, collateral_id_=collateral_id_);
+        // Update the market array if required
+        if (market_array_update_ == 1) {
+            add_to_market_array(market_id_=market_id_, collateral_id_=collateral_id_);
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
-    } else {
-        if (market_array_update_ == 2) {
-            remove_from_market_array(market_id_=market_id_, collateral_id_=collateral_id_);
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            if (market_array_update_ == 2) {
+                remove_from_market_array(market_id_=market_id_, collateral_id_=collateral_id_);
 
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            }
+        }
+
+        // Update the deleveragable_or_liquidatable_position if required
+        if (is_liquidation_ == 1) {
+            deleveragable_or_liquidatable_position.write(
+                collateral_id=collateral_id_, value=updated_liquidatable_position_
+            );
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -1507,41 +1527,40 @@ func execute_order{
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
         }
-    }
 
-    // Update the deleveragable_or_liquidatable_position if required
-    if (is_liquidation_ == 1) {
-        deleveragable_or_liquidatable_position.write(
-            collateral_id=collateral_id_, value=updated_liquidatable_position_
-        );
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+        // Emit event for the order
+        let (keys: felt*) = alloc();
+        assert keys[0] = 'trade';
+        let (data: felt*) = alloc();
+        assert data[0] = execution_details_.order_id;
+        assert data[1] = market_id_;
+        assert data[2] = execution_details_.direction;
+        assert data[3] = execution_details_.size;
+        assert data[4] = execution_details_.order_type;
+        assert data[5] = execution_details_.order_side;
+        assert data[6] = execution_details_.execution_price;
+        assert data[7] = execution_details_.pnl;
+        assert data[8] = execution_details_.side;
+        assert data[9] = execution_details_.opening_fee;
+        assert data[10] = execution_details_.is_final;
+
+        emit_event(1, keys, 11, data);
+
+        return ();
     } else {
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+        // emit the error
+        // Emit event for the order
+        let (keys: felt*) = alloc();
+        assert keys[0] = 'order_rejected';
+        let (data: felt*) = alloc();
+        assert data[0] = error_message_;
+        assert data[1] = execution_details_.order_id;
+        assert data[2] = error_param_1_;
+
+        emit_event(1, keys, 3, data);
+
+        return ();
     }
-
-    // Emit event for the order
-    let (keys: felt*) = alloc();
-    assert keys[0] = 'trade';
-    let (data: felt*) = alloc();
-    assert data[0] = execution_details_.order_id;
-    assert data[1] = market_id_;
-    assert data[2] = execution_details_.direction;
-    assert data[3] = execution_details_.size;
-    assert data[4] = execution_details_.order_type;
-    assert data[5] = execution_details_.order_side;
-    assert data[6] = execution_details_.execution_price;
-    assert data[7] = execution_details_.pnl;
-    assert data[8] = execution_details_.side;
-    assert data[9] = execution_details_.opening_fee;
-    assert data[10] = execution_details_.is_final;
-
-    emit_event(1, keys, 11, data);
-
-    return ();
 }
 
 // @notice function to update l1 fee and node operators l1 wallet address

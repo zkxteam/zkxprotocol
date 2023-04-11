@@ -83,6 +83,8 @@ namespace IAccountManager {
         updated_portion_executed_: felt,
         market_array_update_: felt,
         is_liquidation_: felt,
+        error_message_: felt,
+        error_param_1_: felt,
     ) {
     }
 

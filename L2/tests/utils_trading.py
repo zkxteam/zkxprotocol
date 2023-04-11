@@ -1002,8 +1002,9 @@ class OrderExecutor:
                 current_batch_locked_size = 0
             position = user.get_position(
                 market_id=request["market_id"], direction=request["direction"])
-            
-            remaining_position_size = position["position_size"] - current_batch_locked_size
+
+            remaining_position_size = position["position_size"] - \
+                current_batch_locked_size
 
             if quantity_to_execute <= remaining_position_size:
                 quantity_to_execute_final = quantity_to_execute
@@ -1011,7 +1012,8 @@ class OrderExecutor:
                 quantity_to_execute_final = remaining_position_size
 
             current_batch_locked_size_new = current_batch_locked_size + quantity_to_execute_final
-            position_locked.update({user.user_address: {request["direction"]: current_batch_locked_size_new}})
+            position_locked.update(
+                {user.user_address: {request["direction"]: current_batch_locked_size_new}})
         else:
             quantity_to_execute_final = quantity_to_execute
 
@@ -1157,19 +1159,19 @@ class OrderExecutor:
                     asset_id=market_to_collateral_mapping[order["market_id"]])
                 if user_balance >= margin_unlock_amount:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
-                        asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
+                                               asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
                 else:
                     if user_balance <= 0:
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount)      
+                                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount)
                     else:
                         pnl_abs = abs(pnl)
                         if user_balance <= pnl_abs:
                             self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=pnl_abs-user_balance)      
+                                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=pnl_abs-user_balance)
                         else:
                             self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
-                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance-pnl_abs)      
+                                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance-pnl_abs)
                 user.modify_balance(
                     mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount)
                 realized_pnl = margin_unlock_amount*-1
@@ -1246,21 +1248,21 @@ class OrderExecutor:
             if i == len(request_list) - 1:
                 if request_list[i]["post_only"] != 0:
                     print("Post Only order cannot be a taker")
-                    return
+                    continue
 
                 if request_list[i]["time_in_force"] == order_time_in_force["fill_or_kill"]:
                     if request_list[i]["quantity"] != maker_execution_sizes[i]:
                         print("F&K must be executed fully")
-                    return
+                        continue
 
                 if request_list[i]["order_type"] == order_types["market"]:
                     if request_list[i]["slippage"] < 0:
                         print("Slippage cannot be negative")
-                        return
+                        continue
 
                 if request_list[i]["slippage"] > 15:
                     print("Slippage cannot be > 15")
-                    return
+                    continue
 
                 execution_price = running_weighted_sum/maker_execution_sizes[i]
 
@@ -2264,3 +2266,8 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 #     1000,
 #     100
 # )
+
+# events=[OrderedEvent(order=11, keys=[1756515458597831082913579168078796195293983956188744624143372741104935810388], data=[8191878929007626516798557746042, 2305843009213693952000])]
+
+# print( felt_to_str(8191878929007626516798557746042),
+#       from64x61(2305843009213693952000))

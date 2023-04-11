@@ -59,7 +59,7 @@ from contracts.interfaces.ILiquidate import ILiquidate
 from contracts.interfaces.ILiquidityFund import ILiquidityFund
 from contracts.interfaces.IMarketPrices import IMarketPrices
 from contracts.interfaces.IMarkets import IMarkets
-// from contracts.interfaces.ITradingStats import ITradingStats
+from contracts.interfaces.ITradingStats import ITradingStats
 from contracts.interfaces.ITradingFees import ITradingFees
 from contracts.libraries.CommonLibrary import CommonLib
 from contracts.Math_64x61 import (
@@ -67,6 +67,7 @@ from contracts.Math_64x61 import (
     Math64x61_div,
     Math64x61_is_equal,
     Math64x61_is_le,
+    Math64x61_min,
     Math64x61_mul,
     Math64x61_ONE,
     Math64x61_sub,
@@ -213,16 +214,6 @@ func execute_batch{
     let last_index = request_list_len - 1;
 
     let (initial_taker_locked: felt) = find_initial_taker_locked(
-        asset_token_decimal_=asset.token_decimal,
-        request_=request_list[last_index],
-        quantity_locked_=quantity_locked_,
-    );
-
-    with_attr error_message("0523: {quantity_locked_} 0") {
-        assert is_zero_quantity = 0;
-    }
-
-    adjust_quantity_locked(
         batch_id_=batch_id_,
         asset_token_decimal_=asset.token_decimal,
         request_=request_list[last_index],
@@ -231,11 +222,12 @@ func execute_batch{
 
     let (is_zero_quantity) = Math64x61_is_equal(initial_taker_locked, 0, 6);
     with_attr error_message("0523: {quantity_locked_} 0") {
-        assert is_zero_quantity = 0;
+        assert is_zero_quantity = FALSE;
     }
 
     // Recursively loop through the orders in the batch
     let (taker_execution_price: felt, open_interest: felt) = process_and_execute_orders_recurse(
+        batch_id_=batch_id_,
         taker_locked_quantity_=initial_taker_locked,
         market_id_=market_id_,
         collateral_id_=collateral_id,
@@ -279,19 +271,25 @@ func execute_batch{
         tempvar range_check_ptr = range_check_ptr;
     }
 
-    // // Record TradingStats
-    // ITradingStats.record_trade_batch_stats(
-    //     contract_address=trading_stats_address,
-    //     market_id_=market_id_,
-    //     execution_price_64x61_=taker_execution_price,
-    //     request_list_len=request_list_len,
-    //     request_list=request_list,
-    //     trader_stats_list_len=request_list_len,
-    //     trader_stats_list=trader_stats_list,
-    //     executed_sizes_list_len=request_list_len,
-    //     executed_sizes_list=execution_sizes,
-    //     open_interest_=open_interest,
-    // );
+    // Initialize empty trader_stats_list
+    let (trader_stats_list: TraderStats*) = alloc();
+
+    // Initialize empty executed_sizes_list
+    let (executed_sizes_list: felt*) = alloc();
+
+    // Record TradingStats
+    ITradingStats.record_trade_batch_stats(
+        contract_address=trading_stats_address,
+        market_id_=market_id_,
+        execution_price_64x61_=taker_execution_price,
+        request_list_len=request_list_len,
+        request_list=request_list,
+        trader_stats_list_len=0,
+        trader_stats_list=trader_stats_list,
+        executed_sizes_list_len=0,
+        executed_sizes_list=executed_sizes_list,
+        open_interest_=open_interest,
+    );
 
     // Change the status of the batch to TRUE
     batch_id_status.write(batch_id=batch_id_, value=TRUE);
@@ -396,7 +394,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // @param request_list_ - Request list of orders
 // @param quantity_locked_ - Original quantity lokcked of the batch
 func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_token_decimal_: felt, request_: MultipleOrder, quantity_locked_: felt
+    batch_id_: felt, asset_token_decimal_: felt, request_: MultipleOrder, quantity_locked_: felt
 ) -> (taker_quantity_to_execute: felt) {
     // Get the portion executed of the order
     let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
@@ -412,6 +410,7 @@ func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
     // Adjust the quantity to execute on the taker side
     let (taker_quantity_to_execute) = get_quantity_to_execute(
+        batch_id_=batch_id_,
         order_portion_executed_=order_portion_executed,
         position_details_=position_details,
         asset_token_decimal_=asset_token_decimal_,
@@ -1226,6 +1225,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 func process_and_execute_orders_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
+    batch_id_: felt,
     taker_locked_quantity_: felt,
     market_id_: felt,
     collateral_id_: felt,
@@ -1286,11 +1286,24 @@ func process_and_execute_orders_recurse{
         contract_address=account_registry_address_, address_=[request_list_].user_address
     );
     if (is_registered == FALSE) {
-        order_rejected.emit(
-            code='0510', param_1=[request_list_].order_id, param_2=[request_list_].user_address
+        // Call the account contract to reject the order
+        IAccountManager.execute_order(
+            contract_address=[request_list_].user_address,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+            updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+            updated_margin_locked_=0,
+            updated_portion_executed_=0,
+            market_array_update_=0,
+            is_liquidation_=0,
+            error_message_='0510',
+            error_param_1_=[request_list_].user_address,
         );
 
         return process_and_execute_orders_recurse(
+            batch_id_=batch_id_,
             taker_locked_quantity_=taker_locked_quantity_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
@@ -1323,11 +1336,24 @@ func process_and_execute_orders_recurse{
         min_quantity_, [request_list_].quantity, asset_token_decimal_
     );
     if (size_check == FALSE) {
-        order_rejected.emit(
-            code='0505', param_1=[request_list_].order_id, param_2=[request_list_].quantity
+        // Call the account contract to reject the order
+        IAccountManager.execute_order(
+            contract_address=[request_list_].user_address,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+            updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+            updated_margin_locked_=0,
+            updated_portion_executed_=0,
+            market_array_update_=0,
+            is_liquidation_=0,
+            error_message_='0505',
+            error_param_1_=[request_list_].quantity,
         );
 
         return process_and_execute_orders_recurse(
+            batch_id_=batch_id_,
             taker_locked_quantity_=taker_locked_quantity_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
@@ -1357,11 +1383,24 @@ func process_and_execute_orders_recurse{
 
     // Error Handling: Wrong market passed for the order
     if ([request_list_].market_id != market_id_) {
-        order_rejected.emit(
-            code='0504', param_1=[request_list_].order_id, param_2=[request_list_].market_id
+        // Call the account contract to reject the order
+        IAccountManager.execute_order(
+            contract_address=[request_list_].user_address,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+            updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+            updated_margin_locked_=0,
+            updated_portion_executed_=0,
+            market_array_update_=0,
+            is_liquidation_=0,
+            error_message_='0504',
+            error_param_1_=[request_list_].market_id,
         );
 
         return process_and_execute_orders_recurse(
+            batch_id_=batch_id_,
             taker_locked_quantity_=taker_locked_quantity_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
@@ -1394,11 +1433,24 @@ func process_and_execute_orders_recurse{
         LEVERAGE_ONE, [request_list_].leverage, asset_token_decimal_
     );
     if (leverage_min_check == FALSE) {
-        order_rejected.emit(
-            code='0503', param_1=[request_list_].order_id, param_2=[request_list_].leverage
+        // Call the account contract to reject the order
+        IAccountManager.execute_order(
+            contract_address=[request_list_].user_address,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+            updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+            updated_margin_locked_=0,
+            updated_portion_executed_=0,
+            market_array_update_=0,
+            is_liquidation_=0,
+            error_message_='0503',
+            error_param_1_=[request_list_].leverage,
         );
 
         return process_and_execute_orders_recurse(
+            batch_id_=batch_id_,
             taker_locked_quantity_=taker_locked_quantity_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
@@ -1431,11 +1483,24 @@ func process_and_execute_orders_recurse{
         [request_list_].leverage, max_leverage_, asset_token_decimal_
     );
     if (leverage_max_check == FALSE) {
-        order_rejected.emit(
-            code='0502', param_1=[request_list_].order_id, param_2=[request_list_].leverage
+        // Call the account contract to reject the order
+        IAccountManager.execute_order(
+            contract_address=[request_list_].user_address,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+            updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+            updated_margin_locked_=0,
+            updated_portion_executed_=0,
+            market_array_update_=0,
+            is_liquidation_=0,
+            error_message_='0502',
+            error_param_1_=[request_list_].leverage,
         );
 
         return process_and_execute_orders_recurse(
+            batch_id_=batch_id_,
             taker_locked_quantity_=taker_locked_quantity_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
@@ -1485,10 +1550,6 @@ func process_and_execute_orders_recurse{
         contract_address=[request_list_].user_address
     );
 
-    let (local is_final) = Math64x61_is_equal(
-        order_portion_executed, [request_list_].quantity, asset_token_decimal_
-    );
-
     // Create a temporary order object
     tempvar temp_order_request: felt* = new (
         [request_list_].order_id,
@@ -1513,9 +1574,24 @@ func process_and_execute_orders_recurse{
     let (hash_error) = order_hash_check(order_id_=[request_list_].order_id, order_hash_=hash);
 
     if (hash_error == TRUE) {
-        order_rejected.emit(code='0536', param_1=[request_list_].order_id, param_2=hash);
+        // Call the account contract to reject the order
+        IAccountManager.execute_order(
+            contract_address=[request_list_].user_address,
+            market_id_=market_id_,
+            collateral_id_=collateral_id_,
+            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+            updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+            updated_margin_locked_=0,
+            updated_portion_executed_=0,
+            market_array_update_=0,
+            is_liquidation_=0,
+            error_message_='0536',
+            error_param_1_=hash,
+        );
 
         return process_and_execute_orders_recurse(
+            batch_id_=batch_id_,
             taker_locked_quantity_=taker_locked_quantity_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
@@ -1562,8 +1638,13 @@ func process_and_execute_orders_recurse{
         assert quantity_to_execute = quantity_executed_;
         let (is_zero_quantity) = Math64x61_is_equal(quantity_to_execute, 0, 6);
 
+        // with_attr error_message("0524: {taker_locked_quantity_}") {
+        //     is_zero_quantity == FALSE;
+        // }
+
         if (is_zero_quantity == TRUE) {
             return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
                 taker_locked_quantity_=taker_locked_quantity_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
@@ -1591,21 +1672,30 @@ func process_and_execute_orders_recurse{
             );
         }
 
-        with_attr error_message("0524: {taker_locked_quantity_}") {
-            assert_not_zero(maker_quantity_to_execute);
-        }
-
         // Direction Check
         let (is_error) = validate_taker(
             maker1_direction_, maker1_side_, [request_list_].direction, [request_list_].side
         );
 
         if (is_error == TRUE) {
-            order_rejected.emit(
-                code='0513', param_1=[request_list_].order_id, param_2=[request_list_].direction
+            // Call the account contract to reject the order
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_='0513',
+                error_param_1_=[request_list_].direction,
             );
 
             return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
                 taker_locked_quantity_=taker_locked_quantity_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
@@ -1635,11 +1725,24 @@ func process_and_execute_orders_recurse{
 
         // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].post_only == TRUE) {
-            order_rejected.emit(
-                code='0515', param_1=[request_list_].order_id, param_2=current_index
+            // Call the account contract to reject the order
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_='0515',
+                error_param_1_=current_index,
             );
 
             return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
                 taker_locked_quantity_=taker_locked_quantity_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
@@ -1675,11 +1778,24 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: A Taker order cannot be a post only order
             if (diff_check == FALSE) {
-                order_rejected.emit(
-                    code='0516', param_1=[request_list_].order_id, param_2=taker_quantity
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_='0516',
+                    error_param_1_=taker_quantity,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -1709,11 +1825,24 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: A Taker order cannot be a post only order
             if ([request_list_].order_type != LIMIT_ORDER) {
-                order_rejected.emit(
-                    code='0550', param_1=[request_list_].order_id, param_2=MARKET_ORDER
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_='0550',
+                    error_param_1_=MARKET_ORDER,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -1758,11 +1887,24 @@ func process_and_execute_orders_recurse{
             assert slippage = [request_list_].slippage;
             // Error Handling: Slippage of a market order cannot be 0
             if (slippage == 0) {
-                order_rejected.emit(
-                    code='0521', param_1=[request_list_].order_id, param_2=slippage
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_='0521',
+                    error_param_1_=slippage,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -1792,11 +1934,24 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: A Taker order cannot be a post only order
             if (is_le(slippage, FIFTEEN_PERCENTAGE) == FALSE) {
-                order_rejected.emit(
-                    code='0521', param_1=[request_list_].order_id, param_2=slippage
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_='0521',
+                    error_param_1_=slippage,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -1834,11 +1989,24 @@ func process_and_execute_orders_recurse{
             );
 
             if (is_error == TRUE) {
-                order_rejected.emit(
-                    code='0506', param_1=[request_list_].order_id, param_2=execution_price
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_='0506',
+                    error_param_1_=execution_price,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -1878,11 +2046,24 @@ func process_and_execute_orders_recurse{
             );
 
             if (is_error_1 == TRUE) {
-                order_rejected.emit(
-                    code=error_message_1, param_1=[request_list_].order_id, param_2=execution_price
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_=error_message_1,
+                    error_param_1_=execution_price,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -1951,6 +2132,7 @@ func process_and_execute_orders_recurse{
 
         // Find quantity that needs to be executed for the current order
         let (quantity_to_execute_remaining) = get_quantity_to_execute(
+            batch_id_=batch_id_,
             order_portion_executed_=order_portion_executed,
             position_details_=position_details,
             asset_token_decimal_=asset_token_decimal_,
@@ -1964,11 +2146,24 @@ func process_and_execute_orders_recurse{
         );
 
         if (is_error == TRUE) {
-            order_rejected.emit(
-                code='0512', param_1=[request_list_].order_id, param_2=[request_list_].direction
+            // Call the account contract to reject the order
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_='0512',
+                error_param_1_=[request_list_].direction,
             );
 
             return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
                 taker_locked_quantity_=taker_locked_quantity_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
@@ -1998,11 +2193,24 @@ func process_and_execute_orders_recurse{
 
         // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].order_type != LIMIT_ORDER) {
-            order_rejected.emit(
-                code='0518', param_1=[request_list_].order_id, param_2=current_index
+            // Call the account contract to reject the order
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_='0518',
+                error_param_1_=current_index,
             );
 
             return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
                 taker_locked_quantity_=taker_locked_quantity_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
@@ -2035,13 +2243,26 @@ func process_and_execute_orders_recurse{
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
 
-        // Send to AccountManager to emit an event in case the execution_price is 0
+        // Send to AccountManager to emit an event in case the execution size is 0
         if (quantity_to_execute == 0) {
-            order_rejected.emit(
-                code='0535', param_1=[request_list_].order_id, param_2=current_index
+            // Call the account contract to reject the order
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_='0535',
+                error_param_1_=current_index,
             );
 
             return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
                 taker_locked_quantity_=taker_locked_quantity_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
@@ -2121,11 +2342,24 @@ func process_and_execute_orders_recurse{
         );
 
         if (is_error == TRUE) {
-            order_rejected.emit(
-                code='0501', param_1=[request_list_].order_id, param_2=user_available_balance
+            // Call the account contract to reject the order
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_='0501',
+                error_param_1_=user_available_balance,
             );
 
             return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
                 taker_locked_quantity_=taker_locked_quantity_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
@@ -2244,6 +2478,10 @@ func process_and_execute_orders_recurse{
         let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_amount);
         assert updated_margin_locked = new_margin_locked;
 
+        let (is_final) = Math64x61_is_equal(
+            new_position_size, [request_list_].quantity, asset_token_decimal_
+        );
+
         assert execution_details = ExecutionDetails(
             order_id=[request_list_].order_id,
             direction=[request_list_].direction,
@@ -2302,11 +2540,24 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: Wrong market for liquidation
             if (liq_position.market_id != market_id_) {
-                order_rejected.emit(
-                    code='0531', param_1=[request_list_].order_id, param_2=market_id_
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_='0531',
+                    error_param_1_=market_id_,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -2336,11 +2587,24 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: Wrong direction for liquidation
             if (liq_position.direction != [request_list_].direction) {
-                order_rejected.emit(
-                    code='0532', param_1=[request_list_].order_id, param_2=[request_list_].direction
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_='0532',
+                    error_param_1_=[request_list_].direction,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -2373,11 +2637,24 @@ func process_and_execute_orders_recurse{
                 quantity_to_execute, liq_position.amount_to_be_sold, asset_token_decimal_
             );
             if (liquidatable_size_check == FALSE) {
-                order_rejected.emit(
-                    code='0533', param_1=[request_list_].order_id, param_2=quantity_to_execute
+                // Call the account contract to reject the order
+                IAccountManager.execute_order(
+                    contract_address=[request_list_].user_address,
+                    market_id_=market_id_,
+                    collateral_id_=collateral_id_,
+                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                    updated_margin_locked_=0,
+                    updated_portion_executed_=0,
+                    market_array_update_=0,
+                    is_liquidation_=0,
+                    error_message_='0533',
+                    error_param_1_=quantity_to_execute,
                 );
 
                 return process_and_execute_orders_recurse(
+                    batch_id_=batch_id_,
                     taker_locked_quantity_=taker_locked_quantity_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
@@ -2427,11 +2704,24 @@ func process_and_execute_orders_recurse{
             if ([request_list_].order_type == DELEVERAGING_ORDER) {
                 // Error Handling: Position not marked as 'deleveragable'
                 if (liq_position.liquidatable == TRUE) {
-                    order_rejected.emit(
-                        code='0534', param_1=[request_list_].order_id, param_2=quantity_to_execute
+                    // Call the account contract to reject the order
+                    IAccountManager.execute_order(
+                        contract_address=[request_list_].user_address,
+                        market_id_=market_id_,
+                        collateral_id_=collateral_id_,
+                        execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                        updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                        updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                        updated_margin_locked_=0,
+                        updated_portion_executed_=0,
+                        market_array_update_=0,
+                        is_liquidation_=0,
+                        error_message_='0534',
+                        error_param_1_=quantity_to_execute,
                     );
 
                     return process_and_execute_orders_recurse(
+                        batch_id_=batch_id_,
                         taker_locked_quantity_=taker_locked_quantity_,
                         market_id_=market_id_,
                         collateral_id_=collateral_id_,
@@ -2471,11 +2761,24 @@ func process_and_execute_orders_recurse{
             } else {
                 // Error Handling: Position not marked as 'liquidatable'
                 if (liq_position.liquidatable == FALSE) {
-                    order_rejected.emit(
-                        code='0535', param_1=[request_list_].order_id, param_2=quantity_to_execute
+                    // Call the account contract to reject the order
+                    IAccountManager.execute_order(
+                        contract_address=[request_list_].user_address,
+                        market_id_=market_id_,
+                        collateral_id_=collateral_id_,
+                        execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                        updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                        updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                        updated_margin_locked_=0,
+                        updated_portion_executed_=0,
+                        market_array_update_=0,
+                        is_liquidation_=0,
+                        error_message_='0535',
+                        error_param_1_=quantity_to_execute,
                     );
 
                     return process_and_execute_orders_recurse(
+                        batch_id_=batch_id_,
                         taker_locked_quantity_=taker_locked_quantity_,
                         market_id_=market_id_,
                         collateral_id_=collateral_id_,
@@ -2619,6 +2922,18 @@ func process_and_execute_orders_recurse{
         assert current_open_interest = 0 - quantity_to_execute;
         assert is_liquidation = is_liq;
 
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
+
+        let (current_available_position) = Math64x61_min(
+            position_details.position_size, [request_list_].quantity
+        );
+        let (is_final) = Math64x61_is_le(
+            current_available_position, new_position_size, asset_token_decimal_
+        );
+
         assert execution_details = ExecutionDetails(
             order_id=[request_list_].order_id,
             direction=[request_list_].direction,
@@ -2662,11 +2977,14 @@ func process_and_execute_orders_recurse{
         updated_portion_executed_=updated_portion_executed,
         market_array_update_=market_array_update,
         is_liquidation_=is_liquidation,
+        error_message_=0,
+        error_param_1_=0,
     );
 
     let (new_open_interest) = Math64x61_add(open_interest_, current_open_interest);
 
     return process_and_execute_orders_recurse(
+        batch_id_=batch_id_,
         taker_locked_quantity_=taker_locked_quantity_,
         market_id_=market_id_,
         collateral_id_=collateral_id_,
