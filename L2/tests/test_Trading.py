@@ -263,6 +263,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_USD_ID, details=BTC_USD_properties.to_dict())
 
     BTC_UST_properties = MarketProperties(
         id=BTC_UST_ID,
@@ -285,6 +287,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_UST_ID, details=BTC_UST_properties.to_dict())
 
     ETH_USD_properties = MarketProperties(
         id=ETH_USD_ID,
@@ -307,6 +311,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=ETH_USD_ID, details=ETH_USD_properties.to_dict())
 
     TSLA_USD_properties = MarketProperties(
         id=TSLA_USD_ID,
@@ -329,6 +335,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', TSLA_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=TSLA_USD_ID, details=TSLA_USD_properties.to_dict())
 
     UST_USDC_properties = MarketProperties(
         id=UST_USDC_ID,
@@ -351,6 +359,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', UST_USDC_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=UST_USDC_ID, details=UST_USDC_properties.to_dict())
 
     # Fund the Holding contract
     python_executor.set_fund_balance(
@@ -377,173 +387,173 @@ async def trading_test_initializer(starknet_service: StarknetService):
     return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats, non_admin
 
 
-# @pytest.mark.asyncio
-# async def test_set_balance_by_non_admin(trading_test_initializer):
-#     _, _, _, _, _, _, _, _, _, _, gary, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, non_admin = trading_test_initializer
+@pytest.mark.asyncio
+async def test_set_balance_by_non_admin(trading_test_initializer):
+    _, _, _, _, _, _, _, _, _, _, gary, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, non_admin = trading_test_initializer
 
-#     await assert_revert(non_admin_signer.send_transaction(non_admin, gary.contract_address, "set_balance", [AssetID.USDC, to64x61(1000000)]), reverted_with="TestAccountManager: Unauthorized Call")
+    await assert_revert(non_admin_signer.send_transaction(non_admin, gary.contract_address, "set_balance", [AssetID.USDC, to64x61(1000000)]), reverted_with="TestAccountManager: Unauthorized Call")
 
 
-# @pytest.mark.asyncio
-# async def test_for_risk_while_opening_order(trading_test_initializer):
-#     starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, non_admin = trading_test_initializer
+@pytest.mark.asyncio
+async def test_for_risk_while_opening_order(trading_test_initializer):
+    starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, non_admin = trading_test_initializer
 
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [felix, gary]
-#     users_test = [felix_test, gary_test]
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [felix, gary]
+    users_test = [felix_test, gary_test]
 
-#     # Sufficient balance for users
-#     felix_balance = 100
-#     gary_balance = 100
-#     balance_array = [felix_balance, gary_balance]
+    # Sufficient balance for users
+    felix_balance = 100
+    gary_balance = 100
+    balance_array = [felix_balance, gary_balance]
 
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 1
-#     market_id_1 = BTC_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 200
+    # Batch params for OPEN orders
+    quantity_locked_1 = 1
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 200
 
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
 
-#     # Create orders
-#     orders_1 = [{
-#         "quantity": 1,
-#         "price": 200,
-#         "order_type": order_types["limit"],
-#         "leverage": 10
-#     }, {
-#         "quantity": 1,
-#         "price": 200,
-#         "leverage": 3,
-#         "direction": order_direction["short"],
-#     }]
+    # Create orders
+    orders_1 = [{
+        "quantity": 1,
+        "price": 200,
+        "order_type": order_types["limit"],
+        "leverage": 10
+    }, {
+        "quantity": 1,
+        "price": 200,
+        "leverage": 3,
+        "direction": order_direction["short"],
+    }]
 
-#     # execute order
-#     (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
-#     assert_event_with_custom_keys_emitted(
-#         tx_exec_info=info,
-#         from_address=trading.contract_address,
-#         keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
-#         data=[to64x61(quantity_locked_1), to64x61(
-#             200), order_direction["short"], side["buy"]],
-#         order=6
-#     )
+    # execute order
+    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
+    assert_event_with_custom_keys_emitted(
+        tx_exec_info=info,
+        from_address=trading.contract_address,
+        keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
+        data=[to64x61(quantity_locked_1), to64x61(
+            200), order_direction["short"], side["buy"]],
+        order=6
+    )
 
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-#     # compare margin info
-#     await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
-#     await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    # compare margin info
+    await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
 
-#     # compare markets array
-#     await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
-#     await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
+    # compare markets array
+    await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
 
-#     starknet_service.state.state.block_info = BlockInfo(
-#         block_number=1, block_timestamp=timestamp1, gas_price=starknet_service.state.state.block_info.gas_price,
-#         sequencer_address=starknet_service.state.state.block_info.sequencer_address,
-#         starknet_version=STARKNET_VERSION
-#     )
+    starknet_service.state.state.block_info = BlockInfo(
+        block_number=1, block_timestamp=timestamp1, gas_price=starknet_service.state.state.block_info.gas_price,
+        sequencer_address=starknet_service.state.state.block_info.sequencer_address,
+        starknet_version=STARKNET_VERSION
+    )
 
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [felix, gary]
-#     users_test = [felix_test, gary_test]
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [felix, gary]
+    users_test = [felix_test, gary_test]
 
-#     # Sufficient balance for users
-#     felix_balance = 400
-#     gary_balance = 1000
-#     balance_array = [felix_balance, gary_balance]
+    # Sufficient balance for users
+    felix_balance = 400
+    gary_balance = 1000
+    balance_array = [felix_balance, gary_balance]
 
-#     # Batch params for OPEN orders
-#     quantity_locked_2 = 1
-#     market_id_2 = BTC_USD_ID
-#     asset_id_2 = AssetID.USDC
-#     oracle_price_2 = 40
+    # Batch params for OPEN orders
+    quantity_locked_2 = 1
+    market_id_2 = BTC_USD_ID
+    asset_id_2 = AssetID.USDC
+    oracle_price_2 = 40
 
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_2)
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_2)
 
-#     # Create orders
-#     orders_2 = [{
-#         "quantity": 1,
-#         "price": 40,
-#         "order_type": order_types["limit"],
-#         "leverage": 10
-#     }, {
-#         "quantity": 1,
-#         "price": 40,
-#         "leverage": 3,
-#         "direction": order_direction["short"],
-#     }]
+    # Create orders
+    orders_2 = [{
+        "quantity": 1,
+        "price": 40,
+        "order_type": order_types["limit"],
+        "leverage": 10
+    }, {
+        "quantity": 1,
+        "price": 40,
+        "leverage": 3,
+        "direction": order_direction["short"],
+    }]
 
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp1)
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp1)
 
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
-#     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_2)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_2)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
 
-#     # compare margin info
-#     await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-#     await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    # compare margin info
+    await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
-#     # compare markets array
-#     await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
-#     await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
+    # compare markets array
+    await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
 
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [felix, gary]
-#     users_test = [felix_test, gary_test]
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [felix, gary]
+    users_test = [felix_test, gary_test]
 
-#     # Sufficient balance for users
-#     felix_balance = 40
-#     gary_balance = 40
-#     balance_array = [felix_balance, gary_balance]
+    # Sufficient balance for users
+    felix_balance = 40
+    gary_balance = 40
+    balance_array = [felix_balance, gary_balance]
 
-#     # Batch params for OPEN orders
-#     quantity_locked_3 = 1
-#     market_id_3 = BTC_USD_ID
-#     asset_id_3 = AssetID.USDC
-#     oracle_price_3 = 40
+    # Batch params for OPEN orders
+    quantity_locked_3 = 1
+    market_id_3 = BTC_USD_ID
+    asset_id_3 = AssetID.USDC
+    oracle_price_3 = 40
 
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_3)
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_3)
 
-#     # Create orders
-#     orders_3 = [{
-#         "quantity": 1,
-#         "price": 40,
-#         "order_type": order_types["limit"],
-#         "leverage": 10
-#     }, {
-#         "quantity": 1,
-#         "price": 40,
-#         "leverage": 3,
-#         "direction": order_direction["short"],
-#     }]
+    # Create orders
+    orders_3 = [{
+        "quantity": 1,
+        "price": 40,
+        "order_type": order_types["limit"],
+        "leverage": 10
+    }, {
+        "quantity": 1,
+        "price": 40,
+        "leverage": 3,
+        "direction": order_direction["short"],
+    }]
 
-#     # execute order
-#     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_3, oracle_price=oracle_price_3, trading=trading, is_reverted=1, error_code="1101:", error_at_index=0, param_2=market_id_3, timestamp=timestamp1)
-#     # compare margins
-#     await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
-#     await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_3, oracle_price=oracle_price_3, trading=trading, is_reverted=1, error_code="1101:", error_at_index=0, param_2=market_id_3, timestamp=timestamp1)
+    # compare margins
+    await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
 
-#     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-#     assert open_interest_response.result.res == to64x61(2)
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert open_interest_response.result.res == to64x61(2)
 
 
 # @pytest.mark.asyncio
@@ -1347,12 +1357,6 @@ async def trading_test_initializer(starknet_service: StarknetService):
 async def test_opening_and_closing_full_orders(trading_test_initializer):
     starknet_service, python_executor, admin1, _, alice, bob, _, _, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
 
-    starknet_service.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp1, gas_price=starknet_service.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.state.state.block_info.sequencer_address,
-        starknet_version=STARKNET_VERSION
-    )
-
     ###################
     ### Open orders ##
     ###################
@@ -1387,37 +1391,36 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
-    print(info.call_info)
-    # assert_event_with_custom_keys_emitted(
-    #     tx_exec_info=info,
-    #     from_address=trading.contract_address,
-    #     keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
-    #     data=[to64x61(quantity_locked_1), to64x61(
-    #         1000), order_direction["short"], side["buy"]],
-    #     order=5
-    # )
+    assert_event_with_custom_keys_emitted(
+        tx_exec_info=info,
+        from_address=trading.contract_address,
+        keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
+        data=[to64x61(quantity_locked_1), to64x61(
+            1000), order_direction["short"], side["buy"]],
+        order=5
+    )
 
     # # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # # compare margins
-    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-    # await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    # compare margins
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
     # compare markets array
     await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
     await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # print("Open interest opening: ", from64x61(
-    #     open_interest_response.result.res))
-    # assert open_interest_response.result.res == to64x61(5)
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    print("Open interest opening: ", from64x61(
+        open_interest_response.result.res))
+    assert open_interest_response.result.res == to64x61(5)
 
-    ##################
-    ## Close orders ##
-    ##################
+    #################
+    # Close orders ##
+    #################
     # Batch params for OPEN orders
     quantity_locked_2 = 3
     oracle_price_2 = 1000
@@ -1439,23 +1442,21 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
 
     # # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    # # compare margins
-    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-    # await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    # compare margins
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
     # compare markets array
     await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
     await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert open_interest_response.result.res == to64x61(2)
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert open_interest_response.result.res == to64x61(2)
 
     open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    print("Open interest closing: ", from64x61(
-        open_interest_response.result.res))
 
 
 @pytest.mark.asyncio
@@ -1500,7 +1501,7 @@ async def test_opening_partial_orders(trading_test_initializer):
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     # compare markets array
@@ -1532,20 +1533,20 @@ async def test_opening_partial_orders(trading_test_initializer):
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     # compare margins
-    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-    # await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
     # compare markets array
     await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
     await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert pytest.approx(
-    #     from64x61(open_interest_response.result.res), abs=1e-6) == 4
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert pytest.approx(
+        from64x61(open_interest_response.result.res), abs=1e-6) == 4
 
 
 @ pytest.mark.asyncio
@@ -1588,20 +1589,20 @@ async def test_closing_partial_orders(trading_test_initializer):
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     # compare margins
-    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-    # await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
     # compare markets array
     await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
     await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert pytest.approx(
-    #     from64x61(open_interest_response.result.res), abs=1e-6) == 4
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert pytest.approx(
+        from64x61(open_interest_response.result.res), abs=1e-6) == 4
 
     ###############################
     ### Close orders partially ###
@@ -1631,204 +1632,219 @@ async def test_closing_partial_orders(trading_test_initializer):
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
     # compare margins
-    # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-    # await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
     # compare markets array
     await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
     await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
-    # open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
-    # assert pytest.approx(
-    #     from64x61(open_interest_response.result.res), abs=1e-6) == 4
+    open_interest_response = await trading_stats.get_open_interest(BTC_USD_ID).call()
+    assert pytest.approx(
+        from64x61(open_interest_response.result.res), abs=1e-6) == 4
 
 
-# @ pytest.mark.asyncio
-# async def test_opening_and_closing_full_orders_different_market(trading_test_initializer):
-#     _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
+@ pytest.mark.asyncio
+async def test_opening_and_closing_full_orders_different_market(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, _, alice_test, bob_test, charlie_test, _, _, _, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
 
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
 
-#     # Sufficient balance for users
-#     alice_balance = 5000.3428549
-#     bob_balance = 5000.98429831
-#     balance_array = [alice_balance, bob_balance]
+    # Sufficient balance for users
+    alice_balance = 5000.3428549
+    bob_balance = 5000.98429831
+    balance_array = [alice_balance, bob_balance]
 
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 4.5
-#     market_id_1 = ETH_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 123.45
+    # Batch params for OPEN orders
+    quantity_locked_1 = 4.5
+    market_id_1 = ETH_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 123.45
 
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
 
-#     # Create orders
-#     orders_1 = [{
-#         "market_id": ETH_USD_ID,
-#         "quantity": 4.5,
-#         "price": 120.2,
-#         "order_type": order_types["limit"],
-#         "leverage": 5,
-#     }, {
-#         "market_id": ETH_USD_ID,
-#         "quantity": 4.5,
-#         "price": 120.2,
-#         "direction": order_direction["short"],
-#         "leverage": 5,
-#     }]
+    # Create orders
+    orders_1 = [{
+        "market_id": ETH_USD_ID,
+        "quantity": 4.5,
+        "price": 120.2,
+        "order_type": order_types["limit"],
+        "leverage": 5,
+    }, {
+        "market_id": ETH_USD_ID,
+        "quantity": 4.5,
+        "price": 120.2,
+        "direction": order_direction["short"],
+        "leverage": 5,
+    }]
 
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    # execute order
+    complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
 
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-#     # compare margins
-#     # await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
-#     # await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    # compare margins
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
-#     # compare markets array
-#     await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
-#     await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
-#     # open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
-#     # assert from64x61(open_interest_response.result.res) == 4.5
+    open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
+    assert from64x61(open_interest_response.result.res) == 4.5
 
-#     ###################
-#     ### Close orders ##
-#     ###################
-#     # Batch params for OPEN orders
-#     quantity_locked_2 = 1.523
-#     oracle_price_2 = 130.87
+    ###################
+    ### Close orders ##
+    ###################
+    # Batch params for OPEN orders
+    quantity_locked_2 = 1.523
+    oracle_price_2 = 130.87
 
-#     # Create orders
-#     orders_2 = [{
-#         "market_id": ETH_USD_ID,
-#         "quantity": 4.5,
-#         "price": 130.2,
-#         "side": side["sell"],
-#         "order_type": order_types["limit"],
-#     }, {
-#         "market_id": ETH_USD_ID,
-#         "quantity": 4.5,
-#         "price": 130.2,
-#         "direction": order_direction["short"],
-#         "side": side["sell"],
-#     }]
+    # Create orders
+    orders_2 = [{
+        "market_id": ETH_USD_ID,
+        "quantity": 4.5,
+        "price": 130.2,
+        "side": side["sell"],
+        "order_type": order_types["limit"],
+    }, {
+        "market_id": ETH_USD_ID,
+        "quantity": 4.5,
+        "price": 130.2,
+        "direction": order_direction["short"],
+        "side": side["sell"],
+    }]
 
-#     # execute order
-#     complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    # execute order
+    complete_orders_1 = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
 
-#     # check balances
-#     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-#     # await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-#     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-#     # compare markets array
-#     await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
-#     await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
 
-#     open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
-#     assert pytest.approx(
-#         from64x61(open_interest_response.result.res), abs=1e-6) == 2.977
+    open_interest_response = await trading_stats.get_open_interest(ETH_USD_ID).call()
+    assert pytest.approx(
+        from64x61(open_interest_response.result.res), abs=1e-6) == 2.977
 
 
-# @ pytest.mark.asyncio
-# async def test_placing_order_directly(trading_test_initializer):
-#     _, _, admin1, _, alice, bob, _, dave, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = trading_test_initializer
+@ pytest.mark.asyncio
+async def test_placing_order_directly(trading_test_initializer):
+    _, _, admin1, _, alice, bob, _, dave, _, _, _, alice_test, bob_test, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = trading_test_initializer
 
-#     ###################
-#     ### Open orders ##
-#     ###################
-#     # List of users
-#     users = [alice, bob]
-#     users_test = [alice_test, bob_test]
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
 
-#     # Sufficient balance for users
-#     alice_balance = 2321.3428549
-#     bob_balance = 4535.98429831
-#     balance_array = [alice_balance, bob_balance]
+    # Sufficient balance for users
+    alice_balance = 2321.3428549
+    bob_balance = 4535.98429831
+    balance_array = [alice_balance, bob_balance]
 
-#     # Batch params for OPEN orders
-#     quantity_locked_1 = 4.5
-#     market_id_1 = ETH_USD_ID
-#     asset_id_1 = AssetID.USDC
-#     oracle_price_1 = 123.45
+    # Batch params for OPEN orders
+    quantity_locked_1 = 4.5
+    market_id_1 = ETH_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 123.45
 
-#     # Set balance in Starknet & Python
-#     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
 
-#     # Create orders
-#     params = [
-#         # batch id
-#         1,
-#         # order_id
-#         36913743897347031862778619449,
-#         # market_id
-#         556715728833533465056602594347606394,
-#         # direction
-#         2,
-#         # average price
-#         300220759799622926336,
-#         # price
-#         300220759799622926336,
-#         # quantity
-#         10376293541461622784,
-#         # leverage
-#         2305843009213693952,
-#         # slippage
-#         11529215046068469760,
-#         # order_type
-#         2,
-#         # time_in_force
-#         1,
-#         # post_only
-#         0,
-#         # side
-#         2,
-#         # liquidator_address
-#         0,
-#         # signature
-#         2022636113203008365857965845582934391243391428823771186281133992973234911008, 3145510324462252454033893057773896499982168619823607300721129275918411551641,
-#         # size
-#         10376293541461622784,
-#         # execution_price
-#         300220759799622926336,
-#         # margin_amount
-#         150110379899811463168,
-#         # borrowed_amount
-#         150110379899811463168,
-#         # market_id
-#         556715728833533465056602594347606394,
-#         # collateral_id
-#         AssetID.USDC,
-#         # pnl
-#         0,
-#         # opening_fee
-#         0,
-#         # side,
-#         1,
-#         # margin lock update anount
-#         0
-#     ]
+    # Create orders
+    params = [
+        # batch id
+        1,
+        # market_id
+        556715728833533465056602594347606394,
+        # collateral_id,
+        AssetID.USDC,
+        # Execution Details
+        # order_id
+        1,
+        # direction
+        2,
+        # size
+        10376293541461622784,
+        # order_type
+        2,
+        # order side
+        2,
+        # execution price
+        300220759799622926336,
+        # pnl
+        0,
+        # side
+        1,
+        # opening_fee
+        0,
+        # is_final
+        0,
+        # position details
+        # avg_execution_price
+        0,
+        # position_size
+        0,
+        # margin_amount
+        0,
+        # borrowed_amount
+        0,
+        # leverage
+        0,
+        # created_timestamp
+        0,
+        # modified_timestamp
+        0,
+        # realized_pnl
+        0,
+        # LiquidatablePosition
+        # market_id
+        0,
+        # direction
+        0,
+        # amount_to_be_sold
+        0,
+        # liquidatable
+        0,
+        # updated_margin_locked
+        150110379899811463168,
+        # updated_portion_executed
+        10376293541461622784,
+        # market_array_update
+        1,
+        # is_liquidation
+        0,
+        # error_message
+        0,
+        # error_param_1
+        0
+    ]
 
-#     await assert_revert(
-#         dave_signer.send_transaction(
-#             dave, alice.contract_address, "execute_order", params),
-#         "0002: 36913743897347031862778619449 556715728833533465056602594347606394"
-#     )
+    await assert_revert(
+        dave_signer.send_transaction(
+            dave, alice.contract_address, "execute_order", params),
+        "0002: 36913743897347031862778619449 556715728833533465056602594347606394"
+    )
 
 
 # @ pytest.mark.asyncio

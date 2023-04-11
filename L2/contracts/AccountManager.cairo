@@ -1450,6 +1450,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 func execute_order{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(
+    batch_id_: felt,
     market_id_: felt,
     collateral_id_: felt,
     execution_details_: ExecutionDetails,
@@ -1464,6 +1465,9 @@ func execute_order{
 ) {
     alloc_locals;
 
+    local order_id;
+    assert order_id = execution_details_.order_id;
+
     // Make sure that the caller is the authorized Trading Contract
     let (caller) = get_caller_address();
     let (registry) = CommonLib.get_registry_address();
@@ -1473,7 +1477,7 @@ func execute_order{
         contract_address=registry, index=Trading_INDEX, version=version
     );
 
-    with_attr error_message("0002: {execution_details_.order_id} {market_id_}") {
+    with_attr error_message("0002: {order_id} {market_id_}") {
         assert caller = trading_address;
     }
 
@@ -1531,6 +1535,7 @@ func execute_order{
         // Emit event for the order
         let (keys: felt*) = alloc();
         assert keys[0] = 'trade';
+        assert keys[1] = batch_id_;
         let (data: felt*) = alloc();
         assert data[0] = execution_details_.order_id;
         assert data[1] = market_id_;
@@ -1544,7 +1549,7 @@ func execute_order{
         assert data[9] = execution_details_.opening_fee;
         assert data[10] = execution_details_.is_final;
 
-        emit_event(1, keys, 11, data);
+        emit_event(2, keys, 11, data);
 
         return ();
     } else {
@@ -1552,12 +1557,13 @@ func execute_order{
         // Emit event for the order
         let (keys: felt*) = alloc();
         assert keys[0] = 'order_rejected';
+        assert keys[1] = batch_id_;
         let (data: felt*) = alloc();
         assert data[0] = error_message_;
         assert data[1] = execution_details_.order_id;
         assert data[2] = error_param_1_;
 
-        emit_event(1, keys, 3, data);
+        emit_event(2, keys, 3, data);
 
         return ();
     }

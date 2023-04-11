@@ -74,6 +74,7 @@ namespace IAccountManager {
     // External functions
 
     func execute_order(
+        batch_id_: felt,
         market_id_: felt,
         collateral_id_: felt,
         execution_details_: ExecutionDetails,

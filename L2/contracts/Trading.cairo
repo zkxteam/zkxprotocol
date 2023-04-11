@@ -1289,6 +1289,7 @@ func process_and_execute_orders_recurse{
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
+            batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
             execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1339,6 +1340,7 @@ func process_and_execute_orders_recurse{
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
+            batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
             execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1386,6 +1388,7 @@ func process_and_execute_orders_recurse{
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
+            batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
             execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1436,6 +1439,7 @@ func process_and_execute_orders_recurse{
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
+            batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
             execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1486,6 +1490,7 @@ func process_and_execute_orders_recurse{
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
+            batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
             execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1577,6 +1582,7 @@ func process_and_execute_orders_recurse{
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
+            batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
             execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1681,6 +1687,7 @@ func process_and_execute_orders_recurse{
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
                 execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1728,6 +1735,7 @@ func process_and_execute_orders_recurse{
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
                 execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1781,6 +1789,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1828,6 +1837,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1890,6 +1900,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1937,6 +1948,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -1992,6 +2004,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2049,6 +2062,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2146,9 +2160,9 @@ func process_and_execute_orders_recurse{
         );
 
         if (is_error == TRUE) {
-            // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
                 execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2196,6 +2210,7 @@ func process_and_execute_orders_recurse{
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
                 execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2248,6 +2263,7 @@ func process_and_execute_orders_recurse{
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
                 execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2345,6 +2361,7 @@ func process_and_execute_orders_recurse{
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
                 execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2543,6 +2560,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2590,6 +2608,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2640,6 +2659,7 @@ func process_and_execute_orders_recurse{
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
+                    batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
                     execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2707,6 +2727,7 @@ func process_and_execute_orders_recurse{
                     // Call the account contract to reject the order
                     IAccountManager.execute_order(
                         contract_address=[request_list_].user_address,
+                        batch_id_=batch_id_,
                         market_id_=market_id_,
                         collateral_id_=collateral_id_,
                         execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2764,6 +2785,7 @@ func process_and_execute_orders_recurse{
                     // Call the account contract to reject the order
                     IAccountManager.execute_order(
                         contract_address=[request_list_].user_address,
+                        batch_id_=batch_id_,
                         market_id_=market_id_,
                         collateral_id_=collateral_id_,
                         execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -2968,6 +2990,7 @@ func process_and_execute_orders_recurse{
     // Call the account contract to initialize the order
     IAccountManager.execute_order(
         contract_address=[request_list_].user_address,
+        batch_id_=batch_id_,
         market_id_=market_id_,
         collateral_id_=collateral_id_,
         execution_details_=execution_details,
