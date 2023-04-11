@@ -911,7 +911,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (margin_plus_pnl_felt) = Math64x61_add(margin_amount_to_be_reduced, pnl);
     assert margin_plus_pnl = margin_plus_pnl_felt;
 
-
     // Calculate new values for margin and borrowed amounts
     if (order_.order_type == DELEVERAGING_ORDER) {
         // In delevereaging, we only reduce borrowed field
@@ -1083,16 +1082,58 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
+        let (local user_balance) = IAccountManager.get_balance(
+            contract_address=order_.user_address, assetID_=collateral_id_
+        );
         // If it's not a liquidation order
         if (is_le(order_.order_type, 3) == TRUE) {
+            // if the user is in loss
             if (is_le(pnl, 0) == TRUE) {
+                let pnl_abs = abs_value(pnl);
+                let (is_balance_sufficient) = Math64x61_is_le(
+                    pnl_abs, user_balance, collateral_token_decimal_
+                );
+                // if user balance <= 0, deduct from insurance the whole loss amount
+                if (is_balance_sufficient == FALSE) {
+                    let (is_balance_less_than_zero) = Math64x61_is_le(
+                        user_balance, 0, collateral_token_decimal_
+                    );
+                    if (is_balance_less_than_zero == TRUE) {
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address_,
+                            asset_id_=collateral_id_,
+                            amount=pnl_abs,
+                            position_id_=order_.order_id,
+                        );
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
+                        // if user has some balance, deduct only remaining from insurance
+                    } else {
+                        let (deduct_from_insurance) = Math64x61_sub(pnl_abs, user_balance);
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address_,
+                            asset_id_=collateral_id_,
+                            amount=deduct_from_insurance,
+                            position_id_=order_.order_id,
+                        );
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
+                    }
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
+                    // if user balance can cover whole loss, don't do anything
+                } else {
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
+                }
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
                     asset_id_=collateral_id_,
                     market_id_=market_id_,
-                    amount_=abs_value(pnl),
+                    amount_=pnl_abs,
                     invoked_for_='holding',
                 );
+                // if user is in profit
             } else {
                 IAccountManager.transfer(
                     contract_address=order_.user_address,
@@ -1109,13 +1150,60 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             tempvar range_check_ptr = range_check_ptr;
         } else {
             if (order_.order_type == LIQUIDATION_ORDER) {
-                // Deposit the user's remaining margin in Insurance Fund
-                IInsuranceFund.deposit(
-                    contract_address=insurance_fund_address_,
-                    asset_id_=collateral_id_,
-                    amount=margin_plus_pnl,
-                    position_id_=order_.order_id,
+                let (is_balance_sufficient) = Math64x61_is_le(
+                    margin_amount_to_be_reduced, user_balance, collateral_token_decimal_
                 );
+                // if user balance >= margin amount, deposit remaining margin in insurance
+                if (is_balance_sufficient == TRUE) {
+                    IInsuranceFund.deposit(
+                        contract_address=insurance_fund_address_,
+                        asset_id_=collateral_id_,
+                        amount=margin_plus_pnl,
+                        position_id_=order_.order_id,
+                    );
+                } else {
+                    let (is_balance_less_than_zero) = Math64x61_is_le(
+                        user_balance, 0, collateral_token_decimal_
+                    );
+                    // if user balance <= 0, deduct margin amount from insurance
+                    if (is_balance_less_than_zero == TRUE) {
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address_,
+                            asset_id_=collateral_id_,
+                            amount=margin_amount_to_be_reduced,
+                            position_id_=order_.order_id,
+                        );
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
+                        // if user has some balance
+                    } else {
+                        let pnl_abs = abs_value(pnl);
+                        let (is_balance_less_than_loss) = Math64x61_is_le(
+                            user_balance, pnl_abs, collateral_token_decimal_
+                        );
+                        // if user balance can't cover loss, deduct deficit from insurance
+                        if (is_balance_less_than_loss == TRUE) {
+                            let (deduct_from_insurance) = Math64x61_sub(pnl_abs, user_balance);
+                            IInsuranceFund.withdraw(
+                                contract_address=insurance_fund_address_,
+                                asset_id_=collateral_id_,
+                                amount=deduct_from_insurance,
+                                position_id_=order_.order_id,
+                            );
+                            tempvar syscall_ptr = syscall_ptr;
+                            tempvar range_check_ptr = range_check_ptr;
+                            // if user balance can cover loss, deposit remaining to insurance
+                        } else {
+                            let (deposit_to_insurance) = Math64x61_sub(user_balance, pnl_abs);
+                            IInsuranceFund.deposit(
+                                contract_address=insurance_fund_address_,
+                                asset_id_=collateral_id_,
+                                amount=deposit_to_insurance,
+                                position_id_=order_.order_id,
+                            );
+                        }
+                    }
+                }
 
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
