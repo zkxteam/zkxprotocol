@@ -465,7 +465,7 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     assert_event_with_custom_keys_emitted(
         tx_exec_info=info,
         from_address=trading.contract_address,
-        keys=[str_to_felt('trade_execution'), market_id_1],
+        keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
             200), order_direction["short"], side["buy"]],
         order=6
@@ -1429,7 +1429,7 @@ async def test_opening_and_closing_full_orders(trading_test_initializer):
     assert_event_with_custom_keys_emitted(
         tx_exec_info=info,
         from_address=trading.contract_address,
-        keys=[str_to_felt('trade_execution'), market_id_1],
+        keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
         data=[to64x61(quantity_locked_1), to64x61(
             1000), order_direction["short"], side["buy"]],
         order=5
@@ -1647,11 +1647,11 @@ async def test_closing_partial_orders(trading_test_initializer):
     }]
 
     # execute order
-    (_, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    (batch_id_1, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
     assert_event_with_custom_keys_emitted(
         tx_exec_info=info,
         from_address=trading.contract_address,
-        keys=[str_to_felt('trade_execution'), market_id_1],
+        keys=[str_to_felt('trade_execution'), market_id_1, batch_id_1],
         data=[to64x61(quantity_locked_2), to64x61(
             1000), order_direction["long"], side["buy"]],
         order=3
@@ -1800,6 +1800,8 @@ async def test_placing_order_directly(trading_test_initializer):
 
     # Create orders
     params = [
+        # batch id
+        1, 
         # order_id
         36913743897347031862778619449,
         # market_id
@@ -2235,7 +2237,7 @@ async def test_revert_if_parent_position_is_empty(trading_test_initializer):
 
     error_at_index = 0
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=1, error_code=f"0517:", error_at_index=error_at_index, param_2=0)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=1, error_code=f"0524:", error_at_index=-1, param_2=to64x61(quantity_locked_1))
 
 
 @ pytest.mark.asyncio
@@ -2441,3 +2443,127 @@ async def test_execute_market_order_slippage_lower_limit(trading_test_initialize
     # compare margins
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+
+
+@pytest.mark.asyncio
+async def test_short_actual_execution_price_doubled(trading_test_initializer):
+    _, python_executor, admin1, _, alice, bob, charlie, _, _, _, gary, alice_test, bob_test, charlie_test, _, _, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, _ = trading_test_initializer
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [charlie, gary]
+    users_test = [charlie_test, gary_test]
+
+    # Sufficient balance for users
+    charlie_balance = 10000
+    gary_balance = 10000
+    balance_array = [charlie_balance, gary_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 3
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 3,
+        "order_type": order_types["limit"]
+    }, {
+        "quantity": 3,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    (batch_id_1, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margins
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
+    ###################
+    ### Close orders ##
+    ###################
+    # Batch params for OPEN orders
+    quantity_locked_2 = 3
+    oracle_price_2 = 2000
+
+    # Create orders
+    orders_2 = [{
+        "quantity": 2,
+        "side": side["sell"],
+        "order_type": order_types["limit"],
+        "price": 2000
+    }, {
+        "quantity": 2,
+        "direction": order_direction["short"],
+        "side": side["sell"],
+    }]
+
+    # execute order
+    (batch_id_2, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    await check_batch_status(batch_id=batch_id_2, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margins
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)
+
+    ###################
+    ### Close orders ##
+    ###################
+    # Batch params for OPEN orders
+    quantity_locked_3 = 1
+    oracle_price_3 = 2010
+
+    # Create orders
+    orders_3 = [{
+        "quantity": 1,
+        "side": side["sell"],
+        "order_type": order_types["limit"],
+        "price": 2010
+    }, {
+        "quantity": 1,
+        "direction": order_direction["short"],
+        "side": side["sell"],
+    }]
+
+    # execute order
+    (batch_id_3, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_3, users_test=users_test, quantity_locked=quantity_locked_3, market_id=market_id_1, oracle_price=oracle_price_3, trading=trading, timestamp=timestamp1, is_reverted=0, error_code=0)
+    await check_batch_status(batch_id=batch_id_3, trading=trading, is_executed=1)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margins
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
+
+    # compare markets array
+    await compare_markets_array(user=alice, user_test=alice_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=bob, user_test=bob_test, collatera_id=asset_id_1)

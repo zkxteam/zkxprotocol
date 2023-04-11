@@ -101,9 +101,16 @@ func order_id_mapping(order_id: felt) -> (hash: felt) {
 // Events //
 // /////////
 
-// Event emitted whenever fund() is called
+// Event emitted whenever an order is rejected
 @event
 func order_rejected(code: felt, param_1: felt, param_2: felt) {
+}
+
+// Stores size locked for a user if order is SELL
+@storage_var
+func position_size_locked_per_user(
+    batch_id: felt, user_address: felt, market_id: felt, direction: felt
+) -> (res: felt) {
 }
 
 // //////////////
@@ -211,6 +218,17 @@ func execute_batch{
         quantity_locked_=quantity_locked_,
     );
 
+    with_attr error_message("0523: {quantity_locked_} 0") {
+        assert is_zero_quantity = 0;
+    }
+
+    adjust_quantity_locked(
+        batch_id_=batch_id_,
+        asset_token_decimal_=asset.token_decimal,
+        request_=request_list[last_index],
+        quantity_locked_=quantity_locked_,
+    );
+
     let (is_zero_quantity) = Math64x61_is_equal(initial_taker_locked, 0, 6);
     with_attr error_message("0523: {quantity_locked_} 0") {
         assert is_zero_quantity = 0;
@@ -291,6 +309,7 @@ func execute_batch{
 // @param quantity_remainging - Max quantity that can be executed for that order
 // @returns quantity_to_execute_final - Calculated quantity to execute
 func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    batch_id_: felt,
     order_portion_executed_: felt,
     position_details_: PositionDetails,
     asset_token_decimal_: felt,
@@ -320,22 +339,51 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // If it's a sell order, calculate the amount that can be executed
     if (request_.side == SELL) {
+        // Get the order size already locked for the current batch
+        let (current_batch_locked_size) = position_size_locked_per_user.read(
+            batch_id_, request_.user_address, request_.market_id, request_.direction
+        );
+        // Get position details
+        let (position_details: PositionDetails) = IAccountManager.get_position_data(
+            contract_address=request_.user_address,
+            market_id_=request_.market_id,
+            direction_=request_.direction,
+        );
+
+        let (remaining_position_size) = Math64x61_sub(
+            position_details.position_size, current_batch_locked_size
+        );
+
         let (cmp_res) = Math64x61_is_le(
-            quantity_to_execute, position_details_.position_size, asset_token_decimal_
+            quantity_to_execute, remaining_position_size, asset_token_decimal_
         );
 
         if (cmp_res == FALSE) {
-            quantity_to_execute_final = position_details_.position_size;
+            quantity_to_execute_final = remaining_position_size;
         } else {
             quantity_to_execute_final = quantity_to_execute;
         }
 
+        // Update position size locked for the user in current batch
+        let (current_batch_locked_size_new) = Math64x61_add(
+            current_batch_locked_size, quantity_to_execute_final
+        );
+        position_size_locked_per_user.write(
+            batch_id_,
+            request_.user_address,
+            request_.market_id,
+            request_.direction,
+            current_batch_locked_size_new,
+        );
+
         tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
         quantity_to_execute_final = quantity_to_execute;
 
         tempvar syscall_ptr = syscall_ptr;
+        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
 
@@ -730,7 +778,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 
     // Deposit the funds taken from the user and liquidity fund
     IHolding.deposit(
-        contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_order_value
+        contract_address=holding_address_, asset_id_=collateral_id_, amount_=leveraged_order_value
     );
 
     return (
@@ -814,11 +862,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         assert actual_execution_price = actual_exexution_price_felt;
     }
 
-    // Calculate pnl and net account value
-    let (pnl) = Math64x61_mul(order_size_, diff);
-    let (margin_plus_pnl_felt) = Math64x61_add(margin_amount, pnl);
-    assert margin_plus_pnl = margin_plus_pnl_felt;
-
     // Total value of the asset at current price
     let (leveraged_amount_out) = Math64x61_mul(order_size_, actual_execution_price);
 
@@ -827,6 +870,11 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (borrowed_amount_to_be_returned) = Math64x61_mul(borrowed_amount, ratio_of_position);
     let (local margin_amount_to_be_reduced) = Math64x61_mul(margin_amount, ratio_of_position);
     local margin_amount_open_64x61;
+
+    // Calculate pnl and net account value
+    let (pnl) = Math64x61_mul(order_size_, diff);
+    let (margin_plus_pnl_felt) = Math64x61_add(margin_amount_to_be_reduced, pnl);
+    assert margin_plus_pnl = margin_plus_pnl_felt;
 
     // Calculate new values for margin and borrowed amounts
     if (order_.order_type == DELEVERAGING_ORDER) {
@@ -859,9 +907,19 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
 
     // Deduct funds from holding contract
-    IHolding.withdraw(
-        contract_address=holding_address_, asset_id_=collateral_id_, amount=leveraged_amount_out
-    );
+    if (is_le(0, leveraged_amount_out) == TRUE) {
+        IHolding.withdraw(
+            contract_address=holding_address_,
+            asset_id_=collateral_id_,
+            amount_=leveraged_amount_out,
+        );
+
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    } else {
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+    }
 
     // If the position is leveraged, deposit the borrowed funds to Liquidity Fund
     if (current_position.leverage != LEVERAGE_ONE) {
@@ -885,36 +943,26 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     // Check if the account value for the position is negative
     let (is_underwater) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
 
+    // User's position has lost some amount of borrowed funds
     if (is_underwater == TRUE) {
-        // If yes, deduct the difference from user's balance; balance can go negative
-        // Absolute value of the acc value
+        // Absolute value of the margin_plus_pnl
         let amount_to_transfer_from = abs_value(margin_plus_pnl);
 
-        let (
-            is_liquidation: felt,
-            total_margin: felt,
-            available_margin: felt,
-            unrealized_pnl_sum: felt,
-            maintenance_margin_requirement: felt,
-            least_collateral_ratio: felt,
-            least_collateral_ratio_position: PositionDetailsForRiskManagement,
-            least_collateral_ratio_position_asset_price: felt,
-        ) = IAccountManager.get_margin_info(
-            contract_address=order_.user_address,
-            asset_id_=collateral_id_,
-            new_position_maintanence_requirement_=0,
-            new_position_margin_=0,
+        // Get the balance of user that is not locked
+        let (user_unused_balance) = IAccountManager.get_unused_balance(
+            contract_address=order_.user_address, assetID_=collateral_id_
         );
 
         // Check if the user's balance can cover the deficit
-        let (balance_check) = Math64x61_is_le(
-            amount_to_transfer_from, available_margin, collateral_token_decimal_
+        let (is_balance_sufficient) = Math64x61_is_le(
+            amount_to_transfer_from, user_unused_balance, collateral_token_decimal_
         );
-        if (balance_check == FALSE) {
-            let (balance_less_than_zero_res) = Math64x61_is_le(
-                available_margin, 0, collateral_token_decimal_
+
+        if (is_balance_sufficient == FALSE) {
+            let (is_balance_less_than_zero) = Math64x61_is_le(
+                user_unused_balance, 0, collateral_token_decimal_
             );
-            if (balance_less_than_zero_res == TRUE) {
+            if (is_balance_less_than_zero == TRUE) {
                 IInsuranceFund.withdraw(
                     contract_address=insurance_fund_address_,
                     asset_id_=collateral_id_,
@@ -925,7 +973,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
                 tempvar range_check_ptr = range_check_ptr;
             } else {
                 let (deduct_from_insurance) = Math64x61_sub(
-                    amount_to_transfer_from, available_margin
+                    amount_to_transfer_from, user_unused_balance
                 );
                 IInsuranceFund.withdraw(
                     contract_address=insurance_fund_address_,
@@ -945,10 +993,32 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             tempvar range_check_ptr = range_check_ptr;
         }
 
-        // Retrieve locked_margin from the user account
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar range_check_ptr = range_check_ptr;
+
+        // User's position value has become negative, it's a deficit for Holding contract as well
+        if (is_le(0, leveraged_amount_out) == FALSE) {
+            let holding_deficit = abs_value(leveraged_amount_out);
+
+            IHolding.deposit(
+                contract_address=holding_address_, asset_id_=collateral_id_, amount_=holding_deficit
+            );
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+            tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+        }
+
+        // locked_margin needs to be taken from the user account
         let (total_amount_to_transfer_from) = Math64x61_add(
             amount_to_transfer_from, margin_amount_to_be_reduced
         );
+
+        // Get locked_margin + margin_plus_pnl from the user account
         IAccountManager.transfer_from(
             contract_address=order_.user_address,
             asset_id_=collateral_id_,
@@ -957,23 +1027,65 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             invoked_for_='holding',
         );
 
-        let (signed_realized_pnl) = Math64x61_mul(amount_to_transfer_from, NEGATIVE_ONE);
+        let (signed_realized_pnl) = Math64x61_mul(total_amount_to_transfer_from, NEGATIVE_ONE);
         realized_pnl = signed_realized_pnl;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
     } else {
+        let (local user_balance) = IAccountManager.get_balance(
+            contract_address=order_.user_address, assetID_=collateral_id_
+        );
         // If it's not a liquidation order
         if (is_le(order_.order_type, 3) == TRUE) {
+            // if the user is in loss
             if (is_le(pnl, 0) == TRUE) {
+                let pnl_abs = abs_value(pnl);
+                let (is_balance_sufficient) = Math64x61_is_le(
+                    pnl_abs, user_balance, collateral_token_decimal_
+                );
+                // if user balance <= 0, deduct from insurance the whole loss amount
+                if (is_balance_sufficient == FALSE) {
+                    let (is_balance_less_than_zero) = Math64x61_is_le(
+                        user_balance, 0, collateral_token_decimal_
+                    );
+                    if (is_balance_less_than_zero == TRUE) {
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address_,
+                            asset_id_=collateral_id_,
+                            amount=pnl_abs,
+                            position_id_=order_.order_id,
+                        );
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
+                        // if user has some balance, deduct only remaining from insurance
+                    } else {
+                        let (deduct_from_insurance) = Math64x61_sub(pnl_abs, user_balance);
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address_,
+                            asset_id_=collateral_id_,
+                            amount=deduct_from_insurance,
+                            position_id_=order_.order_id,
+                        );
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
+                    }
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
+                    // if user balance can cover whole loss, don't do anything
+                } else {
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
+                }
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
                     asset_id_=collateral_id_,
                     market_id_=market_id_,
-                    amount_=abs_value(pnl),
+                    amount_=pnl_abs,
                     invoked_for_='holding',
                 );
+                // if user is in profit
             } else {
                 IAccountManager.transfer(
                     contract_address=order_.user_address,
@@ -990,13 +1102,60 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
             tempvar range_check_ptr = range_check_ptr;
         } else {
             if (order_.order_type == LIQUIDATION_ORDER) {
-                // Deposit the user's remaining margin in Insurance Fund
-                IInsuranceFund.deposit(
-                    contract_address=insurance_fund_address_,
-                    asset_id_=collateral_id_,
-                    amount=margin_plus_pnl,
-                    position_id_=order_.order_id,
+                let (is_balance_sufficient) = Math64x61_is_le(
+                    margin_amount_to_be_reduced, user_balance, collateral_token_decimal_
                 );
+                // if user balance >= margin amount, deposit remaining margin in insurance
+                if (is_balance_sufficient == TRUE) {
+                    IInsuranceFund.deposit(
+                        contract_address=insurance_fund_address_,
+                        asset_id_=collateral_id_,
+                        amount=margin_plus_pnl,
+                        position_id_=order_.order_id,
+                    );
+                } else {
+                    let (is_balance_less_than_zero) = Math64x61_is_le(
+                        user_balance, 0, collateral_token_decimal_
+                    );
+                    // if user balance <= 0, deduct margin amount from insurance
+                    if (is_balance_less_than_zero == TRUE) {
+                        IInsuranceFund.withdraw(
+                            contract_address=insurance_fund_address_,
+                            asset_id_=collateral_id_,
+                            amount=margin_amount_to_be_reduced,
+                            position_id_=order_.order_id,
+                        );
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
+                        // if user has some balance
+                    } else {
+                        let pnl_abs = abs_value(pnl);
+                        let (is_balance_less_than_loss) = Math64x61_is_le(
+                            user_balance, pnl_abs, collateral_token_decimal_
+                        );
+                        // if user balance can't cover loss, deduct deficit from insurance
+                        if (is_balance_less_than_loss == TRUE) {
+                            let (deduct_from_insurance) = Math64x61_sub(pnl_abs, user_balance);
+                            IInsuranceFund.withdraw(
+                                contract_address=insurance_fund_address_,
+                                asset_id_=collateral_id_,
+                                amount=deduct_from_insurance,
+                                position_id_=order_.order_id,
+                            );
+                            tempvar syscall_ptr = syscall_ptr;
+                            tempvar range_check_ptr = range_check_ptr;
+                            // if user balance can cover loss, deposit remaining to insurance
+                        } else {
+                            let (deposit_to_insurance) = Math64x61_sub(user_balance, pnl_abs);
+                            IInsuranceFund.deposit(
+                                contract_address=insurance_fund_address_,
+                                asset_id_=collateral_id_,
+                                amount=deposit_to_insurance,
+                                position_id_=order_.order_id,
+                            );
+                        }
+                    }
+                }
 
                 IAccountManager.transfer_from(
                     contract_address=order_.user_address,
@@ -1038,6 +1197,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 }
 
 // @notice Internal function called by execute_batch
+// @param batch_id_ - ID of the batch
 // @param market_id_ - Market ID of the batch
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
 // @param asset_token_decimal_ - No.of token decimals of an asset
@@ -1431,8 +1591,8 @@ func process_and_execute_orders_recurse{
             );
         }
 
-        with_attr error_message("0524: {taker_locked_quantity_} {quantity_to_execute}") {
-            assert is_zero_quantity = FALSE;
+        with_attr error_message("0524: {taker_locked_quantity_}") {
+            assert_not_zero(maker_quantity_to_execute);
         }
 
         // Direction Check
@@ -1771,13 +1931,14 @@ func process_and_execute_orders_recurse{
         let (keys: felt*) = alloc();
         assert keys[0] = 'trade_execution';
         assert keys[1] = market_id_;
+        assert keys[2] = batch_id_;
         let (data: felt*) = alloc();
         assert data[0] = quantity_to_execute;
         assert data[1] = execution_price;
         assert data[2] = [request_list_].direction;
         assert data[3] = [request_list_].side;
 
-        emit_event(2, keys, 4, data);
+        emit_event(3, keys, 4, data);
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;

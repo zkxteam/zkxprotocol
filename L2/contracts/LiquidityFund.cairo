@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
-from contracts.Constants import Trading_INDEX
+from contracts.Constants import LiquidityFund_INDEX, Trading_INDEX
 from contracts.libraries.FundLibrary import balance, FundLib
 from contracts.Math_64x61 import Math64x61_assert64x61
 
@@ -81,7 +81,7 @@ func liq_amount{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
-    FundLib.fund_contract(asset_id_, amount_);
+    FundLib.fund_contract(asset_id_, amount_, LiquidityFund_INDEX);
     fund_Liquidity_called.emit(asset_id=asset_id_, amount=amount_);
 
     return ();
@@ -94,7 +94,7 @@ func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 func defund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
-    FundLib.defund_contract(asset_id_, amount_);
+    FundLib.defund_contract(asset_id_, amount_, LiquidityFund_INDEX);
     defund_Liquidity_called.emit(asset_id=asset_id_, amount=amount_);
 
     return ();

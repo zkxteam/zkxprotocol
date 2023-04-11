@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.bool import FALSE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_lt, assert_not_zero, assert_nn
 from starkware.starknet.common.syscalls import get_caller_address
 
 from contracts.Constants import AdminAuth_INDEX, EmergencyFund_INDEX, ManageFunds_ACTION
@@ -88,8 +88,9 @@ namespace FundLib {
     // @notice add amount to asset_id's balance
     // @param asset_id_ - target asset_id
     // @param amount_ - value to add to asset_id's balance
+    // @param index_ - either Holding_INDEX, InsuranceFund_INDEX or LiquidityFund_INDEX
     func fund_contract{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        asset_id_: felt, amount_: felt
+        asset_id_: felt, amount_: felt, index_: felt
     ) {
         // Auth Check
         let (caller) = get_caller_address();
@@ -103,7 +104,7 @@ namespace FundLib {
             contract_address=auth_address, address=caller, action=ManageFunds_ACTION
         );
 
-        with_attr error_message("FundLib: Amount must be > 0") {
+        with_attr error_message("{index_}01: {asset_id_} {amount_}") {
             assert_lt(0, amount_);
         }
 
@@ -130,9 +131,11 @@ namespace FundLib {
     // @notice Manually deduct amount from asset_id's balance
     // @param asset_id_ - target asset_id
     // @param amount_ - value to deduct from asset_id's balance
+    // @param index_ - either Holding_INDEX, InsuranceFund_INDEX or LiquidityFund_INDEX
     func defund_contract{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        asset_id_: felt, amount_: felt
+        asset_id_: felt, amount_: felt, index_: felt
     ) {
+        alloc_locals;
         // Auth Check
         let (caller) = get_caller_address();
         let (registry) = FundLib_registry_address.read();
@@ -145,12 +148,12 @@ namespace FundLib {
             contract_address=auth_address, address=caller, action=ManageFunds_ACTION
         );
 
-        with_attr error_message("FundLib: Amount must > 0") {
+        with_attr error_message("{index_}02: {asset_id_} {amount_}") {
             assert_lt(0, amount_);
         }
 
-        let current_amount: felt = FundLib_balance_by_id.read(id=asset_id_);
-        with_attr error_message("FundLib: Insufficient balance") {
+        let (local current_amount: felt) = FundLib_balance_by_id.read(id=asset_id_);
+        with_attr error_message("{index_}03: {asset_id_} {current_amount}") {
             assert_le(amount_, current_amount);
         }
         let updated_amount: felt = Math64x61_sub(current_amount, amount_);
@@ -191,8 +194,8 @@ namespace FundLib {
             assert caller = contract_address;
         }
 
-        with_attr error_message("FundLib: Amount must be > 0") {
-            assert_lt(0, amount_);
+        with_attr error_message("{index_}04: {id_} {amount_}") {
+            assert_nn(amount_);
         }
 
         let current_amount: felt = FundLib_balance_by_id.read(id=id_);
@@ -210,6 +213,7 @@ namespace FundLib {
     func withdraw_from_contract{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         id_: felt, amount_: felt, index_: felt
     ) {
+        alloc_locals;
         // Auth Check
         let (caller) = get_caller_address();
         let (registry) = FundLib_registry_address.read();
@@ -222,13 +226,13 @@ namespace FundLib {
             assert caller = contract_address;
         }
 
-        with_attr error_message("FundLib: Amount must be > 0") {
-            assert_lt(0, amount_);
+        with_attr error_message("{index_}05: {id_} {amount_}") {
+            assert_nn(amount_);
         }
 
-        let current_amount: felt = FundLib_balance_by_id.read(id=id_);
-        with_attr error_message("FundLib: Insufficient balance") {
-            assert_le(amount_, current_amount);
+        let (local current_amount: felt) = FundLib_balance_by_id.read(id=id_);
+        with_attr error_message("{index_}06: {id_} {current_amount}") {
+            assert_nn(current_amount);
         }
         let updated_amount: felt = Math64x61_sub(current_amount, amount_);
 
@@ -240,8 +244,9 @@ namespace FundLib {
     // @notice Manually add amount to id's balance
     // @param id_ - market_id for ABR fund contract and asset_id for emergency fund contract
     // @param amount_ - value to add to market_id's or asset_id's balance
+    // @param index_ - ABR_FUND_INDEX for ABR fund contract and EmergencyFund_INDEX for emergency fund contract
     func fund_abr_or_emergency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        id_: felt, amount_: felt
+        id_: felt, amount_: felt, index_: felt
     ) {
         with_attr error_message("FundLib: Unauthorized call to manage funds") {
             let (registry) = FundLib_registry_address.read();
@@ -249,7 +254,7 @@ namespace FundLib {
             verify_caller_authority(registry, version, ManageFunds_ACTION);
         }
 
-        with_attr error_message("Amount cannot be 0 or negative") {
+        with_attr error_message("{index_}07: {id_} {amount_}") {
             assert_lt(0, amount_);
         }
 
@@ -264,21 +269,23 @@ namespace FundLib {
     // @notice Manually deduct amount from id's balance
     // @param id_ - market_id for ABR fund contract and asset_id for emergency fund contract
     // @param amount_ - value to deduct from market_id's or asset_id's balance
+    // @param index_ - ABR_FUND_INDEX for ABR fund contract and EmergencyFund_INDEX for emergency fund contract
     func defund_abr_or_emergency{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-        id_: felt, amount_: felt
+        id_: felt, amount_: felt, index_: felt
     ) {
+        alloc_locals;
         with_attr error_message("FundLib: Unauthorized call to manage funds") {
             let (registry) = FundLib_registry_address.read();
             let (version) = FundLib_contract_version.read();
             verify_caller_authority(registry, version, ManageFunds_ACTION);
         }
 
-        with_attr error_message("FundLib: Amount must be > 0") {
+        with_attr error_message("{index_}08: {id_} {amount_}") {
             assert_lt(0, amount_);
         }
 
-        let current_amount: felt = FundLib_balance_by_id.read(id=id_);
-        with_attr error_message("FundLib: Insufficient balance") {
+        let (local current_amount: felt) = FundLib_balance_by_id.read(id=id_);
+        with_attr error_message("{index_}09: {id_} {current_amount}") {
             assert_le(amount_, current_amount);
         }
         let updated_amount: felt = Math64x61_sub(current_amount, amount_);

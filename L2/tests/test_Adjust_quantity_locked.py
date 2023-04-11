@@ -1,10 +1,17 @@
+from copyreg import constructor
 import pytest
 import asyncio
 import time
+from starkware.starknet.testing.starknet import Starknet
+from starkware.starkware_utils.error_handling import StarkException
+from starkware.starknet.definitions.error_codes import StarknetErrorCode
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
-from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, PRIME, PRIME_HALF, assert_event_with_custom_keys_emitted
-from utils_trading import User, Liquidator,order_direction, order_types, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, get_safe_amount_to_withdraw_python, compare_margin_info, compare_markets_array, side
+from starkware.starknet.business_logic.execution.objects import OrderedEvent
+from starkware.starknet.public.abi import get_selector_from_name
+
+from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, assert_event_with_custom_keys_emitted, PRIME, PRIME_HALF
+from utils_trading import User, order_direction, order_side, order_types, order_time_in_force, side, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, compare_margin_info, check_batch_status, compare_markets_array
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -13,6 +20,7 @@ from dummy_addresses import L1_dummy_address
 
 admin1_signer = Signer(123456789987654321)
 admin2_signer = Signer(123456789987654322)
+non_admin_signer = Signer(123456789987654330)
 alice_signer = Signer(123456789987654323)
 bob_signer = Signer(123456789987654324)
 charlie_signer = Signer(123456789987654325)
@@ -33,9 +41,7 @@ UST_USDC_ID = str_to_felt("2jfk20wert12lmzaksc")
 
 timestamp = int(time.time())
 timestamp1 = int(time.time()) + 61
-timestamp2 = timestamp1 + 61
-timestamp3 = timestamp2 + 61
-timestamp4 = timestamp3 + 121
+timestamp2 = timestamp1 + 125
 
 
 @pytest.fixture(scope='module')
@@ -53,6 +59,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
     admin2 = await starknet_service.deploy(ContractType.Account, [
         admin2_signer.public_key
     ])
+    non_admin = await starknet_service.deploy(ContractType.Account, [
+        non_admin_signer.public_key
+    ])
     adminAuth = await starknet_service.deploy(ContractType.AdminAuth, [admin1.contract_address, admin2.contract_address])
     registry = await starknet_service.deploy(ContractType.AuthorizedRegistry, [adminAuth.contract_address])
     account_registry = await starknet_service.deploy(ContractType.AccountRegistry, [registry.contract_address, 1])
@@ -60,7 +69,6 @@ async def trading_test_initializer(starknet_service: StarknetService):
     asset = await starknet_service.deploy(ContractType.Asset, [registry.contract_address, 1])
 
     python_executor = OrderExecutor()
-    python_liquidator = Liquidator()
     # Deploy user accounts
     account_factory = AccountFactory(
         starknet_service,
@@ -135,7 +143,6 @@ async def trading_test_initializer(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [alice.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [bob.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [charlie.contract_address])
-    await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [eduard.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [felix.contract_address])
     await admin1_signer.send_transaction(admin1, account_registry.contract_address, 'add_to_account_registry', [gary.contract_address])
 
@@ -205,6 +212,26 @@ async def trading_test_initializer(starknet_service: StarknetService):
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', USDC_properties)
 
+    UST_properties = build_asset_properties(
+        id=AssetID.UST,
+        asset_version=1,
+        short_name=str_to_felt("UST"),
+        is_tradable=True,
+        is_collateral=True,
+        token_decimal=6
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', UST_properties)
+
+    DOGE_properties = build_asset_properties(
+        id=AssetID.DOGE,
+        asset_version=1,
+        short_name=str_to_felt("DOGE"),
+        is_tradable=False,
+        is_collateral=False,
+        token_decimal=8
+    )
+    await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', DOGE_properties)
+
     TESLA_properties = build_asset_properties(
         id=AssetID.TSLA,
         asset_version=1,
@@ -227,8 +254,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         step_size=1,
         minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
-        maximum_leverage=to64x61(10),
-        currently_allowed_leverage=to64x61(10),
+        maximum_leverage=to64x61(20),
+        currently_allowed_leverage=to64x61(20),
         maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
@@ -237,6 +264,28 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+
+    BTC_UST_properties = MarketProperties(
+        id=BTC_UST_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.UST,
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=to64x61(0.0001),
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(20),
+        currently_allowed_leverage=to64x61(20),
+        maintenance_margin_fraction=to64x61(0.075),
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
 
     ETH_USD_properties = MarketProperties(
         id=ETH_USD_ID,
@@ -247,10 +296,10 @@ async def trading_test_initializer(starknet_service: StarknetService):
         ttl=60,
         tick_size=1,
         step_size=1,
-        minimum_order_size=10,
+        minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
-        maximum_leverage=to64x61(10),
-        currently_allowed_leverage=to64x61(3),
+        maximum_leverage=to64x61(20),
+        currently_allowed_leverage=to64x61(20),
         maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
@@ -273,7 +322,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(5),
         currently_allowed_leverage=to64x61(3),
-        maintenance_margin_fraction=1,
+        maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
         incremental_position_size=100,
@@ -281,6 +330,28 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', TSLA_USD_properties.to_params_list())
+
+    UST_USDC_properties = MarketProperties(
+        id=UST_USDC_ID,
+        asset=AssetID.UST,
+        asset_collateral=AssetID.USDC,
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=10,
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(5),
+        currently_allowed_leverage=to64x61(3),
+        maintenance_margin_fraction=to64x61(0.075),
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', UST_USDC_properties.to_params_list())
 
     # Fund the Holding contract
     python_executor.set_fund_balance(
@@ -303,379 +374,114 @@ async def trading_test_initializer(starknet_service: StarknetService):
     print("Market:", hex(market.contract_address))
     print("Market Prices:", hex(marketPrices.contract_address))
     print("Auth Registry", hex(registry.contract_address))
-    return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats, python_liquidator
+
+    return starknet_service.starknet, python_executor, admin1, admin2, alice, bob, charlie, dave, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, adminAuth, fees, asset, trading, marketPrices, fixed_math, holding, feeBalance, liquidity, insurance, trading_stats, non_admin
 
 
 @pytest.mark.asyncio
-async def test_for_risk_while_opening_order(trading_test_initializer):
-    starknet_service, python_executor, admin1, _, alice, bob, charlie, _, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, python_liquidator = trading_test_initializer
-    
-    ### Open orders to set price ###
+async def test_adjust_quantity_locked(trading_test_initializer):
+    starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, non_admin = trading_test_initializer
 
+    ###################
+    ### Open orders ##
+    ###################
     # List of users
     users = [felix, gary]
     users_test = [felix_test, gary_test]
 
     # Sufficient balance for users
-    felix_balance = 200
-    gary_balance = 200
+    felix_balance = 5000
+    gary_balance = 2000
     balance_array = [felix_balance, gary_balance]
 
     # Batch params for OPEN orders
-    quantity_locked_1 = 1
-    market_id_1 = BTC_USD_ID
+    quantity_locked_1 = 3
+    market_id_1 = ETH_USD_ID
     asset_id_1 = AssetID.USDC
-    oracle_price_1 = 100
+    oracle_price_1 = 2000
 
     # Set balance in Starknet & Python
     await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
 
     # Create orders
     orders_1 = [{
-        "quantity": 1,
-        "price": 100,
+        "quantity": 3,
+        "market_id": ETH_USD_ID,
+        "price": 2000,
         "order_type": order_types["limit"],
-        "leverage": 1
+        "leverage": 5
     }, {
-        "quantity": 1,
-        "price": 100,
-        "leverage": 1,
+        "quantity": 3,
+        "market_id": ETH_USD_ID,
+        "price": 2000,
+        "leverage": 5,
         "direction": order_direction["short"],
     }]
 
     # execute order
     (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
-    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
 
-    starknet_service.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp1, gas_price=starknet_service.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.state.state.block_info.sequencer_address,
-        starknet_version=STARKNET_VERSION
-    )
+    # compare margin info
+    await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
 
-    ### Open orders Alice and Bob ###
+    # compare markets array
+    await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
 
+    ###################
+    ### Open orders ##
+    ###################
     # List of users
-    users = [alice, bob]
-    users_test = [alice_test, bob_test]
-
-    # Sufficient balance for users
-    alice_balance = 155
-    bob_balance = 1100
-    balance_array = [alice_balance, bob_balance]
+    users = [felix, felix, gary]
+    users_test = [felix_test, felix_test, gary_test]
 
     # Batch params for OPEN orders
-    quantity_locked_2 = 10
-    market_id_2 = BTC_USD_ID
+    quantity_locked_2 = 4
+    market_id_2 = ETH_USD_ID
     asset_id_2 = AssetID.USDC
-    oracle_price_2 = 100
-
-    # Set balance in Starknet & Python
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_2)
+    oracle_price_2 = 2000
 
     # Create orders
     orders_2 = [{
-        "quantity": 10,
-        "price": 100,
+        "quantity": 2.5,
+        "market_id": ETH_USD_ID,
+        "price": 2000,
+        "side": side["sell"],
         "order_type": order_types["limit"],
-        "leverage": 10
     }, {
-        "quantity": 10,
-        "price": 100,
-        "leverage": 1,
-        "direction": order_direction["short"],
+        "quantity": 1.5,
+        "market_id": ETH_USD_ID,
+        "price": 2000,
+        "side": side["sell"],
+        "order_type": order_types["limit"],
+    }, {
+        "quantity": 4,
+        "market_id": ETH_USD_ID,
+        "price": 2000,
+        "leverage": 10,
     }]
 
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp1)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
 
     # check balances
     await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_2)
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_2)
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
 
-    withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp1)
+    # compare margin info
+    await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
 
-    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(withdrawable_python[0], abs=1e-3)
-    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
+    # compare markets array
+    await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
 
-    starknet_service.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp2, gas_price=starknet_service.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.state.state.block_info.sequencer_address,
-        starknet_version=STARKNET_VERSION
-    )
-
-    ### Open orders to set price ###
-
-    # List of users
-    users = [felix, gary]
-    users_test = [felix_test, gary_test]
-
-    # Sufficient balance for users
-    felix_balance = 250
-    gary_balance = 250
-    balance_array = [felix_balance, gary_balance]
-
-    # Batch params for OPEN orders
-    quantity_locked_1 = 1
-    market_id_1 = BTC_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 98
-
-    # Set balance in Starknet & Python
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-    # Create orders
-    orders_1 = [{
-        "quantity": 1,
-        "price": 98,
-        "order_type": order_types["limit"],
-        "leverage": 1
-    }, {
-        "quantity": 1,
-        "price": 98,
-        "leverage": 1,
-        "direction": order_direction["short"],
-    }]
-
-    # execute order
-    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp2)
-    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
-
-    # check balances
-    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-
-    withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp2)
-
-    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(withdrawable_python[0], abs=1e-3)
-    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
-
-    starknet_service.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp3, gas_price=starknet_service.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.state.state.block_info.sequencer_address,
-        starknet_version=STARKNET_VERSION
-    )
-
-    ### Open orders to set price ###
-
-    # List of users
-    users = [felix, gary]
-    users_test = [felix_test, gary_test]
-
-    # Sufficient balance for users
-    felix_balance = 600
-    gary_balance = 600
-    balance_array = [felix_balance, gary_balance]
-
-    # Batch params for OPEN orders
-    quantity_locked_1 = 1
-    market_id_1 = BTC_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 91
-
-    # Set balance in Starknet & Python
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-    # Create orders
-    orders_1 = [{
-        "quantity": 1,
-        "price": 91,
-        "order_type": order_types["limit"],
-        "leverage": 1
-    }, {
-        "quantity": 1,
-        "price": 91,
-        "leverage": 1,
-        "direction": order_direction["short"],
-    }]
-
-    # execute order
-    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp3)
-    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
-
-    # check balances
-    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-
-    withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp3)
-
-    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(withdrawable_python[0], abs=1e-3)
-    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
-
-    starknet_service.state.state.block_info = BlockInfo(
-        block_number=1, block_timestamp=timestamp4, gas_price=starknet_service.state.state.block_info.gas_price,
-        sequencer_address=starknet_service.state.state.block_info.sequencer_address,
-        starknet_version=STARKNET_VERSION
-    )
-
-    ### Open orders to set price ###
-
-    # List of users
-    users = [felix, gary]
-    users_test = [felix_test, gary_test]
-
-    # Sufficient balance for users
-    felix_balance = 600
-    gary_balance = 600
-    balance_array = [felix_balance, gary_balance]
-
-    # Batch params for OPEN orders
-    quantity_locked_1 = 1
-    market_id_1 = BTC_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 85
-
-    # Set balance in Starknet & Python
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-    # Create orders
-    orders_1 = [{
-        "quantity": 1,
-        "price": 85,
-        "order_type": order_types["limit"],
-        "leverage": 1
-    }, {
-        "quantity": 1,
-        "price": 85,
-        "leverage": 1,
-        "direction": order_direction["short"],
-    }]
-
-    # execute order
-    (batch_id_1, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp4)
-    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
-
-    # check balances
-    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-
-    withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    print("starknet: ", withdrawable_starknet.result)
-    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp4)
-    print("python: ", withdrawable_python)
-
-    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(withdrawable_python[0], abs=1e-3)
-    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
-
-
-@ pytest.mark.asyncio
-async def test_closing_more_than_parent_size_should_pass(trading_test_initializer):
-    starknet_service, python_executor, admin1, _, alice, bob, charlie, _, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, python_liquidator = trading_test_initializer
-    
-    ###################
-    ### Open orders ##
-    ###################
-    # List of users
-    users = [charlie, eduard]
-    users_test = [charlie_test, eduard_test]
-
-    # Sufficient balance for users
-    charlie_balance = 10000
-    eduard_balance = 10000
-    balance_array = [charlie_balance, eduard_balance]
-
-    # Batch params for OPEN orders
-    quantity_locked_1 = 3
-    market_id_1 = ETH_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 1000
-
-    # Set balance in Starknet & Python
-    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
-
-    # Create orders
-    orders_1 = [{
-        "quantity": 3,
-        "order_type": order_types["limit"],
-        "market_id": ETH_USD_ID,
-    }, {
-        "quantity": 3,
-        "direction": order_direction["short"],
-        "market_id": ETH_USD_ID,
-    }]
-
-    # execute order
-    (batch_id_1, _, _) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, timestamp=timestamp4, is_reverted=0, error_code=0)
-    await check_batch_status(batch_id=batch_id_1, trading=trading, is_executed=1)
-
-    # check balances
-    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
-    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
-    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
-
-    # compare margins
-    await compare_margin_info(user=charlie, user_test=charlie_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp4)
-    await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp4)
-
-    ###################
-    ### Close orders ##
-    ###################
-    # Batch params for OPEN orders
-    quantity_locked_2 = 4
-    oracle_price_2 = 1000
-
-    # Create orders
-    orders_2 = [{
-        "quantity": 4,
-        "side": side["sell"],
-        "order_type": order_types["limit"],
-        "market_id": ETH_USD_ID,
-    }, {
-        "quantity": 4,
-        "direction": order_direction["short"],
-        "side": side["sell"],
-        "market_id": ETH_USD_ID,
-    }]
-
-    error_at_index = 0
-    # execute order
-    (batch_id_1, complete_orders_1, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp4, is_reverted=0)
-
-    # compare margins
-    await compare_margin_info(user=charlie, user_test=charlie_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp4)
-    await compare_margin_info(user=eduard, user_test=eduard_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp4)
-    # print("events:", info.call_info.internal_calls[0])
-    # print("orders:", complete_orders_1)
-    # assert_event_with_custom_keys_emitted(
-    #     tx_exec_info=info,
-    #     from_address=charlie.contract_address,
-    #     keys=[str_to_felt('trade')],
-    #     data=[complete_orders_1[1]["order_id"], #order_id
-    #           market_id_1, #market_id
-    #           order_direction["long"], #request.direction
-    #           to64x61(3), #size
-    #           order_types["limit"], #request.order_type
-    #           side["sell"], #request.side
-    #           to64x61(1000), #execution_price
-    #           0, #pnl
-    #           1, #side
-    #           0, #opening_fee
-    #           1], #is_final
-    #     order=2
-    # )
-    # assert_event_with_custom_keys_emitted(
-    #     tx_exec_info=info,
-    #     from_address=eduard.contract_address,
-    #     keys=[str_to_felt('trade')],
-    #     data=[complete_orders_1[1]["order_id"], #order_id
-    #           market_id_1, #market_id
-    #           order_direction["short"], #request.direction
-    #           to64x61(3), #size
-    #           order_types["market"], #request.order_type
-    #           side["sell"], #request.side
-    #           to64x61(1000), #execution_price
-    #           0, #pnl
-    #           2, #side
-    #           0, #opening_fee
-    #           1], #is_final
-    #     order=6
-    # )
+    info = await felix.get_account_info(AssetID.USDC).call()
+    print("Account info: ", info.result)

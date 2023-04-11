@@ -10,7 +10,12 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.common.signature import verify_ecdsa_signature
 
-from starkware.starknet.common.syscalls import emit_event, get_block_timestamp, get_caller_address
+from starkware.starknet.common.syscalls import (
+    emit_event,
+    get_block_timestamp,
+    get_caller_address,
+    get_block_number,
+)
 
 from contracts.Constants import (
     ABR_PAYMENT_INDEX,
@@ -90,6 +95,11 @@ func public_key() -> (res: felt) {
 // Stores balance of an asset
 @storage_var
 func balance(assetID: felt) -> (res: felt) {
+}
+
+// Stores block number at which account got deployed
+@storage_var
+func account_deployed_block_number() -> (block_number: felt) {
 }
 
 // Stores the locked amount of margin for a collateral
@@ -188,6 +198,10 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     balance.write(assetID=collateral_id_, value=DEFAULT_BALANCE);
     add_collateral(new_asset_id=collateral_id_, iterator=0, length=0);
 
+    // Get current block number
+    let (current_block_number) = get_block_number();
+    account_deployed_block_number.write(current_block_number);
+
     CommonLib.initialize(registry_address_, version_);
     return ();
 }
@@ -206,6 +220,16 @@ func get_public_key{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     let (pub_key) = public_key.read();
     let (registry) = CommonLib.get_registry_address();
     return (pub_key=pub_key, auth_reg_addr=registry);
+}
+
+// @notice view function to get block number at which account got deployed
+// @return block_number - block number at which account got deployed
+@view
+func get_account_deployed_block_number{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}() -> (block_number: felt) {
+    let (block_number) = account_deployed_block_number.read();
+    return (block_number=block_number);
 }
 
 // @notice view function to check if the transaction signature is valid
@@ -289,6 +313,20 @@ func get_locked_margin{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) -> (res: felt) {
     let (res) = margin_locked.read(asset_id=assetID_);
     return (res=res);
+}
+
+// @notice view function to get the unused balance of an asset; balance - locked_balance
+// @param assetID_ - ID of an asset
+// @return res - unused balance of an asset
+@view
+func get_unused_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    assetID_: felt
+) -> (res: felt) {
+    let (total_balance) = balance.read(assetID=assetID_);
+    let (locked_balance) = margin_locked.read(asset_id=assetID_);
+
+    let (usused_balance) = Math64x61_sub(total_balance, locked_balance);
+    return (res=usused_balance);
 }
 
 // @notice view function to get the available margin of an asset
@@ -1019,6 +1057,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 }
 
 // @notice Function called by Trading Contract
+// @param batch_id - ID of the batch
 // @param request - Details of the order to be executed
 // @param signature - Details of the signature
 // @param size - Size of the Order to be executed
@@ -2260,6 +2299,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 
     if (liq_position_.market_id == curr_market_id) {
         if (liq_position_.direction == LONG) {
+            assert deleveragable_or_liquidatable_short = 0;
+            assert amount_to_be_sold_short = 0;
             if (liq_position_.liquidatable == TRUE) {
                 assert deleveragable_or_liquidatable_long = 2;
                 assert amount_to_be_sold_long = liq_position_.amount_to_be_sold;
@@ -2273,6 +2314,8 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
                 }
             }
         } else {
+            assert deleveragable_or_liquidatable_long = 0;
+            assert amount_to_be_sold_long = 0;
             if (liq_position_.liquidatable == TRUE) {
                 assert deleveragable_or_liquidatable_short = 2;
                 assert amount_to_be_sold_short = liq_position_.amount_to_be_sold;

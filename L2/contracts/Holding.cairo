@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 
-from contracts.Constants import Trading_INDEX
+from contracts.Constants import Holding_INDEX, Trading_INDEX
 from contracts.libraries.FundLibrary import balance, FundLib
 
 // /////////
@@ -55,7 +55,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
-    FundLib.fund_contract(asset_id_, amount_);
+    FundLib.fund_contract(asset_id_, amount_, Holding_INDEX);
     fund_Holding_called.emit(asset_id=asset_id_, amount=amount_);
 
     return ();
@@ -68,7 +68,7 @@ func fund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
 func defund{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     asset_id_: felt, amount_: felt
 ) {
-    FundLib.defund_contract(asset_id_, amount_);
+    FundLib.defund_contract(asset_id_, amount_, Holding_INDEX);
     defund_Holding_called.emit(asset_id=asset_id_, amount=amount_);
 
     return ();
