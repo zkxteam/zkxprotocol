@@ -2427,14 +2427,14 @@ func process_and_execute_orders_recurse{
             assert error_code_temp = error_code_open;
 
             if (request_list_len_ == 1) {
-                with_attr error_message("{error_code_temp}: {order_id} {current_index}") {
+                with_attr error_message("{error_code_temp}: {order_id} {market_id_}") {
                     assert 1 = 0;
                 }
             } else {
                 if (error_order_id_ == 0) {
                     assert error_code = error_code_temp;
                     assert error_order_id = order_id;
-                    assert error_param = current_index;
+                    assert error_param = market_id_;
                 } else {
                     assert error_code = error_code_;
                     assert error_order_id = error_order_id_;
