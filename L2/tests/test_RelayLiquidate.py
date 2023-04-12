@@ -17,6 +17,7 @@ from utils_trading import (
 )
 from utils_links import DEFAULT_LINK_1, prepare_starknet_string
 from utils_asset import AssetID, build_asset_properties
+from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
@@ -305,10 +306,103 @@ async def adminAuth_factory(starknet_service: StarknetService):
     ).call()
     assert call_counter.result.count == 4
 
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_USD_ID, AssetID.BTC, AssetID.USDC, 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_USD_ID, AssetID.ETH, AssetID.USDC, 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [BTC_DAI_ID, AssetID.BTC, AssetID.DAI, 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(10), to64x61(10), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
-    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', [ETH_DAI_ID, AssetID.ETH, AssetID.DAI, 1, 0, 60, 1, 1, 10, to64x61(1), to64x61(5), to64x61(3), to64x61(0.075), 1, 1, 100, 1000, 10000] + prepare_starknet_string(DEFAULT_LINK_1))
+    # Add markets
+    BTC_USD_properties = MarketProperties(
+        id=BTC_USD_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.USDC,
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=to64x61(0.0001),
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
+        maintenance_margin_fraction=to64x61(0.075),
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_USD_ID, details=BTC_USD_properties.to_dict())
+
+    ETH_USD_properties = MarketProperties(
+        id=ETH_USD_ID,
+        asset=AssetID.ETH,
+        asset_collateral=AssetID.USDC,
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=to64x61(0.0001),
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
+        maintenance_margin_fraction=to64x61(0.075),
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=ETH_USD_ID, details=ETH_USD_properties.to_dict())
+
+    # Add markets
+    BTC_DAI_properties = MarketProperties(
+        id=BTC_DAI_ID,
+        asset=AssetID.BTC,
+        asset_collateral=AssetID.DAI,
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=to64x61(0.0001),
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
+        maintenance_margin_fraction=to64x61(0.075),
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_DAI_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_DAI_ID, details=BTC_DAI_properties.to_dict())
+
+    ETH_DAI_properties = MarketProperties(
+        id=ETH_DAI_ID,
+        asset=AssetID.ETH,
+        asset_collateral=AssetID.DAI,
+        is_tradable=True,
+        is_archived=False,
+        ttl=60,
+        tick_size=1,
+        step_size=1,
+        minimum_order_size=to64x61(0.0001),
+        minimum_leverage=to64x61(1),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
+        maintenance_margin_fraction=to64x61(0.075),
+        initial_margin_fraction=1,
+        incremental_initial_margin_fraction=1,
+        incremental_position_size=100,
+        baseline_position_size=1000,
+        maximum_position_size=10000
+    )
+    await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_DAI_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=ETH_DAI_ID, details=ETH_DAI_properties.to_dict())
 
    # Fund the Holding contract
     python_executor.set_fund_balance(

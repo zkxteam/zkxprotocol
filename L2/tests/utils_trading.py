@@ -1830,6 +1830,11 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
     global execution_info
     # If the batch is to be reverted, generate the error_message
     if is_reverted == 1:
+        #####################
+        print("\norder ids: ")
+        for i in range(len(complete_orders_python)):
+            print("#", i, ": ", complete_orders_python[i]["order_id"])
+        #####################
         actual_error_message = ""
         # If the error code is passed
         if error_code:
