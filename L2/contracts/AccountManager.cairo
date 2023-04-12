@@ -1560,7 +1560,7 @@ func execute_order{
         assert keys[1] = batch_id_;
         let (data: felt*) = alloc();
         assert data[0] = error_message_;
-        assert data[1] = execution_details_.order_id;
+        assert data[1] = order_id;
         assert data[2] = error_param_1_;
 
         emit_event(2, keys, 3, data);

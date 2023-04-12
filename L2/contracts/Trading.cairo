@@ -15,6 +15,8 @@ from contracts.Constants import (
     BUY,
     CLOSE,
     DELEVERAGING_ORDER,
+    EXECUTED,
+    FAILED,
     FeeBalance_INDEX,
     FoK,
     Holding_INDEX,
@@ -213,20 +215,21 @@ func execute_batch{
     // Get the index of the Taker order
     let last_index = request_list_len - 1;
 
-    let (initial_taker_locked: felt) = find_initial_taker_locked(
+    let (initial_taker_locked: felt, error_code: felt) = find_initial_taker_locked(
         batch_id_=batch_id_,
         asset_token_decimal_=asset.token_decimal,
         request_=request_list[last_index],
         quantity_locked_=quantity_locked_,
     );
 
-    let (is_zero_quantity) = Math64x61_is_equal(initial_taker_locked, 0, 6);
-    with_attr error_message("0523: {quantity_locked_} 0") {
-        assert is_zero_quantity = FALSE;
+    with_attr error_message("0553: {quantity_locked_} 0") {
+        assert error_code = 0;
     }
 
     // Recursively loop through the orders in the batch
-    let (taker_execution_price: felt, open_interest: felt) = process_and_execute_orders_recurse(
+    let (
+        is_error: felt, taker_execution_price: felt, open_interest: felt
+    ) = process_and_execute_orders_recurse(
         batch_id_=batch_id_,
         taker_locked_quantity_=initial_taker_locked,
         market_id_=market_id_,
@@ -252,49 +255,57 @@ func execute_batch{
         taker_execution_price_=0,
         open_interest_=0,
         oracle_price_=oracle_price_,
+        is_error_=FALSE,
     );
 
-    // Get Market price for the corresponding market Id
-    let (market_price: felt) = IMarketPrices.get_market_price(
-        contract_address=market_prices_address, id=market_id_
-    );
+    if (is_error == TRUE) {
+        // Change the status of the batch to TRUE
+        batch_id_status.write(batch_id=batch_id_, value=FAILED);
 
-    // update market price
-    if (market_price == 0) {
-        IMarketPrices.update_market_price(
-            contract_address=market_prices_address, id=market_id_, price=oracle_price_
-        );
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+        return ();
     } else {
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+        // Get Market price for the corresponding market Id
+        let (market_price: felt) = IMarketPrices.get_market_price(
+            contract_address=market_prices_address, id=market_id_
+        );
+
+        // update market price
+        if (market_price == 0) {
+            IMarketPrices.update_market_price(
+                contract_address=market_prices_address, id=market_id_, price=oracle_price_
+            );
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+        }
+
+        // Initialize empty trader_stats_list
+        let (trader_stats_list: TraderStats*) = alloc();
+
+        // Initialize empty executed_sizes_list
+        let (executed_sizes_list: felt*) = alloc();
+
+        // Record TradingStats
+        ITradingStats.record_trade_batch_stats(
+            contract_address=trading_stats_address,
+            market_id_=market_id_,
+            execution_price_64x61_=taker_execution_price,
+            request_list_len=request_list_len,
+            request_list=request_list,
+            trader_stats_list_len=0,
+            trader_stats_list=trader_stats_list,
+            executed_sizes_list_len=0,
+            executed_sizes_list=executed_sizes_list,
+            open_interest_=open_interest,
+        );
+
+        // Change the status of the batch to TRUE
+        batch_id_status.write(batch_id=batch_id_, value=EXECUTED);
+
+        return ();
     }
-
-    // Initialize empty trader_stats_list
-    let (trader_stats_list: TraderStats*) = alloc();
-
-    // Initialize empty executed_sizes_list
-    let (executed_sizes_list: felt*) = alloc();
-
-    // Record TradingStats
-    ITradingStats.record_trade_batch_stats(
-        contract_address=trading_stats_address,
-        market_id_=market_id_,
-        execution_price_64x61_=taker_execution_price,
-        request_list_len=request_list_len,
-        request_list=request_list,
-        trader_stats_list_len=0,
-        trader_stats_list=trader_stats_list,
-        executed_sizes_list_len=0,
-        executed_sizes_list=executed_sizes_list,
-        open_interest_=open_interest,
-    );
-
-    // Change the status of the batch to TRUE
-    batch_id_status.write(batch_id=batch_id_, value=TRUE);
-
-    return ();
 }
 
 // ///////////
@@ -313,7 +324,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     asset_token_decimal_: felt,
     request_: MultipleOrder,
     quantity_remaining_: felt,
-) -> (quantity_to_execute_final: felt) {
+) -> (quantity_to_execute_final: felt, error_code: felt) {
     alloc_locals;
     local quantity_to_execute;
     local quantity_to_execute_final;
@@ -329,6 +340,19 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     } else {
         assert quantity_to_execute = executable_quantity;
     }
+
+    // Return if the order is fully executed with the error code
+    let (is_zero_quantity_to_execute) = Math64x61_is_equal(
+        quantity_to_execute, 0, asset_token_decimal_
+    );
+
+    if (is_zero_quantity_to_execute == 1) {
+        return (quantity_to_execute_final=0, error_code='0551');
+    }
+
+    tempvar syscall_ptr = syscall_ptr;
+    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    tempvar range_check_ptr = range_check_ptr;
 
     local order_id;
     local quantity_remaining;
@@ -374,18 +398,25 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             current_batch_locked_size_new,
         );
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+        // Return if the order is fully closed
+        let (is_zero_quantity_to_execute_final) = Math64x61_is_equal(
+            quantity_to_execute_final, 0, asset_token_decimal_
+        );
+
+        local error_code;
+
+        if (is_zero_quantity_to_execute_final == TRUE) {
+            assert error_code = '0552';
+        } else {
+            assert error_code = 0;
+        }
+
+        return (quantity_to_execute_final=quantity_to_execute_final, error_code=error_code);
     } else {
         quantity_to_execute_final = quantity_to_execute;
 
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+        return (quantity_to_execute_final=quantity_to_execute_final, error_code=0);
     }
-
-    return (quantity_to_execute_final,);
 }
 
 // @notice Internal function to adjust and calculate the quantity locked and execution sizes
@@ -395,7 +426,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // @param quantity_locked_ - Original quantity lokcked of the batch
 func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     batch_id_: felt, asset_token_decimal_: felt, request_: MultipleOrder, quantity_locked_: felt
-) -> (taker_quantity_to_execute: felt) {
+) -> (taker_quantity_to_execute: felt, error_code: felt) {
     // Get the portion executed of the order
     let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
         contract_address=request_.user_address, order_id_=request_.order_id
@@ -409,7 +440,7 @@ func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     );
 
     // Adjust the quantity to execute on the taker side
-    let (taker_quantity_to_execute) = get_quantity_to_execute(
+    let (taker_quantity_to_execute: felt, error_code: felt) = get_quantity_to_execute(
         batch_id_=batch_id_,
         order_portion_executed_=order_portion_executed,
         position_details_=position_details,
@@ -418,7 +449,7 @@ func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         quantity_remaining_=quantity_locked_,
     );
 
-    return (taker_quantity_to_execute,);
+    return (taker_quantity_to_execute, error_code);
 }
 
 // @notice Internal function to check to check the slippage of a market order
@@ -650,7 +681,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     fees_balance_address_: felt,
     side_: felt,
 ) -> (
-    is_error: felt,
+    error_code: felt,
     user_available_balance: felt,
     average_execution_price_open: felt,
     margin_amount_open: felt,
@@ -712,7 +743,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     let (trading_fee) = Math64x61_mul(fees, NEGATIVE_ONE);
 
     // Check if the position can be opened
-    let (available_margin) = ILiquidate.check_for_risk(
+    let (available_margin, is_liquidation) = ILiquidate.check_for_risk(
         contract_address=liquidate_address_,
         order_=order_,
         size=order_size_,
@@ -724,12 +755,16 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert user_available_balance = available_margin;
     assert order_id = order_.order_id;
 
+    if (is_liquidation == TRUE) {
+        return ('1101', user_available_balance, 0, 0, 0, 0, 0);
+    }
+
     let (user_balance_check) = Math64x61_is_le(
         fees, user_available_balance, collateral_token_decimal_
     );
 
     if (user_balance_check == FALSE) {
-        return (FALSE, user_available_balance, 0, 0, 0, 0, 0);
+        return ('0501', user_available_balance, 0, 0, 0, 0, 0);
     }
 
     if (is_le(fees, 0) == 0) {
@@ -1250,7 +1285,8 @@ func process_and_execute_orders_recurse{
     taker_execution_price_: felt,
     open_interest_: felt,
     oracle_price_: felt,
-) -> (taker_execution_price: felt, open_interest: felt) {
+    is_error_: felt,
+) -> (is_error: felt, taker_execution_price: felt, open_interest: felt) {
     alloc_locals;
 
     local execution_price;
@@ -1263,6 +1299,7 @@ func process_and_execute_orders_recurse{
     local opening_fee;
     local updated_position_details: PositionDetails;
     local execution_details: ExecutionDetails;
+    local order_id;
     local pnl;
 
     local market_array_update;
@@ -1276,9 +1313,31 @@ func process_and_execute_orders_recurse{
 
     // Check if the list is empty, if yes return 1
     if (request_list_len_ == 0) {
-        let (actual_open_interest) = Math64x61_div(open_interest_, TWO);
-        return (taker_execution_price_, actual_open_interest);
+        local actual_open_interest;
+
+        if (open_interest_ == 0) {
+            assert actual_open_interest = 0;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+        } else {
+            let (actual_open_interest_felt) = Math64x61_div(open_interest_, TWO);
+            assert actual_open_interest = actual_open_interest_felt;
+
+            tempvar syscall_ptr = syscall_ptr;
+            tempvar range_check_ptr = range_check_ptr;
+            tempvar pedersen_ptr = pedersen_ptr;
+        }
+
+        return (
+            is_error=is_error_,
+            taker_execution_price=taker_execution_price_,
+            open_interest=actual_open_interest,
+        );
     }
+    // Set order_id for AccountManager events
+    assert order_id = [request_list_].order_id;
 
     // Error Handling: User is not registered
     // check that the user account is present in account registry (and thus that it was deployed by zkx)
@@ -1292,7 +1351,7 @@ func process_and_execute_orders_recurse{
             batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
-            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
             updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
             updated_margin_locked_=0,
@@ -1329,6 +1388,7 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
+            is_error_=TRUE,
         );
     }
 
@@ -1343,7 +1403,7 @@ func process_and_execute_orders_recurse{
             batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
-            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
             updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
             updated_margin_locked_=0,
@@ -1380,6 +1440,7 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
+            is_error_=TRUE,
         );
     }
 
@@ -1391,7 +1452,7 @@ func process_and_execute_orders_recurse{
             batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
-            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
             updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
             updated_margin_locked_=0,
@@ -1428,6 +1489,7 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
+            is_error_=TRUE,
         );
     }
 
@@ -1442,7 +1504,7 @@ func process_and_execute_orders_recurse{
             batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
-            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
             updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
             updated_margin_locked_=0,
@@ -1479,6 +1541,7 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
+            is_error_=TRUE,
         );
     }
 
@@ -1493,7 +1556,7 @@ func process_and_execute_orders_recurse{
             batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
-            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
             updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
             updated_margin_locked_=0,
@@ -1530,6 +1593,7 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
+            is_error_=TRUE,
         );
     }
 
@@ -1585,7 +1649,7 @@ func process_and_execute_orders_recurse{
             batch_id_=batch_id_,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
-            execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
             updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
             updated_margin_locked_=0,
@@ -1622,6 +1686,7 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
+            is_error_=TRUE,
         );
     }
 
@@ -1642,13 +1707,26 @@ func process_and_execute_orders_recurse{
     if (request_list_len_ == 1) {
         // Set the quantity to execute as the total quantity executed by the Maker so far
         assert quantity_to_execute = quantity_executed_;
-        let (is_zero_quantity) = Math64x61_is_equal(quantity_to_execute, 0, 6);
-
-        // with_attr error_message("0524: {taker_locked_quantity_}") {
-        //     is_zero_quantity == FALSE;
-        // }
+        let (is_zero_quantity) = Math64x61_is_equal(quantity_executed_, 0, 6);
 
         if (is_zero_quantity == TRUE) {
+            // Call the account contract to reject the order
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_='0524',
+                error_param_1_=0,
+            );
+
             return process_and_execute_orders_recurse(
                 batch_id_=batch_id_,
                 taker_locked_quantity_=taker_locked_quantity_,
@@ -1675,6 +1753,7 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
+                is_error_=TRUE,
             );
         }
 
@@ -1690,7 +1769,7 @@ func process_and_execute_orders_recurse{
                 batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
-                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                 updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                 updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                 updated_margin_locked_=0,
@@ -1727,6 +1806,7 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
+                is_error_=TRUE,
             );
         }
 
@@ -1738,7 +1818,7 @@ func process_and_execute_orders_recurse{
                 batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
-                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                 updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                 updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                 updated_margin_locked_=0,
@@ -1775,6 +1855,7 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
+                is_error_=TRUE,
             );
         }
 
@@ -1792,7 +1873,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -1829,6 +1910,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
 
@@ -1840,7 +1922,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -1877,6 +1959,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
 
@@ -1903,7 +1986,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -1940,6 +2023,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
 
@@ -1951,7 +2035,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -1988,6 +2072,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
 
@@ -2007,7 +2092,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -2044,6 +2129,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
             tempvar syscall_ptr = syscall_ptr;
@@ -2065,7 +2151,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -2102,6 +2188,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
 
@@ -2145,7 +2232,7 @@ func process_and_execute_orders_recurse{
         let (quantity_remaining) = Math64x61_sub(taker_locked_quantity_, quantity_executed_);
 
         // Find quantity that needs to be executed for the current order
-        let (quantity_to_execute_remaining) = get_quantity_to_execute(
+        let (quantity_to_execute_remaining, error_code) = get_quantity_to_execute(
             batch_id_=batch_id_,
             order_portion_executed_=order_portion_executed,
             position_details_=position_details,
@@ -2153,6 +2240,53 @@ func process_and_execute_orders_recurse{
             request_=[request_list_],
             quantity_remaining_=quantity_remaining,
         );
+
+        if (error_code != 0) {
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_=error_code,
+                error_param_1_=0,
+            );
+
+            return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
+                taker_locked_quantity_=taker_locked_quantity_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                asset_token_decimal_=asset_token_decimal_,
+                collateral_token_decimal_=collateral_token_decimal_,
+                orders_len_=orders_len_,
+                request_list_len_=request_list_len_ - 1,
+                request_list_=request_list_ + MultipleOrder.SIZE,
+                quantity_executed_=quantity_executed_,
+                account_registry_address_=account_registry_address_,
+                holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
+                liquidate_address_=liquidate_address_,
+                liquidity_fund_address_=liquidity_fund_address_,
+                insurance_fund_address_=insurance_fund_address_,
+                max_leverage_=max_leverage_,
+                min_quantity_=min_quantity_,
+                maker1_direction_=maker1_direction_,
+                maker1_side_=maker1_side_,
+                total_order_volume_=total_order_volume_,
+                taker_execution_price_=taker_execution_price_,
+                open_interest_=open_interest_,
+                oracle_price_=oracle_price_,
+                is_error_=TRUE,
+            );
+        }
 
         // Check the direction of the maker
         let (is_error) = validate_maker(
@@ -2165,7 +2299,7 @@ func process_and_execute_orders_recurse{
                 batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
-                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                 updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                 updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                 updated_margin_locked_=0,
@@ -2202,6 +2336,7 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
+                is_error_=TRUE,
             );
         }
 
@@ -2213,7 +2348,7 @@ func process_and_execute_orders_recurse{
                 batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
-                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                 updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                 updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                 updated_margin_locked_=0,
@@ -2250,6 +2385,7 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
+                is_error_=TRUE,
             );
         }
         assert quantity_to_execute = quantity_to_execute_remaining;
@@ -2266,7 +2402,7 @@ func process_and_execute_orders_recurse{
                 batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
-                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                 updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                 updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                 updated_margin_locked_=0,
@@ -2303,6 +2439,7 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
+                is_error_=TRUE,
             );
         }
 
@@ -2335,7 +2472,7 @@ func process_and_execute_orders_recurse{
     // If the order is to be opened
     if ([request_list_].side == BUY) {
         let (
-            is_error: felt,
+            error_code: felt,
             user_available_balance: felt,
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
@@ -2357,21 +2494,21 @@ func process_and_execute_orders_recurse{
             side_=current_order_side,
         );
 
-        if (is_error == TRUE) {
+        if (error_code != 0) {
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
                 batch_id_=batch_id_,
                 market_id_=market_id_,
                 collateral_id_=collateral_id_,
-                execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                 updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                 updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                 updated_margin_locked_=0,
                 updated_portion_executed_=0,
                 market_array_update_=0,
                 is_liquidation_=0,
-                error_message_='0501',
+                error_message_=error_code,
                 error_param_1_=user_available_balance,
             );
 
@@ -2401,6 +2538,7 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
+                is_error_=TRUE,
             );
         }
 
@@ -2563,7 +2701,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -2600,6 +2738,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
 
@@ -2611,7 +2750,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -2648,6 +2787,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
 
@@ -2662,7 +2802,7 @@ func process_and_execute_orders_recurse{
                     batch_id_=batch_id_,
                     market_id_=market_id_,
                     collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                     updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                     updated_margin_locked_=0,
@@ -2699,6 +2839,7 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
+                    is_error_=TRUE,
                 );
             }
 
@@ -2730,7 +2871,7 @@ func process_and_execute_orders_recurse{
                         batch_id_=batch_id_,
                         market_id_=market_id_,
                         collateral_id_=collateral_id_,
-                        execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                        execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                         updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                         updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                         updated_margin_locked_=0,
@@ -2767,6 +2908,7 @@ func process_and_execute_orders_recurse{
                         taker_execution_price_=taker_execution_price_,
                         open_interest_=open_interest_,
                         oracle_price_=oracle_price_,
+                        is_error_=TRUE,
                     );
                 }
 
@@ -2788,7 +2930,7 @@ func process_and_execute_orders_recurse{
                         batch_id_=batch_id_,
                         market_id_=market_id_,
                         collateral_id_=collateral_id_,
-                        execution_details_=ExecutionDetails(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                        execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                         updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
                         updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
                         updated_margin_locked_=0,
@@ -2825,6 +2967,7 @@ func process_and_execute_orders_recurse{
                         taker_execution_price_=taker_execution_price_,
                         open_interest_=open_interest_,
                         oracle_price_=oracle_price_,
+                        is_error_=TRUE,
                     );
                 }
 
@@ -3032,6 +3175,7 @@ func process_and_execute_orders_recurse{
         taker_execution_price_=execution_price,
         open_interest_=new_open_interest,
         oracle_price_=oracle_price_,
+        is_error_=FALSE,
     );
 }
 

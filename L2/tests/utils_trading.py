@@ -1829,7 +1829,7 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
 
     global execution_info
     # If the batch is to be reverted, generate the error_message
-    if is_reverted:
+    if is_reverted == 1:
         actual_error_message = ""
         # If the error code is passed
         if error_code:
@@ -1842,6 +1842,8 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
         elif error_message:
             actual_error_message = error_message
         execution_info = await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
+    elif is_reverted == 2:
+        execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
     else:
         execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
         executor.execute_batch(*execute_batch_params_python)

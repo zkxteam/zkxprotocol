@@ -14,7 +14,9 @@ namespace ILiquidate {
 
     // External functions
 
-    func check_for_risk(order_: MultipleOrder, size: felt, execution_price_: felt, margin_amount_:felt) -> (available_margin: felt){
+    func check_for_risk(
+        order_: MultipleOrder, size: felt, execution_price_: felt, margin_amount_: felt
+    ) -> (available_margin: felt, is_liquidation: felt) {
     }
 
     func mark_under_collateralized_position(account_address_: felt, collateral_id_: felt) -> (
@@ -22,6 +24,6 @@ namespace ILiquidate {
         least_collateral_ratio_position: PositionDetailsForRiskManagement,
         total_account_value: felt,
         total_maintenance_requirement: felt,
-    ){
+    ) {
     }
 }
