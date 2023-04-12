@@ -2132,7 +2132,7 @@ func process_and_execute_orders_recurse{
                 local error_param;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0550: {order_id} {MAKER_ORDER}") {
+                    with_attr error_message("0550: {order_id} {MAKER}") {
                         assert 1 = 0;
                     }
                 } else {
@@ -2220,16 +2220,27 @@ func process_and_execute_orders_recurse{
                     with_attr error_message("0521: {order_id} {slippage}") {
                         assert 1 = 0;
                     }
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
                 } else {
                     if (error_order_id_ != 0) {
                         assert error_code = '0521';
                         assert error_order_id = order_id;
                         assert error_param = slippage;
+
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
                     } else {
                         assert error_code = error_code_;
                         assert error_order_id = error_order_id_;
                         assert error_param = error_param_;
+
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
                     }
+
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
                 }
 
                 // Call the account contract to reject the order
@@ -2291,15 +2302,24 @@ func process_and_execute_orders_recurse{
                     with_attr error_message("0521: {order_id} {slippage}") {
                         assert 1 = 0;
                     }
+
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
                 } else {
                     if (error_order_id_ != 0) {
                         assert error_code = '0521';
                         assert error_order_id = order_id;
                         assert error_param = slippage;
+
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
                     } else {
                         assert error_code = error_code_;
                         assert error_order_id = error_order_id_;
                         assert error_param = error_param_;
+
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
                     }
                 }
                 // Call the account contract to reject the order
