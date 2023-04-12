@@ -2924,6 +2924,7 @@ async def test_skipping_invalid_leverage_1(trading_test_initializer):
     await compare_margin_info(user=ian, user_test=ian_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
     await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
 
+
 @pytest.mark.asyncio
 async def test_skipping_invalid_leverage_2(trading_test_initializer):
     _, python_executor, admin1, _, alice, bob, charlie, _, eduard, _, gary, alice_test, bob_test, charlie_test, eduard_test, _, gary_test, _, _, _, trading, _, _, _, _, _, _, _, non_admin, ian, ian_test, jake, jake_test = trading_test_initializer
