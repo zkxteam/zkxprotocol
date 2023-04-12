@@ -204,11 +204,11 @@ func execute_batch{
         contract_address=market_address, market_id_=market_id_
     );
 
-    with_attr error_message("0509: {market_id_}") {
+    with_attr error_message("509: {market_id_}") {
         assert_not_zero(market.is_tradable);
     }
 
-    with_attr error_message("0522: {market_id_}") {
+    with_attr error_message("522: {market_id_}") {
         assert_not_zero(quantity_locked_);
     }
 
@@ -222,7 +222,7 @@ func execute_batch{
         quantity_locked_=quantity_locked_,
     );
 
-    with_attr error_message("0553: {quantity_locked_} 0") {
+    with_attr error_message("553: {quantity_locked_} 0") {
         assert error_code = 0;
     }
 
@@ -340,7 +340,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     );
 
     if (is_zero_quantity_to_execute == 1) {
-        return (quantity_to_execute_final=0, error_code='0551');
+        return (quantity_to_execute_final=0, error_code=551);
     }
 
     tempvar syscall_ptr = syscall_ptr;
@@ -399,7 +399,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         local error_code;
 
         if (is_zero_quantity_to_execute_final == TRUE) {
-            assert error_code = '0552';
+            assert error_code = 552;
         } else {
             assert error_code = 0;
         }
@@ -508,7 +508,7 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
             if (limit_price_check_1 == FALSE) {
                 // if it's a buy order
-                return (TRUE, '0508');
+                return (TRUE, 508);
             }
         } else {
             // if it's a sell order
@@ -517,7 +517,7 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             );
 
             if (limit_price_check_2 == FALSE) {
-                return (TRUE, '0507');
+                return (TRUE, 507);
             }
         }
         tempvar range_check_ptr = range_check_ptr;
@@ -530,7 +530,7 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             );
 
             if (limit_price_check_3 == FALSE) {
-                return (TRUE, '0507');
+                return (TRUE, 507);
             }
         } else {
             // if it's a sell order
@@ -539,7 +539,7 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             );
 
             if (limit_price_check_4 == FALSE) {
-                return (TRUE, '0507');
+                return (TRUE, 507);
             }
         }
         tempvar range_check_ptr = range_check_ptr;
@@ -749,7 +749,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert order_id = order_.order_id;
 
     if (is_liquidation == TRUE) {
-        return ('1101', user_available_balance, 0, 0, 0, 0, 0);
+        return (1101, user_available_balance, 0, 0, 0, 0, 0);
     }
 
     let (user_balance_check) = Math64x61_is_le(
@@ -757,7 +757,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     );
 
     if (user_balance_check == FALSE) {
-        return ('0501', user_available_balance, 0, 0, 0, 0, 0);
+        return (501, user_available_balance, 0, 0, 0, 0, 0);
     }
 
     if (is_le(fees, 0) == 0) {
@@ -1329,12 +1329,12 @@ func process_and_execute_orders_recurse{
         assert user_address = [request_list_].user_address;
 
         if (request_list_len_ == 1) {
-            with_attr error_message("0510: {order_id} {user_address}") {
+            with_attr error_message("510: {order_id} {user_address}") {
                 assert 1 = 0;
             }
         } else {
             if (error_order_id_ != 0) {
-                assert error_code = '0510';
+                assert error_code = 510;
                 assert error_order_id = order_id;
                 assert error_param = user_address;
             } else {
@@ -1357,7 +1357,7 @@ func process_and_execute_orders_recurse{
             updated_portion_executed_=0,
             market_array_update_=0,
             is_liquidation_=0,
-            error_message_='0510',
+            error_message_=510,
             error_param_1_=[request_list_].user_address,
         );
 
@@ -1406,12 +1406,12 @@ func process_and_execute_orders_recurse{
         assert quantity = [request_list_].quantity;
 
         if (request_list_len_ == 1) {
-            with_attr error_message("0505: {order_id} {quantity}") {
+            with_attr error_message("505: {order_id} {quantity}") {
                 assert 1 = 0;
             }
         } else {
             if (error_order_id_ != 0) {
-                assert error_code = '0505';
+                assert error_code = 505;
                 assert error_order_id = order_id;
                 assert error_param = quantity;
             } else {
@@ -1480,12 +1480,12 @@ func process_and_execute_orders_recurse{
         assert market_id_temp = [request_list_].market_id;
 
         if (request_list_len_ == 1) {
-            with_attr error_message("0504: {order_id} {market_id_temp}") {
+            with_attr error_message("504: {order_id} {market_id_temp}") {
                 assert 1 = 0;
             }
         } else {
             if (error_order_id_ != 0) {
-                assert error_code = '0504';
+                assert error_code = 504;
                 assert error_order_id = order_id;
                 assert error_param = market_id_temp;
             } else {
@@ -1556,12 +1556,12 @@ func process_and_execute_orders_recurse{
         assert leverage = [request_list_].leverage;
 
         if (request_list_len_ == 1) {
-            with_attr error_message("0503: {order_id} {leverage}") {
+            with_attr error_message("503: {order_id} {leverage}") {
                 assert 1 = 0;
             }
         } else {
             if (error_order_id_ != 0) {
-                assert error_code = '0503';
+                assert error_code = 503;
                 assert error_order_id = order_id;
                 assert error_param = leverage;
             } else {
@@ -1633,12 +1633,12 @@ func process_and_execute_orders_recurse{
         assert leverage = [request_list_].leverage;
 
         if (request_list_len_ == 1) {
-            with_attr error_message("0502: {order_id} {leverage}") {
+            with_attr error_message("502: {order_id} {leverage}") {
                 assert 1 = 0;
             }
         } else {
             if (error_order_id_ != 0) {
-                assert error_code = '0502';
+                assert error_code = 502;
                 assert error_order_id = order_id;
                 assert error_param = leverage;
             } else {
@@ -1750,12 +1750,12 @@ func process_and_execute_orders_recurse{
         assert order_hash = hash;
 
         if (request_list_len_ == 1) {
-            with_attr error_message("0536: {order_id} {order_hash}") {
+            with_attr error_message("536: {order_id} {order_hash}") {
                 assert 1 = 0;
             }
         } else {
             if (error_order_id_ != 0) {
-                assert error_code = '0536';
+                assert error_code = 536;
                 assert error_order_id = order_id;
                 assert error_param = order_hash;
             } else {
@@ -1833,73 +1833,8 @@ func process_and_execute_orders_recurse{
         assert quantity_to_execute = quantity_executed_;
         let (is_zero_quantity) = Math64x61_is_equal(quantity_executed_, 0, 6);
 
-        if (is_zero_quantity == TRUE) {
-            local error_code;
-            local error_order_id;
-            local error_param;
-
-            if (request_list_len_ == 1) {
-                with_attr error_message("0524: {order_id} 0") {
-                    assert 1 = 0;
-                }
-            } else {
-                if (error_order_id_ != 0) {
-                    assert error_code = '0524';
-                    assert error_order_id = order_id;
-                    assert error_param = 0;
-                } else {
-                    assert error_code = error_code_;
-                    assert error_order_id = error_order_id_;
-                    assert error_param = error_param_;
-                }
-            }
-            // Call the account contract to reject the order
-            IAccountManager.execute_order(
-                contract_address=[request_list_].user_address,
-                batch_id_=batch_id_,
-                market_id_=market_id_,
-                collateral_id_=collateral_id_,
-                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
-                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
-                updated_margin_locked_=0,
-                updated_portion_executed_=0,
-                market_array_update_=0,
-                is_liquidation_=0,
-                error_message_='0524',
-                error_param_1_=0,
-            );
-
-            return process_and_execute_orders_recurse(
-                batch_id_=batch_id_,
-                taker_locked_quantity_=taker_locked_quantity_,
-                market_id_=market_id_,
-                collateral_id_=collateral_id_,
-                asset_token_decimal_=asset_token_decimal_,
-                collateral_token_decimal_=collateral_token_decimal_,
-                orders_len_=orders_len_,
-                request_list_len_=request_list_len_ - 1,
-                request_list_=request_list_ + MultipleOrder.SIZE,
-                quantity_executed_=quantity_executed_,
-                account_registry_address_=account_registry_address_,
-                holding_address_=holding_address_,
-                trading_fees_address_=trading_fees_address_,
-                fees_balance_address_=fees_balance_address_,
-                liquidate_address_=liquidate_address_,
-                liquidity_fund_address_=liquidity_fund_address_,
-                insurance_fund_address_=insurance_fund_address_,
-                max_leverage_=max_leverage_,
-                min_quantity_=min_quantity_,
-                maker1_direction_=maker1_direction_,
-                maker1_side_=maker1_side_,
-                total_order_volume_=total_order_volume_,
-                taker_execution_price_=taker_execution_price_,
-                open_interest_=open_interest_,
-                oracle_price_=oracle_price_,
-                error_order_id_=error_order_id,
-                error_code_=error_code,
-                error_param_=error_param,
-            );
+        with_attr error_message("{error_code_}: {error_order_id_} {error_param_}") {
+            assert is_zero_quantity = FALSE;
         }
 
         // Direction Check
@@ -1916,12 +1851,12 @@ func process_and_execute_orders_recurse{
             assert direction = [request_list_].direction;
 
             if (request_list_len_ == 1) {
-                with_attr error_message("0513: {order_id} {direction}") {
+                with_attr error_message("513: {order_id} {direction}") {
                     assert 1 = 0;
                 }
             } else {
                 if (error_order_id_ != 0) {
-                    assert error_code = '0513';
+                    assert error_code = 513;
                     assert error_order_id = order_id;
                     assert error_param = direction;
                 } else {
@@ -1986,12 +1921,12 @@ func process_and_execute_orders_recurse{
             local error_param;
 
             if (request_list_len_ == 1) {
-                with_attr error_message("0515: {order_id} {current_index}") {
+                with_attr error_message("515: {order_id} {current_index}") {
                     assert 1 = 0;
                 }
             } else {
                 if (error_order_id_ != 0) {
-                    assert error_code = '0515';
+                    assert error_code = 515;
                     assert error_order_id = order_id;
                     assert error_param = current_index;
                 } else {
@@ -2062,12 +1997,12 @@ func process_and_execute_orders_recurse{
                 local error_param;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0516: {order_id} {taker_quantity}") {
+                    with_attr error_message("516: {order_id} {taker_quantity}") {
                         assert 1 = 0;
                     }
                 } else {
                     if (error_order_id_ != 0) {
-                        assert error_code = '0516';
+                        assert error_code = 516;
                         assert error_order_id = order_id;
                         assert error_param = taker_quantity;
                     } else {
@@ -2132,12 +2067,12 @@ func process_and_execute_orders_recurse{
                 local error_param;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0550: {order_id} {MAKER}") {
+                    with_attr error_message("550: {order_id} {MAKER}") {
                         assert 1 = 0;
                     }
                 } else {
                     if (error_order_id_ != 0) {
-                        assert error_code = '0550';
+                        assert error_code = 550;
                         assert error_order_id = order_id;
                         assert error_param = MAKER;
                     } else {
@@ -2217,14 +2152,14 @@ func process_and_execute_orders_recurse{
                 local error_param;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0521: {order_id} {slippage}") {
+                    with_attr error_message("521: {order_id} {slippage}") {
                         assert 1 = 0;
                     }
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar range_check_ptr = range_check_ptr;
                 } else {
                     if (error_order_id_ != 0) {
-                        assert error_code = '0521';
+                        assert error_code = 521;
                         assert error_order_id = order_id;
                         assert error_param = slippage;
 
@@ -2299,7 +2234,7 @@ func process_and_execute_orders_recurse{
                 local error_param;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0521: {order_id} {slippage}") {
+                    with_attr error_message("521: {order_id} {slippage}") {
                         assert 1 = 0;
                     }
 
@@ -2307,7 +2242,7 @@ func process_and_execute_orders_recurse{
                     tempvar range_check_ptr = range_check_ptr;
                 } else {
                     if (error_order_id_ != 0) {
-                        assert error_code = '0521';
+                        assert error_code = 521;
                         assert error_order_id = order_id;
                         assert error_param = slippage;
 
@@ -2386,12 +2321,12 @@ func process_and_execute_orders_recurse{
                 local error_param;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0506: {order_id} {execution_price}") {
+                    with_attr error_message("506: {order_id} {execution_price}") {
                         assert 1 = 0;
                     }
                 } else {
                     if (error_order_id_ != 0) {
-                        assert error_code = '0506';
+                        assert error_code = 506;
                         assert error_order_id = order_id;
                         assert error_param = execution_price;
                     } else {
@@ -2666,12 +2601,12 @@ func process_and_execute_orders_recurse{
             assert direction = [request_list_].direction;
 
             if (request_list_len_ == 1) {
-                with_attr error_message("0512: {order_id} {direction}") {
+                with_attr error_message("512: {order_id} {direction}") {
                     assert 1 = 0;
                 }
             } else {
                 if (error_order_id_ != 0) {
-                    assert error_code = '0512';
+                    assert error_code = 512;
                     assert error_order_id = order_id;
                     assert error_param = direction;
                 } else {
@@ -2736,12 +2671,12 @@ func process_and_execute_orders_recurse{
             local error_param;
 
             if (request_list_len_ == 1) {
-                with_attr error_message("0518: {order_id} {current_index}") {
+                with_attr error_message("518: {order_id} {current_index}") {
                     assert 1 = 0;
                 }
             } else {
                 if (error_order_id_ != 0) {
-                    assert error_code = '0518';
+                    assert error_code = 518;
                     assert error_order_id = order_id;
                     assert error_param = current_index;
                 } else {
@@ -2811,12 +2746,12 @@ func process_and_execute_orders_recurse{
             local error_param;
 
             if (request_list_len_ == 1) {
-                with_attr error_message("0535: {order_id} {current_index}") {
+                with_attr error_message("535: {order_id} {current_index}") {
                     assert 1 = 0;
                 }
             } else {
                 if (error_order_id_ != 0) {
-                    assert error_code = '0535';
+                    assert error_code = 535;
                     assert error_order_id = order_id;
                     assert error_param = current_index;
                 } else {
@@ -3158,12 +3093,12 @@ func process_and_execute_orders_recurse{
                 local error_param;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0531: {order_id} {market_id_}") {
+                    with_attr error_message("531: {order_id} {market_id_}") {
                         assert 1 = 0;
                     }
                 } else {
                     if (error_order_id_ != 0) {
-                        assert error_code = '0531';
+                        assert error_code = 531;
                         assert error_order_id = order_id;
                         assert error_param = market_id_;
                     } else {
@@ -3232,12 +3167,12 @@ func process_and_execute_orders_recurse{
                 assert direction = [request_list_].direction;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0532: {order_id} {direction}") {
+                    with_attr error_message("532: {order_id} {direction}") {
                         assert 1 = 0;
                     }
                 } else {
                     if (error_order_id_ != 0) {
-                        assert error_code = '0532';
+                        assert error_code = 532;
                         assert error_order_id = order_id;
                         assert error_param = direction;
                     } else {
@@ -3306,12 +3241,12 @@ func process_and_execute_orders_recurse{
                 local error_param;
 
                 if (request_list_len_ == 1) {
-                    with_attr error_message("0533: {order_id} {quantity_to_execute}") {
+                    with_attr error_message("533: {order_id} {quantity_to_execute}") {
                         assert 1 = 0;
                     }
                 } else {
                     if (error_order_id_ != 0) {
-                        assert error_code = '0533';
+                        assert error_code = 533;
                         assert error_order_id = order_id;
                         assert error_param = quantity_to_execute;
                     } else {
@@ -3396,12 +3331,12 @@ func process_and_execute_orders_recurse{
                     local error_param;
 
                     if (request_list_len_ == 1) {
-                        with_attr error_message("0534: {order_id} 0") {
+                        with_attr error_message("534: {order_id} 0") {
                             assert 1 = 0;
                         }
                     } else {
                         if (error_order_id_ != 0) {
-                            assert error_code = '0534';
+                            assert error_code = 534;
                             assert error_order_id = order_id;
                             assert error_param = 0;
                         } else {
@@ -3476,12 +3411,12 @@ func process_and_execute_orders_recurse{
                     local error_param;
 
                     if (request_list_len_ == 1) {
-                        with_attr error_message("0535: {order_id} 0") {
+                        with_attr error_message("535: {order_id} 0") {
                             assert 1 = 0;
                         }
                     } else {
                         if (error_order_id_ != 0) {
-                            assert error_code = '0535';
+                            assert error_code = 535;
                             assert error_order_id = order_id;
                             assert error_param = quantity_to_execute;
                         } else {
