@@ -150,6 +150,7 @@ func get_batch_id_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // ///////////
 
 // @notice Function to execute multiple orders in a batch
+// @param batch_id_ - Id of the batch
 // @param quantity_locked_ - Size of the order to be executed
 // @param market_id_ - Market id of the batch
 // @param oracle_price_ - Average of the oracle prices sent by ZKX Nodes
@@ -222,7 +223,12 @@ func execute_batch{
         quantity_locked_=quantity_locked_,
     );
 
-    with_attr error_message("553: {quantity_locked_} 0") {
+    local order_id;
+    local error_code_temp;
+    assert order_id = request_list[last_index].order_id;
+    assert error_code_temp = error_code;
+
+    with_attr error_message("{error_code_temp}: {order_id} 0") {
         assert error_code = 0;
     }
 
@@ -306,10 +312,14 @@ func execute_batch{
 // ///////////
 
 // @notice Internal function to calculate the amount that must be executed for an order
+// @param batch_id_ - Id of the batch
+// @param order_portion_executed_ - Portion of the order that has already been executed
+// @param position_details_ - Position details of the corresponding position
 // @param asset_token_decimal_ - Number of decimals for the asset
 // @param request_ - An order request
 // @param quantity_remainging - Max quantity that can be executed for that order
 // @returns quantity_to_execute_final - Calculated quantity to execute
+// @returns error_code - Returns an error code if the adjsuted size is 0
 func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     batch_id_: felt,
     order_portion_executed_: felt,
@@ -412,11 +422,13 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     }
 }
 
-// @notice Internal function to adjust and calculate the quantity locked and execution sizes
+// @notice Internal function to adjust and calculate the quantity locked for the Taker order
+// @param batch_id_ - Id of the batch
 // @param asset_token_decimal_ - Number of decimals for the asset
-// @param request_list_len_ - Length of the requests list
-// @param request_list_ - Request list of orders
+// @param request_ - Taker order details
 // @param quantity_locked_ - Original quantity lokcked of the batch
+// @returns taker_quantity_to_execute - Adjusted quantity to execute for the taker
+// @returns error_code - Returns an error code if the adjsuted size is 0
 func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     batch_id_: felt, asset_token_decimal_: felt, request_: MultipleOrder, quantity_locked_: felt
 ) -> (taker_quantity_to_execute: felt, error_code: felt) {
@@ -449,6 +461,10 @@ func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 // @param slippage_ - Slippage % of the order
 // @param oracle_price_ - Oracle price of the batch
 // @param execution_price_ - Execution price of the order
+// @param direction_ - Direction of the order
+// @param side_ - Side of the order BUY/SELL
+// @param collateral_token_decimal_ - Decimals of the collateral
+// @returns is_error - True if there's an error; else False
 func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     slippage_: felt,
     oracle_price_: felt,
@@ -488,8 +504,11 @@ func check_within_slippage{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @notice Internal function to check if the execution_price of a limit order is valid (TAKER)
 // @param price_ - Limit price of the order
 // @param execution_price_ - Execution price of the order
+// @param direction_ - Direction of the order
 // @param side_ - Side of the order BUY/SELL
 // @param collateral_token_decimal_ - Number of decimals for the collateral
+// @returns is_error - True if there's an error; else False
+// @returms error_message - Corresponding error message
 func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     price_: felt,
     execution_price_: felt,
@@ -657,9 +676,16 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // @param liquidity_fund_address_ - Address of the Liquidity contract
 // @param liquidate_address_ - Address of the Liquidate contract
 // @param holding_address_ - Address of the Holding contract
+// @param trading_fees_address_ - Address of the Trading fees contract
+// @param fees_balance_address_ - Address of the Fee Balance contract
+// @param side_ - TAKER/MAKER
+// @returns error_code - Returns an error code, if there's an error
+// @returns user_available_balance - Available margin of the user
 // @returns average_execution_price_open - Average Execution Price for the order
-// @returns margin_amount_open - Margin amount for the order
-// @returns borrowed_amount_open - Borrowed amount for the order
+// @returns margin_amount_open - New Margin amount for the position
+// @returns borrowed_amount_open - New Borrowed amount for the position
+// @returns trading_fee - Trading fee for the order
+// @returns margin_lock_amount - Margin to be locked in AccountManager
 func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder,
     execution_price_: felt,
@@ -829,9 +855,11 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @param liquidity_fund_address_ - Address of the Liquidity contract
 // @param insurance_fund_address - Address of the Insurance Fund contract
 // @param holding_address_ - Address of the Holding contract
-// @returns average_execution_price_open - Average Execution Price for the order
-// @returns margin_amount_open - Margin amount for the order
-// @returns borrowed_amount_open - Borrowed amount for the order
+// @returns margin_amount_close - New margin amount for the position
+// @returns borrowed_amount_close - New borrowed amount for the position
+// @returns average_execution_price_open - Average Execution Price for the position
+// @returns realized_pnl - New realized pnl amount for the position
+// @returns margin_unlock_amount - Margin amount to be unlocked in the AccountManager
 func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder,
     execution_price_: felt,
@@ -1225,6 +1253,7 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 
 // @notice Internal function called by execute_batch
 // @param batch_id_ - ID of the batch
+// @param taker_locked_quantity_ - Adjusted taker quantity
 // @param market_id_ - Market ID of the batch
 // @param collateralID_ - Collateral ID of the batch to be set by the first order
 // @param asset_token_decimal_ - No.of token decimals of an asset
@@ -1248,7 +1277,10 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 // @param taker_execution_price - The price to be stored for the market price in execute_batch
 // @param open_interest_ - Open interest corresponding to the current order
 // @param oracle_price_ - Oracle price from the ZKXNode network
-// @return res - returns the net sum of the orders do far
+// @param error_order_id_ - Order id of the first Maker order that has an error
+// @param error_code_ - Error code of the first Maker order that has an error
+// @param error_param_ - Parameter of the above error
+// @return taker_execution_price - The price at which the taker order was executed
 // @return open_interest - open interest corresponding to the trade batch
 func process_and_execute_orders_recurse{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
@@ -2395,14 +2427,14 @@ func process_and_execute_orders_recurse{
             assert error_code_temp = error_code_open;
 
             if (request_list_len_ == 1) {
-                with_attr error_message("{error_code_temp}: {order_id} {market_id_}") {
+                with_attr error_message("{error_code_temp}: {order_id} {current_index}") {
                     assert 1 = 0;
                 }
             } else {
                 if (error_order_id_ == 0) {
                     assert error_code = error_code_temp;
                     assert error_order_id = order_id;
-                    assert error_param = market_id_;
+                    assert error_param = current_index;
                 } else {
                     assert error_code = error_code_;
                     assert error_order_id = error_order_id_;
@@ -3213,6 +3245,7 @@ func process_and_execute_orders_recurse{
 // @param maker1_side_ - Side of first maker order
 // @param current_direction_ - Direction of current maker order
 // @param current_side_ -  Side of current maker order
+// @returns is_error - True if there is an error in the direction of the maker; else false
 func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     maker1_direction_: felt, maker1_side_: felt, current_direction_: felt, current_side_: felt
 ) -> (is_error: felt) {
@@ -3239,6 +3272,7 @@ func validate_maker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 // @param maker1_side_ - Side of first maker order
 // @param current_direction_ - Direction of current maker order
 // @param current_side_ -  Side of current maker order
+// @returns is_error - True if there is an error in the direction of the taker; else false
 func validate_taker{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     maker1_direction_: felt, maker1_side_: felt, current_direction_: felt, current_side_: felt
 ) -> (is_error: felt) {
