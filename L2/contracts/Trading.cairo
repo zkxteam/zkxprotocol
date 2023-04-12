@@ -1333,7 +1333,7 @@ func process_and_execute_orders_recurse{
                 assert 1 = 0;
             }
         } else {
-            if (error_order_id_ != 0) {
+            if (error_order_id_ == 0) {
                 assert error_code = 510;
                 assert error_order_id = order_id;
                 assert error_param = user_address;
@@ -1410,7 +1410,7 @@ func process_and_execute_orders_recurse{
                 assert 1 = 0;
             }
         } else {
-            if (error_order_id_ != 0) {
+            if (error_order_id_ == 0) {
                 assert error_code = 505;
                 assert error_order_id = order_id;
                 assert error_param = quantity;
@@ -1484,7 +1484,7 @@ func process_and_execute_orders_recurse{
                 assert 1 = 0;
             }
         } else {
-            if (error_order_id_ != 0) {
+            if (error_order_id_ == 0) {
                 assert error_code = 504;
                 assert error_order_id = order_id;
                 assert error_param = market_id_temp;
@@ -1560,7 +1560,7 @@ func process_and_execute_orders_recurse{
                 assert 1 = 0;
             }
         } else {
-            if (error_order_id_ != 0) {
+            if (error_order_id_ == 0) {
                 assert error_code = 503;
                 assert error_order_id = order_id;
                 assert error_param = leverage;
@@ -1637,7 +1637,7 @@ func process_and_execute_orders_recurse{
                 assert 1 = 0;
             }
         } else {
-            if (error_order_id_ != 0) {
+            if (error_order_id_ == 0) {
                 assert error_code = 502;
                 assert error_order_id = order_id;
                 assert error_param = leverage;
@@ -1754,7 +1754,7 @@ func process_and_execute_orders_recurse{
                 assert 1 = 0;
             }
         } else {
-            if (error_order_id_ != 0) {
+            if (error_order_id_ == 0) {
                 assert error_code = 536;
                 assert error_order_id = order_id;
                 assert error_param = order_hash;
@@ -1855,7 +1855,7 @@ func process_and_execute_orders_recurse{
                     assert 1 = 0;
                 }
             } else {
-                if (error_order_id_ != 0) {
+                if (error_order_id_ == 0) {
                     assert error_code = 513;
                     assert error_order_id = order_id;
                     assert error_param = direction;
@@ -1925,7 +1925,7 @@ func process_and_execute_orders_recurse{
                     assert 1 = 0;
                 }
             } else {
-                if (error_order_id_ != 0) {
+                if (error_order_id_ == 0) {
                     assert error_code = 515;
                     assert error_order_id = order_id;
                     assert error_param = current_index;
@@ -2001,7 +2001,7 @@ func process_and_execute_orders_recurse{
                         assert 1 = 0;
                     }
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = 516;
                         assert error_order_id = order_id;
                         assert error_param = taker_quantity;
@@ -2071,7 +2071,7 @@ func process_and_execute_orders_recurse{
                         assert 1 = 0;
                     }
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = 550;
                         assert error_order_id = order_id;
                         assert error_param = MAKER;
@@ -2158,7 +2158,7 @@ func process_and_execute_orders_recurse{
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar range_check_ptr = range_check_ptr;
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = 521;
                         assert error_order_id = order_id;
                         assert error_param = slippage;
@@ -2241,7 +2241,7 @@ func process_and_execute_orders_recurse{
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar range_check_ptr = range_check_ptr;
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = 521;
                         assert error_order_id = order_id;
                         assert error_param = slippage;
@@ -2325,7 +2325,7 @@ func process_and_execute_orders_recurse{
                         assert 1 = 0;
                     }
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = 506;
                         assert error_order_id = order_id;
                         assert error_param = execution_price;
@@ -2408,7 +2408,7 @@ func process_and_execute_orders_recurse{
                         assert 1 = 0;
                     }
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = error_message_1;
                         assert error_order_id = order_id;
                         assert error_param = execution_price;
@@ -2529,7 +2529,7 @@ func process_and_execute_orders_recurse{
                     assert 1 = 0;
                 }
             } else {
-                if (error_order_id_ != 0) {
+                if (error_order_id_ == 0) {
                     assert error_code = error_code_quantity;
                     assert error_order_id = order_id;
                     assert error_param = 0;
@@ -2605,7 +2605,7 @@ func process_and_execute_orders_recurse{
                     assert 1 = 0;
                 }
             } else {
-                if (error_order_id_ != 0) {
+                if (error_order_id_ == 0) {
                     assert error_code = 512;
                     assert error_order_id = order_id;
                     assert error_param = direction;
@@ -2675,7 +2675,7 @@ func process_and_execute_orders_recurse{
                     assert 1 = 0;
                 }
             } else {
-                if (error_order_id_ != 0) {
+                if (error_order_id_ == 0) {
                     assert error_code = 518;
                     assert error_order_id = order_id;
                     assert error_param = current_index;
@@ -2750,7 +2750,7 @@ func process_and_execute_orders_recurse{
                     assert 1 = 0;
                 }
             } else {
-                if (error_order_id_ != 0) {
+                if (error_order_id_ == 0) {
                     assert error_code = 535;
                     assert error_order_id = order_id;
                     assert error_param = current_index;
@@ -2876,8 +2876,8 @@ func process_and_execute_orders_recurse{
                     assert 1 = 0;
                 }
             } else {
-                if (error_order_id_ != 0) {
-                    assert error_code = error_code_open;
+                if (error_order_id_ == 0) {
+                    assert error_code = error_code_temp;
                     assert error_order_id = order_id;
                     assert error_param = user_balance;
                 } else {
@@ -3097,7 +3097,7 @@ func process_and_execute_orders_recurse{
                         assert 1 = 0;
                     }
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = 531;
                         assert error_order_id = order_id;
                         assert error_param = market_id_;
@@ -3171,7 +3171,7 @@ func process_and_execute_orders_recurse{
                         assert 1 = 0;
                     }
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = 532;
                         assert error_order_id = order_id;
                         assert error_param = direction;
@@ -3245,7 +3245,7 @@ func process_and_execute_orders_recurse{
                         assert 1 = 0;
                     }
                 } else {
-                    if (error_order_id_ != 0) {
+                    if (error_order_id_ == 0) {
                         assert error_code = 533;
                         assert error_order_id = order_id;
                         assert error_param = quantity_to_execute;
@@ -3335,7 +3335,7 @@ func process_and_execute_orders_recurse{
                             assert 1 = 0;
                         }
                     } else {
-                        if (error_order_id_ != 0) {
+                        if (error_order_id_ == 0) {
                             assert error_code = 534;
                             assert error_order_id = order_id;
                             assert error_param = 0;
@@ -3415,7 +3415,7 @@ func process_and_execute_orders_recurse{
                             assert 1 = 0;
                         }
                     } else {
-                        if (error_order_id_ != 0) {
+                        if (error_order_id_ == 0) {
                             assert error_code = 535;
                             assert error_order_id = order_id;
                             assert error_param = quantity_to_execute;
