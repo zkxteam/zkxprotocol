@@ -2029,8 +2029,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     if (is_le_least_short * is_le_least_long == 1) {
         assert new_least_collateral_ratio = least_collateral_ratio;
         assert new_least_collateral_ratio_position = least_collateral_ratio_position;
-        // assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price
-        // ;
+        assert new_least_collateral_ratio_position_asset_price = least_collateral_ratio_position_asset_price;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;

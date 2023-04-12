@@ -838,7 +838,7 @@ class User:
                 print("checking collateral ratios", least_collateral_ratio,
                       short_collateral_ratio, long_collateral_ratio)
                 least_collateral_ratio_asset_price = market_price
-                if long_collateral_ratio < short_collateral_ratio:
+                if long_collateral_ratio <= short_collateral_ratio:
                     least_collateral_ratio = long_collateral_ratio
                     least_collateral_ratio_position = updated_long_position
                 else:

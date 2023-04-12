@@ -227,9 +227,7 @@ func execute_batch{
     }
 
     // Recursively loop through the orders in the batch
-    let (
-        is_error: felt, taker_execution_price: felt, open_interest: felt
-    ) = process_and_execute_orders_recurse(
+    let (taker_execution_price: felt, open_interest: felt) = process_and_execute_orders_recurse(
         batch_id_=batch_id_,
         taker_locked_quantity_=initial_taker_locked,
         market_id_=market_id_,
@@ -255,57 +253,52 @@ func execute_batch{
         taker_execution_price_=0,
         open_interest_=0,
         oracle_price_=oracle_price_,
-        is_error_=FALSE,
+        error_order_id_=0,
+        error_code_=0,
+        error_param_=0,
     );
 
-    if (is_error == TRUE) {
-        // Change the status of the batch to TRUE
-        batch_id_status.write(batch_id=batch_id_, value=FAILED);
+    // Get Market price for the corresponding market Id
+    let (market_price: felt) = IMarketPrices.get_market_price(
+        contract_address=market_prices_address, id=market_id_
+    );
 
-        return ();
+    // update market price
+    if (market_price == 0) {
+        IMarketPrices.update_market_price(
+            contract_address=market_prices_address, id=market_id_, price=oracle_price_
+        );
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     } else {
-        // Get Market price for the corresponding market Id
-        let (market_price: felt) = IMarketPrices.get_market_price(
-            contract_address=market_prices_address, id=market_id_
-        );
-
-        // update market price
-        if (market_price == 0) {
-            IMarketPrices.update_market_price(
-                contract_address=market_prices_address, id=market_id_, price=oracle_price_
-            );
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-        }
-
-        // Initialize empty trader_stats_list
-        let (trader_stats_list: TraderStats*) = alloc();
-
-        // Initialize empty executed_sizes_list
-        let (executed_sizes_list: felt*) = alloc();
-
-        // Record TradingStats
-        ITradingStats.record_trade_batch_stats(
-            contract_address=trading_stats_address,
-            market_id_=market_id_,
-            execution_price_64x61_=taker_execution_price,
-            request_list_len=request_list_len,
-            request_list=request_list,
-            trader_stats_list_len=0,
-            trader_stats_list=trader_stats_list,
-            executed_sizes_list_len=0,
-            executed_sizes_list=executed_sizes_list,
-            open_interest_=open_interest,
-        );
-
-        // Change the status of the batch to TRUE
-        batch_id_status.write(batch_id=batch_id_, value=EXECUTED);
-
-        return ();
+        tempvar syscall_ptr = syscall_ptr;
+        tempvar range_check_ptr = range_check_ptr;
     }
+
+    // Initialize empty trader_stats_list
+    let (trader_stats_list: TraderStats*) = alloc();
+
+    // Initialize empty executed_sizes_list
+    let (executed_sizes_list: felt*) = alloc();
+
+    // Record TradingStats
+    ITradingStats.record_trade_batch_stats(
+        contract_address=trading_stats_address,
+        market_id_=market_id_,
+        execution_price_64x61_=taker_execution_price,
+        request_list_len=request_list_len,
+        request_list=request_list,
+        trader_stats_list_len=0,
+        trader_stats_list=trader_stats_list,
+        executed_sizes_list_len=0,
+        executed_sizes_list=executed_sizes_list,
+        open_interest_=open_interest,
+    );
+
+    // Change the status of the batch to TRUE
+    batch_id_status.write(batch_id=batch_id_, value=EXECUTED);
+
+    return ();
 }
 
 // ///////////
@@ -1285,8 +1278,10 @@ func process_and_execute_orders_recurse{
     taker_execution_price_: felt,
     open_interest_: felt,
     oracle_price_: felt,
-    is_error_: felt,
-) -> (is_error: felt, taker_execution_price: felt, open_interest: felt) {
+    error_order_id_: felt,
+    error_code_: felt,
+    error_param_: felt,
+) -> (taker_execution_price: felt, open_interest: felt) {
     alloc_locals;
 
     local execution_price;
@@ -1313,28 +1308,9 @@ func process_and_execute_orders_recurse{
 
     // Check if the list is empty, if yes return 1
     if (request_list_len_ == 0) {
-        local actual_open_interest;
+        let (actual_open_interest) = Math64x61_div(open_interest_, TWO);
 
-        if (open_interest_ == 0) {
-            assert actual_open_interest = 0;
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-        } else {
-            let (actual_open_interest_felt) = Math64x61_div(open_interest_, TWO);
-            assert actual_open_interest = actual_open_interest_felt;
-
-            tempvar syscall_ptr = syscall_ptr;
-            tempvar range_check_ptr = range_check_ptr;
-            tempvar pedersen_ptr = pedersen_ptr;
-        }
-
-        return (
-            is_error=is_error_,
-            taker_execution_price=taker_execution_price_,
-            open_interest=actual_open_interest,
-        );
+        return (taker_execution_price=taker_execution_price_, open_interest=actual_open_interest);
     }
     // Set order_id for AccountManager events
     assert order_id = [request_list_].order_id;
@@ -1345,6 +1321,29 @@ func process_and_execute_orders_recurse{
         contract_address=account_registry_address_, address_=[request_list_].user_address
     );
     if (is_registered == FALSE) {
+        local error_code;
+        local error_order_id;
+        local error_param;
+        local user_address;
+
+        assert user_address = [request_list_].user_address;
+
+        if (request_list_len_ == 1) {
+            with_attr error_message("0510: {order_id} {user_address}") {
+                assert 1 = 0;
+            }
+        } else {
+            if (error_order_id_ != 0) {
+                assert error_code = '0510';
+                assert error_order_id = order_id;
+                assert error_param = user_address;
+            } else {
+                assert error_code = error_code_;
+                assert error_order_id = error_order_id_;
+                assert error_param = error_param_;
+            }
+        }
+
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
@@ -1388,7 +1387,9 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
-            is_error_=TRUE,
+            error_order_id_=error_order_id,
+            error_code_=error_code,
+            error_param_=error_param,
         );
     }
 
@@ -1397,6 +1398,29 @@ func process_and_execute_orders_recurse{
         min_quantity_, [request_list_].quantity, asset_token_decimal_
     );
     if (size_check == FALSE) {
+        local error_code;
+        local error_order_id;
+        local error_param;
+        local quantity;
+
+        assert quantity = [request_list_].quantity;
+
+        if (request_list_len_ == 1) {
+            with_attr error_message("0505: {order_id} {quantity}") {
+                assert 1 = 0;
+            }
+        } else {
+            if (error_order_id_ != 0) {
+                assert error_code = '0505';
+                assert error_order_id = order_id;
+                assert error_param = quantity;
+            } else {
+                assert error_code = error_code_;
+                assert error_order_id = error_order_id_;
+                assert error_param = error_param_;
+            }
+        }
+
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
@@ -1440,12 +1464,36 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
-            is_error_=TRUE,
+            error_order_id_=error_order_id,
+            error_code_=error_code,
+            error_param_=error_param,
         );
     }
 
     // Error Handling: Wrong market passed for the order
     if ([request_list_].market_id != market_id_) {
+        local error_code;
+        local error_order_id;
+        local error_param;
+        local market_id_temp;
+
+        assert market_id_temp = [request_list_].market_id;
+
+        if (request_list_len_ == 1) {
+            with_attr error_message("0504: {order_id} {market_id_temp}") {
+                assert 1 = 0;
+            }
+        } else {
+            if (error_order_id_ != 0) {
+                assert error_code = '0504';
+                assert error_order_id = order_id;
+                assert error_param = market_id_temp;
+            } else {
+                assert error_code = error_code_;
+                assert error_order_id = error_order_id_;
+                assert error_param = error_param_;
+            }
+        }
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
@@ -1489,7 +1537,9 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
-            is_error_=TRUE,
+            error_order_id_=error_order_id,
+            error_code_=error_code,
+            error_param_=error_param,
         );
     }
 
@@ -1498,6 +1548,29 @@ func process_and_execute_orders_recurse{
         LEVERAGE_ONE, [request_list_].leverage, asset_token_decimal_
     );
     if (leverage_min_check == FALSE) {
+        local error_code;
+        local error_order_id;
+        local error_param;
+        local leverage;
+
+        assert leverage = [request_list_].leverage;
+
+        if (request_list_len_ == 1) {
+            with_attr error_message("0503: {order_id} {leverage}") {
+                assert 1 = 0;
+            }
+        } else {
+            if (error_order_id_ != 0) {
+                assert error_code = '0503';
+                assert error_order_id = order_id;
+                assert error_param = leverage;
+            } else {
+                assert error_code = error_code_;
+                assert error_order_id = error_order_id_;
+                assert error_param = error_param_;
+            }
+        }
+
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
@@ -1541,7 +1614,9 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
-            is_error_=TRUE,
+            error_order_id_=error_order_id,
+            error_code_=error_code,
+            error_param_=error_param,
         );
     }
 
@@ -1550,6 +1625,28 @@ func process_and_execute_orders_recurse{
         [request_list_].leverage, max_leverage_, asset_token_decimal_
     );
     if (leverage_max_check == FALSE) {
+        local error_code;
+        local error_order_id;
+        local error_param;
+        local leverage;
+
+        assert leverage = [request_list_].leverage;
+
+        if (request_list_len_ == 1) {
+            with_attr error_message("0502: {order_id} {leverage}") {
+                assert 1 = 0;
+            }
+        } else {
+            if (error_order_id_ != 0) {
+                assert error_code = '0502';
+                assert error_order_id = order_id;
+                assert error_param = leverage;
+            } else {
+                assert error_code = error_code_;
+                assert error_order_id = error_order_id_;
+                assert error_param = error_param_;
+            }
+        }
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
@@ -1593,7 +1690,9 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
-            is_error_=TRUE,
+            error_order_id_=error_order_id,
+            error_code_=error_code,
+            error_param_=error_param,
         );
     }
 
@@ -1643,6 +1742,29 @@ func process_and_execute_orders_recurse{
     let (hash_error) = order_hash_check(order_id_=[request_list_].order_id, order_hash_=hash);
 
     if (hash_error == TRUE) {
+        local error_code;
+        local error_order_id;
+        local error_param;
+        local order_hash;
+
+        assert order_hash = hash;
+
+        if (request_list_len_ == 1) {
+            with_attr error_message("0536: {order_id} {order_hash}") {
+                assert 1 = 0;
+            }
+        } else {
+            if (error_order_id_ != 0) {
+                assert error_code = '0536';
+                assert error_order_id = order_id;
+                assert error_param = order_hash;
+            } else {
+                assert error_code = error_code_;
+                assert error_order_id = error_order_id_;
+                assert error_param = error_param_;
+            }
+        }
+
         // Call the account contract to reject the order
         IAccountManager.execute_order(
             contract_address=[request_list_].user_address,
@@ -1686,7 +1808,9 @@ func process_and_execute_orders_recurse{
             taker_execution_price_=taker_execution_price_,
             open_interest_=open_interest_,
             oracle_price_=oracle_price_,
-            is_error_=TRUE,
+            error_order_id_=error_order_id,
+            error_code_=error_code,
+            error_param_=error_param,
         );
     }
 
@@ -1710,6 +1834,25 @@ func process_and_execute_orders_recurse{
         let (is_zero_quantity) = Math64x61_is_equal(quantity_executed_, 0, 6);
 
         if (is_zero_quantity == TRUE) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("0524: {order_id} 0") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ != 0) {
+                    assert error_code = '0524';
+                    assert error_order_id = order_id;
+                    assert error_param = 0;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
@@ -1753,7 +1896,9 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                is_error_=TRUE,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
             );
         }
 
@@ -1763,6 +1908,28 @@ func process_and_execute_orders_recurse{
         );
 
         if (is_error == TRUE) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+            local direction;
+
+            assert direction = [request_list_].direction;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("0513: {order_id} {direction}") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ != 0) {
+                    assert error_code = '0513';
+                    assert error_order_id = order_id;
+                    assert error_param = direction;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
@@ -1806,12 +1973,33 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                is_error_=TRUE,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
             );
         }
 
         // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].post_only == TRUE) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("0515: {order_id} {current_index}") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ != 0) {
+                    assert error_code = '0515';
+                    assert error_order_id = order_id;
+                    assert error_param = current_index;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
@@ -1855,7 +2043,9 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                is_error_=TRUE,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
             );
         }
 
@@ -1867,6 +2057,25 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: A Taker order cannot be a post only order
             if (diff_check == FALSE) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("0516: {order_id} {taker_quantity}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = '0516';
+                        assert error_order_id = order_id;
+                        assert error_param = taker_quantity;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -1910,12 +2119,33 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
 
             // Error Handling: A Taker order cannot be a post only order
             if ([request_list_].order_type != LIMIT_ORDER) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("0550: {order_id} {MAKER_ORDER}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = '0550';
+                        assert error_order_id = order_id;
+                        assert error_param = MAKER;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -1959,7 +2189,9 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
 
@@ -1980,6 +2212,26 @@ func process_and_execute_orders_recurse{
             assert slippage = [request_list_].slippage;
             // Error Handling: Slippage of a market order cannot be 0
             if (slippage == 0) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("0521: {order_id} {slippage}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = '0521';
+                        assert error_order_id = order_id;
+                        assert error_param = slippage;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
+
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -2023,12 +2275,33 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
 
             // Error Handling: A Taker order cannot be a post only order
             if (is_le(slippage, FIFTEEN_PERCENTAGE) == FALSE) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("0521: {order_id} {slippage}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = '0521';
+                        assert error_order_id = order_id;
+                        assert error_param = slippage;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -2072,7 +2345,9 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
 
@@ -2086,6 +2361,25 @@ func process_and_execute_orders_recurse{
             );
 
             if (is_error == TRUE) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("0506: {order_id} {execution_price}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = '0506';
+                        assert error_order_id = order_id;
+                        assert error_param = execution_price;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -2129,7 +2423,9 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
             tempvar syscall_ptr = syscall_ptr;
@@ -2145,6 +2441,28 @@ func process_and_execute_orders_recurse{
             );
 
             if (is_error_1 == TRUE) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+                local error_code_temp;
+
+                assert error_code_temp = error_message_1;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("{error_code_temp}: {order_id} {execution_price}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = error_message_1;
+                        assert error_order_id = order_id;
+                        assert error_param = execution_price;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -2188,7 +2506,9 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
 
@@ -2232,7 +2552,7 @@ func process_and_execute_orders_recurse{
         let (quantity_remaining) = Math64x61_sub(taker_locked_quantity_, quantity_executed_);
 
         // Find quantity that needs to be executed for the current order
-        let (quantity_to_execute_remaining, error_code) = get_quantity_to_execute(
+        let (quantity_to_execute_remaining, error_code_quantity) = get_quantity_to_execute(
             batch_id_=batch_id_,
             order_portion_executed_=order_portion_executed,
             position_details_=position_details,
@@ -2241,7 +2561,29 @@ func process_and_execute_orders_recurse{
             quantity_remaining_=quantity_remaining,
         );
 
-        if (error_code != 0) {
+        if (error_code_quantity != 0) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+            local error_code_temp;
+
+            assert error_code_temp = error_code_quantity;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("{error_code_temp}: {order_id} 0") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ != 0) {
+                    assert error_code = error_code_quantity;
+                    assert error_order_id = order_id;
+                    assert error_param = 0;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
                 batch_id_=batch_id_,
@@ -2284,7 +2626,9 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                is_error_=TRUE,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
             );
         }
 
@@ -2294,6 +2638,29 @@ func process_and_execute_orders_recurse{
         );
 
         if (is_error == TRUE) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+            local direction;
+
+            assert direction = [request_list_].direction;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("0512: {order_id} {direction}") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ != 0) {
+                    assert error_code = '0512';
+                    assert error_order_id = order_id;
+                    assert error_param = direction;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
+
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
                 batch_id_=batch_id_,
@@ -2336,12 +2703,33 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                is_error_=TRUE,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
             );
         }
 
         // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].order_type != LIMIT_ORDER) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("0518: {order_id} {current_index}") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ != 0) {
+                    assert error_code = '0518';
+                    assert error_order_id = order_id;
+                    assert error_param = current_index;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
@@ -2385,7 +2773,9 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                is_error_=TRUE,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
             );
         }
         assert quantity_to_execute = quantity_to_execute_remaining;
@@ -2396,6 +2786,26 @@ func process_and_execute_orders_recurse{
 
         // Send to AccountManager to emit an event in case the execution size is 0
         if (quantity_to_execute == 0) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("0535: {order_id} {current_index}") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ != 0) {
+                    assert error_code = '0535';
+                    assert error_order_id = order_id;
+                    assert error_param = current_index;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
+
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
@@ -2439,7 +2849,9 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                is_error_=TRUE,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
             );
         }
 
@@ -2472,7 +2884,7 @@ func process_and_execute_orders_recurse{
     // If the order is to be opened
     if ([request_list_].side == BUY) {
         let (
-            error_code: felt,
+            error_code_open: felt,
             user_available_balance: felt,
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
@@ -2494,7 +2906,31 @@ func process_and_execute_orders_recurse{
             side_=current_order_side,
         );
 
-        if (error_code != 0) {
+        if (error_code_open != 0) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+            local user_balance;
+            local error_code_temp;
+
+            assert user_balance = user_available_balance;
+            assert error_code_temp = error_code_open;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("{error_code_temp}: {order_id} {user_balance}") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ != 0) {
+                    assert error_code = error_code_open;
+                    assert error_order_id = order_id;
+                    assert error_param = user_balance;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
             // Call the account contract to reject the order
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
@@ -2538,7 +2974,9 @@ func process_and_execute_orders_recurse{
                 taker_execution_price_=taker_execution_price_,
                 open_interest_=open_interest_,
                 oracle_price_=oracle_price_,
-                is_error_=TRUE,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
             );
         }
 
@@ -2695,6 +3133,26 @@ func process_and_execute_orders_recurse{
 
             // Error Handling: Wrong market for liquidation
             if (liq_position.market_id != market_id_) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("0531: {order_id} {market_id_}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = '0531';
+                        assert error_order_id = order_id;
+                        assert error_param = market_id_;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
+
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -2738,12 +3196,37 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
 
             // Error Handling: Wrong direction for liquidation
             if (liq_position.direction != [request_list_].direction) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+                local direction;
+
+                assert direction = [request_list_].direction;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("0532: {order_id} {direction}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = '0532';
+                        assert error_order_id = order_id;
+                        assert error_param = direction;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
+
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -2787,7 +3270,9 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
 
@@ -2796,6 +3281,25 @@ func process_and_execute_orders_recurse{
                 quantity_to_execute, liq_position.amount_to_be_sold, asset_token_decimal_
             );
             if (liquidatable_size_check == FALSE) {
+                local error_code;
+                local error_order_id;
+                local error_param;
+
+                if (request_list_len_ == 1) {
+                    with_attr error_message("0533: {order_id} {quantity_to_execute}") {
+                        assert 1 = 0;
+                    }
+                } else {
+                    if (error_order_id_ != 0) {
+                        assert error_code = '0533';
+                        assert error_order_id = order_id;
+                        assert error_param = quantity_to_execute;
+                    } else {
+                        assert error_code = error_code_;
+                        assert error_order_id = error_order_id_;
+                        assert error_param = error_param_;
+                    }
+                }
                 // Call the account contract to reject the order
                 IAccountManager.execute_order(
                     contract_address=[request_list_].user_address,
@@ -2839,7 +3343,9 @@ func process_and_execute_orders_recurse{
                     taker_execution_price_=taker_execution_price_,
                     open_interest_=open_interest_,
                     oracle_price_=oracle_price_,
-                    is_error_=TRUE,
+                    error_order_id_=error_order_id,
+                    error_code_=error_code,
+                    error_param_=error_param,
                 );
             }
 
@@ -2865,6 +3371,25 @@ func process_and_execute_orders_recurse{
             if ([request_list_].order_type == DELEVERAGING_ORDER) {
                 // Error Handling: Position not marked as 'deleveragable'
                 if (liq_position.liquidatable == TRUE) {
+                    local error_code;
+                    local error_order_id;
+                    local error_param;
+
+                    if (request_list_len_ == 1) {
+                        with_attr error_message("0534: {order_id} 0") {
+                            assert 1 = 0;
+                        }
+                    } else {
+                        if (error_order_id_ != 0) {
+                            assert error_code = '0534';
+                            assert error_order_id = order_id;
+                            assert error_param = 0;
+                        } else {
+                            assert error_code = error_code_;
+                            assert error_order_id = error_order_id_;
+                            assert error_param = error_param_;
+                        }
+                    }
                     // Call the account contract to reject the order
                     IAccountManager.execute_order(
                         contract_address=[request_list_].user_address,
@@ -2879,7 +3404,7 @@ func process_and_execute_orders_recurse{
                         market_array_update_=0,
                         is_liquidation_=0,
                         error_message_='0534',
-                        error_param_1_=quantity_to_execute,
+                        error_param_1_=0,
                     );
 
                     return process_and_execute_orders_recurse(
@@ -2908,7 +3433,9 @@ func process_and_execute_orders_recurse{
                         taker_execution_price_=taker_execution_price_,
                         open_interest_=open_interest_,
                         oracle_price_=oracle_price_,
-                        is_error_=TRUE,
+                        error_order_id_=error_order_id,
+                        error_code_=error_code,
+                        error_param_=error_param,
                     );
                 }
 
@@ -2924,6 +3451,26 @@ func process_and_execute_orders_recurse{
             } else {
                 // Error Handling: Position not marked as 'liquidatable'
                 if (liq_position.liquidatable == FALSE) {
+                    local error_code;
+                    local error_order_id;
+                    local error_param;
+
+                    if (request_list_len_ == 1) {
+                        with_attr error_message("0535: {order_id} 0") {
+                            assert 1 = 0;
+                        }
+                    } else {
+                        if (error_order_id_ != 0) {
+                            assert error_code = '0535';
+                            assert error_order_id = order_id;
+                            assert error_param = quantity_to_execute;
+                        } else {
+                            assert error_code = error_code_;
+                            assert error_order_id = error_order_id_;
+                            assert error_param = error_param_;
+                        }
+                    }
+
                     // Call the account contract to reject the order
                     IAccountManager.execute_order(
                         contract_address=[request_list_].user_address,
@@ -2938,7 +3485,7 @@ func process_and_execute_orders_recurse{
                         market_array_update_=0,
                         is_liquidation_=0,
                         error_message_='0535',
-                        error_param_1_=quantity_to_execute,
+                        error_param_1_=0,
                     );
 
                     return process_and_execute_orders_recurse(
@@ -2967,7 +3514,9 @@ func process_and_execute_orders_recurse{
                         taker_execution_price_=taker_execution_price_,
                         open_interest_=open_interest_,
                         oracle_price_=oracle_price_,
-                        is_error_=TRUE,
+                        error_order_id_=error_order_id,
+                        error_code_=error_code,
+                        error_param_=error_param,
                     );
                 }
 
@@ -3175,7 +3724,9 @@ func process_and_execute_orders_recurse{
         taker_execution_price_=execution_price,
         open_interest_=new_open_interest,
         oracle_price_=oracle_price_,
-        is_error_=FALSE,
+        error_order_id_=error_order_id_,
+        error_code_=error_code_,
+        error_param_=error_param_,
     );
 }
 
