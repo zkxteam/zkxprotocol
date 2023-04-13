@@ -242,7 +242,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
     )
     await admin1_signer.send_transaction(admin1, asset.contract_address, 'add_asset', TESLA_properties)
 
-    # Add markets
+ # Add markets
     BTC_USD_properties = MarketProperties(
         id=BTC_USD_ID,
         asset=AssetID.BTC,
@@ -254,8 +254,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         step_size=1,
         minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
-        maximum_leverage=to64x61(20),
-        currently_allowed_leverage=to64x61(20),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
         maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
@@ -264,6 +264,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_USD_ID, details=BTC_USD_properties.to_dict())
 
     BTC_UST_properties = MarketProperties(
         id=BTC_UST_ID,
@@ -276,8 +278,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         step_size=1,
         minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
-        maximum_leverage=to64x61(20),
-        currently_allowed_leverage=to64x61(20),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
         maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
@@ -286,6 +288,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_UST_ID, details=BTC_UST_properties.to_dict())
 
     ETH_USD_properties = MarketProperties(
         id=ETH_USD_ID,
@@ -298,8 +302,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         step_size=1,
         minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
-        maximum_leverage=to64x61(20),
-        currently_allowed_leverage=to64x61(20),
+        maximum_leverage=to64x61(10),
+        currently_allowed_leverage=to64x61(10),
         maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
@@ -308,6 +312,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=ETH_USD_ID, details=ETH_USD_properties.to_dict())
 
     TSLA_USD_properties = MarketProperties(
         id=TSLA_USD_ID,
@@ -330,6 +336,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', TSLA_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=TSLA_USD_ID, details=TSLA_USD_properties.to_dict())
 
     UST_USDC_properties = MarketProperties(
         id=UST_USDC_ID,
@@ -352,6 +360,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', UST_USDC_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=UST_USDC_ID, details=UST_USDC_properties.to_dict())
 
     # Fund the Holding contract
     python_executor.set_fund_balance(

@@ -4,7 +4,7 @@ import time
 from starkware.cairo.lang.version import __version__ as STARKNET_VERSION
 from starkware.starknet.business_logic.state.state import BlockInfo
 from utils import ContractIndex, ManagerAction, Signer, str_to_felt, from64x61, to64x61, assert_revert, PRIME, PRIME_HALF, assert_event_with_custom_keys_emitted
-from utils_trading import User, Liquidator,order_direction, order_types, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, get_safe_amount_to_withdraw_python, compare_margin_info, compare_markets_array, side
+from utils_trading import User, Liquidator, order_direction, order_types, OrderExecutor, fund_mapping, set_balance, execute_and_compare, compare_fund_balances, compare_user_balances, compare_user_positions, check_batch_status, get_safe_amount_to_withdraw_python, compare_margin_info, compare_markets_array, side
 from utils_asset import AssetID, build_asset_properties
 from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
@@ -237,6 +237,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_USD_ID, details=BTC_USD_properties.to_dict())
 
     ETH_USD_properties = MarketProperties(
         id=ETH_USD_ID,
@@ -247,10 +249,10 @@ async def trading_test_initializer(starknet_service: StarknetService):
         ttl=60,
         tick_size=1,
         step_size=1,
-        minimum_order_size=10,
+        minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(10),
-        currently_allowed_leverage=to64x61(3),
+        currently_allowed_leverage=to64x61(10),
         maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
@@ -259,6 +261,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=ETH_USD_ID, details=ETH_USD_properties.to_dict())
 
     TSLA_USD_properties = MarketProperties(
         id=TSLA_USD_ID,
@@ -273,7 +277,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(5),
         currently_allowed_leverage=to64x61(3),
-        maintenance_margin_fraction=1,
+        maintenance_margin_fraction=to64x61(0.075),
         initial_margin_fraction=1,
         incremental_initial_margin_fraction=1,
         incremental_position_size=100,
@@ -281,6 +285,8 @@ async def trading_test_initializer(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', TSLA_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=TSLA_USD_ID, details=TSLA_USD_properties.to_dict())
 
     # Fund the Holding contract
     python_executor.set_fund_balance(
@@ -309,7 +315,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
 @pytest.mark.asyncio
 async def test_for_risk_while_opening_order(trading_test_initializer):
     starknet_service, python_executor, admin1, _, alice, bob, charlie, _, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, python_liquidator = trading_test_initializer
-    
+
     ### Open orders to set price ###
 
     # List of users
@@ -400,10 +406,13 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await compare_user_positions(users=users, users_test=users_test, market_id=market_id_2)
 
     withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp1)
+    withdrawable_python = get_safe_amount_to_withdraw_python(
+        alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp1)
 
-    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(withdrawable_python[0], abs=1e-3)
-    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(
+        withdrawable_python[0], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(
+        withdrawable_python[1], abs=1e-3)
 
     starknet_service.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp2, gas_price=starknet_service.state.state.block_info.gas_price,
@@ -453,10 +462,13 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
     withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp2)
+    withdrawable_python = get_safe_amount_to_withdraw_python(
+        alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp2)
 
-    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(withdrawable_python[0], abs=1e-3)
-    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(
+        withdrawable_python[0], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(
+        withdrawable_python[1], abs=1e-3)
 
     starknet_service.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp3, gas_price=starknet_service.state.state.block_info.gas_price,
@@ -506,10 +518,13 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
 
     withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
-    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp3)
+    withdrawable_python = get_safe_amount_to_withdraw_python(
+        alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp3)
 
-    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(withdrawable_python[0], abs=1e-3)
-    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(
+        withdrawable_python[0], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(
+        withdrawable_python[1], abs=1e-3)
 
     starknet_service.state.state.block_info = BlockInfo(
         block_number=1, block_timestamp=timestamp4, gas_price=starknet_service.state.state.block_info.gas_price,
@@ -560,17 +575,20 @@ async def test_for_risk_while_opening_order(trading_test_initializer):
 
     withdrawable_starknet = await alice.get_safe_amount_to_withdraw(AssetID.USDC).call()
     print("starknet: ", withdrawable_starknet.result)
-    withdrawable_python = get_safe_amount_to_withdraw_python(alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp4)
+    withdrawable_python = get_safe_amount_to_withdraw_python(
+        alice_test, python_liquidator, python_executor, AssetID.USDC, timestamp4)
     print("python: ", withdrawable_python)
 
-    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(withdrawable_python[0], abs=1e-3)
-    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(withdrawable_python[1], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.safe_withdrawal_amount) == pytest.approx(
+        withdrawable_python[0], abs=1e-3)
+    assert from64x61(withdrawable_starknet.result.withdrawable_amount) == pytest.approx(
+        withdrawable_python[1], abs=1e-3)
 
 
 @ pytest.mark.asyncio
 async def test_closing_more_than_parent_size_should_pass(trading_test_initializer):
     starknet_service, python_executor, admin1, _, alice, bob, charlie, _, eduard, felix, gary, alice_test, bob_test, charlie_test, eduard_test, felix_test, gary_test, _, _, _, trading, _, _, holding, fee_balance, liquidity, insurance, trading_stats, python_liquidator = trading_test_initializer
-    
+
     ###################
     ### Open orders ##
     ###################
