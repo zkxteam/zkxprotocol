@@ -109,7 +109,7 @@ async def trading_test_initializer(starknet_service: StarknetService):
     ian_test = User(123456789987654331, ian.contract_address)
 
     jake = await account_factory.deploy_ZKX_account(jake_signer.public_key)
-    print("ian", hex(jake.contract_address))
+    print("jake", hex(jake.contract_address))
     jake_test = User(123456789987654332, jake.contract_address)
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
