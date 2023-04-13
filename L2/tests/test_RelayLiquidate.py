@@ -1052,7 +1052,7 @@ async def test_liquidation_invalid_order_type(adminAuth_factory):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"551:", error_at_index=error_at_index, param_2=0, timestamp=timestamp_4)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"526:", error_at_index=error_at_index, param_2=to64x61(quantity_locked_1), timestamp=timestamp_4)
 
 
 @pytest.mark.asyncio

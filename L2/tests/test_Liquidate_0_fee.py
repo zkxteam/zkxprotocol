@@ -14,6 +14,7 @@ from utils_trading import (
 )
 from utils_links import DEFAULT_LINK_1, prepare_starknet_string
 from utils_asset import AssetID, build_asset_properties
+from utils_markets import MarketProperties
 from helpers import StarknetService, ContractType, AccountFactory
 from dummy_addresses import L1_dummy_address
 
