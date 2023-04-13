@@ -2079,23 +2079,16 @@ func process_and_execute_orders_recurse{
             local error_param;
             local error_code_temp;
 
-            assert error_code_temp = error_code_quantity;
-
-            if (request_list_len_ == 1) {
-                with_attr error_message("{error_code_temp}: {order_id} 0") {
-                    assert 1 = 0;
-                }
+            if (error_order_id_ == 0) {
+                assert error_code = error_code_quantity;
+                assert error_order_id = order_id;
+                assert error_param = 0;
             } else {
-                if (error_order_id_ == 0) {
-                    assert error_code = error_code_quantity;
-                    assert error_order_id = order_id;
-                    assert error_param = 0;
-                } else {
-                    assert error_code = error_code_;
-                    assert error_order_id = error_order_id_;
-                    assert error_param = error_param_;
-                }
+                assert error_code = error_code_;
+                assert error_order_id = error_order_id_;
+                assert error_param = error_param_;
             }
+
             IAccountManager.execute_order(
                 contract_address=[request_list_].user_address,
                 batch_id_=batch_id_,
