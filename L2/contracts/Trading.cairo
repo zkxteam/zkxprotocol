@@ -186,11 +186,11 @@ func execute_batch{
         contract_address=market_address, market_id_=market_id_
     );
 
-    with_attr error_message("509: {market_id_}") {
+    with_attr error_message("509: {market_id_} 0") {
         assert_not_zero(market.is_tradable);
     }
 
-    with_attr error_message("522: {market_id_}") {
+    with_attr error_message("522: {market_id_} 0") {
         assert_not_zero(quantity_locked_);
     }
 
@@ -328,7 +328,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     );
 
     if (is_zero_quantity_to_execute == 1) {
-        return (quantity_to_execute_final=0, error_code=551);
+        return (quantity_to_execute_final=0, error_code=523);
     }
 
     tempvar syscall_ptr = syscall_ptr;
@@ -360,7 +360,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         local error_code;
 
         if (is_zero_quantity_to_execute_final == TRUE) {
-            assert error_code = 552;
+            assert error_code = 524;
         } else {
             assert error_code = 0;
         }
@@ -507,7 +507,7 @@ func check_limit_price{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
             );
 
             if (limit_price_check_4 == FALSE) {
-                return (TRUE, 507);
+                return (TRUE, 508);
             }
         }
         tempvar range_check_ptr = range_check_ptr;
@@ -724,7 +724,7 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     assert order_id = order_.order_id;
 
     if (is_liquidation == TRUE) {
-        return (1101, user_available_balance, 0, 0, 0, 0, 0);
+        return (531, user_available_balance, 0, 0, 0, 0, 0);
     }
 
     let (user_balance_check) = Math64x61_is_le(
@@ -1782,7 +1782,7 @@ func process_and_execute_orders_recurse{
 
         if (request_list_len_ == 1) {
             if (error_order_id_ == 0) {
-                with_attr error_message("536: {order_id} {order_hash}") {
+                with_attr error_message("525: {order_id} {order_hash}") {
                     assert 1 = 0;
                 }
             } else {
@@ -1791,14 +1791,14 @@ func process_and_execute_orders_recurse{
                         assert 1 = 0;
                     }
                 } else {
-                    with_attr error_message("536: {order_id} {order_hash}") {
+                    with_attr error_message("525: {order_id} {order_hash}") {
                         assert 1 = 0;
                     }
                 }
             }
         } else {
             if (error_order_id_ == 0) {
-                assert error_code = 536;
+                assert error_code = 525;
                 assert error_order_id = order_id;
                 assert error_param = order_hash;
             } else {
@@ -1821,7 +1821,7 @@ func process_and_execute_orders_recurse{
             updated_portion_executed_=0,
             market_array_update_=0,
             is_liquidation_=0,
-            error_message_=536,
+            error_message_=525,
             error_param_1_=hash,
         );
 
@@ -1907,7 +1907,7 @@ func process_and_execute_orders_recurse{
         if ([request_list_].time_in_force == FoK) {
             let (diff_check) = Math64x61_sub([request_list_].quantity, taker_quantity);
 
-            with_attr error_message("0516: {order_id} {taker_quantity}") {
+            with_attr error_message("516: {order_id} {taker_quantity}") {
                 let (is_zero) = Math64x61_is_equal(diff_check, 0, asset_token_decimal_);
                 assert is_zero = TRUE;
                 assert [request_list_].order_type = LIMIT_ORDER;
@@ -1950,7 +1950,7 @@ func process_and_execute_orders_recurse{
             local slippage;
             assert slippage = [request_list_].slippage;
 
-            with_attr error_message("0521: {order_id} {slippage}") {
+            with_attr error_message("521: {order_id} {slippage}") {
                 assert_lt(0, slippage);
                 assert_le(slippage, FIFTEEN_PERCENTAGE);
             }
@@ -2017,6 +2017,9 @@ func process_and_execute_orders_recurse{
             quantity_remaining_=quantity_remaining,
         );
 
+        quantity_to_execute = quantity_to_execute_remaining;
+
+        // Send to AccountManager to emit an event in case the execution size is 0
         if (error_code_quantity != 0) {
             local error_code;
             local error_order_id;
@@ -2158,7 +2161,6 @@ func process_and_execute_orders_recurse{
             );
         }
 
-        // Error Handling: A Taker order cannot be a post only order
         if ([request_list_].order_type != LIMIT_ORDER) {
             local error_code;
             local error_order_id;
@@ -2227,82 +2229,10 @@ func process_and_execute_orders_recurse{
                 error_param_=error_param,
             );
         }
-        assert quantity_to_execute = quantity_to_execute_remaining;
 
         tempvar syscall_ptr = syscall_ptr;
         tempvar pedersen_ptr = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
-
-        // Send to AccountManager to emit an event in case the execution size is 0
-        if (quantity_to_execute == 0) {
-            local error_code;
-            local error_order_id;
-            local error_param;
-
-            if (request_list_len_ == 1) {
-                with_attr error_message("535: {order_id} {current_index}") {
-                    assert 1 = 0;
-                }
-            } else {
-                if (error_order_id_ == 0) {
-                    assert error_code = 535;
-                    assert error_order_id = order_id;
-                    assert error_param = current_index;
-                } else {
-                    assert error_code = error_code_;
-                    assert error_order_id = error_order_id_;
-                    assert error_param = error_param_;
-                }
-            }
-
-            // Call the account contract to reject the order
-            IAccountManager.execute_order(
-                contract_address=[request_list_].user_address,
-                batch_id_=batch_id_,
-                market_id_=market_id_,
-                collateral_id_=collateral_id_,
-                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
-                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
-                updated_margin_locked_=0,
-                updated_portion_executed_=0,
-                market_array_update_=0,
-                is_liquidation_=0,
-                error_message_=535,
-                error_param_1_=current_index,
-            );
-
-            return process_and_execute_orders_recurse(
-                batch_id_=batch_id_,
-                taker_locked_quantity_=taker_locked_quantity_,
-                market_id_=market_id_,
-                collateral_id_=collateral_id_,
-                asset_token_decimal_=asset_token_decimal_,
-                collateral_token_decimal_=collateral_token_decimal_,
-                orders_len_=orders_len_,
-                request_list_len_=request_list_len_ - 1,
-                request_list_=request_list_ + MultipleOrder.SIZE,
-                quantity_executed_=quantity_executed_,
-                account_registry_address_=account_registry_address_,
-                holding_address_=holding_address_,
-                trading_fees_address_=trading_fees_address_,
-                fees_balance_address_=fees_balance_address_,
-                liquidate_address_=liquidate_address_,
-                liquidity_fund_address_=liquidity_fund_address_,
-                insurance_fund_address_=insurance_fund_address_,
-                max_leverage_=max_leverage_,
-                min_quantity_=min_quantity_,
-                maker1_direction_=maker1_direction_,
-                maker1_side_=maker1_side_,
-                total_order_volume_=total_order_volume_,
-                taker_execution_price_=taker_execution_price_,
-                open_interest_=open_interest_,
-                oracle_price_=oracle_price_,
-                error_order_id_=error_order_id,
-                error_code_=error_code,
-                error_param_=error_param,
-            );
-        }
 
         // Add the executed quantity to the running sum of quantity executed
         let (current_quantity_executed_felt: felt) = Math64x61_add(
