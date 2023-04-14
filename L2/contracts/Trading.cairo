@@ -100,22 +100,6 @@ func batch_id_status(batch_id: felt) -> (res: felt) {
 func order_id_mapping(order_id: felt) -> (hash: felt) {
 }
 
-// /////////
-// Events //
-// /////////
-
-// Event emitted whenever an order is rejected
-@event
-func order_rejected(code: felt, param_1: felt, param_2: felt) {
-}
-
-// Stores size locked for a user if order is SELL
-@storage_var
-func position_size_locked_per_user(
-    batch_id: felt, user_address: felt, market_id: felt, direction: felt
-) -> (res: felt) {
-}
-
 // //////////////
 // Constructor //
 // //////////////
@@ -364,10 +348,6 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // If it's a sell order, calculate the amount that can be executed
     if (request_.side == SELL) {
-        // Get the order size already locked for the current batch
-        let (current_batch_locked_size) = position_size_locked_per_user.read(
-            batch_id_, request_.user_address, request_.market_id, request_.direction
-        );
         // Get position details
         let (position_details: PositionDetails) = IAccountManager.get_position_data(
             contract_address=request_.user_address,
@@ -375,31 +355,15 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             direction_=request_.direction,
         );
 
-        let (remaining_position_size) = Math64x61_sub(
-            position_details.position_size, current_batch_locked_size
-        );
-
         let (cmp_res) = Math64x61_is_le(
-            quantity_to_execute, remaining_position_size, asset_token_decimal_
+            quantity_to_execute, position_details.position_size, asset_token_decimal_
         );
 
         if (cmp_res == FALSE) {
-            quantity_to_execute_final = remaining_position_size;
+            quantity_to_execute_final = position_details.position_size;
         } else {
             quantity_to_execute_final = quantity_to_execute;
         }
-
-        // Update position size locked for the user in current batch
-        let (current_batch_locked_size_new) = Math64x61_add(
-            current_batch_locked_size, quantity_to_execute_final
-        );
-        position_size_locked_per_user.write(
-            batch_id_,
-            request_.user_address,
-            request_.market_id,
-            request_.direction,
-            current_batch_locked_size_new,
-        );
 
         // Return if the order is fully closed
         let (is_zero_quantity_to_execute_final) = Math64x61_is_equal(

@@ -1004,37 +1004,14 @@ class OrderExecutor:
         executable_quantity = request["quantity"] - \
             order_portion_executed
 
-        if quantity_remaining < executable_quantity:
-            quantity_to_execute = quantity_remaining
-        else:
-            quantity_to_execute = executable_quantity
+        quantity_to_execute = min(quantity_remaining, executable_quantity)
 
-        if request['side'] == order_direction["short"]:
-            try:
-                current_batch_locked_size = self.position_size_locked[
-                    batch_id][user.user_address][request["direction"]]
-            except KeyError:
-                current_batch_locked_size = 0
+        if request['side'] == side["sell"]:
             position = user.get_position(
                 market_id=request["market_id"], direction=request["direction"])
 
-            remaining_position_size = position["position_size"] - \
-                current_batch_locked_size
-
-            if quantity_to_execute <= remaining_position_size:
-                quantity_to_execute_final = quantity_to_execute
-            else:
-                quantity_to_execute_final = remaining_position_size
-
-            current_batch_locked_size_new = current_batch_locked_size + quantity_to_execute_final
-            self.position_size_locked.update(
-                {batch_id: {
-                    user.user_address: {
-                        request["direction"]: current_batch_locked_size_new
-                    }
-                }
-                }
-            )
+            quantity_to_execute_final = min(
+                quantity_to_execute, position["position_size"])
         else:
             quantity_to_execute_final = quantity_to_execute
 
@@ -1351,6 +1328,8 @@ class OrderExecutor:
                 quantity_to_execute = self.__get_quantity_to_execute(
                     batch_id=batch_id, request=request_list[i], user=user_list[i], quantity_remaining=taker_adjusted_quantity - quantity_executed)
 
+                print(
+                    f"==> quantity_to_execute for maker {i} is {quantity_to_execute}")
                 if quantity_to_execute == 0:
                     print(
                         f"\n<==> Skipping the order {i}: Quantity to execute is 0\n")
