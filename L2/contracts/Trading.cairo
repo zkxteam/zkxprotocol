@@ -16,7 +16,6 @@ from contracts.Constants import (
     CLOSE,
     DELEVERAGING_ORDER,
     EXECUTED,
-    FAILED,
     FeeBalance_INDEX,
     FoK,
     Holding_INDEX,
@@ -29,7 +28,6 @@ from contracts.Constants import (
     LONG,
     MAKER,
     Market_INDEX,
-    MARKET_ORDER,
     MarketPrices_INDEX,
     OPEN,
     SELL,
@@ -44,7 +42,6 @@ from contracts.DataTypes import (
     Market,
     MultipleOrder,
     PositionDetails,
-    PositionDetailsForRiskManagement,
     Signature,
     TraderStats,
 )
@@ -201,7 +198,6 @@ func execute_batch{
     let last_index = request_list_len - 1;
 
     let (initial_taker_locked: felt, error_code: felt) = find_initial_taker_locked(
-        batch_id_=batch_id_,
         asset_token_decimal_=asset.token_decimal,
         request_=request_list[last_index],
         quantity_locked_=quantity_locked_,
@@ -296,7 +292,6 @@ func execute_batch{
 // ///////////
 
 // @notice Internal function to calculate the amount that must be executed for an order
-// @param batch_id_ - Id of the batch
 // @param order_portion_executed_ - Portion of the order that has already been executed
 // @param position_details_ - Position details of the corresponding position
 // @param asset_token_decimal_ - Number of decimals for the asset
@@ -305,7 +300,6 @@ func execute_batch{
 // @returns quantity_to_execute_final - Calculated quantity to execute
 // @returns error_code - Returns an error code if the adjsuted size is 0
 func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    batch_id_: felt,
     order_portion_executed_: felt,
     position_details_: PositionDetails,
     asset_token_decimal_: felt,
@@ -348,19 +342,12 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // If it's a sell order, calculate the amount that can be executed
     if (request_.side == SELL) {
-        // Get position details
-        let (position_details: PositionDetails) = IAccountManager.get_position_data(
-            contract_address=request_.user_address,
-            market_id_=request_.market_id,
-            direction_=request_.direction,
-        );
-
         let (cmp_res) = Math64x61_is_le(
-            quantity_to_execute, position_details.position_size, asset_token_decimal_
+            quantity_to_execute, position_details_.position_size, asset_token_decimal_
         );
 
         if (cmp_res == FALSE) {
-            quantity_to_execute_final = position_details.position_size;
+            quantity_to_execute_final = position_details_.position_size;
         } else {
             quantity_to_execute_final = quantity_to_execute;
         }
@@ -387,14 +374,13 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 }
 
 // @notice Internal function to adjust and calculate the quantity locked for the Taker order
-// @param batch_id_ - Id of the batch
 // @param asset_token_decimal_ - Number of decimals for the asset
 // @param request_ - Taker order details
 // @param quantity_locked_ - Original quantity lokcked of the batch
 // @returns taker_quantity_to_execute - Adjusted quantity to execute for the taker
 // @returns error_code - Returns an error code if the adjsuted size is 0
 func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    batch_id_: felt, asset_token_decimal_: felt, request_: MultipleOrder, quantity_locked_: felt
+    asset_token_decimal_: felt, request_: MultipleOrder, quantity_locked_: felt
 ) -> (taker_quantity_to_execute: felt, error_code: felt) {
     // Get the portion executed of the order
     let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
@@ -410,7 +396,6 @@ func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
 
     // Adjust the quantity to execute on the taker side
     let (taker_quantity_to_execute: felt, error_code: felt) = get_quantity_to_execute(
-        batch_id_=batch_id_,
         order_portion_executed_=order_portion_executed,
         position_details_=position_details,
         asset_token_decimal_=asset_token_decimal_,
@@ -774,8 +759,6 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         tempvar syscall_ptr = syscall_ptr;
     }
 
-    let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
-
     // Deduct the amount from liquidity funds if order is leveraged
     let is_non_leveraged = is_le(order_.leverage, Math64x61_ONE);
 
@@ -922,8 +905,6 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         tempvar syscall_ptr = syscall_ptr;
         tempvar range_check_ptr = range_check_ptr;
     }
-
-    let (order_volume_64x61) = Math64x61_mul(order_size_, execution_price_);
 
     // Deduct funds from holding contract
     if (is_le(0, leveraged_amount_out) == TRUE) {
@@ -2029,7 +2010,6 @@ func process_and_execute_orders_recurse{
 
         // Find quantity that needs to be executed for the current order
         let (quantity_to_execute_remaining, error_code_quantity) = get_quantity_to_execute(
-            batch_id_=batch_id_,
             order_portion_executed_=order_portion_executed,
             position_details_=position_details,
             asset_token_decimal_=asset_token_decimal_,
