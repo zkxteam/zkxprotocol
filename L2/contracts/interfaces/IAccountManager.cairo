@@ -2,6 +2,7 @@
 
 from contracts.DataTypes import (
     CollateralBalance,
+    ExecutionDetails,
     LiquidatablePosition,
     OrderRequest,
     PositionDetails,
@@ -67,24 +68,25 @@ namespace IAccountManager {
     ) {
     }
 
+    func get_locked_margin(assetID_: felt) -> (res: felt) {
+    }
+
     // External functions
 
     func execute_order(
-        batch_id: felt,
-        request: OrderRequest,
-        signature: Signature,
-        size: felt,
-        average_execution_price: felt,
-        execution_price: felt,
-        margin_amount: felt,
-        borrowed_amount: felt,
-        market_id: felt,
+        batch_id_: felt,
+        market_id_: felt,
         collateral_id_: felt,
-        pnl: felt,
-        opening_fee: felt,
-        side: felt,
-        margin_lock_update_amount: felt,
-    ) -> (res: felt) {
+        execution_details_: ExecutionDetails,
+        updated_position_details_: PositionDetails,
+        updated_liquidatable_position_: LiquidatablePosition,
+        updated_margin_locked_: felt,
+        updated_portion_executed_: felt,
+        market_array_update_: felt,
+        is_liquidation_: felt,
+        error_message_: felt,
+        error_param_1_: felt,
+    ) {
     }
 
     func update_withdrawal_history(request_id_: felt) {

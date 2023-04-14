@@ -5,7 +5,8 @@ import string
 import calculate_abr
 from math import isclose
 from utils_asset import AssetID
-from utils import Signer, str_to_felt, assert_revert, hash_order, from64x61, to64x61
+from utils import Signer, str_to_felt, assert_revert, hash_order, from64x61, to64x61, felt_to_str
+from utils_markets import MarketProperties
 from typing import List, Dict, Tuple
 from calculate_abr import calculate_abr
 from starkware.starknet.testing.contract import StarknetContract
@@ -108,7 +109,8 @@ market_to_asset_mapping = {
 
 
 class User:
-    def __init__(self, private_key: int, user_address: int, liquidator_private_key: int = 0):
+    def __init__(self, private_key: int, user_address: int, liquidator_private_key: int = 0, is_registered: int = 1):
+        self.is_registered = is_registered
         self.signer = Signer(private_key)
         self.user_address = user_address
         self.orders = {}
@@ -831,6 +833,7 @@ class User:
                 "leverage": short_position["leverage"],
             }
 
+            print("=> LCR", long_collateral_ratio, short_collateral_ratio)
             if least_collateral_ratio > long_collateral_ratio or least_collateral_ratio > short_collateral_ratio:
                 print("checking collateral ratios", least_collateral_ratio,
                       short_collateral_ratio, long_collateral_ratio)
@@ -881,7 +884,18 @@ class OrderExecutor:
         self.fund_balances = {}
         self.batch_id_status = {}
         self.market_prices = {}
+        self.market_details = {}
+        self.position_size_locked = {}
         self.ttl = 60
+
+    def set_market_details(self, market_id: int, details: Dict):
+        self.market_details[market_id] = details
+
+    def get_market_details(self, market_id: int) -> Dict:
+        try:
+            return self.market_details[market_id]
+        except:
+            return {}
 
     def set_market_price(self, market_id: int, price: float, current_timestamp: int):
         current_price = self.get_market_price(market_id, current_timestamp)
@@ -981,7 +995,7 @@ class OrderExecutor:
         print(margin_amount)
         return (average_execution_price, margin_amount, borrowed_amount, trading_fees, order_value_wo_leverage)
 
-    def __get_quantity_to_execute(self, request: Dict, user: User, quantity_remaining: float, side: int, position_locked: List[Dict]) -> float:
+    def __get_quantity_to_execute(self, batch_id: int, request: Dict, user: User, quantity_remaining: float) -> float:
         quantity_to_execute = 0
         quantity_to_execute_final = 0
 
@@ -990,49 +1004,18 @@ class OrderExecutor:
         executable_quantity = request["quantity"] - \
             order_portion_executed
 
-        if quantity_remaining < executable_quantity:
-            quantity_to_execute = quantity_remaining
-        else:
-            quantity_to_execute = executable_quantity
+        quantity_to_execute = min(quantity_remaining, executable_quantity)
 
-        if request['side'] == 2:
-            try:
-                current_batch_locked_size = position_locked[user.user_address][request["direction"]]
-            except KeyError:
-                current_batch_locked_size = 0
+        if request['side'] == side["sell"]:
             position = user.get_position(
                 market_id=request["market_id"], direction=request["direction"])
-            
-            remaining_position_size = position["position_size"] - current_batch_locked_size
 
-            if quantity_to_execute <= remaining_position_size:
-                quantity_to_execute_final = quantity_to_execute
-            else:
-                quantity_to_execute_final = remaining_position_size
-
-            current_batch_locked_size_new = current_batch_locked_size + quantity_to_execute_final
-            position_locked.update({user.user_address: {request["direction"]: current_batch_locked_size_new}})
+            quantity_to_execute_final = min(
+                quantity_to_execute, position["position_size"])
         else:
             quantity_to_execute_final = quantity_to_execute
 
         return quantity_to_execute_final
-
-    def __adjust_quantity_locked(self, request_list: List[Dict], users_list: List[User], quantity_locked: float, position_locked: List[Dict]) -> Tuple[List[float]]:
-        taker_quantity_to_execute = self.__get_quantity_to_execute(
-            request=request_list[-1:][0], user=users_list[-1:][0], quantity_remaining=quantity_locked, side=order_side["taker"], position_locked=position_locked)
-        print("taker_quantity_to_execute",
-              taker_quantity_to_execute, quantity_locked)
-        maker_execution_sizes = []
-        quantity_executed = 0
-        for i in range(len(request_list) - 1):
-            quantity_to_execute = self.__get_quantity_to_execute(
-                request=request_list[i], user=users_list[i], quantity_remaining=taker_quantity_to_execute - quantity_executed, side=order_side["maker"], position_locked=position_locked)
-            maker_execution_sizes.append(quantity_to_execute)
-
-            quantity_executed += quantity_to_execute
-        maker_execution_sizes.append(quantity_executed)
-
-        return (maker_execution_sizes)
 
     def __process_close_orders(self, user: User, order: Dict, execution_price: float, order_size: float, timestamp: int) -> Tuple[float, float, float, float, float]:
 
@@ -1157,19 +1140,19 @@ class OrderExecutor:
                     asset_id=market_to_collateral_mapping[order["market_id"]])
                 if user_balance >= margin_unlock_amount:
                     self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
-                        asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
+                                               asset_id=market_to_collateral_mapping[order["market_id"]], amount=net_account_value)
                 else:
                     if user_balance <= 0:
                         self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                            asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount)      
+                                                   asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount)
                     else:
                         pnl_abs = abs(pnl)
                         if user_balance <= pnl_abs:
                             self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["defund"],
-                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=pnl_abs-user_balance)      
+                                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=pnl_abs-user_balance)
                         else:
                             self.__modify_fund_balance(fund=fund_mapping["insurance_fund"], mode=fund_mode["fund"],
-                                asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance-pnl_abs)      
+                                                       asset_id=market_to_collateral_mapping[order["market_id"]], amount=user_balance-pnl_abs)
                 user.modify_balance(
                     mode=fund_mode["defund"], asset_id=market_to_collateral_mapping[order["market_id"]], amount=margin_unlock_amount)
                 realized_pnl = margin_unlock_amount*-1
@@ -1182,6 +1165,12 @@ class OrderExecutor:
         # ToDo change this logic when we add user discounts
         # Fee rate
         return self.maker_trading_fees if side == 1 else self.taker_trading_fees
+
+    def __get_opposite(self, side_or_direction: int):
+        if side_or_direction == 1:
+            return 2
+        else:
+            return 1
 
     def set_fund_balance(self, fund: int, asset_id: int, new_balance: float):
         try:
@@ -1220,18 +1209,22 @@ class OrderExecutor:
         except KeyError:
             return 0
 
-    def execute_batch(self, batch_id: int, request_list: List[Dict], user_list: List, quantity_locked: float = 1, market_id: int = BTC_USD_ID, oracle_price: float = 1000, timestamp: int = 0):
-        # Store the quantity executed so far
-        position_size_locked_per_user = {}
+    def execute_batch(self, batch_id: int, request_list: List[Dict], user_list: List[User], quantity_locked: float = 1, market_id: int = BTC_USD_ID, oracle_price: float = 1000, timestamp: int = 0):
         running_weighted_sum = 0
+
+        quantity_executed = 0
+        maker_direction = request_list[0]["direction"]
+        maker_side = request_list[0]["side"]
+        taker_adjusted_quantity = self.__get_quantity_to_execute(
+            batch_id=batch_id, request=request_list[-1:][0], user=user_list[-1:][0], quantity_remaining=quantity_locked)
 
         self.set_market_price(
             market_id=market_id, price=oracle_price, current_timestamp=timestamp)
 
-        (maker_execution_sizes) = self.__adjust_quantity_locked(
-            request_list=request_list, users_list=user_list, quantity_locked=quantity_locked, position_locked=position_size_locked_per_user)
-        print("adjusted size", maker_execution_sizes[-1:])
-        print("maker_execution_sizes", maker_execution_sizes)
+        print("adjusted taker size", taker_adjusted_quantity)
+
+        # Get market details
+        market_details = self.get_market_details(market_id)
 
         for i in range(len(request_list)):
             print("order id:", i)
@@ -1242,27 +1235,63 @@ class OrderExecutor:
             avg_execution_price = 0
             trade_side = 0
 
+            if user_list[i].is_registered == False:
+                print(f"\n<==>Skipping the order {i}: User not registered\n")
+                continue
+
+            if request_list[i]["quantity"] < market_details["minimum_order_size"]:
+                print(market_details["minimum_order_size"])
+                print(f"\n<==>Skipping the order {i}: Quantity too low\n")
+                continue
+
+            if request_list[i]["market_id"] != market_id:
+                print(f"\n<==>Skipping the order {i}: Invalid market\n")
+                continue
+
+            if request_list[i]["leverage"] < market_details["minimum_leverage"]:
+                print(request_list[i]["leverage"],
+                      market_details["minimum_leverage"], market_details["maximum_leverage"])
+                print(f"\n<==>Skipping the order {i}: Leverage too low\n")
+                continue
+
+            if request_list[i]["leverage"] > market_details["maximum_leverage"]:
+                print(f"\n<==>Skipping the order {i}: Leverage too high\n")
+                continue
+
+            # Skipping hash check
+
             # Taker Order
             if i == len(request_list) - 1:
-                if request_list[i]["post_only"] != 0:
-                    print("Post Only order cannot be a taker")
+                quantity_to_execute = quantity_executed
+
+                if quantity_to_execute == 0:
+                    print(f"\n<==> Error: Quantity is 0\n")
                     return
 
+                if request_list[i]["post_only"] != 0:
+                    print(
+                        f"Skipping the order {i}: Postonly Taker not allowed")
+                    continue
+
                 if request_list[i]["time_in_force"] == order_time_in_force["fill_or_kill"]:
-                    if request_list[i]["quantity"] != maker_execution_sizes[i]:
-                        print("F&K must be executed fully")
-                    return
+                    if request_list[i]["quantity"] != quantity_to_execute:
+                        print(
+                            f"\n<==>Skipping the order {i}: F&K order cannot fill completely\n")
+                        continue
 
                 if request_list[i]["order_type"] == order_types["market"]:
                     if request_list[i]["slippage"] < 0:
-                        print("Slippage cannot be negative")
-                        return
+                        print(
+                            f"\n<==> Skipping the order {i}: Slippage cannot be negative\n")
+                        continue
 
                 if request_list[i]["slippage"] > 15:
-                    print("Slippage cannot be > 15")
-                    return
+                    print("Current slippage is: ", request_list[i]["slippage"])
+                    print(
+                        f"\n<==> Skipping the order {i}: Slippage cannot be more than 15%\n")
+                    continue
 
-                execution_price = running_weighted_sum/maker_execution_sizes[i]
+                execution_price = running_weighted_sum/quantity_to_execute
 
                 if request_list[i]["order_type"] == order_types["market"]:
                     threshold = (
@@ -1270,31 +1299,53 @@ class OrderExecutor:
 
                     if request_list[i]["direction"] == request_list[i]["side"]:
                         if execution_price > oracle_price + threshold:
-                            print("High slippage for taker order")
-                            return
+                            print(
+                                f"\n<==> Skipping the order {i}: High slippage for taker order\n")
+                            continue
                     else:
                         if oracle_price - threshold > execution_price:
-                            print("High slippage for taker order")
-                            return
+                            print(
+                                f"\n<==> Skipping the order {i}: High slippage for taker order\n")
+                            continue
                 else:
                     if request_list[i]["direction"] == order_direction["long"]:
                         if execution_price > request_list[i]["price"]:
-                            print("Bad long limit order")
-                            return
+                            print(
+                                f"\n<==> Skipping the order {i}: Bad limit order long\n")
+                            continue
                     else:
                         if execution_price < request_list[i]["price"]:
-                            print("Bad short limit order")
-                            return
-                trade_side = order_side["taker"]
-                quantity_to_execute = maker_execution_sizes[i]
-            else:
-                quantity_to_execute = maker_execution_sizes[i]
-
-                if quantity_to_execute == 0:
-                    print("skipping 0 size order: ", i)
+                            print(
+                                f"\n<==> Skipping the order {i}: Bad limit order short\n")
+                            continue
+                if not (((request_list[i]["direction"] == maker_direction) and (request_list[i]["side"] == self.__get_opposite(maker_side))) or ((request_list[i]["direction"] == self.__get_opposite(maker_direction)) and (request_list[i]["side"] == maker_side))):
+                    print(
+                        f"\n<==> Skipping the order {i}: Invalid Taker order direction\n")
                     continue
-                execution_price = request_list[i]["price"]
 
+                trade_side = order_side["taker"]
+            else:
+                quantity_to_execute = self.__get_quantity_to_execute(
+                    batch_id=batch_id, request=request_list[i], user=user_list[i], quantity_remaining=taker_adjusted_quantity - quantity_executed)
+
+                print(
+                    f"==> quantity_to_execute for maker {i} is {quantity_to_execute}")
+                if quantity_to_execute == 0:
+                    print(
+                        f"\n<==> Skipping the order {i}: Quantity to execute is 0\n")
+                    continue
+
+                if not (((request_list[i]["direction"] == maker_direction) and (request_list[i]["side"] == maker_side)) or ((request_list[i]["direction"] == self.__get_opposite(maker_direction)) and (request_list[i]["side"] == self.__get_opposite(maker_side)))):
+                    print(
+                        f"\n<==> Skipping the order {i}: Invalid direction for the maker\n")
+                    continue
+
+                if request_list[i]["order_type"] != order_types["limit"]:
+                    print(
+                        f"\n<==>Skipping the order {i}: maker must be a limit order\n")
+                    continue
+
+                execution_price = request_list[i]["price"]
                 running_weighted_sum += execution_price*quantity_to_execute
 
                 trade_side = order_side["maker"]
@@ -1308,8 +1359,9 @@ class OrderExecutor:
                 pnl = trading_fees
                 margin_update = margin_lock_update
                 if avg_execution_price == 0:
-                    print("Cannot execute batch; returning")
-                    return
+                    print(
+                        f"\n<==> Skipping the order {i}: Account has insufficient balance\n")
+                    continue
             else:
                 (avg_execution_price, margin_amount, borrowed_amount, realized_pnl, margin_unlock_amount) = self.__process_close_orders(
                     user=user_list[i], order=request_list[i], execution_price=execution_price, order_size=quantity_to_execute, timestamp=timestamp)
@@ -1318,9 +1370,13 @@ class OrderExecutor:
                       pnl, margin_unlock_amount)
                 margin_update = margin_unlock_amount
                 if avg_execution_price == 0:
-                    return
+                    print(
+                        f"\n<==>Error in Close order\n")
+                    continue
             user_list[i].execute_order(order=request_list[i], size=quantity_to_execute, price=avg_execution_price,
                                        margin_amount=margin_amount, borrowed_amount=borrowed_amount, market_id=market_id, timestamp=timestamp, pnl=pnl, margin_update=margin_update)
+
+            quantity_executed += quantity_to_execute
             print("\n\n")
 
         self.batch_id_status[batch_id] = 1
@@ -1752,7 +1808,12 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
 
     global execution_info
     # If the batch is to be reverted, generate the error_message
-    if is_reverted:
+    if is_reverted == 1:
+        #####################
+        print("\norder ids: ")
+        for i in range(len(complete_orders_python)):
+            print("#", i, ": ", complete_orders_python[i]["order_id"])
+        #####################
         actual_error_message = ""
         # If the error code is passed
         if error_code:
@@ -1765,6 +1826,8 @@ async def execute_and_compare(zkx_node_signer: Signer, zkx_node: StarknetContrac
         elif error_message:
             actual_error_message = error_message
         execution_info = await execute_batch_reverted(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet, error_message=actual_error_message)
+    elif is_reverted == 2:
+        execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
     else:
         execution_info = await execute_batch(zkx_node_signer=zkx_node_signer, zkx_node=zkx_node, trading=trading, execute_batch_params=execute_batch_params_starknet)
         executor.execute_batch(*execute_batch_params_python)
@@ -1781,6 +1844,7 @@ async def compare_markets_array(user: StarknetContract, user_test: User, collate
     starknet_markets_array_query = await user.get_collateral_to_markets_array(collatera_id).call()
     starknet_markets_array = starknet_markets_array_query.result.markets_array
 
+    print("Markets array: ", starknet_markets_array)
     for element_1, element_2 in zip(starknet_markets_array, python_markets_array):
         assert element_1 == element_2
 
@@ -1890,6 +1954,7 @@ async def check_batch_status(batch_id: int, trading: StarknetContract, is_execut
 # Compare user balance in starknet and python
 async def compare_user_balances(users: List[StarknetContract], user_tests: List[User], asset_id: int):
     for i in range(len(users)):
+        print("\n\nuser:", i)
         user_balance = await get_user_balance(user=users[i], asset_id=asset_id)
         user_balance_python = get_user_balance_python(
             user=user_tests[i], asset_id=asset_id)
@@ -1912,6 +1977,7 @@ async def compare_user_balances(users: List[StarknetContract], user_tests: List[
 # Compare user positions on starknet and python
 async def compare_user_positions(users: List[StarknetContract], users_test: List[User], market_id: int):
     for i in range(len(users)):
+        print("\n\nuser:", i)
         user_position_python_long = get_user_position_python(
             user=users_test[i], market_id=market_id, direction=order_direction["long"])
         user_position_python_short = get_user_position_python(
@@ -2004,6 +2070,29 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 # alice_test = User(123456789987654323, 2)
 # bob_test = User(123456789987654324, 1)
 
+# BTC_USD_properties = MarketProperties(
+#     id=BTC_USD_ID,
+#     asset=AssetID.BTC,
+#     asset_collateral=AssetID.USDC,
+#     is_tradable=True,
+#     is_archived=False,
+#     ttl=60,
+#     tick_size=1,
+#     step_size=1,
+#     minimum_order_size=to64x61(0.0001),
+#     minimum_leverage=to64x61(1),
+#     maximum_leverage=to64x61(10),
+#     currently_allowed_leverage=to64x61(10),
+#     maintenance_margin_fraction=to64x61(0.075),
+#     initial_margin_fraction=1,
+#     incremental_initial_margin_fraction=1,
+#     incremental_position_size=100,
+#     baseline_position_size=1000,
+#     maximum_position_size=10000
+# )
+# python_executor.set_market_details(
+#     market_id=BTC_USD_ID, details=BTC_USD_properties.to_dict())
+
 # # Set balances
 # alice_test.set_balance(
 #     new_balance=203, asset_id=market_to_collateral_mapping[BTC_USD_ID])
@@ -2011,7 +2100,8 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 #     new_balance=203, asset_id=market_to_collateral_mapping[BTC_USD_ID])
 
 # # Test open long-short positions
-# (alice_long, _) = alice_test.create_order(leverage=5)
+# (alice_long, _) = alice_test.create_order(
+#     order_type=order_types["limit"], leverage=5)
 # print(alice_long)
 
 # (bob_short, _) = bob_test.create_order(
@@ -2261,3 +2351,17 @@ async def compare_abr_values(market_id: int, abr_core: StarknetContract, abr_exe
 #     1000,
 #     100
 # )
+
+# events=[OrderedEvent(order=11, keys=[1756515458597831082913579168078796195293983956188744624143372741104935810388], data=[8191878929007626516798557746042, 2305843009213693952000])]
+
+# print( felt_to_str(8191878929007626516798557746042),
+#       from64x61(2305843009213693952000))
+
+
+# order_executor = OrderExecutor()
+# order_executor.set_market_details(
+#     market_id=1, details=BTC_USD_properties.to_dict())
+# print(order_executor.get_market_details(1))
+
+# user1 = User(private_key=123123, user_address=12345411, is_registered=0)
+# print(user1.is_registered)

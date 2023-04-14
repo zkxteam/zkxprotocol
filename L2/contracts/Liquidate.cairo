@@ -208,10 +208,7 @@ func mark_under_collateralized_position{
     );
 
     return (
-        liq_result,
-        least_collateral_ratio_position,
-        total_margin,
-        maintenance_margin_requirement,
+        liq_result, least_collateral_ratio_position, total_margin, maintenance_margin_requirement
     );
 }
 
@@ -222,7 +219,7 @@ func mark_under_collateralized_position{
 @external
 func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder, size_: felt, execution_price_: felt, margin_amount_: felt
-) -> (available_margin: felt) {
+) -> (available_margin: felt, is_liquidation: felt) {
     alloc_locals;
 
     can_order_be_opened.emit(order=order_);
@@ -270,10 +267,8 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     local market_id;
     assert order_id = order_.order_id;
     assert market_id = order_.market_id;
-    with_attr error_message("1101: {order_id} {market_id}") {
-        assert is_liquidation = FALSE;
-    }
-    return (available_margin,);
+
+    return (available_margin, is_liquidation);
 }
 
 // ////////////

@@ -227,6 +227,8 @@ async def abr_factory(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_USD_ID, details=BTC_USD_properties.to_dict())
 
     BTC_UST_properties = MarketProperties(
         id=BTC_UST_ID,
@@ -249,6 +251,8 @@ async def abr_factory(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', BTC_UST_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=BTC_UST_ID, details=BTC_UST_properties.to_dict())
 
     ETH_USD_properties = MarketProperties(
         id=ETH_USD_ID,
@@ -271,6 +275,8 @@ async def abr_factory(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_USD_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=ETH_USD_ID, details=ETH_USD_properties.to_dict())
 
     ETH_UST_properties = MarketProperties(
         id=ETH_UST_ID,
@@ -293,6 +299,8 @@ async def abr_factory(starknet_service: StarknetService):
         maximum_position_size=10000
     )
     await admin1_signer.send_transaction(admin1, market.contract_address, 'add_market', ETH_UST_properties.to_params_list())
+    python_executor.set_market_details(
+        market_id=ETH_UST_ID, details=ETH_UST_properties.to_dict())
 
     # Fund the Holding contract
     python_executor.set_fund_balance(

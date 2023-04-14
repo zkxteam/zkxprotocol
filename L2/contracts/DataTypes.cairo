@@ -329,6 +329,19 @@ struct ABRDetails {
 }
 
 struct MultipleMarketPrices {
-  market_id: felt,
-  price: felt,
+    market_id: felt,
+    price: felt,
+}
+
+struct ExecutionDetails {
+    order_id: felt,
+    direction: felt,
+    size: felt,
+    order_type: felt,
+    order_side: felt,
+    execution_price: felt,
+    pnl: felt,
+    side: felt,
+    opening_fee: felt,
+    is_final: felt,
 }
