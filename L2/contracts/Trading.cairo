@@ -3204,31 +3204,17 @@ func order_hash_check{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func is_valid_signature_order{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, ecdsa_ptr: SignatureBuiltin*
 }(hash: felt, signature: Signature, liquidator_address_: felt, user_public_key_: felt) -> () {
-    alloc_locals;
-
     let sig_r = signature.r_value;
     let sig_s = signature.s_value;
-    local pub_key;
 
-    if (liquidator_address_ != 0) {
-        // Verify whether call came from node operator
-        let (_public_key) = IAccountLiquidator.getPublicKey(contract_address=liquidator_address_);
-        pub_key = _public_key;
-
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
+    if (liquidator_address_ == 0) {
+        verify_ecdsa_signature(
+            message=hash, public_key=user_public_key_, signature_r=sig_r, signature_s=sig_s
+        );
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     } else {
-        pub_key = user_public_key_;
-
-        tempvar syscall_ptr = syscall_ptr;
-        tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-        tempvar range_check_ptr = range_check_ptr;
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
     }
-
-    verify_ecdsa_signature(message=hash, public_key=pub_key, signature_r=sig_r, signature_s=sig_s);
     return ();
 }
 
