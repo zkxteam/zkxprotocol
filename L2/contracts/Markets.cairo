@@ -13,7 +13,7 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.StringLib import StringLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import Math64x61_assertPositive64x61, Math64x61_log10, Math64x61_ONE, Math64x61_round
+from contracts.Math_64x61 import Math64x61_assertPositive64x61, Math64x61_log10, Math64x61_ONE, Math64x61_round, Math64x61_toFelt
 
 // ////////////
 // Constants //
@@ -913,9 +913,11 @@ func calculate_tick_and_step_precision{
     alloc_locals;
     let (tick_precision) = Math64x61_log10(tick_size_);
     let tick_precision_abs = abs_value(tick_precision);
-    let (tick_precision_round) = Math64x61_round(tick_precision_abs, 0);
+    let (tick_precision_64x61) = Math64x61_round(tick_precision_abs, 0);
+    let (tick_precision_final) = Math64x61_toFelt(tick_precision_64x61);
     let (step_precision) = Math64x61_log10(step_size_);
     let step_precision_abs = abs_value(step_precision);
-    let (step_precision_round) = Math64x61_round(step_precision_abs, 0);
-    return (tick_precision=tick_precision_round, step_precision=step_precision_round);
+    let (step_precision_64x61) = Math64x61_round(step_precision_abs, 0);
+    let (step_precision_final) = Math64x61_toFelt(step_precision_64x61);
+    return (tick_precision=tick_precision_final, step_precision=step_precision_final);
 }
