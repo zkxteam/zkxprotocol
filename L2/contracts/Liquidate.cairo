@@ -8,6 +8,7 @@ from contracts.Constants import Asset_INDEX, LONG, Market_INDEX
 from contracts.DataTypes import (
     Asset,
     LiquidatablePosition,
+    Market,
     MultipleOrder,
     PositionDetailsForRiskManagement,
 )
@@ -321,6 +322,11 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         contract_address=market_address, market_id_=position_.market_id
     );
 
+    // Get the market details
+    let (market: Market) = IMarkets.get_market(
+        contract_address=market_address, market_id_=position_.market_id
+    );
+
     // Get Asset to fetch number of token decimals of an asset
     let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=asset_id);
 
@@ -329,7 +335,7 @@ func check_deleveraging{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     let (price_diff_maintenance) = Math64x61_sub(maintenance_requirement, price_diff);
     let (amount_to_be_present) = Math64x61_div(margin_amount, price_diff_maintenance);
     let (amount_to_be_sold_not_rounded) = Math64x61_sub(position_size, amount_to_be_present);
-    let (amount_to_be_sold) = Math64x61_round(amount_to_be_sold_not_rounded, asset.token_decimal);
+    let (amount_to_be_sold) = Math64x61_round(amount_to_be_sold_not_rounded, market.step_precision);
 
     // Calculate the leverage after deleveraging
     let (position_value) = Math64x61_add(margin_amount, borrowed_amount);
