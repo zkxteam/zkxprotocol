@@ -1559,7 +1559,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     local short_asset_price;
     local short_collateral_ratio;
 
-    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
+    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, market.step_precision);
     if (is_long_zero == TRUE) {
         assert long_collateral_ratio = Math64x61_BOUND;
         assert long_maintanence_requirement = 0;
@@ -1593,7 +1593,7 @@ func get_margin_info_recurse{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     tempvar range_check_ptr = range_check_ptr;
 
-    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
+    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, market.step_precision);
     if (is_short_zero == TRUE) {
         assert short_collateral_ratio = Math64x61_BOUND;
         assert short_maintanence_requirement = 0;
@@ -1983,7 +1983,7 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
         assert amount_to_be_sold_short = 0;
     }
 
-    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
+    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, market.step_precision);
     if (is_long_zero == TRUE) {
         assert is_long = 0;
         tempvar syscall_ptr = syscall_ptr;
@@ -2026,7 +2026,7 @@ func populate_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
     tempvar range_check_ptr = range_check_ptr;
 
-    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
+    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, market.step_precision);
     if (is_short_zero == TRUE) {
         assert is_short = 0;
         tempvar syscall_ptr = syscall_ptr;
@@ -2132,10 +2132,10 @@ func populate_simplified_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin
     local is_short;
 
     let within_timestamp_long = is_le(long_position.created_timestamp, timestamp_filter_);
-    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, asset.token_decimal);
+    let (is_long_zero) = Math64x61_is_equal(long_position.position_size, 0, market.step_precision);
 
     let within_timestamp_short = is_le(short_position.created_timestamp, timestamp_filter_);
-    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, asset.token_decimal);
+    let (is_short_zero) = Math64x61_is_equal(short_position.position_size, 0, market.step_precision);
 
     if (within_timestamp_long == TRUE) {
         if (is_long_zero == FALSE) {

@@ -176,8 +176,8 @@ async def test_add_new_market(adminAuth_factory):
     assert parsed_list.id == DEFAULT_MARKET_ID
     assert parsed_list.asset == str_to_felt("32f0406jz7qj8")
     assert parsed_list.asset_collateral == str_to_felt("32f0406jz7qj7")
-    assert parsed_list.tick_precision == to64x61(1)
-    assert parsed_list.step_precision == to64x61(2)
+    assert parsed_list.tick_precision == 1
+    assert parsed_list.step_precision == 2
 
 @pytest.mark.asyncio
 async def test_override_existing_market(adminAuth_factory):
@@ -375,8 +375,8 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
     adminAuth, asset, market, admin1, admin2, user1 = adminAuth_factory
 
     market_id = str_to_felt("2dsyfdj289fdw")
-    new_tick_size = to64x61(0.00001)
-    new_step_size = to64x61(0.000001)
+    new_tick_size = to64x61(0.001)
+    new_step_size = to64x61(0.0001)
     new_ttl = 3600
     new_minimum_order_size = to64x61(0.25)
     new_minimum_leverage = to64x61(2)
@@ -410,9 +410,9 @@ async def test_modifying_trade_settings_by_admin(adminAuth_factory):
     fetched_market = execution_info.result.currMarket
 
     assert fetched_market.tick_size == new_tick_size
-    assert fetched_market.tick_precision == to64x61(5)
+    assert fetched_market.tick_precision == 3
     assert fetched_market.step_size == new_step_size
-    assert fetched_market.step_precision == to64x61(6)
+    assert fetched_market.step_precision == 4
     assert fetched_market.ttl == new_ttl
     assert fetched_market.minimum_order_size == new_minimum_order_size
     assert fetched_market.minimum_leverage == new_minimum_leverage
