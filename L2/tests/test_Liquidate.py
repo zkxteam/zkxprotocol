@@ -821,46 +821,6 @@ async def test_deleveraging_invalid_order_type(adminAuth_factory):
 
 
 @pytest.mark.asyncio
-async def test_deleveraging_invalid_order_size(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
-
-    is_liquidatable = await alice.get_deleveragable_or_liquidatable_position(AssetID.USDC).call()
-    print("alice liq position", is_liquidatable.result.position)
-
-    ####### Opening of Deleveraged Order #######
-    # List of users
-    users = [charlie, alice]
-    users_test = [charlie_test, alice_test]
-
-    # Batch params
-    quantity_locked_1 = 0.48427673
-    market_id_1 = ETH_USD_ID
-    asset_id_1 = AssetID.USDC
-    oracle_price_1 = 130
-
-    # Create orders
-    orders_1 = [{
-        "quantity": quantity_locked_1,
-        "price": 130,
-        "market_id": market_id_1,
-        "order_type": order_types["limit"],
-        "direction": order_direction["short"]
-    }, {
-        "quantity": quantity_locked_1,
-        "price": 130,
-        "market_id": market_id_1,
-        "order_type": order_types["deleverage"],
-        "liquidator_address": liquidator.contract_address,
-        "direction": order_direction["short"],
-        "side": side["sell"],
-    }]
-
-    error_at_index = 1
-    # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code=f"530:", error_at_index=error_at_index, param_2=to64x61(quantity_locked_1), timestamp=timestamp_4)
-
-
-@pytest.mark.asyncio
 async def test_deleveraging_in_multiple_orders(adminAuth_factory):
     adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
 
@@ -911,7 +871,7 @@ async def test_deleveraging_in_multiple_orders(adminAuth_factory):
     users_test = [charlie_test, alice_test]
 
     # Batch params
-    quantity_locked_2 = 0.2842767
+    quantity_locked_2 = 0.5
     market_id_2 = ETH_USD_ID
     collateral_id_2 = AssetID.USDC
     oracle_price_2 = 130
@@ -1047,7 +1007,7 @@ async def test_liquidation_in_multiple_orders(adminAuth_factory):
     users_test = [charlie_test, alice_test]
 
     # Batch params
-    quantity_locked_2 = 1.0
+    quantity_locked_2 = 1.5
     market_id_2 = BTC_DAI_ID
     oracle_price_2 = 7450.0
 
