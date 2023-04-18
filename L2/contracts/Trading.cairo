@@ -2448,9 +2448,17 @@ func process_and_execute_orders_recurse{
         let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_amount);
         assert updated_margin_locked = new_margin_locked;
 
-        let (is_final) = Math64x61_is_equal(
-            new_position_size, [request_list_].quantity, asset_token_decimal_
-        );
+        local is_final;
+        if ([request_list_].time_in_force == IoC) {
+            assert is_final = TRUE;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            let (is_final_temp) = Math64x61_is_equal(
+                new_position_size, [request_list_].quantity, asset_token_decimal_
+            );
+            assert is_final = is_final_temp;
+            tempvar range_check_ptr = range_check_ptr;
+        }
 
         assert execution_details = ExecutionDetails(
             order_id=[request_list_].order_id,
@@ -3018,12 +3026,20 @@ func process_and_execute_orders_recurse{
         tempvar range_check_ptr = range_check_ptr;
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
 
-        let (current_available_position) = Math64x61_min(
-            position_details.position_size, [request_list_].quantity
-        );
-        let (is_final) = Math64x61_is_le(
-            current_available_position, new_position_size, asset_token_decimal_
-        );
+        local is_final;
+        if ([request_list_].time_in_force == IoC) {
+            assert is_final = TRUE;
+            tempvar range_check_ptr = range_check_ptr;
+        } else {
+            let (current_available_position) = Math64x61_min(
+                position_details.position_size, [request_list_].quantity
+            );
+            let (is_final_temp) = Math64x61_is_le(
+                current_available_position, new_position_size, asset_token_decimal_
+            );
+            assert is_final = is_final_temp;
+            tempvar range_check_ptr = range_check_ptr;
+        }
 
         assert execution_details = ExecutionDetails(
             order_id=[request_list_].order_id,
