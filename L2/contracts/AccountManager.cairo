@@ -975,8 +975,9 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     assert data[3] = market_id_;
     assert data[4] = abr_value_;
     assert data[5] = position_size_;
+    assert data[6] = direction_;
 
-    emit_event(1, keys, 6, data);
+    emit_event(1, keys, 7, data);
 
     return ();
 }
@@ -1050,8 +1051,9 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     assert data[3] = market_id_;
     assert data[4] = abr_value_;
     assert data[5] = position_size_;
+    assert data[6] = direction_;
 
-    emit_event(1, keys, 6, data);
+    emit_event(1, keys, 7, data);
 
     return ();
 }
