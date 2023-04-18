@@ -566,14 +566,6 @@ class User:
                 liq_position = self.get_deleveragable_or_liquidatable_position(
                     collateral_id=market_to_collateral_mapping[market_id])
 
-                if liq_position["market_id"] == market_id and liq_position["direction"] == order["direction"] and liq_position["amount_to_be_sold"] != 0:
-                    new_amount_to_be_sold = liq_position["amount_to_be_sold"] - size
-                    self.set_deleveragable_or_liquidatable_position(
-                        collateral_id=market_to_collateral_mapping[market_id], updated_position={"market_id": liq_position["market_id"],
-                                                                                                 "direction": liq_position["direction"],
-                                                                                                 "amount_to_be_sold": new_amount_to_be_sold,
-                                                                                                 "liquidatable": liq_position["liquidatable"]})
-
                 new_leverage = position["leverage"]
 
                 current_locked_margin = self.get_locked_margin(
@@ -583,6 +575,22 @@ class User:
 
                 print("Lock margin update ", current_locked_margin, current_locked_margin +
                       margin_update)
+
+                if liq_position["market_id"] == market_id and liq_position["direction"] == order["direction"] and liq_position["amount_to_be_sold"] != 0:
+                    print("==> User closes the position before node")
+                    new_amount_to_be_sold = liq_position["amount_to_be_sold"] - size
+                    if new_amount_to_be_sold <= 0:
+                        self.set_deleveragable_or_liquidatable_position(
+                            collateral_id=market_to_collateral_mapping[market_id], updated_position={"market_id": 0,
+                                                                                                     "direction": 0,
+                                                                                                     "amount_to_be_sold": 0,
+                                                                                                     "liquidatable": 0})
+                    else:
+                        self.set_deleveragable_or_liquidatable_position(
+                            collateral_id=market_to_collateral_mapping[market_id], updated_position={"market_id": liq_position["market_id"],
+                                                                                                     "direction": liq_position["direction"],
+                                                                                                     "amount_to_be_sold": new_amount_to_be_sold,
+                                                                                                     "liquidatable": liq_position["liquidatable"]})
 
             updated_position = {}
             if new_position_size == 0:
@@ -1464,8 +1472,8 @@ class Liquidator:
         (liq_result, total_margin, _, _, maintenance_margin_requirement, least_collateral_ratio, least_collateral_ratio_position,
          least_collateral_ratio_position_asset_price) = user.get_margin_info(order_executor=order_executor, asset_id=collateral_id, timestamp=timestamp)
 
-        print("least_collateral_ratio_position_asset_price",
-              least_collateral_ratio_position_asset_price)
+        print("==> liquidation comparison: ", liq_result, from64x61(
+            maintenance_margin_requirement), from64x61(total_margin))
         if least_collateral_ratio_position_asset_price == 0:
             return (0, {
                 "market_id": 0,
@@ -1478,7 +1486,9 @@ class Liquidator:
             }, 0, 0)
 
         if liq_result:
+            print("==> Position is to be liq/del\n")
             if least_collateral_ratio > 0:
+                print("==> Position is to be deleveraged")
                 amount_to_be_sold = self.__check_for_deleveraging(
                     position=least_collateral_ratio_position, asset_price=least_collateral_ratio_position_asset_price)
                 user.liquidate_position(
@@ -1487,6 +1497,7 @@ class Liquidator:
                     collateral_id=collateral_id
                 )
             else:
+                print("==> Position is to be liquidated")
                 user.liquidate_position(
                     position=least_collateral_ratio_position,
                     amount_to_be_sold=0,

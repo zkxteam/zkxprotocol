@@ -30,6 +30,7 @@ daniel_signer = Signer(123456789987654327)
 eduard_signer = Signer(123456789987654328)
 gary_signer = Signer(123456789987654329)
 felix_signer = Signer(123456789987654330)
+ian_signer = Signer(123456789987654331)
 
 maker_trading_fees = to64x61(0.0002 * 0.97)
 taker_trading_fees = to64x61(0.0005 * 0.97)
@@ -52,6 +53,7 @@ timestamp_6 = timestamp_5 + 61
 timestamp_7 = timestamp_6 + 61
 timestamp_8 = timestamp_7 + 61
 timestamp_9 = timestamp_8 + 61
+timestamp_10 = timestamp_9 + 61
 
 
 @pytest.fixture(scope='module')
@@ -108,6 +110,10 @@ async def adminAuth_factory(starknet_service: StarknetService):
     felix = await account_factory.deploy_ZKX_account(felix_signer.public_key)
     felix_test = User(123456789987654330,
                       felix.contract_address, liquidator_private_key)
+
+    ian = await account_factory.deploy_ZKX_account(ian_signer.public_key)
+    ian_test = User(123456789987654331,
+                    ian.contract_address, liquidator_private_key)
 
     starknet_service.starknet.state.state.block_info = BlockInfo(
         block_number=1,
@@ -170,6 +176,9 @@ async def adminAuth_factory(starknet_service: StarknetService):
 
     await admin1_signer.send_transaction(
         admin1, account_registry.contract_address, 'add_to_account_registry', [felix.contract_address])
+
+    await admin1_signer.send_transaction(
+        admin1, account_registry.contract_address, 'add_to_account_registry', [ian.contract_address])
 
     # Update contract addresses in registry
     await admin1_signer.send_transaction(admin1, registry.contract_address, 'update_contract_registry', [ContractIndex.Asset, 1, asset.contract_address])
@@ -366,7 +375,7 @@ async def adminAuth_factory(starknet_service: StarknetService):
     await admin1_signer.send_transaction(admin1, liquidityFund.contract_address, 'fund', [AssetID.DAI, to64x61(1000000)])
     await admin1_signer.send_transaction(admin1, insuranceFund.contract_address, 'fund', [AssetID.DAI, to64x61(1000000)])
 
-    return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, alice_test, bob_test, charlie_test, python_executor, python_liquidator, feeBalance, liquidityFund, eduard_test, daniel_test, gary, felix, gary_test, felix_test, marketPrices, starknet_service
+    return adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insuranceFund, alice_test, bob_test, charlie_test, python_executor, python_liquidator, feeBalance, liquidityFund, eduard_test, daniel_test, gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test
 
 
 async def set_asset_price_by_trading(starknet_service, admin: StarknetContract, trading: StarknetContract, python_executor: OrderExecutor, new_timestamp: int,  gary: StarknetContract, felix: StarknetContract, gary_test: User, felix_test: User, market_id: int, collateral_id: int, price: float):
@@ -419,7 +428,7 @@ async def set_asset_price_by_trading(starknet_service, admin: StarknetContract, 
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     ###################
     ### Open orders ##
@@ -539,7 +548,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_1(adminAuth_factory)
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     collateral_id_1 = AssetID.USDC
     market_id_1 = BTC_USD_ID
@@ -618,7 +627,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_2(adminAuth_factory)
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     ###################
     ### Open orders ##
@@ -773,7 +782,7 @@ async def test_should_calculate_correct_liq_DAI_collateral_1(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_deleveraging_invalid_order_type(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     is_liquidatable = await alice.get_deleveragable_or_liquidatable_position(AssetID.USDC).call()
     print("alice liq position", is_liquidatable.result.position)
@@ -822,7 +831,7 @@ async def test_deleveraging_invalid_order_type(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_deleveraging_in_multiple_orders(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
 
@@ -907,7 +916,7 @@ async def test_deleveraging_in_multiple_orders(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_liquidation_invalid_order_type(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     ####### Opening of Deleveraged Order #######
     # List of users
@@ -954,7 +963,7 @@ async def test_liquidation_invalid_order_type(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_liquidation_in_multiple_orders(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     ####### Opening of Deleveraged Order #######
     # List of users
@@ -1043,7 +1052,7 @@ async def test_liquidation_in_multiple_orders(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_USDC_collateral_3(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     collateral_id_1 = AssetID.USDC
     market_id_1 = BTC_USD_ID
@@ -1071,7 +1080,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_3(adminAuth_factory)
 
 @pytest.mark.asyncio
 async def test_liquidation_underwater(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=AssetID.USDC)
     ####### Opening of Deleveraged Order #######
@@ -1127,7 +1136,7 @@ async def test_liquidation_underwater(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_should_calculate_correct_liq_USDC_collateral_4(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     collateral_id_1 = AssetID.USDC
     market_id_1 = ETH_USD_ID
@@ -1154,7 +1163,7 @@ async def test_should_calculate_correct_liq_USDC_collateral_4(adminAuth_factory)
 
 @pytest.mark.asyncio
 async def test_should_liquidate_after_deleveraging(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     ####### Opening of Deleveraged Order #######
     # List of users
@@ -1210,7 +1219,7 @@ async def test_should_liquidate_after_deleveraging(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
     ###################
     ### Open orders ##
     ###################
@@ -1307,7 +1316,7 @@ async def test_shouldnt_liquidate_long_leverage_1(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_should_liquidate_short_leverage_1(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     market_id_1 = BTC_USD_ID
     collateral_id_1 = AssetID.USDC
@@ -1343,7 +1352,7 @@ async def test_should_liquidate_short_leverage_1(adminAuth_factory):
 
 @pytest.mark.asyncio
 async def test_shouldnt_liquidate_multiple_leverage_1(adminAuth_factory):
-    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service = adminAuth_factory
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
 
     ###################
     ### Open orders ##
@@ -1414,3 +1423,177 @@ async def test_shouldnt_liquidate_multiple_leverage_1(adminAuth_factory):
     await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
 
     await compare_margin_info(user=daniel, user_test=daniel_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_9)
+
+
+@pytest.mark.asyncio
+async def test_should_reset_liquidatable_position_after_user_closing(adminAuth_factory):
+    adminAuth, fees, admin1, admin2, asset, trading, alice, bob, charlie, daniel, eduard, liquidator, fixed_math, holding, feeBalance, liquidate, insurance,  alice_test, bob_test, charlie_test, python_executor, python_liquidator, fee_balance, liquidity, eduard_test, daniel_test,  gary, felix, gary_test, felix_test, marketPrices, starknet_service, ian, ian_test = adminAuth_factory
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [daniel, ian]
+    users_test = [daniel_test, ian_test]
+
+    # Collaterals
+    collateral_id_1 = AssetID.DAI
+
+    # Sufficient balance for users
+    daniel_balance_dai = 1000000
+    ian_balance_dai = 1005
+
+    balance_array_dai = [daniel_balance_dai, ian_balance_dai]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 2
+    market_id_1 = BTC_DAI_ID
+    asset_id_1 = AssetID.DAI
+    oracle_price_1 = 5000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array_dai, asset_id=collateral_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 2,
+        "price": 5000,
+        "market_id": BTC_DAI_ID,
+        "order_type": order_types["limit"],
+        "leverage": 2,
+    }, {
+        "quantity": 2,
+        "price": 5000,
+        "market_id": BTC_DAI_ID,
+        "direction": order_direction["short"],
+        "leverage": 10,
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, error_at_index=0, param_2=0, timestamp=timestamp_9)
+
+    # compare
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_9)
+
+    ###################################################
+    ######## Daniel's liquidation result DAI ########
+    ###################################################
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=daniel, user_test=daniel_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_9)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=daniel, user_test=daniel_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=daniel, user_test=daniel_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_9)
+
+    ###################################################
+    ####### Ian's liquidation result DAI ##########
+    ###################################################
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=ian, user_test=ian_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_9)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=ian, user_test=ian_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=ian, user_test=ian_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_9)
+
+    ###################################################
+    ######## Set new price for the market #############
+    ###################################################
+    await set_asset_price_by_trading(starknet_service=starknet_service, admin=admin1, trading=trading, python_executor=python_executor, new_timestamp=timestamp_10,  gary=gary,
+                                     felix=felix, gary_test=gary_test, felix_test=felix_test, market_id=market_id_1, collateral_id=collateral_id_1, price=5495)
+
+    ###################################################
+    ####### Ian's liquidation result DAI ##########
+    ###################################################
+    await mark_under_collateralized_position(zkx_node_signer=liquidator_signer, zkx_node=liquidator, liquidator=python_liquidator, user=ian, user_test=ian_test, liquidate=liquidate, collateral_id=collateral_id_1, order_executor=python_executor, timestamp=timestamp_10)
+
+    await compare_debugging_values(liquidate=liquidate, liquidator=python_liquidator)
+    await compare_liquidatable_position(user=ian, user_test=ian_test, collateral_id=collateral_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=ian, user_test=ian_test, order_executor=python_executor, collateral_id=collateral_id_1, timestamp=timestamp_10)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    ##############################
+    ### Close orders partially ###
+    ##############################
+
+    # Batch params for OPEN order
+    quantity_locked_2 = 0.5
+    oracle_price_2 = 5495
+
+    # Create orders
+    orders_2 = [{
+        "quantity":  0.5,
+        "direction": order_direction["short"],
+        "market_id": market_id_1,
+        "order_type": order_types["limit"],
+        "price": oracle_price_2,
+    }, {
+        "quantity":  0.5,
+        "direction": order_direction["short"],
+        "market_id": market_id_1,
+        "side": side["sell"],
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp_10, is_reverted=0, error_code=0)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margins
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp_10)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp_10)
+
+    ###################################################
+    ####### Ian's liquidation result DAI ##########
+    ###################################################
+    await compare_liquidatable_position(user=ian, user_test=ian_test, collateral_id=collateral_id_1)
+
+    ##############################
+    ### Close orders partially ###
+    ##############################
+
+    # Batch params for OPEN order
+    quantity_locked_2 = 0.5
+    oracle_price_2 = 5494
+
+    # Create orders
+    orders_2 = [{
+        "quantity":  0.5,
+        "direction": order_direction["short"],
+        "market_id": market_id_1,
+        "order_type": order_types["limit"],
+        "price": oracle_price_2,
+    }, {
+        "quantity":  0.5,
+        "direction": order_direction["short"],
+        "market_id": market_id_1,
+        "side": side["sell"],
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp_10, is_reverted=0, error_code=0)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margins
+    await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp_10)
+    await compare_margin_info(user=bob, user_test=bob_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp_10)
+
+    ###################################################
+    ####### Ian's liquidation result DAI ##########
+    ###################################################
+    await compare_liquidatable_position(user=ian, user_test=ian_test, collateral_id=collateral_id_1)
