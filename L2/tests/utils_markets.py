@@ -14,7 +14,9 @@ class MarketProperties:
     is_archived: bool
     ttl: int
     tick_size: int
+    tick_precision: int
     step_size: int
+    step_precision: int
     minimum_order_size: int
     minimum_leverage: int
     maximum_leverage: int
@@ -36,7 +38,9 @@ class MarketProperties:
             self.is_archived,
             self.ttl,
             self.tick_size,
+            self.tick_precision,
             self.step_size,
+            self.step_precision,
             self.minimum_order_size,
             self.minimum_leverage,
             self.maximum_leverage,
@@ -58,7 +62,9 @@ class MarketProperties:
             "is_archived": self.is_archived,
             "ttl": self.ttl,
             "tick_size": self.tick_size,
+            "tick_precision": self.tick_precision,
             "step_size": self.step_size,
+            "step_precision": self.step_precision,
             "minimum_order_size": from64x61(self.minimum_order_size),
             "minimum_leverage": from64x61(self.minimum_leverage),
             "maximum_leverage": from64x61(self.maximum_leverage),

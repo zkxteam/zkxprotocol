@@ -13,7 +13,7 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.StringLib import StringLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import Math64x61_assertPositive64x61, Math64x61_log10, Math64x61_ONE
+from contracts.Math_64x61 import Math64x61_assertPositive64x61, Math64x61_log10, Math64x61_ONE, Math64x61_round
 
 // ////////////
 // Constants //
@@ -579,7 +579,7 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
     // Computes tick precision and step precision corresponding to the new tick size and step size
     let (tick_precision, step_precision) = calculate_tick_and_step_precision(
-        market.tick_size, market.step_size
+        tick_size_, step_size_
     );
 
     local updated_market: Market = Market(
@@ -913,7 +913,9 @@ func calculate_tick_and_step_precision{
     alloc_locals;
     let (tick_precision) = Math64x61_log10(tick_size_);
     let tick_precision_abs = abs_value(tick_precision);
+    let (tick_precision_round) = Math64x61_round(tick_precision_abs, 0);
     let (step_precision) = Math64x61_log10(step_size_);
     let step_precision_abs = abs_value(step_precision);
-    return (tick_precision=tick_precision_abs, step_precision=step_precision_abs);
+    let (step_precision_round) = Math64x61_round(step_precision_abs, 0);
+    return (tick_precision=tick_precision_round, step_precision=step_precision_round);
 }
