@@ -563,6 +563,17 @@ class User:
                     print("Lock margin update ", current_locked_margin, current_locked_margin +
                           margin_update)
             else:
+                liq_position = self.get_deleveragable_or_liquidatable_position(
+                    collateral_id=market_to_collateral_mapping[market_id])
+
+                if liq_position["market_id"] == market_id and liq_position["direction"] == order["direction"] and liq_position["amount_to_be_sold"] != 0:
+                    new_amount_to_be_sold = liq_position["amount_to_be_sold"] - size
+                    self.set_deleveragable_or_liquidatable_position(
+                        collateral_id=market_to_collateral_mapping[market_id], updated_position={"market_id": liq_position["market_id"],
+                                                                                                 "direction": liq_position["direction"],
+                                                                                                 "amount_to_be_sold": new_amount_to_be_sold,
+                                                                                                 "liquidatable": liq_position["liquidatable"]})
+
                 new_leverage = position["leverage"]
 
                 current_locked_margin = self.get_locked_margin(
@@ -995,7 +1006,7 @@ class OrderExecutor:
         print(margin_amount)
         return (average_execution_price, margin_amount, borrowed_amount, trading_fees, order_value_wo_leverage)
 
-    def __get_quantity_to_execute(self, batch_id: int, request: Dict, user: User, quantity_remaining: float) -> float:
+    def __get_quantity_to_execute(self,  request: Dict, user: User, quantity_remaining: float) -> float:
         quantity_to_execute = 0
         quantity_to_execute_final = 0
 
@@ -1007,11 +1018,21 @@ class OrderExecutor:
         quantity_to_execute = min(quantity_remaining, executable_quantity)
 
         if request['side'] == side["sell"]:
+            liquidatable_position = user.get_deleveragable_or_liquidatable_position(
+                collateral_id=market_to_collateral_mapping[request["market_id"]])
             position = user.get_position(
                 market_id=request["market_id"], direction=request["direction"])
 
-            quantity_to_execute_final = min(
-                quantity_to_execute, position["position_size"])
+            if request["order_type"] > 3:
+                if request["market_id"] == liquidatable_position["market_id"] and request["direction"] == liquidatable_position["direction"]:
+                    quantity_to_execute_final = min(
+                        liquidatable_position["amount_to_be_sold"], quantity_to_execute)
+                else:
+                    print("==> Position not market to be liqudiated")
+                    return 0
+            else:
+                quantity_to_execute_final = min(
+                    quantity_to_execute, position["position_size"])
         else:
             quantity_to_execute_final = quantity_to_execute
 
@@ -1216,7 +1237,7 @@ class OrderExecutor:
         maker_direction = request_list[0]["direction"]
         maker_side = request_list[0]["side"]
         taker_adjusted_quantity = self.__get_quantity_to_execute(
-            batch_id=batch_id, request=request_list[-1:][0], user=user_list[-1:][0], quantity_remaining=quantity_locked)
+            request=request_list[-1:][0], user=user_list[-1:][0], quantity_remaining=quantity_locked)
 
         self.set_market_price(
             market_id=market_id, price=oracle_price, current_timestamp=timestamp)
@@ -1326,7 +1347,7 @@ class OrderExecutor:
                 trade_side = order_side["taker"]
             else:
                 quantity_to_execute = self.__get_quantity_to_execute(
-                    batch_id=batch_id, request=request_list[i], user=user_list[i], quantity_remaining=taker_adjusted_quantity - quantity_executed)
+                    request=request_list[i], user=user_list[i], quantity_remaining=taker_adjusted_quantity - quantity_executed)
 
                 print(
                     f"==> quantity_to_execute for maker {i} is {quantity_to_execute}")

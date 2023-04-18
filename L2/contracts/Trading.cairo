@@ -199,8 +199,10 @@ func execute_batch{
 
     let (initial_taker_locked: felt, error_code: felt) = find_initial_taker_locked(
         asset_token_decimal_=asset.token_decimal,
+        market_id_=market_id_,
         request_=request_list[last_index],
         quantity_locked_=quantity_locked_,
+        collateral_id_=collateral_id,
     );
 
     local order_id;
@@ -301,9 +303,11 @@ func execute_batch{
 // @returns error_code - Returns an error code if the adjsuted size is 0
 func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_portion_executed_: felt,
+    market_id_: felt,
     position_details_: PositionDetails,
     asset_token_decimal_: felt,
     request_: MultipleOrder,
+    liquidatable_position_: LiquidatablePosition,
     quantity_remaining_: felt,
 ) -> (quantity_to_execute_final: felt, error_code: felt) {
     alloc_locals;
@@ -312,15 +316,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // Get min of remaining quantity and the order quantity
     let (executable_quantity: felt) = Math64x61_sub(request_.quantity, order_portion_executed_);
-    let (cmp_res) = Math64x61_is_le(quantity_remaining_, executable_quantity, asset_token_decimal_);
-
-    // If yes, make the quantity_to_execute to be quantity_remaining
-    // i.e Partial order
-    if (cmp_res == TRUE) {
-        assert quantity_to_execute = quantity_remaining_;
-    } else {
-        assert quantity_to_execute = executable_quantity;
-    }
+    let (quantity_to_execute) = Math64x61_min(executable_quantity, quantity_remaining_);
 
     // Return if the order is fully executed with the error code
     let (is_zero_quantity_to_execute) = Math64x61_is_equal(
@@ -331,45 +327,59 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         return (quantity_to_execute_final=0, error_code=523);
     }
 
-    tempvar syscall_ptr = syscall_ptr;
-    tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
-    tempvar range_check_ptr = range_check_ptr;
-
-    local order_id;
-    local quantity_remaining;
-    assert order_id = request_.order_id;
-    assert quantity_remaining = quantity_remaining_;
-
     // If it's a sell order, calculate the amount that can be executed
     if (request_.side == SELL) {
-        let (cmp_res) = Math64x61_is_le(
-            quantity_to_execute, position_details_.position_size, asset_token_decimal_
-        );
+        if (is_le(LIQUIDATION_ORDER, request_.order_type) == 1) {
+            local error_code;
 
-        if (cmp_res == FALSE) {
-            quantity_to_execute_final = position_details_.position_size;
+            // Error Handling: Wrong market for liquidation
+            if (liquidatable_position_.market_id != market_id_) {
+                return (quantity_to_execute_final=0, error_code=528);
+            }
+
+            // Error Handling: Wrong direction for liquidation
+            if (liquidatable_position_.direction != request_.direction) {
+                return (quantity_to_execute_final=0, error_code=529);
+            }
+
+            let (quantity_to_execute_liq) = Math64x61_min(
+                quantity_to_execute, liquidatable_position_.amount_to_be_sold
+            );
+
+            // Return if the order is fully closed
+            let (is_zero_quantity_to_execute) = Math64x61_is_equal(
+                quantity_to_execute_liq, 0, asset_token_decimal_
+            );
+
+            if (is_zero_quantity_to_execute == TRUE) {
+                assert error_code = 531;
+            } else {
+                assert error_code = 0;
+            }
+
+            return (quantity_to_execute_final=quantity_to_execute_liq, error_code=error_code);
         } else {
-            quantity_to_execute_final = quantity_to_execute;
+            local error_code;
+
+            let (quantity_to_execute_non_liq) = Math64x61_min(
+                quantity_to_execute, position_details_.position_size
+            );
+
+            // Return if the order is fully closed
+            let (is_zero_quantity_to_execute) = Math64x61_is_equal(
+                quantity_to_execute_non_liq, 0, asset_token_decimal_
+            );
+
+            if (is_zero_quantity_to_execute == TRUE) {
+                assert error_code = 524;
+            } else {
+                assert error_code = 0;
+            }
+
+            return (quantity_to_execute_final=quantity_to_execute_non_liq, error_code=error_code);
         }
-
-        // Return if the order is fully closed
-        let (is_zero_quantity_to_execute_final) = Math64x61_is_equal(
-            quantity_to_execute_final, 0, asset_token_decimal_
-        );
-
-        local error_code;
-
-        if (is_zero_quantity_to_execute_final == TRUE) {
-            assert error_code = 524;
-        } else {
-            assert error_code = 0;
-        }
-
-        return (quantity_to_execute_final=quantity_to_execute_final, error_code=error_code);
     } else {
-        quantity_to_execute_final = quantity_to_execute;
-
-        return (quantity_to_execute_final=quantity_to_execute_final, error_code=0);
+        return (quantity_to_execute_final=quantity_to_execute, error_code=0);
     }
 }
 
@@ -380,7 +390,11 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 // @returns taker_quantity_to_execute - Adjusted quantity to execute for the taker
 // @returns error_code - Returns an error code if the adjsuted size is 0
 func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    asset_token_decimal_: felt, request_: MultipleOrder, quantity_locked_: felt
+    asset_token_decimal_: felt,
+    market_id_: felt,
+    request_: MultipleOrder,
+    quantity_locked_: felt,
+    collateral_id_: felt,
 ) -> (taker_quantity_to_execute: felt, error_code: felt) {
     // Get the portion executed of the order
     let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
@@ -394,12 +408,21 @@ func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
         direction_=request_.direction,
     );
 
+    // Get liquidatable position details
+    let (
+        liq_position: LiquidatablePosition
+    ) = IAccountManager.get_deleveragable_or_liquidatable_position(
+        contract_address=request_.user_address, collateral_id_=collateral_id_
+    );
+
     // Adjust the quantity to execute on the taker side
     let (taker_quantity_to_execute: felt, error_code: felt) = get_quantity_to_execute(
         order_portion_executed_=order_portion_executed,
+        market_id_=market_id_,
         position_details_=position_details,
         asset_token_decimal_=asset_token_decimal_,
         request_=request_,
+        liquidatable_position_=liq_position,
         quantity_remaining_=quantity_locked_,
     );
 
@@ -1749,6 +1772,12 @@ func process_and_execute_orders_recurse{
         contract_address=[request_list_].user_address
     );
 
+    let (
+        liq_position: LiquidatablePosition
+    ) = IAccountManager.get_deleveragable_or_liquidatable_position(
+        contract_address=[request_list_].user_address, collateral_id_=collateral_id_
+    );
+
     // Create a temporary order object
     tempvar temp_order_request: felt* = new (
         [request_list_].order_id,
@@ -2011,9 +2040,11 @@ func process_and_execute_orders_recurse{
         // Find quantity that needs to be executed for the current order
         let (quantity_to_execute_remaining, error_code_quantity) = get_quantity_to_execute(
             order_portion_executed_=order_portion_executed,
+            market_id_=market_id_,
             position_details_=position_details,
             asset_token_decimal_=asset_token_decimal_,
             request_=[request_list_],
+            liquidatable_position_=liq_position,
             quantity_remaining_=quantity_remaining,
         );
 
@@ -2512,228 +2543,6 @@ func process_and_execute_orders_recurse{
         tempvar range_check_ptr = range_check_ptr;
 
         if (is_liq == TRUE) {
-            // If it's not a normal order, check if it satisfies the conditions to liquidate/deleverage
-            let liq_position: LiquidatablePosition = IAccountManager.get_deleveragable_or_liquidatable_position(
-                contract_address=[request_list_].user_address, collateral_id_=collateral_id_);
-
-            // Error Handling: Wrong market for liquidation
-            if (liq_position.market_id != market_id_) {
-                local error_code;
-                local error_order_id;
-                local error_param;
-
-                if (request_list_len_ == 1) {
-                    with_attr error_message("528: {order_id} {market_id_}") {
-                        assert 1 = 0;
-                    }
-                } else {
-                    if (error_order_id_ == 0) {
-                        assert error_code = 528;
-                        assert error_order_id = order_id;
-                        assert error_param = market_id_;
-                    } else {
-                        assert error_code = error_code_;
-                        assert error_order_id = error_order_id_;
-                        assert error_param = error_param_;
-                    }
-                }
-
-                // Call the account contract to reject the order
-                IAccountManager.execute_order(
-                    contract_address=[request_list_].user_address,
-                    batch_id_=batch_id_,
-                    market_id_=market_id_,
-                    collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
-                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
-                    updated_margin_locked_=0,
-                    updated_portion_executed_=0,
-                    market_array_update_=0,
-                    is_liquidation_=0,
-                    error_message_=528,
-                    error_param_1_=market_id_,
-                );
-
-                return process_and_execute_orders_recurse(
-                    batch_id_=batch_id_,
-                    taker_locked_quantity_=taker_locked_quantity_,
-                    market_id_=market_id_,
-                    collateral_id_=collateral_id_,
-                    asset_token_decimal_=asset_token_decimal_,
-                    collateral_token_decimal_=collateral_token_decimal_,
-                    orders_len_=orders_len_,
-                    request_list_len_=request_list_len_ - 1,
-                    request_list_=request_list_ + MultipleOrder.SIZE,
-                    quantity_executed_=quantity_executed_,
-                    account_registry_address_=account_registry_address_,
-                    holding_address_=holding_address_,
-                    trading_fees_address_=trading_fees_address_,
-                    fees_balance_address_=fees_balance_address_,
-                    liquidate_address_=liquidate_address_,
-                    liquidity_fund_address_=liquidity_fund_address_,
-                    insurance_fund_address_=insurance_fund_address_,
-                    max_leverage_=max_leverage_,
-                    min_quantity_=min_quantity_,
-                    maker1_direction_=maker1_direction_,
-                    maker1_side_=maker1_side_,
-                    total_order_volume_=total_order_volume_,
-                    taker_execution_price_=taker_execution_price_,
-                    open_interest_=open_interest_,
-                    oracle_price_=oracle_price_,
-                    error_order_id_=error_order_id,
-                    error_code_=error_code,
-                    error_param_=error_param,
-                );
-            }
-
-            // Error Handling: Wrong direction for liquidation
-            if (liq_position.direction != [request_list_].direction) {
-                local error_code;
-                local error_order_id;
-                local error_param;
-                local direction;
-
-                assert direction = [request_list_].direction;
-
-                if (request_list_len_ == 1) {
-                    with_attr error_message("529: {order_id} {direction}") {
-                        assert 1 = 0;
-                    }
-                } else {
-                    if (error_order_id_ == 0) {
-                        assert error_code = 529;
-                        assert error_order_id = order_id;
-                        assert error_param = direction;
-                    } else {
-                        assert error_code = error_code_;
-                        assert error_order_id = error_order_id_;
-                        assert error_param = error_param_;
-                    }
-                }
-
-                // Call the account contract to reject the order
-                IAccountManager.execute_order(
-                    contract_address=[request_list_].user_address,
-                    batch_id_=batch_id_,
-                    market_id_=market_id_,
-                    collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
-                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
-                    updated_margin_locked_=0,
-                    updated_portion_executed_=0,
-                    market_array_update_=0,
-                    is_liquidation_=0,
-                    error_message_=529,
-                    error_param_1_=[request_list_].direction,
-                );
-
-                return process_and_execute_orders_recurse(
-                    batch_id_=batch_id_,
-                    taker_locked_quantity_=taker_locked_quantity_,
-                    market_id_=market_id_,
-                    collateral_id_=collateral_id_,
-                    asset_token_decimal_=asset_token_decimal_,
-                    collateral_token_decimal_=collateral_token_decimal_,
-                    orders_len_=orders_len_,
-                    request_list_len_=request_list_len_ - 1,
-                    request_list_=request_list_ + MultipleOrder.SIZE,
-                    quantity_executed_=quantity_executed_,
-                    account_registry_address_=account_registry_address_,
-                    holding_address_=holding_address_,
-                    trading_fees_address_=trading_fees_address_,
-                    fees_balance_address_=fees_balance_address_,
-                    liquidate_address_=liquidate_address_,
-                    liquidity_fund_address_=liquidity_fund_address_,
-                    insurance_fund_address_=insurance_fund_address_,
-                    max_leverage_=max_leverage_,
-                    min_quantity_=min_quantity_,
-                    maker1_direction_=maker1_direction_,
-                    maker1_side_=maker1_side_,
-                    total_order_volume_=total_order_volume_,
-                    taker_execution_price_=taker_execution_price_,
-                    open_interest_=open_interest_,
-                    oracle_price_=oracle_price_,
-                    error_order_id_=error_order_id,
-                    error_code_=error_code,
-                    error_param_=error_param,
-                );
-            }
-
-            // Error Handling: Size larger than marked one
-            let (liquidatable_size_check) = Math64x61_is_le(
-                quantity_to_execute, liq_position.amount_to_be_sold, asset_token_decimal_
-            );
-            if (liquidatable_size_check == FALSE) {
-                local error_code;
-                local error_order_id;
-                local error_param;
-
-                if (request_list_len_ == 1) {
-                    with_attr error_message("530: {order_id} {quantity_to_execute}") {
-                        assert 1 = 0;
-                    }
-                } else {
-                    if (error_order_id_ == 0) {
-                        assert error_code = 530;
-                        assert error_order_id = order_id;
-                        assert error_param = quantity_to_execute;
-                    } else {
-                        assert error_code = error_code_;
-                        assert error_order_id = error_order_id_;
-                        assert error_param = error_param_;
-                    }
-                }
-                // Call the account contract to reject the order
-                IAccountManager.execute_order(
-                    contract_address=[request_list_].user_address,
-                    batch_id_=batch_id_,
-                    market_id_=market_id_,
-                    collateral_id_=collateral_id_,
-                    execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                    updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
-                    updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
-                    updated_margin_locked_=0,
-                    updated_portion_executed_=0,
-                    market_array_update_=0,
-                    is_liquidation_=0,
-                    error_message_=530,
-                    error_param_1_=quantity_to_execute,
-                );
-
-                return process_and_execute_orders_recurse(
-                    batch_id_=batch_id_,
-                    taker_locked_quantity_=taker_locked_quantity_,
-                    market_id_=market_id_,
-                    collateral_id_=collateral_id_,
-                    asset_token_decimal_=asset_token_decimal_,
-                    collateral_token_decimal_=collateral_token_decimal_,
-                    orders_len_=orders_len_,
-                    request_list_len_=request_list_len_ - 1,
-                    request_list_=request_list_ + MultipleOrder.SIZE,
-                    quantity_executed_=quantity_executed_,
-                    account_registry_address_=account_registry_address_,
-                    holding_address_=holding_address_,
-                    trading_fees_address_=trading_fees_address_,
-                    fees_balance_address_=fees_balance_address_,
-                    liquidate_address_=liquidate_address_,
-                    liquidity_fund_address_=liquidity_fund_address_,
-                    insurance_fund_address_=insurance_fund_address_,
-                    max_leverage_=max_leverage_,
-                    min_quantity_=min_quantity_,
-                    maker1_direction_=maker1_direction_,
-                    maker1_side_=maker1_side_,
-                    total_order_volume_=total_order_volume_,
-                    taker_execution_price_=taker_execution_price_,
-                    open_interest_=open_interest_,
-                    oracle_price_=oracle_price_,
-                    error_order_id_=error_order_id,
-                    error_code_=error_code,
-                    error_param_=error_param,
-                );
-            }
-
             let (updated_amount) = Math64x61_sub(
                 liq_position.amount_to_be_sold, quantity_to_execute
             );
@@ -2923,9 +2732,45 @@ func process_and_execute_orders_recurse{
 
             assert updated_margin_locked = new_margin_locked;
 
-            assert updated_liquidatable_position = LiquidatablePosition(
-                market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
-            );
+            if (liq_position.amount_to_be_sold == 0) {
+                assert updated_liquidatable_position = LiquidatablePosition(
+                    market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
+                );
+
+                tempvar syscall_ptr = syscall_ptr;
+                tempvar range_check_ptr = range_check_ptr;
+            } else {
+                if (liq_position.market_id == market_id_) {
+                    if (liq_position.direction == [request_list_].direction) {
+                        let (new_amount_to_be_sold) = Math64x61_sub(
+                            liq_position.amount_to_be_sold, quantity_to_execute
+                        );
+                        assert updated_liquidatable_position = LiquidatablePosition(
+                            market_id=liq_position.market_id,
+                            direction=liq_position.direction,
+                            amount_to_be_sold=new_amount_to_be_sold,
+                            liquidatable=liq_position.liquidatable,
+                        );
+
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
+                    } else {
+                        assert updated_liquidatable_position = LiquidatablePosition(
+                            market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
+                        );
+
+                        tempvar syscall_ptr = syscall_ptr;
+                        tempvar range_check_ptr = range_check_ptr;
+                    }
+                } else {
+                    assert updated_liquidatable_position = LiquidatablePosition(
+                        market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
+                    );
+
+                    tempvar syscall_ptr = syscall_ptr;
+                    tempvar range_check_ptr = range_check_ptr;
+                }
+            }
             tempvar syscall_ptr = syscall_ptr;
             tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
             tempvar range_check_ptr = range_check_ptr;
@@ -2934,10 +2779,11 @@ func process_and_execute_orders_recurse{
         tempvar pedersen_ptr: HashBuiltin* = pedersen_ptr;
         tempvar range_check_ptr = range_check_ptr;
 
-        // Check if the new position size is 0
+        // Check if the current position size is 0
         let (is_zero_current_position) = Math64x61_is_equal(
-            new_position_size, 0, asset_token_decimal_
+            position_details.position_size, 0, asset_token_decimal_
         );
+
         // If yes, fetch the opposite position
         if (is_zero_current_position == TRUE) {
             let (opposite_direction: felt) = get_opposite(
