@@ -263,7 +263,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_archived=False,
         ttl=60,
         tick_size=1,
+        tick_precision=0,
         step_size=1,
+        step_precision=0,
         minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(10),
@@ -287,7 +289,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_archived=False,
         ttl=60,
         tick_size=1,
+        tick_precision=0,
         step_size=1,
+        step_precision=0,
         minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(10),
@@ -311,7 +315,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_archived=False,
         ttl=60,
         tick_size=1,
+        tick_precision=0,
         step_size=1,
+        step_precision=0,
         minimum_order_size=to64x61(0.0001),
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(10),
@@ -335,7 +341,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_archived=False,
         ttl=60,
         tick_size=1,
+        tick_precision=0,
         step_size=1,
+        step_precision=0,
         minimum_order_size=10,
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(5),
@@ -359,7 +367,9 @@ async def trading_test_initializer(starknet_service: StarknetService):
         is_archived=False,
         ttl=60,
         tick_size=1,
+        tick_precision=0,
         step_size=1,
+        step_precision=0,
         minimum_order_size=10,
         minimum_leverage=to64x61(1),
         maximum_leverage=to64x61(5),
@@ -1856,7 +1866,7 @@ async def test_invalid_liquidation(trading_test_initializer):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=1, error_code="528:", error_at_index=error_at_index, param_2=market_id_1)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=1, error_code="528:", error_at_index=error_at_index, param_2=0)
 
     # compare margins
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
@@ -1935,7 +1945,7 @@ async def test_invalid_deleverage(trading_test_initializer):
 
     error_at_index = 1
     # execute order
-    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=1, error_code="528:", error_at_index=error_at_index, param_2=market_id_1)
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_1, oracle_price=oracle_price_2, trading=trading, timestamp=timestamp1, is_reverted=1, error_code="528:", error_at_index=error_at_index, param_2=0)
 
     # compare margins
     await compare_margin_info(user=alice, user_test=alice_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp1)
