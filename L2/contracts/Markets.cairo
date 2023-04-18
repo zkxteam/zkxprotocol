@@ -3,7 +3,7 @@
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from starkware.cairo.common.math import assert_le, assert_not_zero
+from starkware.cairo.common.math import assert_le, assert_not_zero, abs_value
 
 from contracts.Constants import Asset_INDEX, ManageMarkets_ACTION
 from contracts.DataTypes import Asset, Market
@@ -13,7 +13,7 @@ from contracts.libraries.CommonLibrary import CommonLib
 from contracts.libraries.StringLib import StringLib
 from contracts.libraries.Utils import verify_caller_authority
 from contracts.libraries.Validation import assert_bool
-from contracts.Math_64x61 import Math64x61_assertPositive64x61, Math64x61_ONE
+from contracts.Math_64x61 import Math64x61_assertPositive64x61, Math64x61_log10, Math64x61_ONE, Math64x61_round
 
 // ////////////
 // Constants //
@@ -270,6 +270,11 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 
     let (new_tradable) = resolve_tradable_status(new_market_);
 
+    // Computes tick precision and step precision
+    let (tick_precision, step_precision) = calculate_tick_and_step_precision(
+        new_market_.tick_size, new_market_.step_size
+    );
+
     // Save market to storage
     market_by_id.write(
         market_id=new_market_.id,
@@ -281,7 +286,9 @@ func add_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
             is_archived=new_market_.is_archived,
             ttl=new_market_.ttl,
             tick_size=new_market_.tick_size,
+            tick_precision=tick_precision,
             step_size=new_market_.step_size,
+            step_precision=step_precision,
             minimum_order_size=new_market_.minimum_order_size,
             minimum_leverage=new_market_.minimum_leverage,
             maximum_leverage=new_market_.maximum_leverage,
@@ -371,7 +378,9 @@ func remove_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
             is_archived=0,
             ttl=0,
             tick_size=0,
+            tick_precision=0,
             step_size=0,
+            step_precision=0,
             minimum_order_size=0,
             minimum_leverage=0,
             maximum_leverage=0,
@@ -429,7 +438,9 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
                 is_archived=market.is_archived,
                 ttl=market.ttl,
                 tick_size=market.tick_size,
+                tick_precision=market.tick_precision,
                 step_size=market.step_size,
+                step_precision=market.step_precision,
                 minimum_order_size=market.minimum_order_size,
                 minimum_leverage=market.minimum_leverage,
                 maximum_leverage=market.maximum_leverage,
@@ -461,7 +472,9 @@ func modify_tradable{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
                 is_archived=market.is_archived,
                 ttl=market.ttl,
                 tick_size=market.tick_size,
+                tick_precision=market.tick_precision,
                 step_size=market.step_size,
+                step_precision=market.step_precision,
                 minimum_order_size=market.minimum_order_size,
                 minimum_leverage=market.minimum_leverage,
                 maximum_leverage=market.maximum_leverage,
@@ -505,7 +518,9 @@ func modify_archived_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
             is_archived=is_archived_,
             ttl=market.ttl,
             tick_size=market.tick_size,
+            tick_precision=market.tick_precision,
             step_size=market.step_size,
+            step_precision=market.step_precision,
             minimum_order_size=market.minimum_order_size,
             minimum_leverage=market.minimum_leverage,
             maximum_leverage=market.maximum_leverage,
@@ -561,6 +576,12 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
     verify_market_id_exists(market_id_, should_exist_=TRUE);
 
     let (market: Market) = market_by_id.read(market_id_);
+
+    // Computes tick precision and step precision corresponding to the new tick size and step size
+    let (tick_precision, step_precision) = calculate_tick_and_step_precision(
+        tick_size_, step_size_
+    );
+
     local updated_market: Market = Market(
         id=market.id,
         asset=market.asset,
@@ -569,7 +590,9 @@ func modify_trade_settings{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
         is_archived=market.is_archived,
         ttl=ttl_,
         tick_size=tick_size_,
+        tick_precision=tick_precision,
         step_size=step_size_,
+        step_precision=step_precision,
         minimum_order_size=minimum_order_size_,
         minimum_leverage=minimum_leverage_,
         maximum_leverage=maximum_leverage_,
@@ -657,7 +680,9 @@ func populate_markets{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
             is_archived=market_details.is_archived,
             ttl=market_details.ttl,
             tick_size=market_details.tick_size,
+            tick_precision=market_details.tick_precision,
             step_size=market_details.step_size,
+            step_precision=market_details.step_precision,
             minimum_order_size=market_details.minimum_order_size,
             minimum_leverage=market_details.minimum_leverage,
             maximum_leverage=market_details.maximum_leverage,
@@ -717,7 +742,9 @@ func populate_markets_by_state{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
                     is_archived=market_details.is_archived,
                     ttl=market_details.ttl,
                     tick_size=market_details.tick_size,
+                    tick_precision=market_details.tick_precision,
                     step_size=market_details.step_size,
+                    step_precision=market_details.step_precision,
                     minimum_order_size=market_details.minimum_order_size,
                     minimum_leverage=market_details.minimum_leverage,
                     maximum_leverage=market_details.maximum_leverage,
@@ -766,8 +793,8 @@ func verify_market_id_exists{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     return ();
 }
 
-// @param Internal function to resolve updated market tradable status
-// @praram market - struct of type Market
+// @notice Internal function to resolve updated market tradable status
+// @param market - struct of type Market
 func resolve_tradable_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market: Market
 ) -> (new_tradable: felt) {
@@ -792,8 +819,8 @@ func resolve_tradable_status{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     return (0,);
 }
 
-// @param Internal function to validate market core propeties
-// @praram market - struct of type Market
+// @notice Internal function to validate market core propeties
+// @param market - struct of type Market
 func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     market: Market
 ) {
@@ -838,8 +865,8 @@ func validate_market_properties{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, 
     return ();
 }
 
-// @param Internal function to validate market trading propeties
-// @praram market - struct of type Market
+// @notice Internal function to validate market trading propeties
+// @param market - struct of type Market
 func validate_market_trading_settings{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }(market_: Market) {
@@ -873,4 +900,22 @@ func validate_market_trading_settings{
         assert_le(market_.baseline_position_size, market_.maximum_position_size);
     }
     return ();
+}
+
+// @notice Internal function to compute tick and step precisions
+// @param tick_size_ - tick size of a market
+// @param step_size_ - step size of a market
+// @returns tick_precision - returns tick precision of the market
+// @returns step_precision - returns step precision of the market
+func calculate_tick_and_step_precision{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
+}(tick_size_: felt, step_size_: felt) -> (tick_precision: felt, step_precision: felt) {
+    alloc_locals;
+    let (tick_precision) = Math64x61_log10(tick_size_);
+    let tick_precision_abs = abs_value(tick_precision);
+    let (tick_precision_round) = Math64x61_round(tick_precision_abs, 0);
+    let (step_precision) = Math64x61_log10(step_size_);
+    let step_precision_abs = abs_value(step_precision);
+    let (step_precision_round) = Math64x61_round(step_precision_abs, 0);
+    return (tick_precision=tick_precision_round, step_precision=step_precision_round);
 }
