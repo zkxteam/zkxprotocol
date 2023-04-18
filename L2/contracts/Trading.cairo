@@ -338,22 +338,14 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
             // Error Handling: Wrong market for liquidation
             if (liquidatable_position_.market_id != market_id_) {
-<<<<<<< HEAD
                 return (quantity_to_execute_final=0, error_code=528, error_param=market_id_);
-=======
-                return (quantity_to_execute_final=0, error_code=528);
->>>>>>> main
             }
 
             // Error Handling: Wrong direction for liquidation
             if (liquidatable_position_.direction != request_.direction) {
-<<<<<<< HEAD
                 return (
                     quantity_to_execute_final=0, error_code=529, error_param=request_.direction
                 );
-=======
-                return (quantity_to_execute_final=0, error_code=529);
->>>>>>> main
             }
 
             let (quantity_to_execute_liq) = Math64x61_min(
@@ -366,24 +358,16 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             );
 
             if (is_zero_quantity_to_execute == TRUE) {
-<<<<<<< HEAD
                 assert error_code = 524;
-=======
-                assert error_code = 531;
->>>>>>> main
             } else {
                 assert error_code = 0;
             }
 
-<<<<<<< HEAD
             return (
                 quantity_to_execute_final=quantity_to_execute_liq,
                 error_code=error_code,
                 error_param=0,
             );
-=======
-            return (quantity_to_execute_final=quantity_to_execute_liq, error_code=error_code);
->>>>>>> main
         } else {
             local error_code;
 
@@ -402,7 +386,6 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 assert error_code = 0;
             }
 
-<<<<<<< HEAD
             return (
                 quantity_to_execute_final=quantity_to_execute_non_liq,
                 error_code=error_code,
@@ -411,12 +394,6 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
         }
     } else {
         return (quantity_to_execute_final=quantity_to_execute, error_code=0, error_param=0);
-=======
-            return (quantity_to_execute_final=quantity_to_execute_non_liq, error_code=error_code);
-        }
-    } else {
-        return (quantity_to_execute_final=quantity_to_execute, error_code=0);
->>>>>>> main
     }
 }
 
@@ -432,11 +409,7 @@ func find_initial_taker_locked{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, r
     request_: MultipleOrder,
     quantity_locked_: felt,
     collateral_id_: felt,
-<<<<<<< HEAD
 ) -> (taker_quantity_to_execute: felt, error_code: felt, error_param: felt) {
-=======
-) -> (taker_quantity_to_execute: felt, error_code: felt) {
->>>>>>> main
     // Get the portion executed of the order
     let (order_portion_executed: felt) = IAccountManager.get_portion_executed(
         contract_address=request_.user_address, order_id_=request_.order_id
@@ -2523,17 +2496,9 @@ func process_and_execute_orders_recurse{
         let (new_margin_locked) = Math64x61_add(current_margin_locked, margin_lock_amount);
         assert updated_margin_locked = new_margin_locked;
 
-        local is_final;
-        if ([request_list_].time_in_force == IoC) {
-            assert is_final = TRUE;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            let (is_final_temp) = Math64x61_is_equal(
-                new_position_size, [request_list_].quantity, asset_token_decimal_
-            );
-            assert is_final = is_final_temp;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+        let (is_final) = Math64x61_is_equal(
+            new_position_size, [request_list_].quantity, asset_token_decimal_
+        );
 
         assert execution_details = ExecutionDetails(
             order_id=[request_list_].order_id,
@@ -2777,14 +2742,7 @@ func process_and_execute_orders_recurse{
             assert updated_margin_locked = new_margin_locked;
 
             if (liq_position.amount_to_be_sold == 0) {
-<<<<<<< HEAD
                 assert updated_liquidatable_position = liq_position;
-=======
-                assert updated_liquidatable_position = LiquidatablePosition(
-                    market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
-                );
-
->>>>>>> main
                 tempvar syscall_ptr = syscall_ptr;
                 tempvar range_check_ptr = range_check_ptr;
             } else {
@@ -2793,7 +2751,6 @@ func process_and_execute_orders_recurse{
                         let (new_amount_to_be_sold) = Math64x61_sub(
                             liq_position.amount_to_be_sold, quantity_to_execute
                         );
-<<<<<<< HEAD
 
                         // Check if the current position size is <= 0
                         let (is_le_zero_liquidation_size) = Math64x61_is_le(
@@ -2823,33 +2780,12 @@ func process_and_execute_orders_recurse{
                         tempvar range_check_ptr = range_check_ptr;
                     } else {
                         assert updated_liquidatable_position = liq_position;
-=======
-                        assert updated_liquidatable_position = LiquidatablePosition(
-                            market_id=liq_position.market_id,
-                            direction=liq_position.direction,
-                            amount_to_be_sold=new_amount_to_be_sold,
-                            liquidatable=liq_position.liquidatable,
-                        );
-
-                        tempvar syscall_ptr = syscall_ptr;
-                        tempvar range_check_ptr = range_check_ptr;
-                    } else {
-                        assert updated_liquidatable_position = LiquidatablePosition(
-                            market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
-                        );
->>>>>>> main
 
                         tempvar syscall_ptr = syscall_ptr;
                         tempvar range_check_ptr = range_check_ptr;
                     }
                 } else {
-<<<<<<< HEAD
                     assert updated_liquidatable_position = liq_position;
-=======
-                    assert updated_liquidatable_position = LiquidatablePosition(
-                        market_id=0, direction=0, amount_to_be_sold=0, liquidatable=0
-                    );
->>>>>>> main
 
                     tempvar syscall_ptr = syscall_ptr;
                     tempvar range_check_ptr = range_check_ptr;
@@ -2865,7 +2801,7 @@ func process_and_execute_orders_recurse{
 
         // Check if the current position size is 0
         let (is_zero_current_position) = Math64x61_is_equal(
-            position_details.position_size, 0, asset_token_decimal_
+            new_position_size, 0, asset_token_decimal_
         );
 
         // If yes, fetch the opposite position
@@ -2956,20 +2892,12 @@ func process_and_execute_orders_recurse{
         tempvar range_check_ptr = range_check_ptr;
         tempvar ecdsa_ptr: SignatureBuiltin* = ecdsa_ptr;
 
-        local is_final;
-        if ([request_list_].time_in_force == IoC) {
-            assert is_final = TRUE;
-            tempvar range_check_ptr = range_check_ptr;
-        } else {
-            let (current_available_position) = Math64x61_min(
-                position_details.position_size, [request_list_].quantity
-            );
-            let (is_final_temp) = Math64x61_is_le(
-                current_available_position, new_position_size, asset_token_decimal_
-            );
-            assert is_final = is_final_temp;
-            tempvar range_check_ptr = range_check_ptr;
-        }
+        let (current_available_position) = Math64x61_min(
+            position_details.position_size, [request_list_].quantity
+        );
+        let (is_final) = Math64x61_is_le(
+            current_available_position, new_position_size, asset_token_decimal_
+        );
 
         assert execution_details = ExecutionDetails(
             order_id=[request_list_].order_id,
