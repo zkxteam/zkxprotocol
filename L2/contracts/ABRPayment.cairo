@@ -109,6 +109,7 @@ func user_pays{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     abs_payment_amount_: felt,
     abr_value_: felt,
     position_size_: felt,
+    abr_last_price_: felt,
 ) {
     IAccountManager.transfer_from_abr(
         contract_address=account_address_,
@@ -118,6 +119,7 @@ func user_pays{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         amount_=abs_payment_amount_,
         abr_value_=abr_value_,
         position_size_=position_size_,
+        abr_last_price_=abr_last_price_,
     );
     IABRFund.deposit(
         contract_address=abr_funding_,
@@ -144,6 +146,7 @@ func user_receives{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     abs_payment_amount_: felt,
     abr_value_: felt,
     position_size_: felt,
+    abr_last_price_: felt,
 ) {
     IABRFund.withdraw(
         contract_address=abr_funding_,
@@ -159,6 +162,7 @@ func user_receives{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         amount_=abs_payment_amount_,
         abr_value_=abr_value_,
         position_size_=position_size_,
+        abr_last_price_=abr_last_price_,
     );
     return ();
 }
@@ -228,6 +232,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 abs_payment_amount,
                 abr_value,
                 [positions_].position_size,
+                abr_last_price,
             );
         } else {
             // user receives
@@ -240,6 +245,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 abs_payment_amount,
                 abr_value,
                 [positions_].position_size,
+                abr_last_price,
             );
         }
         // If the abr is positive
@@ -255,6 +261,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 abs_payment_amount,
                 abr_value,
                 [positions_].position_size,
+                abr_last_price,
             );
         } else {
             // user pays
@@ -267,6 +274,7 @@ func pay_abr_users_positions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
                 abs_payment_amount,
                 abr_value,
                 [positions_].position_size,
+                abr_last_price,
             );
         }
     }

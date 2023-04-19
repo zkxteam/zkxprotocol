@@ -917,6 +917,7 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     amount_: felt,
     abr_value_: felt,
     position_size_: felt,
+    abr_last_price_: felt,
 ) {
     // Check if the caller is ABR Payment
     let (caller) = get_caller_address();
@@ -976,8 +977,9 @@ func transfer_from_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     assert data[4] = abr_value_;
     assert data[5] = position_size_;
     assert data[6] = direction_;
+    assert data[7] = abr_last_price_;
 
-    emit_event(1, keys, 7, data);
+    emit_event(1, keys, 8, data);
 
     return ();
 }
@@ -994,6 +996,7 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     amount_: felt,
     abr_value_: felt,
     position_size_: felt,
+    abr_last_price_: felt,
 ) {
     // Check if the caller is trading contract
     let (caller) = get_caller_address();
@@ -1052,8 +1055,9 @@ func transfer_abr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     assert data[4] = abr_value_;
     assert data[5] = position_size_;
     assert data[6] = direction_;
+    assert data[7] = abr_last_price_;
 
-    emit_event(1, keys, 7, data);
+    emit_event(1, keys, 8, data);
 
     return ();
 }
