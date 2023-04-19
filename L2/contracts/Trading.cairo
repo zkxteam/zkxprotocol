@@ -151,7 +151,7 @@ func execute_batch{
     alloc_locals;
 
     let (status: felt) = batch_id_status.read(batch_id=batch_id_);
-    with_attr error_message("0525: {batch_id_}") {
+    with_attr error_message("525: {batch_id_} 0") {
         assert status = FALSE;
     }
 
@@ -326,7 +326,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
     // Return if the order is fully executed with the error code
     let (is_zero_quantity_to_execute) = Math64x61_is_equal(quantity_to_execute, 0, step_precision_);
 
-    if (is_zero_quantity_to_execute == 1) {
+    if (is_zero_quantity_to_execute == TRUE) {
         return (quantity_to_execute_final=0, error_code=523, error_param=0);
     }
 
@@ -357,7 +357,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
             );
 
             if (is_zero_quantity_to_execute == TRUE) {
-                assert error_code = 531;
+                assert error_code = 524;
             } else {
                 assert error_code = 0;
             }
@@ -2604,7 +2604,7 @@ func process_and_execute_orders_recurse{
                         market_array_update_=0,
                         is_liquidation_=0,
                         error_message_=526,
-                        error_param_1_=0,
+                        error_param_1_=quantity_to_execute,
                     );
 
                     return process_and_execute_orders_recurse(
