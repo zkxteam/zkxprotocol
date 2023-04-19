@@ -102,6 +102,7 @@ namespace IAccountManager {
         amount_: felt,
         abr_value_: felt,
         position_size_: felt,
+        abr_last_price_: felt,
     ) {
     }
 
@@ -112,6 +113,7 @@ namespace IAccountManager {
         amount_: felt,
         abr_value_: felt,
         position_size_: felt,
+        abr_last_price_: felt,
     ) {
     }
 
