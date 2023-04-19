@@ -332,7 +332,7 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // If it's a sell order, calculate the amount that can be executed
     if (request_.side == SELL) {
-        if (is_le(LIQUIDATION_ORDER, request_.order_type) == 1) {
+        if (is_le(LIQUIDATION_ORDER, request_.order_type) == TRUE) {
             local error_code;
 
             // Error Handling: Wrong market for liquidation
