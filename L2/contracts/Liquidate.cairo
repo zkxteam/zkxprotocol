@@ -4,7 +4,7 @@ from starkware.cairo.common.bool import FALSE, TRUE
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
 
-from contracts.Constants import Asset_INDEX, LONG, Market_INDEX
+from contracts.Constants import Asset_INDEX, LIMIT_ORDER, LONG, Market_INDEX, SHORT
 from contracts.DataTypes import (
     Asset,
     LiquidatablePosition,
@@ -219,7 +219,12 @@ func mark_under_collateralized_position{
 // @param execution_price - Execution price of current order
 @external
 func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_: MultipleOrder, size_: felt, execution_price_: felt, margin_amount_: felt
+    order_: MultipleOrder,
+    size_: felt,
+    execution_price_: felt,
+    oracle_price_: felt,
+    margin_amount_: felt,
+    collateral_token_decimal_: felt,
 ) -> (available_margin: felt, is_liquidation: felt) {
     alloc_locals;
 
@@ -266,10 +271,45 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 
     local order_id;
     local market_id;
+    local is_error;
     assert order_id = order_.order_id;
     assert market_id = order_.market_id;
 
-    return (available_margin, is_liquidation);
+    if (is_liquidation == TRUE) {
+        assert is_error = TRUE;
+        tempvar range_check_ptr = range_check_ptr;
+        tempvar syscall_ptr = syscall_ptr;
+    } else {
+        if (order_.direction - order_.side == 1) {
+            if (order_.order_type == LIMIT_ORDER) {
+                local pnl;
+                local available_margin_temp;
+                let (opposite_order_diff) = Math64x61_sub(oracle_price_, execution_price_);
+                let (opposite_order_pnl) = Math64x61_mul(opposite_order_diff, size_);
+
+                let (is_deficit) = Math64x61_is_le(
+                    available_margin, opposite_order_pnl, collateral_token_decimal_
+                );
+
+                assert pnl = opposite_order_pnl;
+                assert available_margin_temp = available_margin;
+
+                assert is_error = is_deficit;
+                tempvar range_check_ptr = range_check_ptr;
+                tempvar syscall_ptr = syscall_ptr;
+            } else {
+                assert is_error = FALSE;
+                tempvar range_check_ptr = range_check_ptr;
+                tempvar syscall_ptr = syscall_ptr;
+            }
+        } else {
+            assert is_error = FALSE;
+            tempvar range_check_ptr = range_check_ptr;
+            tempvar syscall_ptr = syscall_ptr;
+        }
+    }
+
+    return (available_margin, is_error);
 }
 
 // ////////////

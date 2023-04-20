@@ -418,6 +418,49 @@ async def test_set_balance_by_non_admin(trading_test_initializer):
 
 
 @pytest.mark.asyncio
+async def test_for_extremely_low_price_revert(trading_test_initializer):
+    starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, _, _, _, _, _ = trading_test_initializer
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [felix, gary]
+    users_test = [felix_test, gary_test]
+
+    # Sufficient balance for users
+    felix_balance = 10000
+    gary_balance = 10000
+    balance_array = [felix_balance, gary_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 10000
+    market_id_1 = BTC_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 1950
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 10000,
+        "price": 1,
+        "order_type": order_types["limit"],
+        "leverage": 10
+    }, {
+        "quantity": 10000,
+        "price": 1,
+        "direction": order_direction["short"],
+        "order_type": order_types["limit"],
+        "leverage": 10
+    }]
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=1, error_code="531:", error_at_index=1, timestamp=timestamp, param_2=market_id_1)
+
+
+@pytest.mark.asyncio
 async def test_for_risk_while_opening_order(trading_test_initializer):
     starknet_service, python_executor, admin1, _, _, _, _, _, _, felix, gary, _, _, _, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, _, _, _, _, _ = trading_test_initializer
 

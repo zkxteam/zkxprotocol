@@ -660,6 +660,7 @@ func get_registry_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     order_: MultipleOrder,
     execution_price_: felt,
+    oracle_price_: felt,
     order_size_: felt,
     market_id_: felt,
     collateral_id_: felt,
@@ -738,7 +739,9 @@ func process_open_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
         order_=order_,
         size=order_size_,
         execution_price_=execution_price_,
+        oracle_price_=oracle_price_,
         margin_amount_=margin_order_value,
+        collateral_token_decimal_=collateral_token_decimal_,
     );
 
     // Setting local values to be used in error message
@@ -2315,6 +2318,7 @@ func process_and_execute_orders_recurse{
         ) = process_open_orders(
             order_=[request_list_],
             execution_price_=execution_price,
+            oracle_price_=oracle_price_,
             order_size_=quantity_to_execute,
             market_id_=market_id_,
             collateral_id_=collateral_id_,
