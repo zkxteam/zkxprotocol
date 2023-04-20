@@ -2460,8 +2460,8 @@ func process_and_execute_orders_recurse{
         let (new_leverage) = Math64x61_div(total_value, margin_amount_temp);
         let (new_leverage_rounded) = Math64x61_round(new_leverage, 6);
         let (new_pnl) = Math64x61_add(position_details.realized_pnl, trading_fee);
-        let (margin_amount_rounded) = Math64x61_round(margin_amount_temp, tick_precision_);
-        let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount_temp, tick_precision_);
+        let (margin_amount_rounded) = Math64x61_round(margin_amount_temp, collateral_token_decimal_);
+        let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount_temp, collateral_token_decimal_);
 
         // Create a new struct with the updated details
         assert updated_position_details = PositionDetails(
@@ -2842,8 +2842,8 @@ func process_and_execute_orders_recurse{
             tempvar range_check_ptr = range_check_ptr;
         } else {
             let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, realized_pnl);
-            let (margin_amount_rounded) = Math64x61_round(margin_amount_temp, tick_precision_);
-            let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount_temp, tick_precision_);
+            let (margin_amount_rounded) = Math64x61_round(margin_amount_temp, collateral_token_decimal_);
+            let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount_temp, collateral_token_decimal_);
 
             // Round off the average execution price of the position
             let (average_execution_price_rounded) = Math64x61_round(
