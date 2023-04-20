@@ -90,8 +90,10 @@ func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
     alloc_locals;
     local value;
 
-    Math64x61_assert64x61(x);
-    assert_in_range(precision, 0, 19);
+    with_attr error_message("Math64x61: Error in Math64x61_round") {
+        Math64x61_assert64x61(x);
+        assert_in_range(precision, 0, 19);
+    }
 
     let (ten_power_precision) = pow(10, precision + 1);
     let prod = x * ten_power_precision;
@@ -429,10 +431,21 @@ func Math64x61_log10{range_check_ptr}(x: felt) -> (res: felt) {
 // Returns 1, if (x - y) <= 10^-scale
 // Returns 0, otherwise
 func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: felt) {
-    Math64x61_assert64x61(x);
-    Math64x61_assert64x61(y);
-    assert_in_range(scale, 1, 19);
+    alloc_locals;
+    with_attr error_message("Math64x61: Error in Math64x61_is_le") {
+        Math64x61_assert64x61(x);
+        Math64x61_assert64x61(y);
+        assert_in_range(scale, 0, 19);
+    }
+    
     let x_le = is_le(x, y);
+
+    if (scale == 0) {
+        let (local x_round) = Math64x61_round(x, 0);
+        let (y_round) = Math64x61_round(y, 0);
+        let is_less = is_le(x_round, y_round);
+        return (is_less,);
+    }
 
     if (x_le == TRUE) {
         return (TRUE,);
