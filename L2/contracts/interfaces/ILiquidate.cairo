@@ -15,7 +15,12 @@ namespace ILiquidate {
     // External functions
 
     func check_for_risk(
-        order_: MultipleOrder, size: felt, execution_price_: felt, margin_amount_: felt
+        order_: MultipleOrder,
+        size: felt,
+        execution_price_: felt,
+        oracle_price_: felt,
+        margin_amount_: felt,
+        collateral_token_decimal_: felt,
     ) -> (available_margin: felt, is_liquidation: felt) {
     }
 

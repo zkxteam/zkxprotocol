@@ -505,3 +505,94 @@ async def test_adjust_quantity_locked(trading_test_initializer):
 
     info = await felix.get_account_info(AssetID.USDC).call()
     print("Account info: ", info.result)
+
+@pytest.mark.asyncio
+async def test_close_short_sell_with_huge_loss(trading_test_initializer):
+    starknet_service, python_executor, admin1, _, alice, bob, charlie, _, _, felix, gary, alice_test, bob_test, charlie_test, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, non_admin = trading_test_initializer
+
+    ###################
+    ### Open orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Sufficient balance for users
+    alice_balance = 10000
+    bob_balance = 10000
+    balance_array = [alice_balance, bob_balance]
+
+    # Batch params for OPEN orders
+    quantity_locked_1 = 4
+    market_id_1 = ETH_USD_ID
+    asset_id_1 = AssetID.USDC
+    oracle_price_1 = 2000
+
+    # Set balance in Starknet & Python
+    await set_balance(admin_signer=admin1_signer, admin=admin1, users=users, users_test=users_test, balance_array=balance_array, asset_id=asset_id_1)
+
+    # Create orders
+    orders_1 = [{
+        "quantity": 4,
+        "market_id": ETH_USD_ID,
+        "price": 2000,
+        "order_type": order_types["limit"],
+        "leverage": 1
+    }, {
+        "quantity": 4,
+        "market_id": ETH_USD_ID,
+        "price": 2000,
+        "leverage": 1,
+        "direction": order_direction["short"],
+    }]
+
+    # execute order
+    (batch_id_1, _, info) = await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_1, users_test=users_test, quantity_locked=quantity_locked_1, market_id=market_id_1, oracle_price=oracle_price_1, trading=trading, is_reverted=0, error_code=0, timestamp=timestamp)
+
+    # check balances
+    await compare_user_balances(users=users, user_tests=users_test, asset_id=asset_id_1)
+    await compare_fund_balances(executor=python_executor, holding=holding, liquidity=liquidity, fee_balance=fee_balance, insurance=insurance, asset_id=asset_id_1)
+    await compare_user_positions(users=users, users_test=users_test, market_id=market_id_1)
+
+    # compare margin info
+    await compare_margin_info(user=felix, user_test=felix_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+    await compare_margin_info(user=gary, user_test=gary_test, order_executor=python_executor, collateral_id=asset_id_1, timestamp=timestamp)
+
+    # compare markets array
+    await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
+    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1) 
+
+    ###################
+    ### Close orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Batch params for OPEN orders
+    quantity_locked_2 = 4
+    market_id_2 = ETH_USD_ID
+    asset_id_2 = AssetID.USDC
+    oracle_price_2 = 2000
+
+    # Create orders
+    orders_2 = [{
+        "quantity": 4,
+        "market_id": ETH_USD_ID,
+        "price": 10000,
+        "side": side["sell"],
+        "order_type": order_types["limit"],
+    }, {
+        "quantity": 4,
+        "market_id": ETH_USD_ID,
+        "price": 10000,
+        "side": side["sell"],
+        "order_type": order_types["limit"],
+        "direction": order_direction["short"],
+    }]
+
+    bob_balance = await bob.get_unused_balance(AssetID.USDC).call()
+    bob_unused_balance = bob_balance.result.res
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=1, error_code="532:", error_at_index=1, timestamp=timestamp, param_2=bob_unused_balance)

@@ -5,7 +5,7 @@ from contracts.libraries.RelayLibrary import (
     get_inner_contract,
     initialize,
     record_call_details,
-    get_call_counter
+    get_call_counter,
 )
 
 from contracts.DataTypes import PositionDetailsForRiskManagement, MultipleOrder
@@ -52,7 +52,12 @@ func return_acc_value{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 
 @external
 func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    order_: MultipleOrder, size_: felt, execution_price_: felt, margin_amount_: felt
+    order_: MultipleOrder,
+    size_: felt,
+    execution_price_: felt,
+    oracle_price_: felt,
+    margin_amount_: felt,
+    collateral_token_decimal_: felt,
 ) -> () {
     alloc_locals;
 
@@ -61,7 +66,15 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 
     record_call_details('check_for_risk');
     let (inner_address) = get_inner_contract();
-    ILiquidate.check_for_risk(inner_address, order_, size_, execution_price_, margin_amount_);
+    ILiquidate.check_for_risk(
+        inner_address,
+        order_,
+        size_,
+        execution_price_,
+        oracle_price_,
+        margin_amount_,
+        collateral_token_decimal_,
+    );
     return ();
 }
 
@@ -73,7 +86,7 @@ func mark_under_collateralized_position{
     least_collateral_ratio_position: PositionDetailsForRiskManagement,
     total_account_value: felt,
     total_maintenance_requirement: felt,
-){
+) {
     alloc_locals;
 
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
@@ -86,7 +99,11 @@ func mark_under_collateralized_position{
         least_collateral_ratio_position: PositionDetailsForRiskManagement,
         total_account_value: felt,
         total_maintenance_requirement: felt,
-    ) = ILiquidate.mark_under_collateralized_position(contract_address = inner_address, account_address_=account_address_, collateral_id_=collateral_id_);
+    ) = ILiquidate.mark_under_collateralized_position(
+        contract_address=inner_address,
+        account_address_=account_address_,
+        collateral_id_=collateral_id_,
+    );
     return (
         liq_result,
         least_collateral_ratio_position,
