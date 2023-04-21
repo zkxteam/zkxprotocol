@@ -319,6 +319,12 @@ func get_quantity_to_execute{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, ran
 
     // Get min of remaining quantity and the order quantity
     let (executable_quantity: felt) = Math64x61_sub(request_.quantity, order_portion_executed_);
+
+    let (is_zero_executable_quantity) = Math64x61_is_equal(executable_quantity, 0, step_precision_);
+    if (is_zero_executable_quantity == TRUE) {
+        return (quantity_to_execute_final=0, error_code=533, error_param=0);
+    }
+
     let (quantity_to_execute) = Math64x61_min(executable_quantity, quantity_remaining_);
 
     // Return if the order is fully executed with the error code
