@@ -477,10 +477,25 @@ func Math64x61_assert_le{range_check_ptr}(x: felt, y: felt, scale: felt) {
 // Returns 0, otherwise
 func Math64x61_is_equal{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: felt) {
     alloc_locals;
-    Math64x61_assert64x61(x);
-    Math64x61_assert64x61(y);
-    assert_in_range(scale, 1, 19);
+
+    with_attr error_message("Math64x61: Error in Math64x61_is_equal") {
+        Math64x61_assert64x61(x);
+        Math64x61_assert64x61(y);
+        assert_in_range(scale, 0, 19);
+    }
+
     let (local res) = Math64x61_sub(x, y);
+
+    if (scale == 0) {
+        let (local x_round) = Math64x61_round(x, 0);
+        let (y_round) = Math64x61_round(y, 0);
+        let (sub_result) = Math64x61_sub(x_round, y_round);
+        if (sub_result == 0) {
+            return (TRUE,);
+        } else {
+            return (FALSE,);
+        }
+    }
 
     if (res == 0) {
         return (TRUE,);
