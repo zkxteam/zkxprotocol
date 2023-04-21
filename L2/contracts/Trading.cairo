@@ -31,6 +31,7 @@ from contracts.Constants import (
     MarketPrices_INDEX,
     OPEN,
     SELL,
+    SHORT,
     TAKER,
     TradingFees_INDEX,
     TradingStats_INDEX,
@@ -174,9 +175,6 @@ func execute_batch{
     let (asset_id: felt, collateral_id: felt) = IMarkets.get_asset_collateral_from_market(
         contract_address=market_address, market_id_=market_id_
     );
-
-    // // Get Asset to fetch number of token decimals of an asset
-    // let (asset: Asset) = IAsset.get_asset(contract_address=asset_address, id=asset_id);
 
     // Get collateral to fetch number of token decimals of a collateral
     let (collateral: Asset) = IAsset.get_asset(contract_address=asset_address, id=collateral_id);
@@ -843,9 +841,11 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     insurance_fund_address_: felt,
     holding_address_: felt,
 ) -> (
+    error_code: felt,
+    user_balance: felt,
+    average_execution_price_close: felt,
     margin_amount_close: felt,
     borrowed_amount_close: felt,
-    average_execution_price_close: felt,
     realized_pnl: felt,
     margin_unlock_amount: felt,
 ) {
@@ -965,6 +965,11 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     tempvar syscall_ptr = syscall_ptr;
     tempvar range_check_ptr = range_check_ptr;
 
+    // Get the balance of user that is not locked
+    let (local user_unused_balance) = IAccountManager.get_unused_balance(
+        contract_address=order_.user_address, assetID_=collateral_id_
+    );
+
     // Check if the account value for the position is negative
     let (is_underwater) = Math64x61_is_le(margin_plus_pnl, 0, collateral_token_decimal_);
 
@@ -973,17 +978,17 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         // Absolute value of the margin_plus_pnl
         let amount_to_transfer_from = abs_value(margin_plus_pnl);
 
-        // Get the balance of user that is not locked
-        let (user_unused_balance) = IAccountManager.get_unused_balance(
-            contract_address=order_.user_address, assetID_=collateral_id_
-        );
-
         // Check if the user's balance can cover the deficit
         let (is_balance_sufficient) = Math64x61_is_le(
             amount_to_transfer_from, user_unused_balance, collateral_token_decimal_
         );
 
         if (is_balance_sufficient == FALSE) {
+            if (order_direction == SHORT) {
+                if (order_.order_type == LIMIT_ORDER) {
+                    return (532, user_unused_balance, 0, 0, 0, 0, 0);
+                }
+            }
             let (is_balance_less_than_zero) = Math64x61_is_le(
                 user_unused_balance, 0, collateral_token_decimal_
             );
@@ -1213,6 +1218,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
     }
 
     return (
+        FALSE,
+        user_unused_balance,
         average_execution_price_close,
         margin_amount_close,
         borrowed_amount_close,
@@ -2521,6 +2528,8 @@ func process_and_execute_orders_recurse{
     } else {
         // Close order
         let (
+            error_code_close: felt,
+            user_balance: felt,
             average_execution_price_temp: felt,
             margin_amount_temp: felt,
             borrowed_amount_temp: felt,
@@ -2537,6 +2546,81 @@ func process_and_execute_orders_recurse{
             insurance_fund_address_=insurance_fund_address_,
             holding_address_=holding_address_,
         );
+
+        if (error_code_close != 0) {
+            local error_code;
+            local error_order_id;
+            local error_param;
+            local error_code_temp;
+            local user_remaining_balance;
+
+            assert error_code_temp = error_code_close;
+            user_remaining_balance = user_balance;
+
+            if (request_list_len_ == 1) {
+                with_attr error_message("{error_code_temp}: {order_id} {user_remaining_balance}") {
+                    assert 1 = 0;
+                }
+            } else {
+                if (error_order_id_ == 0) {
+                    assert error_code = error_code_temp;
+                    assert error_order_id = order_id;
+                    assert error_param = market_id_;
+                } else {
+                    assert error_code = error_code_;
+                    assert error_order_id = error_order_id_;
+                    assert error_param = error_param_;
+                }
+            }
+            // Call the account contract to reject the order
+            IAccountManager.execute_order(
+                contract_address=[request_list_].user_address,
+                batch_id_=batch_id_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                execution_details_=ExecutionDetails(order_id, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                updated_position_details_=PositionDetails(0, 0, 0, 0, 0, 0, 0, 0),
+                updated_liquidatable_position_=LiquidatablePosition(0, 0, 0, 0),
+                updated_margin_locked_=0,
+                updated_portion_executed_=0,
+                market_array_update_=0,
+                is_liquidation_=0,
+                error_message_=error_code,
+                error_param_1_=user_remaining_balance,
+            );
+
+            return process_and_execute_orders_recurse(
+                batch_id_=batch_id_,
+                taker_locked_quantity_=taker_locked_quantity_,
+                market_id_=market_id_,
+                collateral_id_=collateral_id_,
+                step_precision_=step_precision_,
+                tick_precision_=tick_precision_,
+                collateral_token_decimal_=collateral_token_decimal_,
+                orders_len_=orders_len_,
+                request_list_len_=request_list_len_ - 1,
+                request_list_=request_list_ + MultipleOrder.SIZE,
+                quantity_executed_=quantity_executed_,
+                account_registry_address_=account_registry_address_,
+                holding_address_=holding_address_,
+                trading_fees_address_=trading_fees_address_,
+                fees_balance_address_=fees_balance_address_,
+                liquidate_address_=liquidate_address_,
+                liquidity_fund_address_=liquidity_fund_address_,
+                insurance_fund_address_=insurance_fund_address_,
+                max_leverage_=max_leverage_,
+                min_quantity_=min_quantity_,
+                maker1_direction_=maker1_direction_,
+                maker1_side_=maker1_side_,
+                total_order_volume_=total_order_volume_,
+                taker_execution_price_=taker_execution_price_,
+                open_interest_=open_interest_,
+                oracle_price_=oracle_price_,
+                error_order_id_=error_order_id,
+                error_code_=error_code,
+                error_param_=error_param,
+            );
+        }
 
         // Calculate the new leverage if it's a deleveraging order
         local new_leverage;
