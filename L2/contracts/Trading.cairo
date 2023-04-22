@@ -2563,7 +2563,7 @@ func process_and_execute_orders_recurse{
             local user_remaining_balance;
 
             assert error_code_temp = error_code_close;
-            user_remaining_balance = user_balance;
+            assert user_remaining_balance = user_balance;
 
             if (request_list_len_ == 1) {
                 with_attr error_message("{error_code_temp}: {order_id} {user_remaining_balance}") {
