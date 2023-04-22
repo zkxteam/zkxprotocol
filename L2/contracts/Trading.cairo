@@ -990,10 +990,8 @@ func process_close_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
         );
 
         if (is_balance_sufficient == FALSE) {
-            if (order_direction == SHORT) {
-                if (order_.order_type == LIMIT_ORDER) {
-                    return (532, user_unused_balance, 0, 0, 0, 0, 0);
-                }
+            if (order_.order_type == LIMIT_ORDER) {
+                return (532, user_unused_balance, 0, 0, 0, 0, 0);
             }
             let (is_balance_less_than_zero) = Math64x61_is_le(
                 user_unused_balance, 0, collateral_token_decimal_
@@ -2477,8 +2475,12 @@ func process_and_execute_orders_recurse{
         let (new_leverage) = Math64x61_div(total_value, margin_amount_temp);
         let (new_leverage_rounded) = Math64x61_round(new_leverage, 6);
         let (new_pnl) = Math64x61_add(position_details.realized_pnl, trading_fee);
-        let (margin_amount_rounded) = Math64x61_round(margin_amount_temp, collateral_token_decimal_);
-        let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount_temp, collateral_token_decimal_);
+        let (margin_amount_rounded) = Math64x61_round(
+            margin_amount_temp, collateral_token_decimal_
+        );
+        let (borrowed_amount_rounded) = Math64x61_round(
+            borrowed_amount_temp, collateral_token_decimal_
+        );
 
         // Create a new struct with the updated details
         assert updated_position_details = PositionDetails(
@@ -2561,7 +2563,7 @@ func process_and_execute_orders_recurse{
             local user_remaining_balance;
 
             assert error_code_temp = error_code_close;
-            user_remaining_balance = user_balance;
+            assert user_remaining_balance = user_balance;
 
             if (request_list_len_ == 1) {
                 with_attr error_message("{error_code_temp}: {order_id} {user_remaining_balance}") {
@@ -2571,7 +2573,7 @@ func process_and_execute_orders_recurse{
                 if (error_order_id_ == 0) {
                     assert error_code = error_code_temp;
                     assert error_order_id = order_id;
-                    assert error_param = market_id_;
+                    assert error_param = user_remaining_balance;
                 } else {
                     assert error_code = error_code_;
                     assert error_order_id = error_order_id_;
@@ -2936,8 +2938,12 @@ func process_and_execute_orders_recurse{
             tempvar range_check_ptr = range_check_ptr;
         } else {
             let (current_pnl: felt) = Math64x61_add(position_details.realized_pnl, realized_pnl);
-            let (margin_amount_rounded) = Math64x61_round(margin_amount_temp, collateral_token_decimal_);
-            let (borrowed_amount_rounded) = Math64x61_round(borrowed_amount_temp, collateral_token_decimal_);
+            let (margin_amount_rounded) = Math64x61_round(
+                margin_amount_temp, collateral_token_decimal_
+            );
+            let (borrowed_amount_rounded) = Math64x61_round(
+                borrowed_amount_temp, collateral_token_decimal_
+            );
 
             // Round off the average execution price of the position
             let (average_execution_price_rounded) = Math64x61_round(
