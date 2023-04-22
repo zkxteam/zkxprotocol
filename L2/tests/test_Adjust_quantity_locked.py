@@ -506,6 +506,7 @@ async def test_adjust_quantity_locked(trading_test_initializer):
     info = await felix.get_account_info(AssetID.USDC).call()
     print("Account info: ", info.result)
 
+
 @pytest.mark.asyncio
 async def test_close_short_sell_with_huge_loss(trading_test_initializer):
     starknet_service, python_executor, admin1, _, alice, bob, charlie, _, _, felix, gary, alice_test, bob_test, charlie_test, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, non_admin = trading_test_initializer
@@ -518,7 +519,7 @@ async def test_close_short_sell_with_huge_loss(trading_test_initializer):
     users_test = [alice_test, bob_test]
 
     # Sufficient balance for users
-    alice_balance = 10000
+    alice_balance = 1000
     bob_balance = 10000
     balance_array = [alice_balance, bob_balance]
 
@@ -537,7 +538,7 @@ async def test_close_short_sell_with_huge_loss(trading_test_initializer):
         "market_id": ETH_USD_ID,
         "price": 2000,
         "order_type": order_types["limit"],
-        "leverage": 1
+        "leverage": 10
     }, {
         "quantity": 4,
         "market_id": ETH_USD_ID,
@@ -560,7 +561,7 @@ async def test_close_short_sell_with_huge_loss(trading_test_initializer):
 
     # compare markets array
     await compare_markets_array(user=felix, user_test=felix_test, collatera_id=asset_id_1)
-    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1) 
+    await compare_markets_array(user=gary, user_test=gary_test, collatera_id=asset_id_1)
 
     ###################
     ### Close orders ##
@@ -596,3 +597,44 @@ async def test_close_short_sell_with_huge_loss(trading_test_initializer):
 
     # execute order
     await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=1, error_code="532:", error_at_index=1, timestamp=timestamp, param_2=bob_unused_balance)
+
+
+@pytest.mark.asyncio
+async def test_close_long_sell_with_huge_loss(trading_test_initializer):
+    starknet_service, python_executor, admin1, _, alice, bob, charlie, _, _, felix, gary, alice_test, bob_test, charlie_test, _, felix_test, gary_test, _, _, _, trading, marketPrices, _, holding, fee_balance, liquidity, insurance, trading_stats, non_admin = trading_test_initializer
+
+    ###################
+    ### Close orders ##
+    ###################
+    # List of users
+    users = [alice, bob]
+    users_test = [alice_test, bob_test]
+
+    # Batch params for OPEN orders
+    quantity_locked_2 = 4
+    market_id_2 = ETH_USD_ID
+    asset_id_2 = AssetID.USDC
+    oracle_price_2 = 500
+
+    # Create orders
+    orders_2 = [{
+        "quantity": 4,
+        "market_id": ETH_USD_ID,
+        "price": 500,
+        "side": side["sell"],
+        "order_type": order_types["limit"],
+    }, {
+        "quantity": 4,
+        "market_id": ETH_USD_ID,
+        "price": 500,
+        "side": side["sell"],
+        "order_type": order_types["limit"],
+        "direction": order_direction["short"],
+    }]
+
+    alice_balance = await alice.get_unused_balance(AssetID.USDC).call()
+    alice_unused_balance = alice_balance.result.res
+    print("alice_unused_balance", from64x61(alice_unused_balance))
+
+    # execute order
+    await execute_and_compare(zkx_node_signer=admin1_signer, zkx_node=admin1, executor=python_executor, orders=orders_2, users_test=users_test, quantity_locked=quantity_locked_2, market_id=market_id_2, oracle_price=oracle_price_2, trading=trading, is_reverted=1, error_code="532:", error_at_index=0, timestamp=timestamp, param_2=alice_unused_balance)

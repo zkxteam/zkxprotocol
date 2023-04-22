@@ -282,17 +282,12 @@ func check_for_risk{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     } else {
         if (order_.direction - order_.side == 1) {
             if (order_.order_type == LIMIT_ORDER) {
-                local pnl;
-                local available_margin_temp;
                 let (opposite_order_diff) = Math64x61_sub(oracle_price_, execution_price_);
                 let (opposite_order_pnl) = Math64x61_mul(opposite_order_diff, size_);
 
                 let (is_deficit) = Math64x61_is_le(
                     available_margin, opposite_order_pnl, collateral_token_decimal_
                 );
-
-                assert pnl = opposite_order_pnl;
-                assert available_margin_temp = available_margin;
 
                 assert is_error = is_deficit;
                 tempvar range_check_ptr = range_check_ptr;
