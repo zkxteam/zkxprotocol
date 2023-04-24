@@ -27,7 +27,9 @@ const Math64x61_BOUND = 2 ** 125;
 
 // 0x002000000000000000 or 2305843009213693952
 const Math64x61_ONE = 1 * Math64x61_FRACT_PART;
+const Math64x61_ONE_NEGATIVE = -1 * Math64x61_FRACT_PART;
 const Math64x61_TWO = 4611686018427387904;
+const Math64x61_FOUR = 9223372036854775808;
 const Math64x61_FIVE = 11529215046068469760;
 const Math64x61_TEN = 10 * Math64x61_FRACT_PART;
 
@@ -96,10 +98,18 @@ func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
         assert_in_range(precision, 0, 19);
     }
 
+    local is_negative;
+    let x_abs = abs_value(x);
+    if (x_abs != x) {
+        assert is_negative = TRUE;
+    } else {
+        assert is_negative = FALSE;
+    }
+
     let (ten_power_precision) = pow(10, precision + 1);
-    let prod = x * ten_power_precision;
+    let prod = x_abs * ten_power_precision;
     let (int_val, mod_val) = unsigned_div_rem(prod, Math64x61_TEN);
-    let is_less = is_le(mod_val, Math64x61_FIVE);
+    let is_less = is_le(mod_val, Math64x61_FOUR);
     if (is_less == TRUE) {
         value = int_val;
     } else {
@@ -117,6 +127,11 @@ func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
     let (decimal_part_64x61) = Math64x61_div(mod_64x61, ten_power_precision_64x61);
     // Adding both integer and decimal part
     let (res) = Math64x61_add(quo_64x61, decimal_part_64x61);
+
+    if (is_negative == TRUE) {
+        let (res_negative) = Math64x61_mul(res, Math64x61_ONE_NEGATIVE);
+        return (res_negative,);
+    }
     return (res,);
 }
 
@@ -438,34 +453,11 @@ func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: fe
         Math64x61_assert64x61(y);
         assert_in_range(scale, 0, 19);
     }
-    
-    let x_le = is_le(x, y);
 
-    if (scale == 0) {
-        let (local x_round) = Math64x61_round(x, 0);
-        let (y_round) = Math64x61_round(y, 0);
-        let is_less = is_le(x_round, y_round);
-        return (is_less,);
-    }
-
-    if (x_le == TRUE) {
-        return (TRUE,);
-    } else {
-        let (ten_power_scale) = pow(10, scale);
-        let (ten_power_scale_64x61: felt) = Math64x61_fromIntFelt(ten_power_scale);
-        let (one_64x61: felt) = Math64x61_fromIntFelt(1);
-        let (epsilon_temp) = Math64x61_div(one_64x61, ten_power_scale_64x61);
-        let (epsilon) = Math64x61_div(epsilon_temp, Math64x61_TWO);
-        let (res) = Math64x61_sub(x, y);
-        let abs_res = abs_value(res);
-        let res_le = is_le(abs_res, epsilon);
-
-        if (res_le == TRUE) {
-            return (TRUE,);
-        } else {
-            return (FALSE,);
-        }
-    }
+    let (x_round) = Math64x61_round(x, scale);
+    let (y_round) = Math64x61_round(y, scale);
+    let is_less = is_le(x_round, y_round);
+    return (is_less,);
 }
 
 // Verifies that x <= y
@@ -487,35 +479,12 @@ func Math64x61_is_equal{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res:
         assert_in_range(scale, 0, 19);
     }
 
-    let (local res) = Math64x61_sub(x, y);
-
-    if (scale == 0) {
-        let (local x_round) = Math64x61_round(x, 0);
-        let (y_round) = Math64x61_round(y, 0);
-        let (sub_result) = Math64x61_sub(x_round, y_round);
-        if (sub_result == 0) {
-            return (TRUE,);
-        } else {
-            return (FALSE,);
-        }
-    }
-
-    if (res == 0) {
+    let (x_round) = Math64x61_round(x, scale);
+    let (y_round) = Math64x61_round(y, scale);
+    if (x_round == y_round) {
         return (TRUE,);
     } else {
-        let (ten_power_scale) = pow(10, scale);
-        let (ten_power_scale_64x61: felt) = Math64x61_fromIntFelt(ten_power_scale);
-        let (one_64x61: felt) = Math64x61_fromIntFelt(1);
-        let (epsilon_temp) = Math64x61_div(one_64x61, ten_power_scale_64x61);
-        let (epsilon) = Math64x61_div(epsilon_temp, Math64x61_TWO);
-        let abs_res = abs_value(res);
-        let res_le = is_le(abs_res, epsilon);
-
-        if (res_le == TRUE) {
-            return (TRUE,);
-        } else {
-            return (FALSE,);
-        }
+        return (FALSE,);
     }
 }
 
