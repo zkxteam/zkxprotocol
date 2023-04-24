@@ -27,6 +27,7 @@ const Math64x61_BOUND = 2 ** 125;
 
 // 0x002000000000000000 or 2305843009213693952
 const Math64x61_ONE = 1 * Math64x61_FRACT_PART;
+const Math64x61_TWO = 4611686018427387904;
 const Math64x61_FIVE = 11529215046068469760;
 const Math64x61_TEN = 10 * Math64x61_FRACT_PART;
 
@@ -453,9 +454,11 @@ func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: fe
         let (ten_power_scale) = pow(10, scale);
         let (ten_power_scale_64x61: felt) = Math64x61_fromIntFelt(ten_power_scale);
         let (one_64x61: felt) = Math64x61_fromIntFelt(1);
-        let (epsilon) = Math64x61_div(one_64x61, ten_power_scale_64x61);
+        let (epsilon_temp) = Math64x61_div(one_64x61, ten_power_scale_64x61);
+        let (epsilon) = Math64x61_div(epsilon_temp, Math64x61_TWO);
         let (res) = Math64x61_sub(x, y);
-        let res_le = is_le(res, epsilon);
+        let abs_res = abs_value(res);
+        let res_le = is_le(abs_res, epsilon);
 
         if (res_le == TRUE) {
             return (TRUE,);
@@ -503,7 +506,8 @@ func Math64x61_is_equal{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res:
         let (ten_power_scale) = pow(10, scale);
         let (ten_power_scale_64x61: felt) = Math64x61_fromIntFelt(ten_power_scale);
         let (one_64x61: felt) = Math64x61_fromIntFelt(1);
-        let (epsilon) = Math64x61_div(one_64x61, ten_power_scale_64x61);
+        let (epsilon_temp) = Math64x61_div(one_64x61, ten_power_scale_64x61);
+        let (epsilon) = Math64x61_div(epsilon_temp, Math64x61_TWO);
         let abs_res = abs_value(res);
         let res_le = is_le(abs_res, epsilon);
 

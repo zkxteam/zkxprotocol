@@ -98,6 +98,27 @@ async def test_math64x61_is_le(adminAuth_factory):
    res = await test.math64x61_is_le(x,y,2).call()
    assert res.result.res == 1
 
+   x_pos = to64x61(0.11)
+   y_pos = to64x61(0.12)
+   x_neg = to64x61(-0.11)
+   y_neg = to64x61(-0.12)
+   res = await test.math64x61_is_le(x_pos,y_pos,2).call()
+   assert res.result.res == 1
+   res = await test.math64x61_is_le(y_pos,x_pos,2).call()
+   assert res.result.res == 0
+   res = await test.math64x61_is_le(x_neg,y_neg,2).call()
+   assert res.result.res == 0
+   res = await test.math64x61_is_le(y_neg,x_neg,2).call()
+   assert res.result.res == 1
+   res = await test.math64x61_is_le(x_neg,y_pos,2).call()
+   assert res.result.res == 1
+   res = await test.math64x61_is_le(y_pos,x_neg,2).call()
+   assert res.result.res == 0
+   res = await test.math64x61_is_le(x_pos,y_neg,2).call()
+   assert res.result.res == 0
+   res = await test.math64x61_is_le(y_neg,x_pos,2).call()
+   assert res.result.res == 1
+
 @pytest.mark.asyncio
 async def test_math64x61_assert_le(adminAuth_factory):
    test = adminAuth_factory
