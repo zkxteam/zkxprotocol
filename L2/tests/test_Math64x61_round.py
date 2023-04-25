@@ -36,7 +36,7 @@ async def test_approx_2(math64x61_factory):
    math = math64x61_factory
 
    approx = await math.calc(to64x61(1.24567), 1).call()
-   assert from64x61(approx.result.res) == 1.3
+   assert from64x61(approx.result.res) == 1.2
 
    approx = await math.calc(to64x61(1.24567), 2).call()
    assert from64x61(approx.result.res) == 1.25
@@ -64,7 +64,7 @@ async def test_approx_3(math64x61_factory):
    assert from64x61(approx.result.res) == -2.35
 
    approx = await math.calc(to64x61(-2.345), 1).call()
-   assert from64x61(approx.result.res) == -2.4
+   assert from64x61(approx.result.res) == -2.3
 
    approx = await math.calc(to64x61(-2.345), 0).call()
    assert from64x61(approx.result.res) == -2
