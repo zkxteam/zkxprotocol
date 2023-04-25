@@ -109,7 +109,8 @@ func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
     let (ten_power_precision) = pow(10, precision + 1);
     let prod = x_abs * ten_power_precision;
     let (int_val, mod_val) = unsigned_div_rem(prod, Math64x61_TEN);
-    let is_less = is_le(mod_val, Math64x61_FOUR);
+    let (mod_val_floor) = Math64x61_floor(mod_val);
+    let is_less = is_le(mod_val_floor, Math64x61_FOUR);
     if (is_less == TRUE) {
         value = int_val;
     } else {
