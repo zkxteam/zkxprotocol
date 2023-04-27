@@ -1,6 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.bool import FALSE, TRUE
+from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.pow import pow
 from starkware.cairo.common.math import (
@@ -35,6 +36,17 @@ const Math64x61_TEN = 10 * Math64x61_FRACT_PART;
 
 // E (~2.7182) * ONE (2305843009213693952)
 const Math64x61_E = 6267931151224907085;
+
+@storage_var
+func mod_value() -> (res: felt) {
+}
+
+@view
+func get_mod_val{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+) -> (res: felt) {
+    let (res) = mod_value.read();
+    return (res=res);
+}
 
 // /////////////
 // Assertions //
@@ -89,7 +101,7 @@ func Math64x61_toFelt{range_check_ptr}(x: felt) -> (res: felt) {
 // //////////////////
 
 // Approximates a 64.61 value to a specific number of decimal places
-func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
+func Math64x61_round{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
     alloc_locals;
     local value;
 
@@ -109,6 +121,7 @@ func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
     let (ten_power_precision) = pow(10, precision + 1);
     let prod = x_abs * ten_power_precision;
     let (int_val, mod_val) = unsigned_div_rem(prod, Math64x61_TEN);
+    mod_value.write(mod_val);
     let (mod_val_floor) = Math64x61_floor(mod_val);
     let is_less = is_le(mod_val_floor, Math64x61_FOUR);
     if (is_less == TRUE) {
@@ -134,37 +147,6 @@ func Math64x61_round{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
         return (res_negative,);
     }
     return (res,);
-}
-
-// Approximates a 64.61 value to a specific number of decimal places
-func Math64x61_round_2{range_check_ptr}(x: felt, precision: felt) -> (res: felt) {
-    alloc_locals;
-
-    with_attr error_message("Math64x61: Error in Math64x61_round") {
-        Math64x61_assert64x61(x);
-        assert_in_range(precision, 0, 19);
-    }
-
-    let (ten_power_precision) = pow(10, precision);
-    let round_sign = sign(x);
-    let round_val = abs_value(x);
-    let prod = round_val * ten_power_precision;
-    let (int_val, mod_val) = signed_div_rem(prod, Math64x61_ONE, Math64x61_BOUND);
-    let half = 2 ** 60;
-    let addend = is_le(half, mod_val);
-    let value = (int_val + addend);
-
-    let (quo, mod) = unsigned_div_rem(value, ten_power_precision);
-    // Calculating decimal part
-    let (ten_power_precision_64x61) = Math64x61_fromIntFelt(ten_power_precision);
-    let (decimal_part_64x61) = Math64x61_div(mod * Math64x61_ONE, ten_power_precision_64x61);
-
-    // Adding both integer and decimal part
-    let (res_temp) = Math64x61_add(quo * Math64x61_ONE, decimal_part_64x61);
-    // Adding the correct sign
-    let res = res_temp * round_sign;
-
-    return (mod_val,);
 }
 
 // Calculates the floor of a 64.61 value
@@ -478,51 +460,51 @@ func Math64x61_log10{range_check_ptr}(x: felt) -> (res: felt) {
 // Returns 1, if x <= y (or more precisely 0 <= y - x < RANGE_CHECK_BOUND).
 // Returns 1, if (x - y) <= 10^-scale
 // Returns 0, otherwise
-func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: felt) {
-    alloc_locals;
-    with_attr error_message("Math64x61: Error in Math64x61_is_le") {
-        Math64x61_assert64x61(x);
-        Math64x61_assert64x61(y);
-        assert_in_range(scale, 0, 19);
-    }
+// func Math64x61_is_le{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: felt) {
+//     alloc_locals;
+//     with_attr error_message("Math64x61: Error in Math64x61_is_le") {
+//         Math64x61_assert64x61(x);
+//         Math64x61_assert64x61(y);
+//         assert_in_range(scale, 0, 19);
+//     }
 
-    let (x_round) = Math64x61_round(x, scale);
-    let (y_round) = Math64x61_round(y, scale);
-    let is_less = is_le(x_round, y_round);
-    return (is_less,);
-}
+//     let (x_round) = Math64x61_round(x, scale);
+//     let (y_round) = Math64x61_round(y, scale);
+//     let is_less = is_le(x_round, y_round);
+//     return (is_less,);
+// }
 
-// Verifies that x <= y
-func Math64x61_assert_le{range_check_ptr}(x: felt, y: felt, scale: felt) {
-    let (res) = Math64x61_is_le(x, y, scale);
-    assert res = TRUE;
-    return ();
-}
+// // Verifies that x <= y
+// func Math64x61_assert_le{range_check_ptr}(x: felt, y: felt, scale: felt) {
+//     let (res) = Math64x61_is_le(x, y, scale);
+//     assert res = TRUE;
+//     return ();
+// }
 
-// Returns 1, if x == y
-// Returns 1, if |x - y| <= 10^-scale
-// Returns 0, otherwise
-func Math64x61_is_equal{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: felt) {
-    alloc_locals;
+// // Returns 1, if x == y
+// // Returns 1, if |x - y| <= 10^-scale
+// // Returns 0, otherwise
+// func Math64x61_is_equal{range_check_ptr}(x: felt, y: felt, scale: felt) -> (res: felt) {
+//     alloc_locals;
 
-    with_attr error_message("Math64x61: Error in Math64x61_is_equal") {
-        Math64x61_assert64x61(x);
-        Math64x61_assert64x61(y);
-        assert_in_range(scale, 0, 19);
-    }
+//     with_attr error_message("Math64x61: Error in Math64x61_is_equal") {
+//         Math64x61_assert64x61(x);
+//         Math64x61_assert64x61(y);
+//         assert_in_range(scale, 0, 19);
+//     }
 
-    let (x_round) = Math64x61_round(x, scale);
-    let (y_round) = Math64x61_round(y, scale);
-    if (x_round == y_round) {
-        return (TRUE,);
-    } else {
-        return (FALSE,);
-    }
-}
+//     let (x_round) = Math64x61_round(x, scale);
+//     let (y_round) = Math64x61_round(y, scale);
+//     if (x_round == y_round) {
+//         return (TRUE,);
+//     } else {
+//         return (FALSE,);
+//     }
+// }
 
-// Verifies that x == y
-func Math64x61_assert_equal{range_check_ptr}(x: felt, y: felt, scale: felt) {
-    let (res) = Math64x61_is_equal(x, y, scale);
-    assert res = TRUE;
-    return ();
-}
+// // Verifies that x == y
+// func Math64x61_assert_equal{range_check_ptr}(x: felt, y: felt, scale: felt) {
+//     let (res) = Math64x61_is_equal(x, y, scale);
+//     assert res = TRUE;
+//     return ();
+// }
